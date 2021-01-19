@@ -1,5 +1,7 @@
 # Tendermint Validator
 
+> ## NOTE: This repo is starting as a fork of https://gitlab.com/polychainlabs/tendermint-validator with the intention of making a cleaner and more usable command line interface w/o changing any of the core logic.
+
 A [multi-party-computation](https://en.wikipedia.org/wiki/Secure_multi-party_computation) signing service for Tendermint nodes using threshold Ed25519 signatures.
 
 ## Design
