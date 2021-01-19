@@ -1,3 +1,4 @@
 .vscode
 build
 data
+private_share_*

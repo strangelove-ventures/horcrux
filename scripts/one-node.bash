@@ -1,5 +1,5 @@
 #!/bin/sh
-# USAGE: ./one-chain test-chain-id ./data 26657 26656
+# USAGE: ./one-chain test-chain-id ./data
 
 CHAINID=$1
 CHAINDIR=$2
@@ -68,9 +68,24 @@ sed -i '' 's#persistent_peers = ""#persistent_peers = "'$peer1'"#g' $n0cfg
 sed -i '' 's#persistent_peers = ""#persistent_peers = "'$peer0'"#g' $n1cfg
 
 # Copy priv validator over from node that signed gentx to the signer
-mv $n0cfgDir/priv_validator_key.json $HOME/.tmsigner/priv_validator_key.json
-mv $n0dir/data/priv_validator_state.json $HOME/.tmsigner/data/${CHAINID}_priv_validator_state.json
+mv $n0cfgDir/priv_validator_key.json $CHAINDIR/priv_validator_key.json
+cd $CHAINDIR
+go run ../cmd/key2shares/main.go --total 3 --threshold 2 ./priv_validator_key.json
+mkdir signer1 signer2 signer3
+cp ./private_share_1.json ./signer1/priv-key-shard.json
+cp ../scripts/cosigner1.toml ./signer1/config.toml
+cp ../scripts/state.json ./signer1/test-chain-id_share_sign_state.json
+cp ./private_share_2.json ./signer2/priv-key-shard.json
+cp ../scripts/cosigner2.toml ./signer2/config.toml
+cp ../scripts/state.json ./signer2/test-chain-id_share_sign_state.json
+cp ./private_share_3.json ./signer3/priv-key-shard.json
+cp ../scripts/cosigner3.toml ./signer3/config.toml
+cp ../scripts/state.json ./signer3/test-chain-id_share_sign_state.json
+cd ..
 
-# Start the akash instances
+# Start the gaia instances
+go run cmd/signer/main.go --config $CHAINDIR/signer1/config.toml > $CHAINDIR/signer1.log 2>&1 &
+go run cmd/signer/main.go --config $CHAINDIR/signer2/config.toml > $CHAINDIR/signer2.log 2>&1 &
+go run cmd/signer/main.go --config $CHAINDIR/signer3/config.toml > $CHAINDIR/signer3.log 2>&1 &
 gaiad $home0 start --pruning=nothing > $CHAINDIR/$CHAINID.n0.log 2>&1 &
 gaiad $home1 start --pruning=nothing > $CHAINDIR/$CHAINID.n1.log 2>&1 &
