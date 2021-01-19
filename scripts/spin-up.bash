@@ -56,6 +56,7 @@ sed -i '' 's#priv_validator_laddr = ""#priv_validator_laddr = "tcp://0.0.0.0:123
 # Set proper defaults and change ports on n1
 sed -i '' 's#"tcp://127.0.0.1:26657"#"tcp://0.0.0.0:26667"#g' $n1cfg
 sed -i '' 's#"tcp://0.0.0.0:26656"#"tcp://0.0.0.0:26666"#g' $n1cfg
+sed -i '' 's#"0.0.0.0:9090"#"0.0.0.0:9091"#g' $n1cfgDir/app.toml
 sed -i '' 's#"localhost:6060"#"localhost:6061"#g' $n1cfg
 sed -i '' 's/timeout_commit = "5s"/timeout_commit = "1s"/g' $n1cfg
 sed -i '' 's/timeout_propose = "3s"/timeout_propose = "1s"/g' $n1cfg

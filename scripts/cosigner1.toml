@@ -1,41 +1,20 @@
 mode = "mpc"
-
-# Each validator instance has its own private share.
-# Avoid putting more than one share per instance.
 key_file = "/Users/johnzampolin/go/src/github.com/jackzampolin/horcrux/data/signer1/priv-key-shard.json"
-
-# The state directory stores watermarks for double signing protection.
-# Each validator instance maintains a watermark.
 state_dir = "/Users/johnzampolin/go/src/github.com/jackzampolin/horcrux/data/signer1/"
-
-# The network chain id for your p2p nodes
 chain_id = "test-chain-id"
-
-# The required number of participant share signatures.
-# This must match the `--threshold` value specified during key2shares
 cosigner_threshold = 2
-
-# IP address and port for receiving communication from other validator instances.
-# The validator instances must communicate during the signing process.
 cosigner_listen_address = "tcp://0.0.0.0:2222"
 
-# Each validator peer appears in a `cosigner` section.
-# This sample file is for validator ID 1, so we configure sections for peers 2 and 3.
-
 [[cosigner]]
-# The ID of this peer, these must match the key IDs.
 id = 2
-# The IP address and port for communication with this peer
 remote_address = "tcp://0.0.0.0:2223"
 
 [[cosigner]]
 id = 3
 remote_address = "tcp://0.0.0.0:2224"
 
-# Configure any number of p2p network nodes.
-# We recommend at least 2 nodes per cosigner for redundancy.
 [[node]]
-address = "tcp://0.0.0.0:1234"
+address = "tcp://0.0.0.0:1234" 
 
 [[node]]
 address = "tcp://0.0.0.0:1235"
