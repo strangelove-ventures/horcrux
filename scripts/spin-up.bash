@@ -1,18 +1,8 @@
 #!/bin/sh
 # USAGE: ./one-chain test-chain-id ./data
 
-CHAINID=$1
-CHAINDIR=$2
-
-if [ -z "$1" ]; then
-  echo "Need to input chain id..."
-  exit 1
-fi
-
-if [ -z "$2" ]; then
-  echo "Need to input directory to create files in..."
-  exit 1
-fi
+CHAINID=test-chain-id
+CHAINDIR=./data
 
 echo "Creating gaiad instance with home=$CHAINDIR chain-id=$CHAINID..."
 # Build genesis file incl account for passed address
@@ -52,6 +42,11 @@ cp $n0cfgDir/genesis.json $n1cfgDir/genesis.json
 sed -i '' 's/timeout_commit = "5s"/timeout_commit = "1s"/g' $n0cfg
 sed -i '' 's/timeout_propose = "3s"/timeout_propose = "1s"/g' $n0cfg
 sed -i '' 's#priv_validator_laddr = ""#priv_validator_laddr = "tcp://0.0.0.0:1234"#g' $n0cfg
+sed -i '' 's#allow_duplicate_ip = false#allow_duplicate_ip = true#g' $n0cfg
+sed -i '' 's#log_level = "main:info,state:info,statesync:info,*:error"#log_level = "info"#g' $n0cfg
+sed -i '' 's#addr_book_strict = true#addr_book_strict = false#g' $n0cfg
+sed -i '' 's#external_address = ""#external_address = "tcp://127.0.0.1:26677"#g' $n0cfg
+
 
 # Set proper defaults and change ports on n1
 sed -i '' 's#"tcp://127.0.0.1:26657"#"tcp://0.0.0.0:26667"#g' $n1cfg
@@ -61,6 +56,11 @@ sed -i '' 's#"localhost:6060"#"localhost:6061"#g' $n1cfg
 sed -i '' 's/timeout_commit = "5s"/timeout_commit = "1s"/g' $n1cfg
 sed -i '' 's/timeout_propose = "3s"/timeout_propose = "1s"/g' $n1cfg
 sed -i '' 's#priv_validator_laddr = ""#priv_validator_laddr = "tcp://0.0.0.0:1235"#g' $n1cfg
+sed -i '' 's#allow_duplicate_ip = false#allow_duplicate_ip = true#g' $n1cfg
+sed -i '' 's#log_level = "main:info,state:info,statesync:info,*:error"#log_level = "info"#g' $n1cfg
+sed -i '' 's#addr_book_strict = true#addr_book_strict = false#g' $n1cfg
+sed -i '' 's#external_address = ""#external_address = "tcp://127.0.0.1:26677"#g' $n1cfg
+
 
 # Set peers for both nodes
 peer0="$(gaiad $home0 tendermint show-node-id)@127.0.0.1:26656"
@@ -71,7 +71,7 @@ sed -i '' 's#persistent_peers = ""#persistent_peers = "'$peer0'"#g' $n1cfg
 # Copy priv validator over from node that signed gentx to the signer
 mv $n0cfgDir/priv_validator_key.json $CHAINDIR/priv_validator_key.json
 cd $CHAINDIR
-go run ../cmd/key2shares/main.go --total 3 --threshold 2 ./priv_validator_key.json
+../build/key2shares --total 3 --threshold 2 ./priv_validator_key.json
 mkdir signer1 signer2 signer3
 cp ./private_share_1.json ./signer1/priv-key-shard.json
 cp ../scripts/cosigner1.toml ./signer1/config.toml
@@ -85,8 +85,16 @@ cp ../scripts/state.json ./signer3/test-chain-id_share_sign_state.json
 cd ..
 
 # Start the gaia instances
-go run cmd/signer/main.go --config $CHAINDIR/signer1/config.toml > $CHAINDIR/signer1.log 2>&1 &
-go run cmd/signer/main.go --config $CHAINDIR/signer2/config.toml > $CHAINDIR/signer2.log 2>&1 &
-go run cmd/signer/main.go --config $CHAINDIR/signer3/config.toml > $CHAINDIR/signer3.log 2>&1 &
+./build/signer --config $CHAINDIR/signer1/config.toml > $CHAINDIR/signer1.log 2>&1 &
+./build/signer --config $CHAINDIR/signer2/config.toml > $CHAINDIR/signer2.log 2>&1 &
+./build/signer --config $CHAINDIR/signer3/config.toml > $CHAINDIR/signer3.log 2>&1 &
 gaiad $home0 start --pruning=nothing > $CHAINDIR/$CHAINID.n0.log 2>&1 &
 gaiad $home1 start --pruning=nothing > $CHAINDIR/$CHAINID.n1.log 2>&1 &
+
+echo
+echo "Logs:"
+echo "  - n0 'tail -f ./data/signer1.log'"
+echo "  - n1 'tail -f ./data/signer2.log'"
+echo "  - n2 'tail -f ./data/signer3.log'"
+echo "  - f0 'tail -f ./data/test-chain-id.n0.log'"
+echo "  - f1 'tail -f ./data/test-chain-id.n1.log'"
