@@ -8,15 +8,45 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"strconv"
 
 	"tendermint-signer/internal/signer"
 
+	"github.com/spf13/cobra"
 	"github.com/tendermint/tendermint/crypto/ed25519"
 	tmjson "github.com/tendermint/tendermint/libs/json"
+	"github.com/tendermint/tendermint/libs/os"
 	tmOS "github.com/tendermint/tendermint/libs/os"
 	"github.com/tendermint/tendermint/privval"
 	tsed25519 "gitlab.com/polychainlabs/threshold-ed25519/pkg"
 )
+
+func shardCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "shard [priv_validator.json] [shards] [threshold]",
+		Aliases: []string{},
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) != 3 {
+				return fmt.Errorf("wrong num args exp(3) got(%d)", len(args))
+			}
+			if !os.FileExists(args[0]) {
+				return fmt.Errorf("priv_validator.json file(%s) doesn't exist", args[0])
+			}
+			if _, err := strconv.ParseInt(args[1], 10, 64); err != nil {
+				return fmt.Errorf("shards must be an integer got(%s)", args[1])
+			}
+			if _, err := strconv.ParseInt(args[2], 10, 64); err != nil {
+				return fmt.Errorf("threshold must be an integer got(%s)", args[2])
+			}
+			return nil
+		},
+		Short: "shard a private validator key",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
+	}
+	return cmd
+}
 
 func main() {
 	var threshold = flag.Int("threshold", 2, "the number of shares required to produce a valid signature")
