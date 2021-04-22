@@ -41,7 +41,62 @@ func shardCmd() *cobra.Command {
 			return nil
 		},
 		Short: "shard a private validator key",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
+			var (
+				threshold, _ = strconv.ParseInt(args[1], 10, 64)
+				numShards, _ = strconv.ParseInt(args[2], 10, 64)
+				rsaKeys      = make([]*rsa.PrivateKey, numShards)
+				pubkeys      = make([]*rsa.PublicKey, numShards)
+			)
+
+			// read in keyfile and unmarshal checking for errors
+			bz := []byte{}
+			if bz, err = ioutil.ReadFile(args[0]); err != nil {
+				return err
+			}
+			privValidator := privval.FilePVKey{}
+			if err = tmjson.Unmarshal(bz, &privValidator); err != nil {
+				return err
+			}
+
+			shares := tsed25519.DealShares(tsed25519.ExpandSecret(privValidator.PrivKey.Bytes()[:32]), uint8(threshold), uint8(numShards))
+
+			// generate all rsa keys
+			for i := range shares {
+				bitSize := 4096
+				rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
+				if err != nil {
+					return err
+				}
+				rsaKeys[i] = rsaKey
+				pubkeys[i] = &rsaKey.PublicKey
+			}
+
+			// write shares and keys to private share files
+			for idx, share := range shares {
+				shareID := idx + 1
+
+				privateFilename := fmt.Sprintf("private_share_%d.json", shareID)
+
+				cosignerKey := signer.CosignerKey{
+					PubKey:       privValidator.PubKey,
+					ShareKey:     share,
+					ID:           shareID,
+					RSAKey:       *rsaKeys[idx],
+					CosignerKeys: pubkeys,
+				}
+
+				jsonBytes, err := json.Marshal(&cosignerKey)
+				if err != nil {
+					panic(err)
+				}
+
+				if err = ioutil.WriteFile(privateFilename, jsonBytes, 0644); err != nil {
+					panic(err)
+				}
+				fmt.Printf("Created Share %d\n", shareID)
+			}
+
 			return nil
 		},
 	}
@@ -82,6 +137,9 @@ func main() {
 	default:
 		panic("Not an ed25519 private key")
 	}
+
+	fmt.Printf("key bytes %X\n", privKeyBytes)
+	fmt.Printf("bytes from key %X\n", pvKey.PrivKey.Bytes())
 
 	// generate shares from secret
 	shares := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), uint8(*threshold), uint8(*total))
