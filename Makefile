@@ -29,3 +29,6 @@ clean:
 	rm -rf build
 
 .PHONY: all lint test race msan tools clean build
+
+build-simd-docker:
+	docker build -t jackzampolin/simd:v0.42.3 -f ./docker/simd/Dockerfile ./docker/simd/
