@@ -2,7 +2,9 @@ package testing
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"os"
 	"path"
@@ -190,19 +192,6 @@ func (tn *TestNode) Gentx(name string) error {
 	return err
 }
 
-func (tn *TestNode) StartNode() error {
-	_, err := tn.Pool.RunWithOptions(&dockertest.RunOptions{
-		Hostname:     tn.Name(),
-		Name:         tn.Name(),
-		Repository:   tn.Chain.Repository,
-		Tag:          tn.Chain.Version,
-		Cmd:          []string{tn.Chain.Bin, "start", "--home", "/root/.simd"},
-		Mounts:       tn.Bind(),
-		ExposedPorts: tn.Chain.Ports,
-	})
-	return err
-}
-
 func (tn *TestNode) CollectGentxs() error {
 	// NOTE: on job containers generate random name
 	container := RandLowerCaseLetterString(10)
@@ -215,6 +204,19 @@ func (tn *TestNode) CollectGentxs() error {
 		Mounts:       tn.Bind(),
 		ExposedPorts: tn.Chain.Ports,
 	}, func(hc *docker.HostConfig) { hc.AutoRemove = true })
+	return err
+}
+
+func (tn *TestNode) StartNode() error {
+	_, err := tn.Pool.RunWithOptions(&dockertest.RunOptions{
+		Hostname:     tn.Name(),
+		Name:         tn.Name(),
+		Repository:   tn.Chain.Repository,
+		Tag:          tn.Chain.Version,
+		Cmd:          []string{tn.Chain.Bin, "start", "--home", "/root/.simd"},
+		Mounts:       tn.Bind(),
+		ExposedPorts: tn.Chain.Ports,
+	})
 	return err
 }
 
@@ -308,4 +310,31 @@ func (tn TestNodes) Peers(node *TestNode) (out TestNodes) {
 		}
 	}
 	return
+}
+
+func (tn *TestNode) GenesisReady() error {
+	return retry.Do(tn.GentxAppended)
+}
+
+func (tn *TestNode) GentxAppended() error {
+	bz, err := ioutil.ReadFile(tn.GenesisFilePath())
+	if err != nil {
+		return err
+	}
+	gen := &GenesisParse{}
+	if err := json.Unmarshal(bz, gen); err != nil {
+		return err
+	}
+	if len(gen.AppState.Genutil.GenTxs) == 0 {
+		return fmt.Errorf("genutils is nil")
+	}
+	return nil
+}
+
+type GenesisParse struct {
+	AppState struct {
+		Genutil struct {
+			GenTxs []interface{} `json:"gen_txs"`
+		} `json:"genutil"`
+	} `json:"app_state"`
 }

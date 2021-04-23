@@ -81,6 +81,12 @@ func setupMultiValTestnetFiles(t *testing.T, pool *dockertest.Pool, nodes []*Tes
 		return err
 	}
 
+	t.Log("waiting for genesis")
+	// wait for genesis to be ready
+	if err := node0.GenesisReady(); err != nil {
+		return err
+	}
+
 	// copy genesis file bytes into memory
 	genbz, err := ioutil.ReadFile(node0.GenesisFilePath())
 	if err != nil {
