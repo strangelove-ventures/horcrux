@@ -1,10 +1,9 @@
 package testing
 
 import (
+	"context"
 	"crypto/rand"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"os"
 	"path"
@@ -13,14 +12,15 @@ import (
 
 	"github.com/avast/retry-go"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
-	"github.com/ory/dockertest/v3"
-	"github.com/ory/dockertest/v3/docker"
 	tmconfig "github.com/tendermint/tendermint/config"
 	"github.com/tendermint/tendermint/p2p"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 var (
-	valKey = "validator"
+	valKey   = "validator"
+	genCoins = "1000000000000stake"
 )
 
 // ChainType represents the type of chain to instantiate
@@ -36,22 +36,22 @@ var simdChain = &ChainType{
 	Repository: "jackzampolin/simd",
 	Version:    "v0.42.3",
 	Bin:        "simd",
-	Ports:      []string{"26656", "26657", "9090", "1317"},
+	Ports:      []string{"26656", "26657"},
 }
 
 // TestNode represents a node in the test network that is being created
 type TestNode struct {
-	Home    string
-	Index   int
-	ChainID string
-	Chain   *ChainType
-	Pool    *dockertest.Pool
+	Home     string
+	Index    int
+	ChainID  string
+	Chain    *ChainType
+	Provider *testcontainers.DockerProvider
 }
 
 // MakeTestNodes create the test node objects required for bootstrapping tests
-func MakeTestNodes(count int, home, chainid string, chainType *ChainType, pool *dockertest.Pool) (out []*TestNode) {
+func MakeTestNodes(count int, home, chainid string, chainType *ChainType, provider *testcontainers.DockerProvider) (out []*TestNode) {
 	for i := 0; i < count; i++ {
-		tn := &TestNode{Home: home, Index: i, Chain: chainType, ChainID: chainid, Pool: pool}
+		tn := &TestNode{Home: home, Index: i, Chain: chainType, ChainID: chainid, Provider: provider}
 		tn.MkDir()
 		out = append(out, tn)
 	}
@@ -76,8 +76,9 @@ func (tn *TestNode) MkDir() {
 }
 
 // GentxPath returns the path to the gentx for a node
-func (tn *TestNode) GentxPath() string {
-	return path.Join(tn.Dir(), "config", "gentx", fmt.Sprintf("gentx-%s.json", tn.NodeID()))
+func (tn *TestNode) GentxPath() (string, error) {
+	id, err := tn.NodeID()
+	return path.Join(tn.Dir(), "config", "gentx", fmt.Sprintf("gentx-%s.json", id)), err
 }
 
 func (tn *TestNode) GenesisFilePath() string {
@@ -89,8 +90,12 @@ func (tn *TestNode) TMConfigPath() string {
 }
 
 // Bind returns the home folder bind point for running the node
-func (tn *TestNode) Bind() []string {
-	return []string{fmt.Sprintf("%s:/root/.%s/", tn.Dir(), tn.Chain.Bin)}
+func (tn *TestNode) Bind() map[string]string {
+	return map[string]string{tn.Dir(): fmt.Sprintf("/root/.%s", tn.Chain.Bin)}
+}
+
+func (tn *TestNode) NodeHome() string {
+	return fmt.Sprintf("/root/.%s", tn.Chain.Bin)
 }
 
 // Keybase returns the keyring for a given node
@@ -102,8 +107,8 @@ func (tn *TestNode) Keybase() keyring.Keyring {
 	return kr
 }
 
-// ModifyConfig modifies the config for a validator node to start a chain
-func (tn *TestNode) ModifyConfig(peers TestNodes) error {
+// SetValidatorConfigAndPeers modifies the config for a validator node to start a chain
+func (tn *TestNode) SetValidatorConfigAndPeers(peers TestNodes) error {
 	// Pull current config
 	cfg := tmconfig.DefaultConfig()
 	// turn down blocktimes to make the chain faster
@@ -121,162 +126,130 @@ func (tn *TestNode) ModifyConfig(peers TestNodes) error {
 	cfg.BaseConfig.LogLevel = "info"
 
 	// set persistent peer nodes
-	cfg.P2P.PersistentPeers = peers.PeerString()
+	ps, err := peers.PeerString()
+	if err != nil {
+		return err
+	}
+	cfg.P2P.PersistentPeers = ps
 
 	// overwrite with the new config
 	tmconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
 	return nil
 }
 
-// InitHomeFolder initializes a home folder for the given node
-func (tn *TestNode) InitHomeFolder() error {
+func (tn *TestNode) NodeJob(ctx context.Context, cmd []string, waiting wait.Strategy) (testcontainers.Container, error) {
 	// NOTE: on job containers generate random name
 	container := RandLowerCaseLetterString(10)
-	_, err := tn.Pool.RunWithOptions(&dockertest.RunOptions{
-		Hostname:     container,
-		Name:         container,
-		Repository:   tn.Chain.Repository,
-		Tag:          tn.Chain.Version,
-		Cmd:          []string{tn.Chain.Bin, "init", tn.Name(), "--chain-id", tn.ChainID, "--home", "/root/.simd"},
-		Mounts:       tn.Bind(),
+	return tn.Provider.RunContainer(ctx, testcontainers.ContainerRequest{
+		Image:        fmt.Sprintf("%s:%s", tn.Chain.Repository, tn.Chain.Version),
 		ExposedPorts: tn.Chain.Ports,
-	}, func(hc *docker.HostConfig) { hc.AutoRemove = true })
-	return err
+		Cmd:          cmd,
+		BindMounts:   tn.Bind(),
+		WaitingFor:   waiting,
+		Name:         container,
+		Hostname:     container,
+		AutoRemove:   true,
+	})
+}
+
+// InitHomeFolder initializes a home folder for the given node
+func (tn *TestNode) InitHomeFolder(ctx context.Context) (testcontainers.Container, error) {
+	cmd := []string{tn.Chain.Bin, "init", tn.Name(),
+		"--chain-id", tn.ChainID,
+		"--home", tn.NodeHome(),
+	}
+	return tn.NodeJob(ctx, cmd, wait.ForLog("validator_accumulated_commissions"))
 }
 
 // CreateKey creates a key in the keyring backend test for the given node
-func (tn *TestNode) CreateKey(name string) error {
-	// NOTE: on job containers generate random name
-	container := RandLowerCaseLetterString(10)
-	_, err := tn.Pool.RunWithOptions(&dockertest.RunOptions{
-		Hostname:     container,
-		Name:         container,
-		Repository:   tn.Chain.Repository,
-		Tag:          tn.Chain.Version,
-		Cmd:          []string{tn.Chain.Bin, "keys", "add", name, "--keyring-backend", "test", "--home", "/root/.simd"},
-		Mounts:       tn.Bind(),
-		ExposedPorts: tn.Chain.Ports,
-	}, func(hc *docker.HostConfig) { hc.AutoRemove = true })
-	return err
+func (tn *TestNode) CreateKey(ctx context.Context, name string) (testcontainers.Container, error) {
+	cmd := []string{tn.Chain.Bin, "keys", "add", name,
+		"--keyring-backend", "test",
+		"--output", "json",
+		"--home", tn.NodeHome(),
+	}
+	return tn.NodeJob(ctx, cmd, wait.ForLog("mnemonic"))
 }
 
 // AddGenesisAccount adds a genesis account for each key
-func (tn *TestNode) AddGenesisAccount(address string) error {
-	// NOTE: on job containers generate random name
-	container := RandLowerCaseLetterString(10)
-	_, err := tn.Pool.RunWithOptions(&dockertest.RunOptions{
-		Hostname:     container,
-		Name:         container,
-		Repository:   tn.Chain.Repository,
-		Tag:          tn.Chain.Version,
-		Cmd:          []string{tn.Chain.Bin, "add-genesis-account", address, "1000000000000stake", "--home", "/root/.simd"},
-		Mounts:       tn.Bind(),
-		ExposedPorts: tn.Chain.Ports,
-	}, func(hc *docker.HostConfig) { hc.AutoRemove = true })
-	return err
+func (tn *TestNode) AddGenesisAccount(ctx context.Context, address string) (testcontainers.Container, error) {
+	cmd := []string{tn.Chain.Bin, "add-genesis-account", address, "1000000000000stake",
+		"--home", tn.NodeHome(),
+	}
+	return tn.NodeJob(ctx, cmd, wait.ForLog(""))
 }
 
 // Gentx generates the gentx for a given node
-func (tn *TestNode) Gentx(name string) error {
-	// NOTE: on job containers generate random name
-	container := RandLowerCaseLetterString(10)
-	_, err := tn.Pool.RunWithOptions(&dockertest.RunOptions{
-		Hostname:     container,
-		Name:         container,
-		Repository:   tn.Chain.Repository,
-		Tag:          tn.Chain.Version,
-		Cmd:          []string{tn.Chain.Bin, "gentx", valKey, "100000000000stake", "--keyring-backend", "test", "--home", "/root/.simd", "--chain-id", tn.ChainID},
-		Mounts:       tn.Bind(),
-		ExposedPorts: tn.Chain.Ports,
-	}, func(hc *docker.HostConfig) { hc.AutoRemove = true })
-	return err
+func (tn *TestNode) Gentx(ctx context.Context, name string) (testcontainers.Container, error) {
+	cmd := []string{tn.Chain.Bin, "gentx", valKey, "100000000000stake",
+		"--keyring-backend", "test",
+		"--home", tn.NodeHome(),
+		"--chain-id", tn.ChainID,
+	}
+	return tn.NodeJob(ctx, cmd, wait.ForLog("Genesis transaction"))
 }
 
-func (tn *TestNode) CollectGentxs() error {
-	// NOTE: on job containers generate random name
-	container := RandLowerCaseLetterString(10)
-	_, err := tn.Pool.RunWithOptions(&dockertest.RunOptions{
-		Hostname:     container,
-		Name:         container,
-		Repository:   tn.Chain.Repository,
-		Tag:          tn.Chain.Version,
-		Cmd:          []string{tn.Chain.Bin, "collect-gentxs", "--home", "/root/.simd"},
-		Mounts:       tn.Bind(),
-		ExposedPorts: tn.Chain.Ports,
-	}, func(hc *docker.HostConfig) { hc.AutoRemove = true })
-	return err
+func (tn *TestNode) CollectGentxs(ctx context.Context) (testcontainers.Container, error) {
+	cmd := []string{tn.Chain.Bin, "collect-gentxs",
+		"--home", tn.NodeHome(),
+	}
+	return tn.NodeJob(ctx, cmd, wait.ForLog("validator_accumulated_commissions"))
 }
 
-func (tn *TestNode) StartNode() error {
-	_, err := tn.Pool.RunWithOptions(&dockertest.RunOptions{
-		Hostname:     tn.Name(),
-		Name:         tn.Name(),
-		Repository:   tn.Chain.Repository,
-		Tag:          tn.Chain.Version,
-		Cmd:          []string{tn.Chain.Bin, "start", "--home", "/root/.simd"},
-		Mounts:       tn.Bind(),
+func (tn *TestNode) CreateNodeContainer(ctx context.Context) (testcontainers.Container, error) {
+	return tn.Provider.CreateContainer(ctx, testcontainers.ContainerRequest{
+		Image:        fmt.Sprintf("%s:%s", tn.Chain.Repository, tn.Chain.Version),
 		ExposedPorts: tn.Chain.Ports,
+		Cmd: []string{tn.Chain.Bin, "start",
+			"--home", tn.NodeHome(),
+		},
+		BindMounts: tn.Bind(),
+		WaitingFor: wait.ForLog("Starting RPC HTTP server"),
+		Name:       tn.Name(),
+		Hostname:   tn.Name(),
+		AutoRemove: true,
 	})
-	return err
 }
 
-func (tn *TestNode) InitNodeFilesAndGentx() error {
-	if err := tn.InitHomeFolder(); err != nil {
+// InitNodeFilesAndGentx creates the node files and signs a genesis transaction
+func (tn *TestNode) InitNodeFilesAndGentx(ctx context.Context) error {
+	fmt.Println("init")
+	if _, err := tn.InitHomeFolder(ctx); err != nil {
 		return err
 	}
-	if err := tn.CreateKey(valKey); err != nil {
+	fmt.Println("create key")
+	if _, err := tn.CreateKey(ctx, valKey); err != nil {
 		return err
 	}
-	if err := tn.AddGenesisAccount(tn.GetKey(valKey).GetAddress().String()); err != nil {
+	fmt.Println("get key")
+	key, err := tn.GetKey(valKey)
+	if err != nil {
 		return err
 	}
-	if err := tn.Gentx(valKey); err != nil {
+	fmt.Println("add genesis account")
+	if _, err := tn.AddGenesisAccount(ctx, key.GetAddress().String()); err != nil {
 		return err
 	}
-	return tn.WaitForGentx()
+	fmt.Println("gentx")
+	_, err = tn.Gentx(ctx, valKey)
+	return err
 }
 
 // NodeID returns the node of a given node
-func (tn *TestNode) NodeID() string {
+func (tn *TestNode) NodeID() (string, error) {
 	nodeKey, err := p2p.LoadNodeKey(path.Join(tn.Dir(), "config", "node_key.json"))
 	if err != nil {
-		panic(err)
+		return "", err
 	}
-	return string(nodeKey.ID())
-}
-
-// KeysList lists the keys in a keychain
-func (tn *TestNode) KeysList() []keyring.Info {
-	out, err := tn.Keybase().List()
-	if err != nil {
-		panic(err)
-	}
-	return out
-}
-
-// WaitForGentx waits for the gentx to be be complete
-func (tn *TestNode) WaitForGentx() error {
-	return retry.Do(func() error {
-		if _, err := os.Stat(path.Join(tn.Dir(), "config", "gentx")); os.IsNotExist(err) {
-			return err
-		}
-		return nil
-	})
+	return string(nodeKey.ID()), nil
 }
 
 // GetKey gets a key, waiting until it is available
-func (tn *TestNode) GetKey(name string) keyring.Info {
-	kb := tn.Keybase()
-	var info keyring.Info
-	var err error
-	err = retry.Do(func() (err error) {
-		info, err = kb.Key(name)
+func (tn *TestNode) GetKey(name string) (info keyring.Info, err error) {
+	return info, retry.Do(func() (err error) {
+		info, err = tn.Keybase().Key(name)
 		return err
 	})
-	if err != nil {
-		panic(err)
-	}
-	return info
 }
 
 // RandLowerCaseLetterString returns a lowercase letter string of given length
@@ -294,12 +267,17 @@ func RandLowerCaseLetterString(length int) string {
 type TestNodes []*TestNode
 
 // PeerString returns the peer identifiers for a given set of nodes
-func (tn TestNodes) PeerString() string {
+// TODO: probably needs refactor
+func (tn TestNodes) PeerString() (string, error) {
 	out := []string{}
 	for _, n := range tn {
-		out = append(out, fmt.Sprintf("%s@%s:%s", n.NodeID(), n.Name(), "26656"))
+		nid, err := n.NodeID()
+		if err != nil {
+			return "", err
+		}
+		out = append(out, fmt.Sprintf("%s@%s:%s", nid, n.Name(), "26656"))
 	}
-	return strings.Join(out, ",")
+	return strings.Join(out, ","), nil
 }
 
 // Peers returns the peer nodes for a given node if it is included in a set of nodes
@@ -310,31 +288,4 @@ func (tn TestNodes) Peers(node *TestNode) (out TestNodes) {
 		}
 	}
 	return
-}
-
-func (tn *TestNode) GenesisReady() error {
-	return retry.Do(tn.GentxAppended)
-}
-
-func (tn *TestNode) GentxAppended() error {
-	bz, err := ioutil.ReadFile(tn.GenesisFilePath())
-	if err != nil {
-		return err
-	}
-	gen := &GenesisParse{}
-	if err := json.Unmarshal(bz, gen); err != nil {
-		return err
-	}
-	if len(gen.AppState.Genutil.GenTxs) == 0 {
-		return fmt.Errorf("genutils is nil")
-	}
-	return nil
-}
-
-type GenesisParse struct {
-	AppState struct {
-		Genutil struct {
-			GenTxs []interface{} `json:"gen_txs"`
-		} `json:"genutil"`
-	} `json:"app_state"`
 }
