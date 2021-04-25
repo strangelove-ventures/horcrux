@@ -3,15 +3,19 @@ package testing
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"os"
 	"path"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/avast/retry-go"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
+	"github.com/stretchr/testify/require"
 	tmconfig "github.com/tendermint/tendermint/config"
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/testcontainers/testcontainers-go"
@@ -49,7 +53,7 @@ type TestNode struct {
 }
 
 // MakeTestNodes create the test node objects required for bootstrapping tests
-func MakeTestNodes(count int, home, chainid string, chainType *ChainType, provider *testcontainers.DockerProvider) (out []*TestNode) {
+func MakeTestNodes(count int, home, chainid string, chainType *ChainType, provider *testcontainers.DockerProvider) (out TestNodes) {
 	for i := 0; i < count; i++ {
 		tn := &TestNode{Home: home, Index: i, Chain: chainType, ChainID: chainid, Provider: provider}
 		tn.MkDir()
@@ -108,7 +112,7 @@ func (tn *TestNode) Keybase() keyring.Keyring {
 }
 
 // SetValidatorConfigAndPeers modifies the config for a validator node to start a chain
-func (tn *TestNode) SetValidatorConfigAndPeers(peers TestNodes) error {
+func (tn *TestNode) SetValidatorConfigAndPeers(peers string) {
 	// Pull current config
 	cfg := tmconfig.DefaultConfig()
 	// turn down blocktimes to make the chain faster
@@ -126,15 +130,10 @@ func (tn *TestNode) SetValidatorConfigAndPeers(peers TestNodes) error {
 	cfg.BaseConfig.LogLevel = "info"
 
 	// set persistent peer nodes
-	ps, err := peers.PeerString()
-	if err != nil {
-		return err
-	}
-	cfg.P2P.PersistentPeers = ps
+	cfg.P2P.PersistentPeers = peers
 
 	// overwrite with the new config
 	tmconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
-	return nil
 }
 
 func (tn *TestNode) NodeJob(ctx context.Context, cmd []string, waiting wait.Strategy) (testcontainers.Container, error) {
@@ -176,7 +175,7 @@ func (tn *TestNode) AddGenesisAccount(ctx context.Context, address string) (test
 	cmd := []string{tn.Chain.Bin, "add-genesis-account", address, "1000000000000stake",
 		"--home", tn.NodeHome(),
 	}
-	return tn.NodeJob(ctx, cmd, wait.ForLog(""))
+	return tn.NodeJob(ctx, cmd, nil)
 }
 
 // Gentx generates the gentx for a given node
@@ -189,6 +188,7 @@ func (tn *TestNode) Gentx(ctx context.Context, name string) (testcontainers.Cont
 	return tn.NodeJob(ctx, cmd, wait.ForLog("Genesis transaction"))
 }
 
+// CollectGentxs runs collect gentxs on the node's home folders
 func (tn *TestNode) CollectGentxs(ctx context.Context) (testcontainers.Container, error) {
 	cmd := []string{tn.Chain.Bin, "collect-gentxs",
 		"--home", tn.NodeHome(),
@@ -200,37 +200,35 @@ func (tn *TestNode) CreateNodeContainer(ctx context.Context) (testcontainers.Con
 	return tn.Provider.CreateContainer(ctx, testcontainers.ContainerRequest{
 		Image:        fmt.Sprintf("%s:%s", tn.Chain.Repository, tn.Chain.Version),
 		ExposedPorts: tn.Chain.Ports,
-		Cmd: []string{tn.Chain.Bin, "start",
-			"--home", tn.NodeHome(),
-		},
-		BindMounts: tn.Bind(),
-		WaitingFor: wait.ForLog("Starting RPC HTTP server"),
-		Name:       tn.Name(),
-		Hostname:   tn.Name(),
-		AutoRemove: true,
+		Cmd:          []string{tn.Chain.Bin, "start", "--home", tn.NodeHome()},
+		BindMounts:   tn.Bind(),
+		WaitingFor:   wait.ForLog("Starting RPC HTTP server"),
+		Name:         tn.Name(),
+		Hostname:     tn.Name(),
+		Networks:     []string{netid},
 	})
 }
 
 // InitNodeFilesAndGentx creates the node files and signs a genesis transaction
 func (tn *TestNode) InitNodeFilesAndGentx(ctx context.Context) error {
-	fmt.Println("init")
+	fmt.Printf("node-%d init\n", tn.Index)
 	if _, err := tn.InitHomeFolder(ctx); err != nil {
 		return err
 	}
-	fmt.Println("create key")
+	fmt.Printf("node-%d create key\n", tn.Index)
 	if _, err := tn.CreateKey(ctx, valKey); err != nil {
 		return err
 	}
-	fmt.Println("get key")
+	fmt.Printf("node-%d get key\n", tn.Index)
 	key, err := tn.GetKey(valKey)
 	if err != nil {
 		return err
 	}
-	fmt.Println("add genesis account")
+	fmt.Printf("node-%d add genesis account\n", tn.Index)
 	if _, err := tn.AddGenesisAccount(ctx, key.GetAddress().String()); err != nil {
 		return err
 	}
-	fmt.Println("gentx")
+	fmt.Printf("node-%d gentx\n", tn.Index)
 	_, err = tn.Gentx(ctx, valKey)
 	return err
 }
@@ -288,4 +286,13 @@ func (tn TestNodes) Peers(node *TestNode) (out TestNodes) {
 		}
 	}
 	return
+}
+
+// LogGenesisHashes logs the genesis hashes for the various nodes
+func (tn TestNodes) LogGenesisHashes(t *testing.T) {
+	for _, n := range tn {
+		gen, err := ioutil.ReadFile(path.Join(n.Dir(), "config", "genesis.json"))
+		require.NoError(t, err)
+		t.Log(fmt.Sprintf("node-%d genesis hash: %x", n.Index, sha256.Sum256(gen)))
+	}
 }
