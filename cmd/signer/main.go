@@ -12,6 +12,7 @@ import (
 
 	internalSigner "tendermint-signer/internal/signer"
 
+	"github.com/spf13/cobra"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmOS "github.com/tendermint/tendermint/libs/os"
 	tmService "github.com/tendermint/tendermint/libs/service"
@@ -196,4 +197,17 @@ func main() {
 		wg.Done()
 	})
 	wg.Wait()
+}
+
+func CmdSingleSigner() *cobra.Command {
+	return &cobra.Command{
+		Use:     "single-signer-start",
+		Aliases: []string{"signer", "single"},
+		Short:   "starts the single instance signer",
+		Args:    cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
+		SuggestionsMinimumDistance: 0,
+	}
 }
