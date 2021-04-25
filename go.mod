@@ -7,7 +7,7 @@ require (
 	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/cosmos/cosmos-sdk v0.42.3
 	github.com/gogo/protobuf v1.3.3
-	github.com/ory/dockertest/v3 v3.6.3
+	github.com/moby/term v0.0.0-20200915141129-7f0af18e79f2 // indirect
 	github.com/spf13/cobra v1.1.3
 	github.com/stretchr/testify v1.7.0
 	github.com/tendermint/go-amino v0.16.0
