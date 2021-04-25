@@ -27,6 +27,8 @@ func init() {
 }
 
 func TestTestnet(t *testing.T) {
+	testsDone := make(chan struct{})
+	contDone := make(chan struct{})
 	home, err := ioutil.TempDir("", "")
 	require.NoError(t, err)
 
@@ -43,14 +45,15 @@ func TestTestnet(t *testing.T) {
 	require.NoError(t, err)
 	nodes.LogGenesisHashes(t)
 
+	// set the test cleanup function
+	go cleanUpTest(t, testsDone, contDone, cont, net, home)
+	t.Cleanup(func() {
+		testsDone <- struct{}{}
+		<-contDone
+	})
+
 	t.Log("nodes started waiting 60 seconds before teardown")
 	time.Sleep(60 * time.Second)
-
-	for _, r := range cont {
-		require.NoError(t, r.Terminate(ctx))
-	}
-
-	require.NoError(t, net.Remove(ctx))
 }
 
 // startValidatorContainers is passed a chain id and number chains to spin up
@@ -135,7 +138,7 @@ func startValidatorContainers(t *testing.T, pool *testcontainers.DockerProvider,
 	return cont
 }
 
-// CONTRACT: testnode array and containers array have the same order
+// peerString returns the string for connecting the nodes passed in
 func peerString(ctx context.Context, nodes []*TestNode) (out string, err error) {
 	bldr := new(strings.Builder)
 	for _, n := range nodes {
@@ -148,23 +151,22 @@ func peerString(ctx context.Context, nodes []*TestNode) (out string, err error) 
 	return strings.TrimSuffix(bldr.String(), ","), nil
 }
 
-// cleanUpTest is called as a goroutine to wait until the tests have completed and
-// cleans up the docker items created
-func cleanUpTest(t *testing.T, testsDone <-chan struct{}, contDone chan<- struct{},
-	cont []testcontainers.Container, dir string) {
+// cleanUpTest is trigged by t.Cleanup and cleans up all resorces from the test
+func cleanUpTest(t *testing.T, testsDone <-chan struct{}, contDone chan<- struct{}, cont []testcontainers.Container, net testcontainers.Network, dir string) {
 	// block here until tests are complete
 	<-testsDone
 
 	// clean up the tmp dir
-	if err := os.RemoveAll(dir); err != nil {
-		require.NoError(t, fmt.Errorf("{cleanUpTest} failed to rm dir(%w), %s ", err, dir))
-	}
+	require.NoError(t, os.RemoveAll(dir))
 
 	// remove all the docker containers
 	for _, r := range cont {
 		require.NoError(t, r.Terminate(context.Background()))
 	}
 
-	// Notify the other side that we have deleted the docker containers
+	// remove the docker network
+	require.NoError(t, net.Remove(context.Background()))
+
+	// Notify the t.Cleanup that cleanup is done
 	contDone <- struct{}{}
 }

@@ -13,6 +13,7 @@ import (
 	"tendermint-signer/internal/signer"
 
 	"github.com/spf13/cobra"
+	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/ed25519"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/os"
@@ -42,65 +43,86 @@ func shardCmd() *cobra.Command {
 		},
 		Short: "shard a private validator key",
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			var (
-				threshold, _ = strconv.ParseInt(args[1], 10, 64)
-				numShards, _ = strconv.ParseInt(args[2], 10, 64)
-				rsaKeys      = make([]*rsa.PrivateKey, numShards)
-				pubkeys      = make([]*rsa.PublicKey, numShards)
-			)
+			threshold, _ := strconv.ParseInt(args[1], 10, 64)
+			numShards, _ := strconv.ParseInt(args[2], 10, 64)
 
 			// read in keyfile and unmarshal checking for errors
-			bz := []byte{}
-			if bz, err = ioutil.ReadFile(args[0]); err != nil {
-				return err
-			}
-			privValidator := privval.FilePVKey{}
-			if err = tmjson.Unmarshal(bz, &privValidator); err != nil {
+			pv, err := ReadPrivKeyFile(args[0])
+			if err != nil {
 				return err
 			}
 
-			shares := tsed25519.DealShares(tsed25519.ExpandSecret(privValidator.PrivKey.Bytes()[:32]), uint8(threshold), uint8(numShards))
+			// create threshold signing shards
+			shares := tsed25519.DealShares(tsed25519.ExpandSecret(pv.PrivKey.Bytes()[:32]), uint8(threshold), uint8(numShards))
 
-			// generate all rsa keys
-			for i := range shares {
-				bitSize := 4096
-				rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
-				if err != nil {
+			// make cooresponding rsa keys for each shard
+			csKeys, err := CreateCosignerKeys(shares, pv.PubKey)
+			if err != nil {
+				return err
+			}
+
+			// write keys to files
+			for _, c := range csKeys {
+				if err = WriteKeyShardFile(c, fmt.Sprintf("private_share_%d.json", c.ID)); err != nil {
 					return err
 				}
-				rsaKeys[i] = rsaKey
-				pubkeys[i] = &rsaKey.PublicKey
+				fmt.Printf("Created Share %d\n", c.ID)
 			}
-
-			// write shares and keys to private share files
-			for idx, share := range shares {
-				shareID := idx + 1
-
-				privateFilename := fmt.Sprintf("private_share_%d.json", shareID)
-
-				cosignerKey := signer.CosignerKey{
-					PubKey:       privValidator.PubKey,
-					ShareKey:     share,
-					ID:           shareID,
-					RSAKey:       *rsaKeys[idx],
-					CosignerKeys: pubkeys,
-				}
-
-				jsonBytes, err := json.Marshal(&cosignerKey)
-				if err != nil {
-					panic(err)
-				}
-
-				if err = ioutil.WriteFile(privateFilename, jsonBytes, 0644); err != nil {
-					panic(err)
-				}
-				fmt.Printf("Created Share %d\n", shareID)
-			}
-
 			return nil
 		},
 	}
 	return cmd
+}
+
+func CreateCosignerKeys(shares []tsed25519.Scalar, pvPub crypto.PubKey) (out []signer.CosignerKey, err error) {
+	rsaKeys, pubKeys, err := makeRSAKeys(len(shares))
+	if err != nil {
+		return nil, err
+	}
+	for idx, share := range shares {
+		out = append(out, signer.CosignerKey{
+			PubKey:       pvPub,
+			ShareKey:     share,
+			ID:           idx + 1,
+			RSAKey:       *rsaKeys[idx],
+			CosignerKeys: pubKeys,
+		})
+	}
+	return
+}
+
+func ReadPrivKeyFile(priv string) (out privval.FilePVKey, err error) {
+	bz := []byte{}
+	if bz, err = ioutil.ReadFile(priv); err != nil {
+		return
+	}
+	if err = tmjson.Unmarshal(bz, &out); err != nil {
+		return
+	}
+	return
+}
+
+func WriteKeyShardFile(cosigner signer.CosignerKey, file string) error {
+	jsonBytes, err := json.Marshal(&cosigner)
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(file, jsonBytes, 0644)
+}
+
+func makeRSAKeys(num int) (rsaKeys []*rsa.PrivateKey, pubKeys []*rsa.PublicKey, err error) {
+	rsaKeys = make([]*rsa.PrivateKey, num)
+	pubKeys = make([]*rsa.PublicKey, num)
+	for i := 0; i < num; i++ {
+		bitSize := 4096
+		rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
+		if err != nil {
+			return rsaKeys, pubKeys, err
+		}
+		rsaKeys[i] = rsaKey
+		pubKeys[i] = &rsaKey.PublicKey
+	}
+	return
 }
 
 func main() {

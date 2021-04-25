@@ -45,11 +45,13 @@ var simdChain = &ChainType{
 
 // TestNode represents a node in the test network that is being created
 type TestNode struct {
-	Home     string
-	Index    int
-	ChainID  string
-	Chain    *ChainType
-	Provider *testcontainers.DockerProvider
+	Home         string
+	Index        int
+	ChainID      string
+	Chain        *ChainType
+	GenesisCoins string
+	Validator    bool
+	Provider     *testcontainers.DockerProvider
 }
 
 // MakeTestNodes create the test node objects required for bootstrapping tests
