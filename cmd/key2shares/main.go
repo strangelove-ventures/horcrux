@@ -13,7 +13,6 @@ import (
 	"tendermint-signer/internal/signer"
 
 	"github.com/spf13/cobra"
-	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/ed25519"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/os"
@@ -26,42 +25,15 @@ func shardCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "shard [priv_validator.json] [shards] [threshold]",
 		Aliases: []string{},
-		Args: func(cmd *cobra.Command, args []string) error {
-			if len(args) != 3 {
-				return fmt.Errorf("wrong num args exp(3) got(%d)", len(args))
-			}
-			if !os.FileExists(args[0]) {
-				return fmt.Errorf("priv_validator.json file(%s) doesn't exist", args[0])
-			}
-			if _, err := strconv.ParseInt(args[1], 10, 64); err != nil {
-				return fmt.Errorf("shards must be an integer got(%s)", args[1])
-			}
-			if _, err := strconv.ParseInt(args[2], 10, 64); err != nil {
-				return fmt.Errorf("threshold must be an integer got(%s)", args[2])
-			}
-			return nil
-		},
-		Short: "shard a private validator key",
+		Args:    validateShardCmd,
+		Short:   "shard a private validator key",
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			threshold, _ := strconv.ParseInt(args[1], 10, 64)
 			numShards, _ := strconv.ParseInt(args[2], 10, 64)
-
-			// read in keyfile and unmarshal checking for errors
-			pv, err := ReadPrivKeyFile(args[0])
+			csKeys, err := CosignerKeysFromFile(args[0], threshold, numShards)
 			if err != nil {
 				return err
 			}
-
-			// create threshold signing shards
-			shares := tsed25519.DealShares(tsed25519.ExpandSecret(pv.PrivKey.Bytes()[:32]), uint8(threshold), uint8(numShards))
-
-			// make cooresponding rsa keys for each shard
-			csKeys, err := CreateCosignerKeys(shares, pv.PubKey)
-			if err != nil {
-				return err
-			}
-
-			// write keys to files
 			for _, c := range csKeys {
 				if err = WriteKeyShardFile(c, fmt.Sprintf("private_share_%d.json", c.ID)); err != nil {
 					return err
@@ -74,14 +46,25 @@ func shardCmd() *cobra.Command {
 	return cmd
 }
 
-func CreateCosignerKeys(shares []tsed25519.Scalar, pvPub crypto.PubKey) (out []signer.CosignerKey, err error) {
+// CosignerKeysFromFile creates cosigner key objects from a priv_validator_key.json file
+func CosignerKeysFromFile(priv string, threshold, shards int64) ([]signer.CosignerKey, error) {
+	pv, err := ReadPrivKeyFile(priv)
+	if err != nil {
+		return nil, err
+	}
+	return CreateCosignerKeys(pv, threshold, shards)
+}
+
+// CreateCosignerKeys creates cosigner key objects from a privval.FilePVKey
+func CreateCosignerKeys(pv privval.FilePVKey, threshold, shards int64) (out []signer.CosignerKey, err error) {
+	shares := tsed25519.DealShares(tsed25519.ExpandSecret(pv.PrivKey.Bytes()[:32]), uint8(threshold), uint8(shards))
 	rsaKeys, pubKeys, err := makeRSAKeys(len(shares))
 	if err != nil {
 		return nil, err
 	}
 	for idx, share := range shares {
 		out = append(out, signer.CosignerKey{
-			PubKey:       pvPub,
+			PubKey:       pv.PubKey,
 			ShareKey:     share,
 			ID:           idx + 1,
 			RSAKey:       *rsaKeys[idx],
@@ -91,6 +74,7 @@ func CreateCosignerKeys(shares []tsed25519.Scalar, pvPub crypto.PubKey) (out []s
 	return
 }
 
+// ReadPrivKeyFile reads in a privval.FilePVKey from a given file
 func ReadPrivKeyFile(priv string) (out privval.FilePVKey, err error) {
 	bz := []byte{}
 	if bz, err = ioutil.ReadFile(priv); err != nil {
@@ -102,6 +86,7 @@ func ReadPrivKeyFile(priv string) (out privval.FilePVKey, err error) {
 	return
 }
 
+// WriteKeyShardFile writes a cosigner key to a given file name
 func WriteKeyShardFile(cosigner signer.CosignerKey, file string) error {
 	jsonBytes, err := json.Marshal(&cosigner)
 	if err != nil {
@@ -123,6 +108,22 @@ func makeRSAKeys(num int) (rsaKeys []*rsa.PrivateKey, pubKeys []*rsa.PublicKey, 
 		pubKeys[i] = &rsaKey.PublicKey
 	}
 	return
+}
+
+func validateShardCmd(cmd *cobra.Command, args []string) error {
+	if len(args) != 3 {
+		return fmt.Errorf("wrong num args exp(3) got(%d)", len(args))
+	}
+	if !os.FileExists(args[0]) {
+		return fmt.Errorf("priv_validator.json file(%s) doesn't exist", args[0])
+	}
+	if _, err := strconv.ParseInt(args[1], 10, 64); err != nil {
+		return fmt.Errorf("shards must be an integer got(%s)", args[1])
+	}
+	if _, err := strconv.ParseInt(args[2], 10, 64); err != nil {
+		return fmt.Errorf("threshold must be an integer got(%s)", args[2])
+	}
+	return nil
 }
 
 func main() {
