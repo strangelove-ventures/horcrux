@@ -1,4 +1,4 @@
-module tendermint-signer
+module github.com/jackzampolin/horcrux
 
 go 1.15
 
@@ -18,6 +18,7 @@ require (
 	gitlab.com/polychainlabs/edwards25519 v0.0.0-20200206000358-2272e01758fb
 	gitlab.com/polychainlabs/threshold-ed25519 v0.0.0-20200221030822-1c35a36a51c1
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
 replace github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1

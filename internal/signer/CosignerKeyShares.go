@@ -18,10 +18,10 @@ import (
 // CreateCosignerSharesCmd is a cobra command for creating cosigner shares from a priv validator
 func CreateCosignerSharesCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "create-cosigner-shares [priv_validator.json] [shares] [threshold]",
+		Use:     "create-shares [priv_validator.json] [shares] [threshold]",
 		Aliases: []string{"shard", "shares"},
 		Args:    validateCreateCosignerShares,
-		Short:   "create  cosigner shares ",
+		Short:   "create  cosigner shares",
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			threshold, _ := strconv.ParseInt(args[1], 10, 64)
 			numShares, _ := strconv.ParseInt(args[2], 10, 64)
