@@ -26,7 +26,7 @@ func init() {
 	log.Default().SetOutput(ioutil.Discard)
 }
 
-func TestTestnet(t *testing.T) {
+func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	testsDone := make(chan struct{})
 	contDone := make(chan struct{})
 	home, err := ioutil.TempDir("", "")
@@ -36,7 +36,7 @@ func TestTestnet(t *testing.T) {
 	provider, err := testcontainers.NewDockerProvider()
 	require.NoError(t, err)
 
-	net, err := provider.CreateNetwork(ctx, testcontainers.NetworkRequest{Name: netid})
+	net, err := provider.CreateNetwork(ctx, testcontainers.NetworkRequest{Name: netid, Internal: false})
 	require.NoError(t, err)
 
 	nodes := MakeTestNodes(4, home, chainid, simdChain, provider)
@@ -52,8 +52,22 @@ func TestTestnet(t *testing.T) {
 		<-contDone
 	})
 
+	for i, n := range nodes {
+		str, err := cont[i].PortEndpoint(ctx, "26657", "http")
+		require.NoError(t, err)
+		fmt.Printf("%s available at %s\n", n.Name(), str)
+		require.NoError(t, n.NewClient(str))
+	}
+
+	time.Sleep(10 * time.Second)
+
 	t.Log("nodes started waiting 60 seconds before teardown")
 	time.Sleep(60 * time.Second)
+	// TODO: init 3 signer directories
+	// TODO: stop one node
+	// TODO: generate keys shares from node private key
+	// TODO: copy key shares to signer node directories
+	// TODO: modify node config to listen for priv_validator connections
 }
 
 // startValidatorContainers is passed a chain id and number chains to spin up

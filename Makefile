@@ -5,8 +5,11 @@ build: build/signer
 build/signer: cmd/signer/main.go $(wildcard internal/**/*.go)
 	CGO_ENABLED=0 go build -o ./build/signer ${gobuild_flags} ./cmd/signer
 
+install:
+	go install ./cmd/horcrux/...
+
 build-linux:
-	go build -o ./build/signer ./cmd/signer
+	GOOS=linux GOARCH=amd64 go build -o ./build/horcrux ./cmd/horcrux
 
 test:
 	@go test -short ./...

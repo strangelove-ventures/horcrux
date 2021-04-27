@@ -18,6 +18,9 @@ import (
 	"github.com/stretchr/testify/require"
 	tmconfig "github.com/tendermint/tendermint/config"
 	"github.com/tendermint/tendermint/p2p"
+	rpcclient "github.com/tendermint/tendermint/rpc/client"
+	rpchttp "github.com/tendermint/tendermint/rpc/client/http"
+	libclient "github.com/tendermint/tendermint/rpc/jsonrpc/client"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
@@ -40,7 +43,7 @@ var simdChain = &ChainType{
 	Repository: "jackzampolin/simd",
 	Version:    "v0.42.3",
 	Bin:        "simd",
-	Ports:      []string{"26656", "26657"},
+	Ports:      []string{"26656", "26657", "1234"},
 }
 
 // TestNode represents a node in the test network that is being created
@@ -52,6 +55,7 @@ type TestNode struct {
 	GenesisCoins string
 	Validator    bool
 	Provider     *testcontainers.DockerProvider
+	Client       rpcclient.Client
 }
 
 // MakeTestNodes create the test node objects required for bootstrapping tests
@@ -62,6 +66,23 @@ func MakeTestNodes(count int, home, chainid string, chainType *ChainType, provid
 		out = append(out, tn)
 	}
 	return
+}
+
+func (tn *TestNode) NewClient(addr string) error {
+	httpClient, err := libclient.DefaultHTTPClient(addr)
+	if err != nil {
+		return err
+	}
+
+	httpClient.Timeout = 10 * time.Second
+	rpcClient, err := rpchttp.NewWithClient(addr, "/websocket", httpClient)
+	if err != nil {
+		return err
+	}
+
+	tn.Client = rpcClient
+	return nil
+
 }
 
 // Name is the hostname of the test node container
@@ -115,8 +136,17 @@ func (tn *TestNode) Keybase() keyring.Keyring {
 
 // SetValidatorConfigAndPeers modifies the config for a validator node to start a chain
 func (tn *TestNode) SetValidatorConfigAndPeers(peers string) {
-	// Pull current config
+	// Pull default config
 	cfg := tmconfig.DefaultConfig()
+
+	// change config to include everything needed
+	stdconfigchanges(cfg, peers)
+
+	// overwrite with the new config
+	tmconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
+}
+
+func stdconfigchanges(cfg *tmconfig.Config, peers string) {
 	// turn down blocktimes to make the chain faster
 	cfg.Consensus.TimeoutCommit = 1 * time.Second
 	cfg.Consensus.TimeoutPropose = 1 * time.Second
@@ -133,9 +163,6 @@ func (tn *TestNode) SetValidatorConfigAndPeers(peers string) {
 
 	// set persistent peer nodes
 	cfg.P2P.PersistentPeers = peers
-
-	// overwrite with the new config
-	tmconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
 }
 
 func (tn *TestNode) NodeJob(ctx context.Context, cmd []string, waiting wait.Strategy) (testcontainers.Container, error) {
@@ -213,24 +240,19 @@ func (tn *TestNode) CreateNodeContainer(ctx context.Context) (testcontainers.Con
 
 // InitNodeFilesAndGentx creates the node files and signs a genesis transaction
 func (tn *TestNode) InitNodeFilesAndGentx(ctx context.Context) error {
-	fmt.Printf("node-%d init\n", tn.Index)
 	if _, err := tn.InitHomeFolder(ctx); err != nil {
 		return err
 	}
-	fmt.Printf("node-%d create key\n", tn.Index)
 	if _, err := tn.CreateKey(ctx, valKey); err != nil {
 		return err
 	}
-	fmt.Printf("node-%d get key\n", tn.Index)
 	key, err := tn.GetKey(valKey)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("node-%d add genesis account\n", tn.Index)
 	if _, err := tn.AddGenesisAccount(ctx, key.GetAddress().String()); err != nil {
 		return err
 	}
-	fmt.Printf("node-%d gentx\n", tn.Index)
 	_, err = tn.Gentx(ctx, valKey)
 	return err
 }

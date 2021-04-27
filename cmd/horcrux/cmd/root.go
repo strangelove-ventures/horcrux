@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v2"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
@@ -34,6 +36,7 @@ func init() {
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
+	cfg := Config{}
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	} else {
@@ -42,9 +45,16 @@ func initConfig() {
 		viper.AddConfigPath(path.Join(home, ".horcrux"))
 		viper.SetConfigName("config")
 	}
+	viper.SetEnvPrefix("horcrux")
 	viper.AutomaticEnv()
-	handleInitError(viper.ReadInConfig())
-	handleInitError(viper.Unmarshal(config))
+	if err := viper.ReadInConfig(); err != nil {
+		fmt.Println("no config exists at default location. run 'horcrux config init --help' to see configuration options", err)
+	}
+	handleInitError(viper.Unmarshal(&cfg))
+	bz, err := ioutil.ReadFile(viper.ConfigFileUsed())
+	handleInitError(err)
+	handleInitError(yaml.Unmarshal(bz, &cfg))
+	config = &cfg
 }
 
 func handleInitError(err error) {

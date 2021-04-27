@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	internalSigner "horcrux/internal/signer"
+	internalSigner "github.com/jackzampolin/horcrux/internal/signer"
 
 	"github.com/spf13/cobra"
 	tmlog "github.com/tendermint/tendermint/libs/log"

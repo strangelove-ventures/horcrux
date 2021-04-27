@@ -16,6 +16,6 @@ RUN apk add --no-cache ca-certificates
 
 WORKDIR /root
 
-COPY --from=build-env /go/src/github.com/jackzampolin/horcrux/build/signer /usr/bin/signer
+COPY --from=build-env /go/src/github.com/jackzampolin/horcrux/build/horcrux  /usr/bin/horcrux
 
-CMD ["signer"]
+CMD ["horcrux"]
