@@ -68,6 +68,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	// TODO: generate keys shares from node private key
 	// TODO: copy key shares to signer node directories
 	// TODO: modify node config to listen for priv_validator connections
+	// TODO: restart node and check that slashing doesn't happen and cluster continues to make blocks
 }
 
 // startValidatorContainers is passed a chain id and number chains to spin up
