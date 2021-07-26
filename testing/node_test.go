@@ -15,14 +15,16 @@ import (
 
 	"github.com/avast/retry-go"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
+	"github.com/ory/dockertest"
+	"github.com/ory/dockertest/docker"
 	"github.com/stretchr/testify/require"
 	tmconfig "github.com/tendermint/tendermint/config"
 	"github.com/tendermint/tendermint/p2p"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	rpchttp "github.com/tendermint/tendermint/rpc/client/http"
 	libclient "github.com/tendermint/tendermint/rpc/jsonrpc/client"
-	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
+	// "github.com/testcontainers/testcontainers-go/wait"
 )
 
 var (
@@ -35,7 +37,7 @@ type ChainType struct {
 	Repository string
 	Version    string
 	Bin        string
-	Ports      []string
+	Ports      map[docker.Port]struct{}
 }
 
 // ChainType instance for simd
@@ -43,7 +45,13 @@ var simdChain = &ChainType{
 	Repository: "jackzampolin/simd",
 	Version:    "v0.42.3",
 	Bin:        "simd",
-	Ports:      []string{"26656", "26657", "1234"},
+	Ports: map[docker.Port]struct{}{
+		"26656/tcp": struct{}{},
+		"26657/tcp": struct{}{},
+		"9090/tcp":  struct{}{},
+		"1337/tcp":  struct{}{},
+		"1234/tcp":  struct{}{},
+	},
 }
 
 // TestNode represents a node in the test network that is being created
@@ -54,12 +62,12 @@ type TestNode struct {
 	Chain        *ChainType
 	GenesisCoins string
 	Validator    bool
-	Provider     *testcontainers.DockerProvider
+	Provider     *dockertest.Pool
 	Client       rpcclient.Client
 }
 
 // MakeTestNodes create the test node objects required for bootstrapping tests
-func MakeTestNodes(count int, home, chainid string, chainType *ChainType, provider *testcontainers.DockerProvider) (out TestNodes) {
+func MakeTestNodes(count int, home, chainid string, chainType *ChainType, provider *dockertest.Pool) (out TestNodes) {
 	for i := 0; i < count; i++ {
 		tn := &TestNode{Home: home, Index: i, Chain: chainType, ChainID: chainid, Provider: provider}
 		tn.MkDir()
@@ -117,8 +125,8 @@ func (tn *TestNode) TMConfigPath() string {
 }
 
 // Bind returns the home folder bind point for running the node
-func (tn *TestNode) Bind() map[string]string {
-	return map[string]string{tn.Dir(): fmt.Sprintf("/root/.%s", tn.Chain.Bin)}
+func (tn *TestNode) Bind() []string {
+	return []string{fmt.Sprintf("%s:/root/.%s", tn.Dir(), tn.Chain.Bin)}
 }
 
 func (tn *TestNode) NodeHome() string {
@@ -165,68 +173,116 @@ func stdconfigchanges(cfg *tmconfig.Config, peers string) {
 	cfg.P2P.PersistentPeers = peers
 }
 
-func (tn *TestNode) NodeJob(ctx context.Context, cmd []string, waiting wait.Strategy) (testcontainers.Container, error) {
-	// NOTE: on job containers generate random name
+// NodeJob run a container for a specific job and block until the container exits
+// NOTE: on job containers generate random name
+func (tn *TestNode) NodeJob(ctx context.Context, cmd []string) (int, error) {
 	container := RandLowerCaseLetterString(10)
-	return tn.Provider.RunContainer(ctx, testcontainers.ContainerRequest{
-		Image:        fmt.Sprintf("%s:%s", tn.Chain.Repository, tn.Chain.Version),
-		ExposedPorts: tn.Chain.Ports,
-		Cmd:          cmd,
-		BindMounts:   tn.Bind(),
-		WaitingFor:   waiting,
-		Name:         container,
-		Hostname:     container,
-		AutoRemove:   true,
+	cont, err := tn.Provider.Client.CreateContainer(docker.CreateContainerOptions{
+		Name: container,
+		Config: &docker.Config{
+			Hostname:     container,
+			ExposedPorts: tn.Chain.Ports,
+			DNS:          []string{},
+			Image:        fmt.Sprintf("%s:%s", tn.Chain.Repository, tn.Chain.Version),
+		},
+		HostConfig: &docker.HostConfig{
+			Binds:           tn.Bind(),
+			PublishAllPorts: true,
+			AutoRemove:      true,
+		},
+		NetworkingConfig: &docker.NetworkingConfig{
+			EndpointsConfig: map[string]*docker.EndpointConfig{},
+		},
+		Context: nil,
 	})
+	if err != nil {
+		return 1, err
+	}
+	if err := tn.Provider.Client.StartContainer(cont.ID, nil); err != nil {
+		return 1, err
+	}
+
+	return tn.Provider.Client.WaitContainer(cont.ID)
 }
 
 // InitHomeFolder initializes a home folder for the given node
-func (tn *TestNode) InitHomeFolder(ctx context.Context) (testcontainers.Container, error) {
+func (tn *TestNode) InitHomeFolder(ctx context.Context) (int, error) {
 	cmd := []string{tn.Chain.Bin, "init", tn.Name(),
 		"--chain-id", tn.ChainID,
 		"--home", tn.NodeHome(),
 	}
-	return tn.NodeJob(ctx, cmd, wait.ForLog("validator_accumulated_commissions"))
+	return tn.NodeJob(ctx, cmd)
 }
 
 // CreateKey creates a key in the keyring backend test for the given node
-func (tn *TestNode) CreateKey(ctx context.Context, name string) (testcontainers.Container, error) {
+func (tn *TestNode) CreateKey(ctx context.Context, name string) (int, error) {
 	cmd := []string{tn.Chain.Bin, "keys", "add", name,
 		"--keyring-backend", "test",
 		"--output", "json",
 		"--home", tn.NodeHome(),
 	}
-	return tn.NodeJob(ctx, cmd, wait.ForLog("mnemonic"))
+	return tn.NodeJob(ctx, cmd)
 }
 
 // AddGenesisAccount adds a genesis account for each key
-func (tn *TestNode) AddGenesisAccount(ctx context.Context, address string) (testcontainers.Container, error) {
+func (tn *TestNode) AddGenesisAccount(ctx context.Context, address string) (int, error) {
 	cmd := []string{tn.Chain.Bin, "add-genesis-account", address, "1000000000000stake",
 		"--home", tn.NodeHome(),
 	}
-	return tn.NodeJob(ctx, cmd, nil)
+	return tn.NodeJob(ctx, cmd)
 }
 
 // Gentx generates the gentx for a given node
-func (tn *TestNode) Gentx(ctx context.Context, name string) (testcontainers.Container, error) {
+func (tn *TestNode) Gentx(ctx context.Context, name string) (int, error) {
 	cmd := []string{tn.Chain.Bin, "gentx", valKey, "100000000000stake",
 		"--keyring-backend", "test",
 		"--home", tn.NodeHome(),
 		"--chain-id", tn.ChainID,
 	}
-	return tn.NodeJob(ctx, cmd, wait.ForLog("Genesis transaction"))
+	return tn.NodeJob(ctx, cmd)
 }
 
 // CollectGentxs runs collect gentxs on the node's home folders
-func (tn *TestNode) CollectGentxs(ctx context.Context) (testcontainers.Container, error) {
+func (tn *TestNode) CollectGentxs(ctx context.Context) (int, error) {
 	cmd := []string{tn.Chain.Bin, "collect-gentxs",
 		"--home", tn.NodeHome(),
 	}
-	return tn.NodeJob(ctx, cmd, wait.ForLog("validator_accumulated_commissions"))
+	return tn.NodeJob(ctx, cmd)
 }
 
-func (tn *TestNode) CreateNodeContainer(ctx context.Context) (testcontainers.Container, error) {
-	return tn.Provider.CreateContainer(ctx, testcontainers.ContainerRequest{
+func (tn *TestNode) CreateNodeContainer(ctx context.Context) (*dockertest.Resource, error) {
+	cont, err := tn.Provider.Client.CreateContainer(docker.CreateContainerOptions{
+		Name: tn.Name(),
+		Config: &docker.Config{
+			Hostname:     tn.Name(),
+			ExposedPorts: tn.Chain.Ports,
+			DNS:          []string{},
+			Image:        fmt.Sprintf("%s:%s", tn.Chain.Repository, tn.Chain.Version),
+		},
+		HostConfig: &docker.HostConfig{
+			Binds:           tn.Bind(),
+			PublishAllPorts: true,
+			AutoRemove:      true,
+		},
+		NetworkingConfig: &docker.NetworkingConfig{
+			EndpointsConfig: map[string]*docker.EndpointConfig{},
+		},
+		Context: nil,
+	})
+	if err != nil {
+		return 1, err
+	}
+	if err := tn.Provider.Client.StartContainer(cont.ID, nil); err != nil {
+		return 1, err
+	}
+
+	if err := tn.Provider.Retry(func() error {
+		// TODO: curl the node until it comes online
+		return nil
+	}); err != nil {
+		return 1, err
+	}
+	return tn.Provider.CreateContainer(ctx, dockertest.ContainerRequest{
 		Image:        fmt.Sprintf("%s:%s", tn.Chain.Repository, tn.Chain.Version),
 		ExposedPorts: tn.Chain.Ports,
 		Cmd:          []string{tn.Chain.Bin, "start", "--home", tn.NodeHome()},

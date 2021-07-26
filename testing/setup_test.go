@@ -11,8 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ory/dockertest"
+	"github.com/ory/dockertest/docker"
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -21,7 +22,7 @@ var (
 	netid   = "horcrux"
 )
 
-// disable logging from testcontainers
+// disable logging from dockertest
 func init() {
 	log.Default().SetOutput(ioutil.Discard)
 }
@@ -33,10 +34,12 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	provider, err := testcontainers.NewDockerProvider()
+	provider, err := dockertest.NewPool("")
 	require.NoError(t, err)
 
-	net, err := provider.CreateNetwork(ctx, testcontainers.NetworkRequest{Name: netid, Internal: false})
+	require.NoError(t, err)
+
+	net, err := provider.Client.CreateNetwork(docker.CreateNetworkOptions{Name: netid, Internal: false})
 	require.NoError(t, err)
 
 	nodes := MakeTestNodes(4, home, chainid, simdChain, provider)
@@ -72,7 +75,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 }
 
 // startValidatorContainers is passed a chain id and number chains to spin up
-func startValidatorContainers(t *testing.T, pool *testcontainers.DockerProvider, net testcontainers.Network, nodes []*TestNode) []testcontainers.Container {
+func startValidatorContainers(t *testing.T, pool *dockertest.Pool, net docker.Network, nodes []*TestNode) []docker.Container {
 	eg := new(errgroup.Group)
 	ctx := context.Background()
 	// sign gentx for each node
@@ -118,7 +121,7 @@ func startValidatorContainers(t *testing.T, pool *testcontainers.DockerProvider,
 	}
 
 	t.Log("creating node containers")
-	cont := make([]testcontainers.Container, len(nodes))
+	cont := make([]dockertest.Container, len(nodes))
 	for i, n := range nodes {
 		n, i := n, i
 		eg.Go(func() error {
@@ -167,7 +170,7 @@ func peerString(ctx context.Context, nodes []*TestNode) (out string, err error) 
 }
 
 // cleanUpTest is trigged by t.Cleanup and cleans up all resorces from the test
-func cleanUpTest(t *testing.T, testsDone <-chan struct{}, contDone chan<- struct{}, cont []testcontainers.Container, net testcontainers.Network, dir string) {
+func cleanUpTest(t *testing.T, testsDone <-chan struct{}, contDone chan<- struct{}, cont []dockertest.Container, net dockertest.Network, dir string) {
 	// block here until tests are complete
 	<-testsDone
 
