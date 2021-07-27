@@ -63,12 +63,14 @@ type TestNode struct {
 	Validator    bool
 	Provider     *dockertest.Pool
 	Client       rpcclient.Client
+
+	t *testing.T
 }
 
 // MakeTestNodes create the test node objects required for bootstrapping tests
-func MakeTestNodes(count int, home, chainid string, chainType *ChainType, provider *dockertest.Pool) (out TestNodes) {
+func MakeTestNodes(count int, home, chainid string, chainType *ChainType, provider *dockertest.Pool, t *testing.T) (out TestNodes) {
 	for i := 0; i < count; i++ {
-		tn := &TestNode{Home: home, Index: i, Chain: chainType, ChainID: chainid, Provider: provider}
+		tn := &TestNode{Home: home, Index: i, Chain: chainType, ChainID: chainid, Provider: provider, t: t}
 		tn.MkDir()
 		out = append(out, tn)
 	}
@@ -175,6 +177,7 @@ func stdconfigchanges(cfg *tmconfig.Config, peers string) {
 // NodeJob run a container for a specific job and block until the container exits
 // NOTE: on job containers generate random name
 func (tn *TestNode) NodeJob(ctx context.Context, cmd []string) (int, error) {
+	tn.t.Log("COMMAND:", cmd)
 	container := RandLowerCaseLetterString(10)
 	cont, err := tn.Provider.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: container,
@@ -183,6 +186,7 @@ func (tn *TestNode) NodeJob(ctx context.Context, cmd []string) (int, error) {
 			ExposedPorts: tn.Chain.Ports,
 			DNS:          []string{},
 			Image:        fmt.Sprintf("%s:%s", tn.Chain.Repository, tn.Chain.Version),
+			Cmd:          cmd,
 		},
 		HostConfig: &docker.HostConfig{
 			Binds:           tn.Bind(),
@@ -201,7 +205,7 @@ func (tn *TestNode) NodeJob(ctx context.Context, cmd []string) (int, error) {
 		return 1, err
 	}
 
-	return tn.Provider.Client.WaitContainer(cont.ID)
+	return tn.Provider.Client.WaitContainerWithContext(cont.ID, ctx)
 }
 
 // InitHomeFolder initializes a home folder for the given node

@@ -48,7 +48,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	nodes := MakeTestNodes(4, home, chainid, simdChain, provider)
+	nodes := MakeTestNodes(4, home, chainid, simdChain, provider, t)
 
 	cont := startValidatorContainers(t, provider, net, nodes)
 	require.NoError(t, err)
