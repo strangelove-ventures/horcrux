@@ -39,7 +39,13 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 
 	require.NoError(t, err)
 
-	net, err := provider.Client.CreateNetwork(docker.CreateNetworkOptions{Name: netid, Internal: false})
+	net, err := provider.Client.CreateNetwork(docker.CreateNetworkOptions{
+		Name:   netid,
+		Labels: map[string]string{},
+		// CheckDuplicate: false, todo: maybe enable?
+		Internal: false,
+		Context:  ctx,
+	})
 	require.NoError(t, err)
 
 	nodes := MakeTestNodes(4, home, chainid, simdChain, provider)
@@ -55,11 +61,11 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 		<-contDone
 	})
 
-	for i, n := range nodes {
-		str, err := cont[i].PortEndpoint(ctx, "26657", "http")
-		require.NoError(t, err)
-		fmt.Printf("%s available at %s\n", n.Name(), str)
-		require.NoError(t, n.NewClient(str))
+	for _, n := range nodes {
+		// str, err := cont[i].PortEndpoint(ctx, "26657", "http")
+		// require.NoError(t, err)
+		fmt.Printf("%s available at %s\n", n.Name(), "Foooo")
+		require.NoError(t, n.NewClient("foo"))
 	}
 
 	time.Sleep(10 * time.Second)
@@ -75,7 +81,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 }
 
 // startValidatorContainers is passed a chain id and number chains to spin up
-func startValidatorContainers(t *testing.T, pool *dockertest.Pool, net docker.Network, nodes []*TestNode) []docker.Container {
+func startValidatorContainers(t *testing.T, pool *dockertest.Pool, net *docker.Network, nodes []*TestNode) []*dockertest.Resource {
 	eg := new(errgroup.Group)
 	ctx := context.Background()
 	// sign gentx for each node
@@ -121,7 +127,7 @@ func startValidatorContainers(t *testing.T, pool *dockertest.Pool, net docker.Ne
 	}
 
 	t.Log("creating node containers")
-	cont := make([]dockertest.Container, len(nodes))
+	cont := make([]*docker.Container, len(nodes))
 	for i, n := range nodes {
 		n, i := n, i
 		eg.Go(func() error {
@@ -148,12 +154,23 @@ func startValidatorContainers(t *testing.T, pool *dockertest.Pool, net docker.Ne
 	for i, c := range cont {
 		c := c
 		t.Logf("starting node-%d", i)
-		eg.Go(func() error { return c.Start(ctx) })
+		eg.Go(func() error {
+			if err := pool.Client.StartContainer(c.ID, nil); err != nil {
+				return err
+			}
+
+			return pool.Retry(func() error {
+				// TODO: curl the node until it comes online
+				return nil
+			})
+		})
 	}
 	require.NoError(t, eg.Wait())
 	t.Log("nodes started")
 
-	return cont
+	// TODO: produce resource here
+	// return cont
+	return []*dockertest.Resource{}
 }
 
 // peerString returns the string for connecting the nodes passed in
@@ -170,20 +187,22 @@ func peerString(ctx context.Context, nodes []*TestNode) (out string, err error) 
 }
 
 // cleanUpTest is trigged by t.Cleanup and cleans up all resorces from the test
-func cleanUpTest(t *testing.T, testsDone <-chan struct{}, contDone chan<- struct{}, cont []dockertest.Container, net dockertest.Network, dir string) {
+func cleanUpTest(t *testing.T, testsDone <-chan struct{}, contDone chan<- struct{}, cont []*dockertest.Resource, net *docker.Network, dir string) {
 	// block here until tests are complete
 	<-testsDone
 
 	// clean up the tmp dir
 	require.NoError(t, os.RemoveAll(dir))
 
+	// TODO: cleanup the stuffs here
+
 	// remove all the docker containers
-	for _, r := range cont {
-		require.NoError(t, r.Terminate(context.Background()))
-	}
+	// for _, r := range cont {
+	// 	require.NoError(t, r.Terminate(context.Background()))
+	// }
 
 	// remove the docker network
-	require.NoError(t, net.Remove(context.Background()))
+	// require.NoError(t, net.Remove(context.Background()))
 
 	// Notify the t.Cleanup that cleanup is done
 	contDone <- struct{}{}

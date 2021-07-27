@@ -23,7 +23,6 @@ import (
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	rpchttp "github.com/tendermint/tendermint/rpc/client/http"
 	libclient "github.com/tendermint/tendermint/rpc/jsonrpc/client"
-	"github.com/testcontainers/testcontainers-go/wait"
 	// "github.com/testcontainers/testcontainers-go/wait"
 )
 
@@ -250,8 +249,8 @@ func (tn *TestNode) CollectGentxs(ctx context.Context) (int, error) {
 	return tn.NodeJob(ctx, cmd)
 }
 
-func (tn *TestNode) CreateNodeContainer(ctx context.Context) (*dockertest.Resource, error) {
-	cont, err := tn.Provider.Client.CreateContainer(docker.CreateContainerOptions{
+func (tn *TestNode) CreateNodeContainer(ctx context.Context) (*docker.Container, error) {
+	return tn.Provider.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: tn.Name(),
 		Config: &docker.Config{
 			Hostname:     tn.Name(),
@@ -269,29 +268,7 @@ func (tn *TestNode) CreateNodeContainer(ctx context.Context) (*dockertest.Resour
 		},
 		Context: nil,
 	})
-	if err != nil {
-		return 1, err
-	}
-	if err := tn.Provider.Client.StartContainer(cont.ID, nil); err != nil {
-		return 1, err
-	}
 
-	if err := tn.Provider.Retry(func() error {
-		// TODO: curl the node until it comes online
-		return nil
-	}); err != nil {
-		return 1, err
-	}
-	return tn.Provider.CreateContainer(ctx, dockertest.ContainerRequest{
-		Image:        fmt.Sprintf("%s:%s", tn.Chain.Repository, tn.Chain.Version),
-		ExposedPorts: tn.Chain.Ports,
-		Cmd:          []string{tn.Chain.Bin, "start", "--home", tn.NodeHome()},
-		BindMounts:   tn.Bind(),
-		WaitingFor:   wait.ForLog("Starting RPC HTTP server"),
-		Name:         tn.Name(),
-		Hostname:     tn.Name(),
-		Networks:     []string{netid},
-	})
 }
 
 // InitNodeFilesAndGentx creates the node files and signs a genesis transaction
