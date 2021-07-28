@@ -74,20 +74,20 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 				if stat.SyncInfo.CatchingUp || stat.SyncInfo.LatestBlockHeight < 15 {
 					return fmt.Errorf("node still under block 15: %d", stat.SyncInfo.LatestBlockHeight)
 				}
+				t.Logf("[%s] => reached block 15\n", n.Name())
 				return nil
 			})
 		})
-		if err := eg.Wait(); err != nil {
-			t.Log("failed to reach cosmos nodes", err)
-		}
-		t.Logf("[%s] => reached block 15\n", n.Name())
-		require.NoError(t, n.NewClient("foo"))
 	}
-
-	time.Sleep(10 * time.Second)
-
+	require.NoError(t, eg.Wait())
 	t.Log("nodes started waiting 60 seconds before teardown")
 	time.Sleep(60 * time.Second)
+
+	// Build horcrux image from current go files
+	// signer-0 -> horcrux config init horcrux tcp://node-0:1234
+	// singer-1 -> horcrux config init horcrux tcp://node-0:1234
+	// signer-2 -> horcrux config init horcrux tcp://node-0:1234
+	// signer-job -> horcrux
 	// TODO: init 3 signer directories
 	// TODO: stop one node
 	// TODO: generate keys shares from node private key
