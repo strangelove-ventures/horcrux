@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"os"
 	"path"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/avast/retry-go"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
 	"github.com/stretchr/testify/require"
@@ -52,19 +54,33 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 
 	cont := startValidatorContainers(t, provider, net, nodes)
 	require.NoError(t, err)
-	nodes.LogGenesisHashes(t)
 
 	// set the test cleanup function
-	go cleanUpTest(t, testsDone, contDone, cont, net, home)
+	go cleanUpTest(t, testsDone, contDone, provider, cont, net, home)
 	t.Cleanup(func() {
 		testsDone <- struct{}{}
 		<-contDone
 	})
 
+	var eg errgroup.Group
 	for _, n := range nodes {
-		// str, err := cont[i].PortEndpoint(ctx, "26657", "http")
-		// require.NoError(t, err)
-		fmt.Printf("%s available at %s\n", n.Name(), "Foooo")
+		n := n
+		eg.Go(func() error {
+			return retry.Do(func() error {
+				stat, err := n.Client.Status(ctx)
+				if err != nil {
+					return err
+				}
+				if stat.SyncInfo.CatchingUp || stat.SyncInfo.LatestBlockHeight < 15 {
+					return fmt.Errorf("node still under block 15: %d", stat.SyncInfo.LatestBlockHeight)
+				}
+				return nil
+			})
+		})
+		if err := eg.Wait(); err != nil {
+			t.Log("failed to reach cosmos nodes", err)
+		}
+		t.Logf("[%s] => reached block 15\n", n.Name())
 		require.NoError(t, n.NewClient("foo"))
 	}
 
@@ -81,18 +97,17 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 }
 
 // startValidatorContainers is passed a chain id and number chains to spin up
-func startValidatorContainers(t *testing.T, pool *dockertest.Pool, net *docker.Network, nodes []*TestNode) []*dockertest.Resource {
+func startValidatorContainers(t *testing.T, pool *dockertest.Pool, net *docker.Network, nodes []*TestNode) []*docker.Container {
 	eg := new(errgroup.Group)
 	ctx := context.Background()
+
 	// sign gentx for each node
-	t.Log("starting seeding node files")
 	for _, n := range nodes {
 		n := n
 		eg.Go(func() error { return n.InitNodeFilesAndGentx(ctx) })
 	}
 	require.NoError(t, eg.Wait())
 
-	t.Log("begin genesis generation")
 	node0 := nodes[0]
 	for i := 1; i < len(nodes); i++ {
 		nodeN := nodes[i]
@@ -100,8 +115,7 @@ func startValidatorContainers(t *testing.T, pool *dockertest.Pool, net *docker.N
 		require.NoError(t, err)
 
 		// add genesis account for node to the first node's genesis file
-		_, err = node0.AddGenesisAccount(ctx, n0key.GetAddress().String())
-		require.NoError(t, err)
+		require.NoError(t, node0.AddGenesisAccount(ctx, n0key.GetAddress().String()))
 
 		nNid, err := nodeN.NodeID()
 		require.NoError(t, err)
@@ -112,26 +126,22 @@ func startValidatorContainers(t *testing.T, pool *dockertest.Pool, net *docker.N
 		require.NoError(t, os.Rename(oldPath, newPath))
 	}
 
-	t.Log("collect gentxs")
-	_, err := node0.CollectGentxs(ctx)
-	require.NoError(t, err)
+	require.NoError(t, node0.CollectGentxs(ctx))
 
-	// copy genesis file bytes into memory
-	t.Log("read final genesis file")
 	genbz, err := ioutil.ReadFile(node0.GenesisFilePath())
 	require.NoError(t, err)
 
-	t.Log("overwrite genesis files")
 	for i := 1; i < len(nodes); i++ {
 		require.NoError(t, ioutil.WriteFile(nodes[i].GenesisFilePath(), genbz, 0644))
 	}
 
-	t.Log("creating node containers")
+	TestNodes(nodes).LogGenesisHashes(t)
+
 	cont := make([]*docker.Container, len(nodes))
 	for i, n := range nodes {
 		n, i := n, i
 		eg.Go(func() error {
-			res, err := n.CreateNodeContainer(ctx)
+			res, err := n.CreateNodeContainer(ctx, net.ID)
 			if err != nil {
 				return err
 			}
@@ -139,71 +149,108 @@ func startValidatorContainers(t *testing.T, pool *dockertest.Pool, net *docker.N
 			return nil
 		})
 	}
-	t.Log("waiting for containers to create")
 	require.NoError(t, eg.Wait())
 
-	t.Log("getting peer string")
-	peers, err := peerString(ctx, nodes)
+	peers, err := peerString(ctx, nodes, t)
 	require.NoError(t, err)
-	t.Log("peer string", peers)
-	t.Log("setting configs")
+
 	for _, n := range nodes {
 		n.SetValidatorConfigAndPeers(peers)
 	}
-	t.Log("start node containers")
+
 	for i, c := range cont {
-		c := c
-		t.Logf("starting node-%d", i)
+		i, c := i, c
+		t.Logf("[node-%d] => starting container...", i)
 		eg.Go(func() error {
 			if err := pool.Client.StartContainer(c.ID, nil); err != nil {
 				return err
 			}
 
+			c, err := pool.Client.InspectContainer(c.ID)
+			if err != nil {
+				return err
+			}
+
+			port := GetHostPort(c, "26657/tcp")
+			t.Logf("[%s] RPC => %s", nodes[i].Name(), port)
+
+			if err := nodes[i].NewClient(fmt.Sprintf("http://%s", port)); err != nil {
+				return err
+			}
+
 			return pool.Retry(func() error {
-				// TODO: curl the node until it comes online
+				stat, err := nodes[i].Client.Status(context.Background())
+				if err != nil {
+					return err
+				}
+				if stat != nil && !stat.SyncInfo.CatchingUp {
+					return fmt.Errorf("still catching up")
+				}
 				return nil
 			})
 		})
 	}
 	require.NoError(t, eg.Wait())
-	t.Log("nodes started")
-
-	// TODO: produce resource here
-	// return cont
-	return []*dockertest.Resource{}
+	return cont
 }
 
 // peerString returns the string for connecting the nodes passed in
-func peerString(ctx context.Context, nodes []*TestNode) (out string, err error) {
+func peerString(ctx context.Context, nodes []*TestNode, t *testing.T) (out string, err error) {
 	bldr := new(strings.Builder)
 	for _, n := range nodes {
 		id, err := n.NodeID()
 		if err != nil {
 			return bldr.String(), err
 		}
-		bldr.WriteString(fmt.Sprintf("%s@%s:26656,", id, n.Name()))
+		ps := fmt.Sprintf("%s@%s:26656,", id, n.Name())
+		t.Logf("{%s} peering (%s)", n.Name(), strings.TrimSuffix(ps, ","))
+		bldr.WriteString(ps)
 	}
 	return strings.TrimSuffix(bldr.String(), ","), nil
 }
 
 // cleanUpTest is trigged by t.Cleanup and cleans up all resorces from the test
-func cleanUpTest(t *testing.T, testsDone <-chan struct{}, contDone chan<- struct{}, cont []*dockertest.Resource, net *docker.Network, dir string) {
+func cleanUpTest(t *testing.T, testsDone <-chan struct{}, contDone chan<- struct{}, pool *dockertest.Pool, cont []*docker.Container, net *docker.Network, dir string) {
 	// block here until tests are complete
 	<-testsDone
 
 	// clean up the tmp dir
 	require.NoError(t, os.RemoveAll(dir))
 
-	// TODO: cleanup the stuffs here
-
 	// remove all the docker containers
-	// for _, r := range cont {
-	// 	require.NoError(t, r.Terminate(context.Background()))
-	// }
+	var eg errgroup.Group
+	for _, r := range cont {
+		r := r
+		eg.Go(func() error {
+			if err := pool.Client.StopContainer(r.ID, uint(time.Second*30)); err != nil {
+				t.Log("error stopping container", err)
+			}
+			return nil
+		})
+	}
+	require.NoError(t, eg.Wait())
 
 	// remove the docker network
-	// require.NoError(t, net.Remove(context.Background()))
+	require.NoError(t, pool.Client.RemoveNetwork(net.ID))
 
 	// Notify the t.Cleanup that cleanup is done
 	contDone <- struct{}{}
+}
+
+// GetHostPort returns a resource's published port with an address.
+func GetHostPort(cont *docker.Container, portID string) string {
+	if cont == nil || cont.NetworkSettings == nil {
+		return ""
+	}
+
+	m, ok := cont.NetworkSettings.Ports[docker.Port(portID)]
+	if !ok || len(m) == 0 {
+		return ""
+	}
+
+	ip := m[0].HostIP
+	if ip == "0.0.0.0" {
+		ip = "localhost"
+	}
+	return net.JoinHostPort(ip, m[0].HostPort)
 }

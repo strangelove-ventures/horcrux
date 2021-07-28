@@ -177,8 +177,8 @@ func stdconfigchanges(cfg *tmconfig.Config, peers string) {
 // NodeJob run a container for a specific job and block until the container exits
 // NOTE: on job containers generate random name
 func (tn *TestNode) NodeJob(ctx context.Context, cmd []string) (int, error) {
-	tn.t.Log("COMMAND:", cmd)
 	container := RandLowerCaseLetterString(10)
+	tn.t.Logf("{%s}[%s] -> '%s'", tn.Name(), container, strings.Join(cmd, " "))
 	cont, err := tn.Provider.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: container,
 		Config: &docker.Config{
@@ -204,59 +204,59 @@ func (tn *TestNode) NodeJob(ctx context.Context, cmd []string) (int, error) {
 	if err := tn.Provider.Client.StartContainer(cont.ID, nil); err != nil {
 		return 1, err
 	}
-
 	return tn.Provider.Client.WaitContainerWithContext(cont.ID, ctx)
 }
 
 // InitHomeFolder initializes a home folder for the given node
-func (tn *TestNode) InitHomeFolder(ctx context.Context) (int, error) {
+func (tn *TestNode) InitHomeFolder(ctx context.Context) error {
 	cmd := []string{tn.Chain.Bin, "init", tn.Name(),
 		"--chain-id", tn.ChainID,
 		"--home", tn.NodeHome(),
 	}
-	return tn.NodeJob(ctx, cmd)
+	return handleNodeJobError(tn.NodeJob(ctx, cmd))
 }
 
 // CreateKey creates a key in the keyring backend test for the given node
-func (tn *TestNode) CreateKey(ctx context.Context, name string) (int, error) {
+func (tn *TestNode) CreateKey(ctx context.Context, name string) error {
 	cmd := []string{tn.Chain.Bin, "keys", "add", name,
 		"--keyring-backend", "test",
 		"--output", "json",
 		"--home", tn.NodeHome(),
 	}
-	return tn.NodeJob(ctx, cmd)
+	return handleNodeJobError(tn.NodeJob(ctx, cmd))
 }
 
 // AddGenesisAccount adds a genesis account for each key
-func (tn *TestNode) AddGenesisAccount(ctx context.Context, address string) (int, error) {
+func (tn *TestNode) AddGenesisAccount(ctx context.Context, address string) error {
 	cmd := []string{tn.Chain.Bin, "add-genesis-account", address, "1000000000000stake",
 		"--home", tn.NodeHome(),
 	}
-	return tn.NodeJob(ctx, cmd)
+	return handleNodeJobError(tn.NodeJob(ctx, cmd))
 }
 
 // Gentx generates the gentx for a given node
-func (tn *TestNode) Gentx(ctx context.Context, name string) (int, error) {
+func (tn *TestNode) Gentx(ctx context.Context, name string) error {
 	cmd := []string{tn.Chain.Bin, "gentx", valKey, "100000000000stake",
 		"--keyring-backend", "test",
 		"--home", tn.NodeHome(),
 		"--chain-id", tn.ChainID,
 	}
-	return tn.NodeJob(ctx, cmd)
+	return handleNodeJobError(tn.NodeJob(ctx, cmd))
 }
 
 // CollectGentxs runs collect gentxs on the node's home folders
-func (tn *TestNode) CollectGentxs(ctx context.Context) (int, error) {
+func (tn *TestNode) CollectGentxs(ctx context.Context) error {
 	cmd := []string{tn.Chain.Bin, "collect-gentxs",
 		"--home", tn.NodeHome(),
 	}
-	return tn.NodeJob(ctx, cmd)
+	return handleNodeJobError(tn.NodeJob(ctx, cmd))
 }
 
-func (tn *TestNode) CreateNodeContainer(ctx context.Context) (*docker.Container, error) {
+func (tn *TestNode) CreateNodeContainer(ctx context.Context, networkID string) (*docker.Container, error) {
 	return tn.Provider.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: tn.Name(),
 		Config: &docker.Config{
+			Cmd:          []string{tn.Chain.Bin, "start", "--home", tn.NodeHome()},
 			Hostname:     tn.Name(),
 			ExposedPorts: tn.Chain.Ports,
 			DNS:          []string{},
@@ -268,30 +268,40 @@ func (tn *TestNode) CreateNodeContainer(ctx context.Context) (*docker.Container,
 			AutoRemove:      true,
 		},
 		NetworkingConfig: &docker.NetworkingConfig{
-			EndpointsConfig: map[string]*docker.EndpointConfig{},
+			EndpointsConfig: map[string]*docker.EndpointConfig{
+				networkID: &docker.EndpointConfig{},
+			},
 		},
 		Context: nil,
 	})
-
 }
 
 // InitNodeFilesAndGentx creates the node files and signs a genesis transaction
 func (tn *TestNode) InitNodeFilesAndGentx(ctx context.Context) error {
-	if _, err := tn.InitHomeFolder(ctx); err != nil {
+	if err := tn.InitHomeFolder(ctx); err != nil {
 		return err
 	}
-	if _, err := tn.CreateKey(ctx, valKey); err != nil {
+	if err := tn.CreateKey(ctx, valKey); err != nil {
 		return err
 	}
 	key, err := tn.GetKey(valKey)
 	if err != nil {
 		return err
 	}
-	if _, err := tn.AddGenesisAccount(ctx, key.GetAddress().String()); err != nil {
+	if err := tn.AddGenesisAccount(ctx, key.GetAddress().String()); err != nil {
 		return err
 	}
-	_, err = tn.Gentx(ctx, valKey)
-	return err
+	return tn.Gentx(ctx, valKey)
+}
+
+func handleNodeJobError(i int, err error) error {
+	if err != nil {
+		return err
+	}
+	if i != 0 {
+		return fmt.Errorf("container returned non-zero error code: %d", i)
+	}
+	return nil
 }
 
 // NodeID returns the node of a given node
@@ -354,6 +364,6 @@ func (tn TestNodes) LogGenesisHashes(t *testing.T) {
 	for _, n := range tn {
 		gen, err := ioutil.ReadFile(path.Join(n.Dir(), "config", "genesis.json"))
 		require.NoError(t, err)
-		t.Log(fmt.Sprintf("node-%d genesis hash: %x", n.Index, sha256.Sum256(gen)))
+		t.Log(fmt.Sprintf("[node-%d] genesis hash %x", n.Index, sha256.Sum256(gen)))
 	}
 }

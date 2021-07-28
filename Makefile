@@ -12,13 +12,7 @@ build-linux:
 	GOOS=linux GOARCH=amd64 go build -o ./build/horcrux ./cmd/horcrux
 
 test:
-	@go test -short ./...
-
-race:
-	@go test -race -short ./...
-
-msan:
-	@go test -msan -short ./...
+	@go test -v ./testing/...
 
 tools:
 	@go install golang.org/x/lint/golint

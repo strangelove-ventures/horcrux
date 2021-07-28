@@ -10,7 +10,7 @@ Pylon Validation Services is currently maintaining and refactoring this codebase
   * [ ] Enable configuration via `ENV`
   * [ ] Seperate functionality into different commands 
   * [ ] Document code, security assumptions, and system functionality
-- [ ] Add robust test suite to ensure operation against specific versions of the [`cosmos-sdk`](https://github.com/cosmos/cosmos-skd) and [`tendermint`](https://github.com/tendermint/tendermint)
+- [ ] Add robust test suite to ensure operation against specific versions of the [`cosmos-sdk`](https://github.com/cosmos/cosmos-sdk) and [`tendermint`](https://github.com/tendermint/tendermint)
   * [ ] Use `dockertest` framework to spin up 
 
 ## Design
