@@ -39,8 +39,6 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	provider, err := dockertest.NewPool("")
 	require.NoError(t, err)
 
-	require.NoError(t, err)
-
 	net, err := provider.Client.CreateNetwork(docker.CreateNetworkOptions{
 		Name:   netid,
 		Labels: map[string]string{},
@@ -52,11 +50,10 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 
 	nodes := MakeTestNodes(4, home, chainid, simdChain, provider, t)
 
-	cont := startValidatorContainers(t, provider, net, nodes)
-	require.NoError(t, err)
+	startValidatorContainers(t, provider, net, nodes)
 
 	// set the test cleanup function
-	go cleanUpTest(t, testsDone, contDone, provider, cont, net, home)
+	go cleanUpTest(t, testsDone, contDone, provider, nodes, net, home)
 	t.Cleanup(func() {
 		testsDone <- struct{}{}
 		<-contDone
@@ -71,6 +68,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 				if err != nil {
 					return err
 				}
+				t.Log(stat)
 				if stat.SyncInfo.CatchingUp || stat.SyncInfo.LatestBlockHeight < 15 {
 					return fmt.Errorf("node still under block 15: %d", stat.SyncInfo.LatestBlockHeight)
 				}
@@ -97,7 +95,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 }
 
 // startValidatorContainers is passed a chain id and number chains to spin up
-func startValidatorContainers(t *testing.T, pool *dockertest.Pool, net *docker.Network, nodes []*TestNode) []*docker.Container {
+func startValidatorContainers(t *testing.T, pool *dockertest.Pool, net *docker.Network, nodes []*TestNode) {
 	eg := new(errgroup.Group)
 	ctx := context.Background()
 
@@ -137,16 +135,10 @@ func startValidatorContainers(t *testing.T, pool *dockertest.Pool, net *docker.N
 
 	TestNodes(nodes).LogGenesisHashes(t)
 
-	cont := make([]*docker.Container, len(nodes))
-	for i, n := range nodes {
-		n, i := n, i
+	for _, n := range nodes {
+		n := n
 		eg.Go(func() error {
-			res, err := n.CreateNodeContainer(ctx, net.ID)
-			if err != nil {
-				return err
-			}
-			cont[i] = res
-			return nil
+			return n.CreateNodeContainer(ctx, net.ID)
 		})
 	}
 	require.NoError(t, eg.Wait())
@@ -155,43 +147,14 @@ func startValidatorContainers(t *testing.T, pool *dockertest.Pool, net *docker.N
 	require.NoError(t, err)
 
 	for _, n := range nodes {
-		n.SetValidatorConfigAndPeers(peers)
-	}
-
-	for i, c := range cont {
-		i, c := i, c
-		t.Logf("[node-%d] => starting container...", i)
+		n := n
+		t.Logf("[ %s ] => starting container...", n.Name())
 		eg.Go(func() error {
-			if err := pool.Client.StartContainer(c.ID, nil); err != nil {
-				return err
-			}
-
-			c, err := pool.Client.InspectContainer(c.ID)
-			if err != nil {
-				return err
-			}
-
-			port := GetHostPort(c, "26657/tcp")
-			t.Logf("[%s] RPC => %s", nodes[i].Name(), port)
-
-			if err := nodes[i].NewClient(fmt.Sprintf("http://%s", port)); err != nil {
-				return err
-			}
-
-			return pool.Retry(func() error {
-				stat, err := nodes[i].Client.Status(context.Background())
-				if err != nil {
-					return err
-				}
-				if stat != nil && !stat.SyncInfo.CatchingUp {
-					return fmt.Errorf("still catching up")
-				}
-				return nil
-			})
+			n.SetValidatorConfigAndPeers(peers)
+			return n.StartContainer(ctx)
 		})
 	}
 	require.NoError(t, eg.Wait())
-	return cont
 }
 
 // peerString returns the string for connecting the nodes passed in
@@ -210,7 +173,7 @@ func peerString(ctx context.Context, nodes []*TestNode, t *testing.T) (out strin
 }
 
 // cleanUpTest is trigged by t.Cleanup and cleans up all resorces from the test
-func cleanUpTest(t *testing.T, testsDone <-chan struct{}, contDone chan<- struct{}, pool *dockertest.Pool, cont []*docker.Container, net *docker.Network, dir string) {
+func cleanUpTest(t *testing.T, testsDone <-chan struct{}, contDone chan<- struct{}, pool *dockertest.Pool, nodes []*TestNode, net *docker.Network, dir string) {
 	// block here until tests are complete
 	<-testsDone
 
@@ -219,10 +182,10 @@ func cleanUpTest(t *testing.T, testsDone <-chan struct{}, contDone chan<- struct
 
 	// remove all the docker containers
 	var eg errgroup.Group
-	for _, r := range cont {
+	for _, r := range nodes {
 		r := r
 		eg.Go(func() error {
-			if err := pool.Client.StopContainer(r.ID, uint(time.Second*30)); err != nil {
+			if err := r.StopContainer(context.Background()); err != nil {
 				t.Log("error stopping container", err)
 			}
 			return nil

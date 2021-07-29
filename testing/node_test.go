@@ -63,8 +63,8 @@ type TestNode struct {
 	Validator    bool
 	Provider     *dockertest.Pool
 	Client       rpcclient.Client
-
-	t *testing.T
+	Container    *docker.Container
+	t            *testing.T
 }
 
 // MakeTestNodes create the test node objects required for bootstrapping tests
@@ -252,8 +252,8 @@ func (tn *TestNode) CollectGentxs(ctx context.Context) error {
 	return handleNodeJobError(tn.NodeJob(ctx, cmd))
 }
 
-func (tn *TestNode) CreateNodeContainer(ctx context.Context, networkID string) (*docker.Container, error) {
-	return tn.Provider.Client.CreateContainer(docker.CreateContainerOptions{
+func (tn *TestNode) CreateNodeContainer(ctx context.Context, networkID string) error {
+	cont, err := tn.Provider.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: tn.Name(),
 		Config: &docker.Config{
 			Cmd:          []string{tn.Chain.Bin, "start", "--home", tn.NodeHome()},
@@ -273,6 +273,49 @@ func (tn *TestNode) CreateNodeContainer(ctx context.Context, networkID string) (
 			},
 		},
 		Context: nil,
+	})
+	if err != nil {
+		return err
+	}
+
+	tn.Container = cont
+
+	return nil
+}
+
+func (tn *TestNode) StopContainer(ctx context.Context) error {
+	return tn.Provider.Client.StopContainer(tn.Container.ID, uint(time.Second*30))
+}
+
+func (tn *TestNode) StartContainer(ctx context.Context) error {
+	if err := tn.Provider.Client.StartContainer(tn.Container.ID, nil); err != nil {
+		return err
+	}
+
+	c, err := tn.Provider.Client.InspectContainer(tn.Container.ID)
+	if err != nil {
+		return err
+	}
+	tn.Container = c
+
+	port := GetHostPort(c, "26657/tcp")
+	tn.t.Logf("[%s] RPC => %s", tn.Name(), port)
+
+	err = tn.NewClient(fmt.Sprintf("tcp://%s", port))
+	if err != nil {
+		return err
+	}
+
+	return retry.Do(func() error {
+		stat, err := tn.Client.Status(ctx)
+		if err != nil {
+			tn.t.Log(err)
+			return err
+		}
+		if stat != nil && !stat.SyncInfo.CatchingUp {
+			return fmt.Errorf("still catching up")
+		}
+		return nil
 	})
 }
 
