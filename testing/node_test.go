@@ -61,16 +61,16 @@ type TestNode struct {
 	Chain        *ChainType
 	GenesisCoins string
 	Validator    bool
-	Provider     *dockertest.Pool
+	Pool         *dockertest.Pool
 	Client       rpcclient.Client
 	Container    *docker.Container
 	t            *testing.T
 }
 
 // MakeTestNodes create the test node objects required for bootstrapping tests
-func MakeTestNodes(count int, home, chainid string, chainType *ChainType, provider *dockertest.Pool, t *testing.T) (out TestNodes) {
+func MakeTestNodes(count int, home, chainid string, chainType *ChainType, pool *dockertest.Pool, t *testing.T) (out TestNodes) {
 	for i := 0; i < count; i++ {
-		tn := &TestNode{Home: home, Index: i, Chain: chainType, ChainID: chainid, Provider: provider, t: t}
+		tn := &TestNode{Home: home, Index: i, Chain: chainType, ChainID: chainid, Pool: pool, t: t}
 		tn.MkDir()
 		out = append(out, tn)
 	}
@@ -179,7 +179,7 @@ func stdconfigchanges(cfg *tmconfig.Config, peers string) {
 func (tn *TestNode) NodeJob(ctx context.Context, cmd []string) (int, error) {
 	container := RandLowerCaseLetterString(10)
 	tn.t.Logf("{%s}[%s] -> '%s'", tn.Name(), container, strings.Join(cmd, " "))
-	cont, err := tn.Provider.Client.CreateContainer(docker.CreateContainerOptions{
+	cont, err := tn.Pool.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: container,
 		Config: &docker.Config{
 			Hostname:     container,
@@ -201,10 +201,10 @@ func (tn *TestNode) NodeJob(ctx context.Context, cmd []string) (int, error) {
 	if err != nil {
 		return 1, err
 	}
-	if err := tn.Provider.Client.StartContainer(cont.ID, nil); err != nil {
+	if err := tn.Pool.Client.StartContainer(cont.ID, nil); err != nil {
 		return 1, err
 	}
-	return tn.Provider.Client.WaitContainerWithContext(cont.ID, ctx)
+	return tn.Pool.Client.WaitContainerWithContext(cont.ID, ctx)
 }
 
 // InitHomeFolder initializes a home folder for the given node
@@ -253,7 +253,7 @@ func (tn *TestNode) CollectGentxs(ctx context.Context) error {
 }
 
 func (tn *TestNode) CreateNodeContainer(ctx context.Context, networkID string) error {
-	cont, err := tn.Provider.Client.CreateContainer(docker.CreateContainerOptions{
+	cont, err := tn.Pool.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: tn.Name(),
 		Config: &docker.Config{
 			Cmd:          []string{tn.Chain.Bin, "start", "--home", tn.NodeHome()},
@@ -284,15 +284,15 @@ func (tn *TestNode) CreateNodeContainer(ctx context.Context, networkID string) e
 }
 
 func (tn *TestNode) StopContainer(ctx context.Context) error {
-	return tn.Provider.Client.StopContainer(tn.Container.ID, uint(time.Second*30))
+	return tn.Pool.Client.StopContainer(tn.Container.ID, uint(time.Second*30))
 }
 
 func (tn *TestNode) StartContainer(ctx context.Context) error {
-	if err := tn.Provider.Client.StartContainer(tn.Container.ID, nil); err != nil {
+	if err := tn.Pool.Client.StartContainer(tn.Container.ID, nil); err != nil {
 		return err
 	}
 
-	c, err := tn.Provider.Client.InspectContainer(tn.Container.ID)
+	c, err := tn.Pool.Client.InspectContainer(tn.Container.ID)
 	if err != nil {
 		return err
 	}

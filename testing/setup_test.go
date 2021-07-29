@@ -36,10 +36,10 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	provider, err := dockertest.NewPool("")
+	pool, err := dockertest.NewPool("")
 	require.NoError(t, err)
 
-	net, err := provider.Client.CreateNetwork(docker.CreateNetworkOptions{
+	net, err := pool.Client.CreateNetwork(docker.CreateNetworkOptions{
 		Name:   netid,
 		Labels: map[string]string{},
 		// CheckDuplicate: false, todo: maybe enable?
@@ -48,12 +48,12 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	nodes := MakeTestNodes(4, home, chainid, simdChain, provider, t)
+	nodes := MakeTestNodes(4, home, chainid, simdChain, pool, t)
 
-	startValidatorContainers(t, provider, net, nodes)
+	startValidatorContainers(t, pool, net, nodes)
 
 	// set the test cleanup function
-	go cleanUpTest(t, testsDone, contDone, provider, nodes, net, home)
+	go cleanUpTest(t, testsDone, contDone, pool, nodes, net, home)
 	t.Cleanup(func() {
 		testsDone <- struct{}{}
 		<-contDone
