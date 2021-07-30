@@ -39,7 +39,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	pool, err := dockertest.NewPool("")
 	require.NoError(t, err)
 
-	net, err := pool.Client.CreateNetwork(docker.CreateNetworkOptions{
+	network, err := pool.Client.CreateNetwork(docker.CreateNetworkOptions{
 		Name:   netid,
 		Labels: map[string]string{},
 		// CheckDuplicate: false, todo: maybe enable?
@@ -50,10 +50,10 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 
 	nodes := MakeTestNodes(4, home, chainid, simdChain, pool, t)
 
-	startValidatorContainers(t, pool, net, nodes)
+	startValidatorContainers(t, pool, network, nodes)
 
 	// set the test cleanup function
-	go cleanUpTest(t, testsDone, contDone, pool, nodes, net, home)
+	go cleanUpTest(t, testsDone, contDone, pool, nodes, network, home)
 	t.Cleanup(func() {
 		testsDone <- struct{}{}
 		<-contDone
@@ -82,6 +82,17 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	time.Sleep(60 * time.Second)
 
 	// Build horcrux image from current go files
+	options := docker.BuildImageOptions {
+		Name:                fmt.Sprintf("%s:%s", imageName, imageVer),
+		Dockerfile:          dockerFile,
+		OutputStream:        os.Stdout,
+		ErrorStream:         os.Stderr,
+		ContextDir:          ctxDir,
+		Context:             ctx,
+	}
+	err = pool.Client.BuildImage(options)
+	require.NoError(t, err)
+
 	// signer-0 -> horcrux config init horcrux tcp://node-0:1234
 	// singer-1 -> horcrux config init horcrux tcp://node-0:1234
 	// signer-2 -> horcrux config init horcrux tcp://node-0:1234

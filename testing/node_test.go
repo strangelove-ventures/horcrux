@@ -410,3 +410,7 @@ func (tn TestNodes) LogGenesisHashes(t *testing.T) {
 		t.Log(fmt.Sprintf("[node-%d] genesis hash %x", n.Index, sha256.Sum256(gen)))
 	}
 }
+
+func (tn TestNodes) CreateKeyShares() {
+
+}
