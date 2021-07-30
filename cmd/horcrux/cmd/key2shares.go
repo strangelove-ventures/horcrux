@@ -118,6 +118,54 @@ var key2sharesCmd = &cobra.Command{
 	},
 }
 
+// KeyToShares takes a priv key and some args and returns the share objects
+func KeyToShares(threshold, total int64, pvKey privval.FilePVKey) []signer.CosignerKey {
+	privKeyBytes := [64]byte{}
+
+	// extract the raw private key bytes from the loaded key
+	// we need this to compute the expanded secret
+	switch ed25519Key := pvKey.PrivKey.(type) {
+	case ed25519.PrivKey:
+		if len(ed25519Key) != len(privKeyBytes) {
+			panic("Key length inconsistency")
+		}
+		copy(privKeyBytes[:], ed25519Key[:])
+		break
+	default:
+		panic("Not an ed25519 private key")
+	}
+
+	// generate shares from secret
+	shares := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), uint8(threshold), uint8(total))
+
+	// generate all rsa keys
+	rsaKeys := make([]*rsa.PrivateKey, len(shares))
+	pubkeys := make([]*rsa.PublicKey, len(shares))
+	for idx := range shares {
+		bitSize := 4096
+		rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
+		if err != nil {
+			panic(err)
+		}
+		rsaKeys[idx] = rsaKey
+		pubkeys[idx] = &rsaKey.PublicKey
+	}
+
+	// write shares and keys to private share files
+	cosignerKeys := []signer.CosignerKey{}
+	for idx, share := range shares {
+		shareID := idx + 1
+		cosignerKeys = append(cosignerKeys, signer.CosignerKey{
+			PubKey:       pvKey.PubKey,
+			ShareKey:     share,
+			ID:           shareID,
+			RSAKey:       *rsaKeys[idx],
+			CosignerKeys: pubkeys,
+		})
+	}
+	return cosignerKeys
+}
+
 func init() {
 	rootCmd.AddCommand(key2sharesCmd)
 

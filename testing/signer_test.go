@@ -1,24 +1,27 @@
 package testing
 
 import (
+	"testing"
+
+	"github.com/jackzampolin/horcrux/internal/signer"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
-	"testing"
 )
 
 var (
-	imageName = "horcrux-test"
-	imageVer = "v0.1.0"
+	imageName  = "horcrux-test"
+	imageVer   = "v0.1.0"
 	dockerFile = "./docker/horcrux/Dockerfile"
-	ctxDir = "/home/anon/go/src/github.com/jackzampolin/horcrux/"
+	ctxDir     = "/home/anon/go/src/github.com/jackzampolin/horcrux/"
 )
 
 type TestSigner struct {
-	Home string
-	Index int
-	Pool         *dockertest.Pool
-	Container    *docker.Container
-	t            *testing.T
+	Home      string
+	Index     int
+	Pool      *dockertest.Pool
+	Container *docker.Container
+	Key       signer.CosignerKey
+	t         *testing.T
 }
 
 func (ts *TestSigner) StartContainer() error {
@@ -47,5 +50,9 @@ func (ts *TestSigner) CreateConfig() error {
 }
 
 func (ts *TestSigner) CopyKeyShare(tn *TestNode) error {
+	return nil
+}
+
+func (ts *TestSigner) WriteKeyToFile() error {
 	return nil
 }
