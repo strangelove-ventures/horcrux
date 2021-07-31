@@ -40,11 +40,11 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	require.NoError(t, err)
 
 	network, err := pool.Client.CreateNetwork(docker.CreateNetworkOptions{
-		Name:   netid,
-		Labels: map[string]string{},
-		// CheckDuplicate: false, todo: maybe enable?
-		Internal: false,
-		Context:  ctx,
+		Name:           netid,
+		Labels:         map[string]string{},
+		CheckDuplicate: true,
+		Internal:       false,
+		Context:        ctx,
 	})
 	require.NoError(t, err)
 

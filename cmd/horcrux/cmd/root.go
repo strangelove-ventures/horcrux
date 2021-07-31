@@ -47,8 +47,10 @@ func initConfig() {
 	}
 	viper.SetEnvPrefix("horcrux")
 	viper.AutomaticEnv()
-	if err := viper.ReadInConfig(); err != nil {
-		fmt.Println("no config exists at default location. run 'horcrux config init --help' to see configuration options", err)
+	err := viper.ReadInConfig()
+	if err != nil {
+		fmt.Println("no config exists at default location", err)
+		return
 	}
 	handleInitError(viper.Unmarshal(&cfg))
 	bz, err := ioutil.ReadFile(viper.ConfigFileUsed())
