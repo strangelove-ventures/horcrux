@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	chainid = "horcux"
+	chainid = "horcrux"
 	netid   = "horcrux"
 )
 
@@ -82,20 +82,20 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	time.Sleep(60 * time.Second)
 
 	// Build horcrux image from current go files
-	options := docker.BuildImageOptions {
-		Name:                fmt.Sprintf("%s:%s", imageName, imageVer),
-		Dockerfile:          dockerFile,
-		OutputStream:        os.Stdout,
-		ErrorStream:         os.Stderr,
-		ContextDir:          ctxDir,
-		Context:             ctx,
+	options := docker.BuildImageOptions{
+		Name:         fmt.Sprintf("%s:%s", imageName, imageVer),
+		Dockerfile:   dockerFile,
+		OutputStream: os.Stdout,
+		ErrorStream:  os.Stderr,
+		ContextDir:   ctxDir,
+		Context:      ctx,
 	}
 	err = pool.Client.BuildImage(options)
 	require.NoError(t, err)
 
-	// signer-0 -> horcrux config init horcrux tcp://node-0:1234
-	// singer-1 -> horcrux config init horcrux tcp://node-0:1234
-	// signer-2 -> horcrux config init horcrux tcp://node-0:1234
+	// signer-0 -> horcrux config init horcrux tcp://node-0:1234 --cosigner --peers="tcp://signer-1:1234|2,tcp://signer-2|3" --threshold 2
+	// singer-1 -> horcrux config init horcrux tcp://node-0:1234 --cosigner --peers="tcp://signer-0:1234|1,tcp://signer-2|3" --threshold 2
+	// signer-2 -> horcrux config init horcrux tcp://node-0:1234 --cosigner --peers="tcp://signer-0:1234|1,tcp://signer-1|2" --threshold 2
 	// signer-job -> horcrux
 	// TODO: init 3 signer directories
 	// TODO: stop one node
