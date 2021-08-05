@@ -5,6 +5,10 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
+	"github.com/jackzampolin/horcrux/cmd/horcrux/cmd"
+	"github.com/jackzampolin/horcrux/internal/signer"
+	tmjson "github.com/tendermint/tendermint/libs/json"
+	"github.com/tendermint/tendermint/privval"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -45,11 +49,11 @@ var simdChain = &ChainType{
 	Version:    "v0.42.3",
 	Bin:        "simd",
 	Ports: map[docker.Port]struct{}{
-		"26656/tcp": struct{}{},
-		"26657/tcp": struct{}{},
-		"9090/tcp":  struct{}{},
-		"1337/tcp":  struct{}{},
-		"1234/tcp":  struct{}{},
+		"26656/tcp": {},
+		"26657/tcp": {},
+		"9090/tcp":  {},
+		"1337/tcp":  {},
+		"1234/tcp":  {},
 	},
 }
 
@@ -127,11 +131,11 @@ func (tn *TestNode) TMConfigPath() string {
 
 // Bind returns the home folder bind point for running the node
 func (tn *TestNode) Bind() []string {
-	return []string{fmt.Sprintf("%s:/root/.%s", tn.Dir(), tn.Chain.Bin)}
+	return []string{fmt.Sprintf("%s:/home/.%s", tn.Dir(), tn.Chain.Bin)}
 }
 
 func (tn *TestNode) NodeHome() string {
-	return fmt.Sprintf("/root/.%s", tn.Chain.Bin)
+	return fmt.Sprintf("/home/.%s", tn.Chain.Bin)
 }
 
 // Keybase returns the keyring for a given node
@@ -182,6 +186,7 @@ func (tn *TestNode) NodeJob(ctx context.Context, cmd []string) (int, error) {
 	cont, err := tn.Pool.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: container,
 		Config: &docker.Config{
+			User:         "1000:1000",
 			Hostname:     container,
 			ExposedPorts: tn.Chain.Ports,
 			DNS:          []string{},
@@ -209,53 +214,54 @@ func (tn *TestNode) NodeJob(ctx context.Context, cmd []string) (int, error) {
 
 // InitHomeFolder initializes a home folder for the given node
 func (tn *TestNode) InitHomeFolder(ctx context.Context) error {
-	cmd := []string{tn.Chain.Bin, "init", tn.Name(),
+	command := []string{tn.Chain.Bin, "init", tn.Name(),
 		"--chain-id", tn.ChainID,
 		"--home", tn.NodeHome(),
 	}
-	return handleNodeJobError(tn.NodeJob(ctx, cmd))
+	return handleNodeJobError(tn.NodeJob(ctx, command))
 }
 
 // CreateKey creates a key in the keyring backend test for the given node
 func (tn *TestNode) CreateKey(ctx context.Context, name string) error {
-	cmd := []string{tn.Chain.Bin, "keys", "add", name,
+	command := []string{tn.Chain.Bin, "keys", "add", name,
 		"--keyring-backend", "test",
 		"--output", "json",
 		"--home", tn.NodeHome(),
 	}
-	return handleNodeJobError(tn.NodeJob(ctx, cmd))
+	return handleNodeJobError(tn.NodeJob(ctx, command))
 }
 
 // AddGenesisAccount adds a genesis account for each key
 func (tn *TestNode) AddGenesisAccount(ctx context.Context, address string) error {
-	cmd := []string{tn.Chain.Bin, "add-genesis-account", address, "1000000000000stake",
+	command := []string{tn.Chain.Bin, "add-genesis-account", address, "1000000000000stake",
 		"--home", tn.NodeHome(),
 	}
-	return handleNodeJobError(tn.NodeJob(ctx, cmd))
+	return handleNodeJobError(tn.NodeJob(ctx, command))
 }
 
 // Gentx generates the gentx for a given node
 func (tn *TestNode) Gentx(ctx context.Context, name string) error {
-	cmd := []string{tn.Chain.Bin, "gentx", valKey, "100000000000stake",
+	command := []string{tn.Chain.Bin, "gentx", valKey, "100000000000stake",
 		"--keyring-backend", "test",
 		"--home", tn.NodeHome(),
 		"--chain-id", tn.ChainID,
 	}
-	return handleNodeJobError(tn.NodeJob(ctx, cmd))
+	return handleNodeJobError(tn.NodeJob(ctx, command))
 }
 
 // CollectGentxs runs collect gentxs on the node's home folders
 func (tn *TestNode) CollectGentxs(ctx context.Context) error {
-	cmd := []string{tn.Chain.Bin, "collect-gentxs",
+	command := []string{tn.Chain.Bin, "collect-gentxs",
 		"--home", tn.NodeHome(),
 	}
-	return handleNodeJobError(tn.NodeJob(ctx, cmd))
+	return handleNodeJobError(tn.NodeJob(ctx, command))
 }
 
-func (tn *TestNode) CreateNodeContainer(ctx context.Context, networkID string) error {
+func (tn *TestNode) CreateNodeContainer(networkID string) error {
 	cont, err := tn.Pool.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: tn.Name(),
 		Config: &docker.Config{
+			User:         "1000:1000",
 			Cmd:          []string{tn.Chain.Bin, "start", "--home", tn.NodeHome()},
 			Hostname:     tn.Name(),
 			ExposedPorts: tn.Chain.Ports,
@@ -269,7 +275,7 @@ func (tn *TestNode) CreateNodeContainer(ctx context.Context, networkID string) e
 		},
 		NetworkingConfig: &docker.NetworkingConfig{
 			EndpointsConfig: map[string]*docker.EndpointConfig{
-				networkID: &docker.EndpointConfig{},
+				networkID: {},
 			},
 		},
 		Context: nil,
@@ -283,7 +289,7 @@ func (tn *TestNode) CreateNodeContainer(ctx context.Context, networkID string) e
 	return nil
 }
 
-func (tn *TestNode) StopContainer(ctx context.Context) error {
+func (tn *TestNode) StopContainer() error {
 	return tn.Pool.Client.StopContainer(tn.Container.ID, uint(time.Second*30))
 }
 
@@ -411,6 +417,20 @@ func (tn TestNodes) LogGenesisHashes(t *testing.T) {
 	}
 }
 
-func (tn TestNodes) CreateKeyShares() {
+func (tn TestNode) CreateKeyShares(threshold, total int64) ([]signer.CosignerKey, error) {
+	tn.t.Logf("{%s} -> Creating Private Key Shares...", tn.Name())
+	pvKey := privval.FilePVKey{}
+	keyPath := fmt.Sprintf("%sconfig/priv_validator_key.json", tn.Dir())
 
+	keyFile, err := ioutil.ReadFile(keyPath)
+	if err != nil {
+		return nil, err
+	}
+
+	err = tmjson.Unmarshal(keyFile, &pvKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return cmd.KeyToShares(threshold, total, pvKey), nil
 }

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/mitchellh/go-homedir"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -10,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/jackzampolin/horcrux/internal/signer"
-	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 )
@@ -64,11 +64,19 @@ func initCmd() *cobra.Command {
 					return err
 				}
 			}
-			home, _ := homedir.Dir()
-			homeDir := path.Join(home, ".horcrux")
-			if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
-				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
+
+			var homeDir string
+			if cfgFile != "" {
+				homeDir = cfgFile
+			} else {
+				home, _ := homedir.Dir()
+				homeDir = path.Join(home, ".horcrux")
 			}
+
+			//TODO double check that omitting directory check does not introduce unexpected behavior
+			//if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
+			//	return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
+			//}
 			var cfg *Config
 			cs, _ := cmd.Flags().GetBool("cosigner")
 			if cs {
