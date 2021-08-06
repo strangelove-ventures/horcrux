@@ -53,7 +53,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	var gid int
 	userOS := runtime.GOOS
 	if  userOS == "darwin" {
-		g, err := user.LookupGroup("admin")
+		g, err := user.LookupGroup("staff")
 		require.NoError(t, err)
 
 		gid, err = strconv.Atoi(g.Gid)
@@ -154,7 +154,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	err = nodes[0].StartContainer(ctx)
 	require.NoError(t, err)
 
-	time.Sleep(10 * time.Second) // TODO can turn this back down after debugging
+	time.Sleep(10 * time.Second)
 
 	consPub, err := nodes[0].GetConsPub()
 	require.NoError(t, err)
