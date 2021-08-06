@@ -32,6 +32,14 @@ func init() {
 }
 
 func TestUpgradeValidatorToHorcrux(t *testing.T) {
+	dir, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+	ctxDir = path.Dir(dir)
+	dockerFile = path.Join(ctxDir, "docker/horcrux/Dockerfile")
+	t.Log("CWD", ctxDir)
+	t.Log("DOCKER", dockerFile)
 	testsDone := make(chan struct{})
 	contDone := make(chan struct{})
 
