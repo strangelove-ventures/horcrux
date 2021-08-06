@@ -14,7 +14,4 @@ id = 3
 remote_address = "tcp://0.0.0.0:2224"
 
 [[node]]
-address = "tcp://0.0.0.0:1234" 
-
-[[node]]
-address = "tcp://0.0.0.0:1235" 
+address = "tcp://0.0.0.0:1235"
