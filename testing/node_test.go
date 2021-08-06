@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"os"
 	"path"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -76,7 +77,6 @@ type TestNode struct {
 	Container    *docker.Container
 	t            *testing.T
 	ec           params.EncodingConfig
-	user         string // string representing the uid:gid of the user/group the containers will be ran from
 }
 
 func (tn *TestNode) CliContext() client.Context {
@@ -93,9 +93,9 @@ func (tn *TestNode) CliContext() client.Context {
 }
 
 // MakeTestNodes create the test node objects required for bootstrapping tests
-func MakeTestNodes(count int, home, usr, chainid string, chainType *ChainType, pool *dockertest.Pool, t *testing.T) (out TestNodes) {
+func MakeTestNodes(count int, home, chainid string, chainType *ChainType, pool *dockertest.Pool, t *testing.T) (out TestNodes) {
 	for i := 0; i < count; i++ {
-		tn := &TestNode{Home: home, Index: i, user: usr, Chain: chainType, ChainID: chainid, Pool: pool, t: t, ec: simapp.MakeTestEncodingConfig()}
+		tn := &TestNode{Home: home, Index: i, Chain: chainType, ChainID: chainid, Pool: pool, t: t, ec: simapp.MakeTestEncodingConfig()}
 		tn.MkDir()
 		out = append(out, tn)
 	}
@@ -207,7 +207,7 @@ func (tn *TestNode) NodeJob(ctx context.Context, cmd []string) (int, error) {
 	cont, err := tn.Pool.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: container,
 		Config: &docker.Config{
-			User:         tn.user,
+			User:         getDockerUserString(),
 			Hostname:     container,
 			ExposedPorts: tn.Chain.Ports,
 			DNS:          []string{},
@@ -282,7 +282,7 @@ func (tn *TestNode) CreateNodeContainer(networkID string) error {
 	cont, err := tn.Pool.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: tn.Name(),
 		Config: &docker.Config{
-			User:         tn.user,
+			User:         getDockerUserString(),
 			Cmd:          []string{tn.Chain.Bin, "start", "--home", tn.NodeHome()},
 			Hostname:     tn.Name(),
 			ExposedPorts: tn.Chain.Ports,
@@ -476,4 +476,16 @@ func (tn *TestNode) CreateKeyShares(threshold, total int64) ([]signer.CosignerKe
 	}
 
 	return cmd.KeyToShares(threshold, total, pvKey), nil
+}
+
+func getDockerUserString() string {
+	uid := os.Getuid()
+	var usr string
+	userOS := runtime.GOOS
+	if userOS == "darwin" {
+		usr = ""
+	} else {
+		usr = fmt.Sprintf("%d:%d", uid, uid)
+	}
+	return usr
 }

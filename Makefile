@@ -12,6 +12,7 @@ build-linux:
 	GOOS=linux GOARCH=amd64 go build -o ./build/horcrux ./cmd/horcrux
 
 test:
+	@docker network prune
 	@go test -v ./testing/...
 
 tools:

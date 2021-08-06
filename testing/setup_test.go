@@ -7,10 +7,7 @@ import (
 	"log"
 	"net"
 	"os"
-	"os/user"
 	"path"
-	"runtime"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -47,21 +44,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 		to explicitly be ran from said user/group. Below code dynamically grabs the uid but it makes the assumption
 		that the gid will be equal to the uid on Linux based systems or that the user will belong to the group 'admin'
 		on MacOS
-	 */
-	uid := os.Getuid()
-
-	var gid int
-	userOS := runtime.GOOS
-	if  userOS == "darwin" {
-		g, err := user.LookupGroup("staff")
-		require.NoError(t, err)
-
-		gid, err = strconv.Atoi(g.Gid)
-		require.NoError(t, err)
-	} else {
-		gid = uid
-	}
-	usr := fmt.Sprintf("%d:%d", uid, gid)
+	*/
 
 	home, err := ioutil.TempDir("", "")
 	require.NoError(t, err)
@@ -93,7 +76,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	nodes := MakeTestNodes(4, home, usr, chainid, simdChain, pool, t)
+	nodes := MakeTestNodes(4, home, chainid, simdChain, pool, t)
 
 	startValidatorContainers(t, network, nodes)
 
@@ -121,7 +104,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	// Create test signers
 	total := 3
 	threshold := 2
-	testSigners := MakeTestSigners(total, home, usr, pool, t)
+	testSigners := MakeTestSigners(total, home, pool, t)
 
 	// Stop one node before spinning up the mpc nodes
 	t.Logf("{%s} -> Stopping Node...", nodes[0].Name())
@@ -135,7 +118,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 		<-contDone
 	})
 
-	startSignerContainers(t, usr, testSigners, nodes[0], threshold, total, network)
+	startSignerContainers(t, getDockerUserString(), testSigners, nodes[0], threshold, total, network)
 
 	// modify node config to listen for private validator connections
 	peers, err := peerString(nodes, t)
@@ -173,9 +156,6 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 		}
 		require.Equal(t, missed, slashInfo.ValSigningInfo.MissedBlocksCounter)
 		require.False(t, slashInfo.ValSigningInfo.Tombstoned)
-
-		//t.Log("MISSED BLOCKS COUNTER", slashInfo.ValSigningInfo.MissedBlocksCounter)
-		//t.Log("TOMBSTONED?", slashInfo.ValSigningInfo.Tombstoned)
 	}
 }
 
