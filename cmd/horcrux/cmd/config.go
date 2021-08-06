@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/jackzampolin/horcrux/signer"
 	"github.com/mitchellh/go-homedir"
 	"io/ioutil"
 	"net/url"
@@ -10,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jackzampolin/horcrux/internal/signer"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 )

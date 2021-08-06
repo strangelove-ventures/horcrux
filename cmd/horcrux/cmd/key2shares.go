@@ -20,10 +20,10 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"fmt"
+	"github.com/jackzampolin/horcrux/signer"
 	"io/ioutil"
 	"strconv"
 
-	"github.com/jackzampolin/horcrux/internal/signer"
 	"github.com/spf13/cobra"
 	"github.com/tendermint/tendermint/crypto/ed25519"
 	tmjson "github.com/tendermint/tendermint/libs/json"

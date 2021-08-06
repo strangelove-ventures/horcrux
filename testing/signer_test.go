@@ -3,13 +3,13 @@ package testing
 import (
 	"context"
 	"fmt"
+	"github.com/jackzampolin/horcrux/signer"
 	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/jackzampolin/horcrux/internal/signer"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
 	"github.com/stretchr/testify/require"
@@ -82,7 +82,6 @@ func MakeTestSigners(count int, home string, pool *dockertest.Pool, t *testing.T
 			Key:       signer.CosignerKey{},
 			t:         t,
 		}
-		//ts.MkDir()
 		out = append(out, ts)
 	}
 	return

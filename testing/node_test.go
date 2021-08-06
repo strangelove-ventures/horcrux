@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
+	"github.com/jackzampolin/horcrux/signer"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -15,7 +16,6 @@ import (
 	"time"
 
 	"github.com/jackzampolin/horcrux/cmd/horcrux/cmd"
-	"github.com/jackzampolin/horcrux/internal/signer"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/privval"
 

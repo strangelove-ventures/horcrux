@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/jackzampolin/horcrux/signer"
 	"log"
 	"net"
 	"os"
@@ -9,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jackzampolin/horcrux/internal/signer"
 	"github.com/spf13/cobra"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmOS "github.com/tendermint/tendermint/libs/os"
@@ -150,14 +150,14 @@ func StartCosignerCmd() *cobra.Command {
 
 			for _, node := range config.Nodes {
 				dialer := net.Dialer{Timeout: 30 * time.Second}
-				signer := signer.NewReconnRemoteSigner(node.Address, logger, config.ChainID, pv, dialer)
+				s := signer.NewReconnRemoteSigner(node.Address, logger, config.ChainID, pv, dialer)
 
-				err := signer.Start()
+				err := s.Start()
 				if err != nil {
 					panic(err)
 				}
 
-				services = append(services, signer)
+				services = append(services, s)
 			}
 
 			wg := sync.WaitGroup{}
