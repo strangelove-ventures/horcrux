@@ -7,7 +7,7 @@ import (
 )
 
 func TestLoadCosignerKey(test *testing.T) {
-	key, err := LoadCosignerKey("../../test/cosigner-key.json")
+	key, err := LoadCosignerKey("./fixtures/cosigner-key.json")
 	require.NoError(test, err)
 	require.Equal(test, key.ID, 3)
 
