@@ -18,7 +18,6 @@ import (
 )
 
 func init() {
-	cosignerCmd.AddCommand(signer.CreateCosignerSharesCmd())
 	cosignerCmd.AddCommand(StartCosignerCmd())
 	rootCmd.AddCommand(cosignerCmd)
 }

@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jackzampolin/horcrux/cmd/horcrux/cmd"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/privval"
 
@@ -470,12 +469,10 @@ func (tn *TestNode) GetConsPub() (string, error) {
 
 func (tn *TestNode) CreateKeyShares(threshold, total int64) ([]signer.CosignerKey, error) {
 	tn.t.Logf("{%s} -> Creating Private Key Shares...", tn.Name())
-	pvKey, err := tn.GetPrivVal()
-	if err != nil {
-		return nil, err
-	}
 
-	return cmd.KeyToShares(threshold, total, pvKey), nil
+	keyPath := fmt.Sprintf("%sconfig/priv_validator_key.json", tn.Dir())
+
+	return signer.CreateCosignerSharesFromFile(keyPath, threshold, total)
 }
 
 func getDockerUserString() string {
