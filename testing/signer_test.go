@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"strings"
 	"testing"
 	"time"
@@ -22,13 +23,14 @@ func init() {
 		panic(err)
 	}
 	ctxDir = dir
+	dockerFile = path.Join(ctxDir, "docker/horcrux/Dockerfile")
 }
 
 var (
 	ctxDir      string
+	dockerFile  string
 	imageName   = "horcrux-test"
 	imageVer    = "latest"
-	dockerFile  = "./docker/horcrux/Dockerfile"
 	signerPorts = map[docker.Port]struct{}{
 		"2222/tcp": {},
 	}
