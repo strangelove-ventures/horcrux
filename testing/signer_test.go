@@ -39,6 +39,7 @@ type TestSigner struct {
 	Container *docker.Container
 	Key       signer.CosignerKey
 	t         *testing.T
+	user      string // string representing the uid:gid of the user/group the containers will be ran from
 }
 
 type TestSigners []*TestSigner
@@ -72,7 +73,7 @@ func (ts TestSigners) PeerString(skip int) string {
 }
 
 // MakeTestSigners creates the TestSigner objects required for bootstrapping tests
-func MakeTestSigners(count int, home string, pool *dockertest.Pool, t *testing.T) (out TestSigners) {
+func MakeTestSigners(count int, home, usr string, pool *dockertest.Pool, t *testing.T) (out TestSigners) {
 	for i := 0; i < count; i++ {
 		ts := &TestSigner{
 			Home:      home,
@@ -81,6 +82,7 @@ func MakeTestSigners(count int, home string, pool *dockertest.Pool, t *testing.T
 			Container: nil,
 			Key:       signer.CosignerKey{},
 			t:         t,
+			user:      usr,
 		}
 		ts.MkDir()
 		out = append(out, ts)
@@ -120,7 +122,7 @@ func (ts *TestSigner) InitSignerConfig(ctx context.Context, listenNode string, p
 	cont, err := ts.Pool.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: container,
 		Config: &docker.Config{
-			User:         "1000:1000", //TODO remove this hardcoded value
+			User:         ts.user,
 			Hostname:     container,
 			ExposedPorts: signerPorts,
 			Image:        fmt.Sprintf("%s:%s", imageName, imageVer),
@@ -178,7 +180,7 @@ func (ts *TestSigner) CreateSignerContainer(networkID string) error {
 	cont, err := ts.Pool.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: ts.Name(),
 		Config: &docker.Config{
-			User:         "1000:1000",
+			User:         ts.user,
 			Cmd:          []string{"horcrux", "cosigner", "start", fmt.Sprintf("--config=%sconfig.yaml", ts.Dir())},
 			Hostname:     ts.Name(),
 			ExposedPorts: signerPorts,

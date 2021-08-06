@@ -7,7 +7,10 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/user"
 	"path"
+	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -41,27 +44,24 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 		of a user account on the host machine without sudo (i.e. can't read the files from Go)
 
 		As of now, when creating a docker container the config is being passed in a uid:gid string to tell the container
-		to explicitly be ran from said user/group. Below code would dynamically grab the uid but it makes the assumption
-		that the gid will be equal to the uid (standard in linux afaik but not sure about OSx.)
+		to explicitly be ran from said user/group. Below code dynamically grabs the uid but it makes the assumption
+		that the gid will be equal to the uid on Linux based systems or that the user will belong to the group 'admin'
+		on MacOS
+	 */
+	uid := os.Getuid()
 
-		uid := os.Getuid()
-		u, err := user.Current()
+	var gid int
+	userOS := runtime.GOOS
+	if  userOS == "darwin" {
+		g, err := user.LookupGroup("admin")
 		require.NoError(t, err)
 
-		groupIDs, err:= u.GroupIds()
+		gid, err = strconv.Atoi(g.Gid)
 		require.NoError(t, err)
-
-		var gid int
-		for _, i := range groupIDs {
-			i, err := strconv.Atoi(i)
-			require.NoError(t, err)
-
-			if i == uid {
-				gid = i
-			}
-		}
-		user := fmt.Sprintf("%d:%d", uid, gid)
-	*/
+	} else {
+		gid = uid
+	}
+	usr := fmt.Sprintf("%d:%d", uid, gid)
 
 	home, err := ioutil.TempDir("", "")
 	require.NoError(t, err)
@@ -79,10 +79,25 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	nodes := MakeTestNodes(4, home, chainid, simdChain, pool, t)
+	// Build horcrux image from current Dockerfile
+	go func() {
+		t.Logf("Building Docker Image %s:%s", imageName, imageVer)
+		options := docker.BuildImageOptions{
+			Name:           fmt.Sprintf("%s:%s", imageName, imageVer),
+			Dockerfile:     dockerFile,
+			OutputStream:   ioutil.Discard,
+			RmTmpContainer: true,
+			ContextDir:     fmt.Sprintf("%s%s", os.Getenv("GOPATH"), ctxDir),
+		}
+		err = pool.Client.BuildImage(options)
+		require.NoError(t, err)
+	}()
+
+	nodes := MakeTestNodes(4, home, usr, chainid, simdChain, pool, t)
 
 	startValidatorContainers(t, network, nodes)
 
+	t.Log("Waiting For Nodes To Reach Block Height 15...")
 	var eg errgroup.Group
 	for _, n := range nodes {
 		n := n
@@ -92,32 +107,21 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				t.Log(stat)
+
 				if stat.SyncInfo.CatchingUp || stat.SyncInfo.LatestBlockHeight < 15 {
 					return fmt.Errorf("node still under block 15: %d", stat.SyncInfo.LatestBlockHeight)
 				}
-				t.Logf("[%s] => reached block 15\n", n.Name())
+				t.Logf("{%s} => reached block 15\n", n.Name())
 				return nil
 			})
 		})
 	}
 	require.NoError(t, eg.Wait())
 
-	// Build horcrux image from current go files
-	options := docker.BuildImageOptions{
-		Name:           fmt.Sprintf("%s:%s", imageName, imageVer),
-		Dockerfile:     dockerFile,
-		OutputStream:   os.Stdout,
-		RmTmpContainer: true,
-		ContextDir:     fmt.Sprintf("%s%s", os.Getenv("GOPATH"), ctxDir),
-	}
-	err = pool.Client.BuildImage(options)
-	require.NoError(t, err)
-
 	// Create test signers
 	total := 3
 	threshold := 2
-	testSigners := MakeTestSigners(total, home, pool, t)
+	testSigners := MakeTestSigners(total, home, usr, pool, t)
 
 	// Stop one node before spinning up the mpc nodes
 	t.Logf("{%s} -> Stopping Node...", nodes[0].Name())
@@ -131,7 +135,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 		<-contDone
 	})
 
-	startSignerContainers(t, testSigners, nodes[0], threshold, total, network)
+	startSignerContainers(t, usr, testSigners, nodes[0], threshold, total, network)
 
 	// modify node config to listen for private validator connections
 	peers, err := peerString(nodes, t)
@@ -150,49 +154,29 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	err = nodes[0].StartContainer(ctx)
 	require.NoError(t, err)
 
-	// nodes[0].Client
-
 	time.Sleep(10 * time.Second) // TODO can turn this back down after debugging
 
 	consPub, err := nodes[0].GetConsPub()
 	require.NoError(t, err)
 
+	missed := int64(0)
 	for i := 0; i < 10; i++ {
+		time.Sleep(1 * time.Second)
 		slashInfo, err := slashingtypes.NewQueryClient(nodes[0].CliContext()).SigningInfo(context.Background(), &slashingtypes.QuerySigningInfoRequest{
 			ConsAddress: consPub,
 		})
 		require.NoError(t, err)
 
-		t.Log("MISSED BLOCKS COUNTER", slashInfo.ValSigningInfo.MissedBlocksCounter)
-		t.Log("TOMBSTONED?", slashInfo.ValSigningInfo.Tombstoned)
+		if i == 0 {
+			missed = slashInfo.ValSigningInfo.MissedBlocksCounter
+			continue
+		}
+		require.Equal(t, missed, slashInfo.ValSigningInfo.MissedBlocksCounter)
+		require.False(t, slashInfo.ValSigningInfo.Tombstoned)
+
+		//t.Log("MISSED BLOCKS COUNTER", slashInfo.ValSigningInfo.MissedBlocksCounter)
+		//t.Log("TOMBSTONED?", slashInfo.ValSigningInfo.Tombstoned)
 	}
-	// sdk.GetPubKeyFromBech32)
-
-	// pk, err := sdk.GetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, args[0])
-	// if err != nil {
-	// return err
-	// }
-
-	// consAddr := sdk.ConsAddress(pk.Address())
-	// params := &types.QuerySigningInfoRequest{ConsAddress: consAddr.String()}
-	// res, err := queryClient.SigningInfo(context.Background(), params)
-	// if err != nil {
-	// return err
-	// }
-
-	t.Log("nodes started waiting 60 seconds before teardown")
-	time.Sleep(120 * time.Second) // TODO can turn this back down after debugging
-
-	// signer-0 -> horcrux config init horcrux tcp://node-0:1234 --cosigner --peers="tcp://signer-1:1234|2,tcp://signer-2|3" --threshold 2
-	// singer-1 -> horcrux config init horcrux tcp://node-0:1234 --cosigner --peers="tcp://signer-0:1234|1,tcp://signer-2|3" --threshold 2
-	// signer-2 -> horcrux config init horcrux tcp://node-0:1234 --cosigner --peers="tcp://signer-0:1234|1,tcp://signer-1|2" --threshold 2
-	// signer-job -> horcrux
-	// init 3 signer directories
-	// stop one node
-	// generate keys shares from node private key
-	// copy key shares to signer node directories
-	// modify node config to listen for priv_validator connections
-	// restart node and check that slashing doesn't happen and cluster continues to make blocks
 }
 
 // startValidatorContainers is passed a chain id and number chains to spin up
@@ -248,7 +232,7 @@ func startValidatorContainers(t *testing.T, net *docker.Network, nodes []*TestNo
 
 	for _, n := range nodes {
 		n := n
-		t.Logf("[ %s ] => starting container...", n.Name())
+		t.Logf("{%s} => starting container...", n.Name())
 		eg.Go(func() error {
 			n.SetValidatorConfigAndPeers(peers)
 			return n.StartContainer(ctx)
@@ -257,7 +241,7 @@ func startValidatorContainers(t *testing.T, net *docker.Network, nodes []*TestNo
 	require.NoError(t, eg.Wait())
 }
 
-func startSignerContainers(t *testing.T, testSigners TestSigners, node *TestNode, threshold, total int, network *docker.Network) {
+func startSignerContainers(t *testing.T, usr string, testSigners TestSigners, node *TestNode, threshold, total int, network *docker.Network) {
 	eg := new(errgroup.Group)
 	ctx := context.Background()
 
@@ -293,7 +277,7 @@ func startSignerContainers(t *testing.T, testSigners TestSigners, node *TestNode
 
 	for _, s := range testSigners {
 		s := s
-		t.Logf("[ %s ] => starting container...", s.Name())
+		t.Logf("{%s} => starting container...", s.Name())
 		eg.Go(func() error {
 			return s.StartContainer()
 		})

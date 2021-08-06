@@ -76,6 +76,7 @@ type TestNode struct {
 	Container    *docker.Container
 	t            *testing.T
 	ec           params.EncodingConfig
+	user         string // string representing the uid:gid of the user/group the containers will be ran from
 }
 
 func (tn *TestNode) CliContext() client.Context {
@@ -92,9 +93,9 @@ func (tn *TestNode) CliContext() client.Context {
 }
 
 // MakeTestNodes create the test node objects required for bootstrapping tests
-func MakeTestNodes(count int, home, chainid string, chainType *ChainType, pool *dockertest.Pool, t *testing.T) (out TestNodes) {
+func MakeTestNodes(count int, home, usr, chainid string, chainType *ChainType, pool *dockertest.Pool, t *testing.T) (out TestNodes) {
 	for i := 0; i < count; i++ {
-		tn := &TestNode{Home: home, Index: i, Chain: chainType, ChainID: chainid, Pool: pool, t: t, ec: simapp.MakeTestEncodingConfig()}
+		tn := &TestNode{Home: home, Index: i, user: usr, Chain: chainType, ChainID: chainid, Pool: pool, t: t, ec: simapp.MakeTestEncodingConfig()}
 		tn.MkDir()
 		out = append(out, tn)
 	}
@@ -206,7 +207,7 @@ func (tn *TestNode) NodeJob(ctx context.Context, cmd []string) (int, error) {
 	cont, err := tn.Pool.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: container,
 		Config: &docker.Config{
-			User:         "1000:1000",
+			User:         tn.user,
 			Hostname:     container,
 			ExposedPorts: tn.Chain.Ports,
 			DNS:          []string{},
@@ -281,7 +282,7 @@ func (tn *TestNode) CreateNodeContainer(networkID string) error {
 	cont, err := tn.Pool.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: tn.Name(),
 		Config: &docker.Config{
-			User:         "1000:1000",
+			User:         tn.user,
 			Cmd:          []string{tn.Chain.Bin, "start", "--home", tn.NodeHome()},
 			Hostname:     tn.Name(),
 			ExposedPorts: tn.Chain.Ports,
@@ -303,9 +304,7 @@ func (tn *TestNode) CreateNodeContainer(networkID string) error {
 	if err != nil {
 		return err
 	}
-
 	tn.Container = cont
-
 	return nil
 }
 
@@ -325,7 +324,7 @@ func (tn *TestNode) StartContainer(ctx context.Context) error {
 	tn.Container = c
 
 	port := GetHostPort(c, "26657/tcp")
-	tn.t.Logf("[%s] RPC => %s", tn.Name(), port)
+	tn.t.Logf("{%s} RPC => %s", tn.Name(), port)
 
 	err = tn.NewClient(fmt.Sprintf("tcp://%s", port))
 	if err != nil {
@@ -335,7 +334,7 @@ func (tn *TestNode) StartContainer(ctx context.Context) error {
 	return retry.Do(func() error {
 		stat, err := tn.Client.Status(ctx)
 		if err != nil {
-			tn.t.Log(err)
+			//tn.t.Log(err)
 			return err
 		}
 		if stat != nil && !stat.SyncInfo.CatchingUp {
@@ -433,7 +432,7 @@ func (tn TestNodes) LogGenesisHashes(t *testing.T) {
 	for _, n := range tn {
 		gen, err := ioutil.ReadFile(path.Join(n.Dir(), "config", "genesis.json"))
 		require.NoError(t, err)
-		t.Log(fmt.Sprintf("[node-%d] genesis hash %x", n.Index, sha256.Sum256(gen)))
+		t.Log(fmt.Sprintf("{node-%d} genesis hash %x", n.Index, sha256.Sum256(gen)))
 	}
 }
 
@@ -464,7 +463,9 @@ func (tn *TestNode) GetConsPub() (string, error) {
 		return "", err
 	}
 
-	return sdk.Bech32ifyPubKey(sdk.Bech32PubKeyTypeConsPub, pubkey)
+	return sdk.ConsAddress(pubkey.Address()).String(), nil
+
+	//return sdk.Bech32ifyPubKey(sdk.Bech32PubKeyTypeValPub, pubkey)
 }
 
 func (tn *TestNode) CreateKeyShares(threshold, total int64) ([]signer.CosignerKey, error) {
