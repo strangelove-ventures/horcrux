@@ -22,7 +22,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	ctxDir = dir
+	ctxDir = path.Dir(dir)
 	dockerFile = path.Join(ctxDir, "docker/horcrux/Dockerfile")
 }
 
