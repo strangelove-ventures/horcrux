@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -40,6 +41,15 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	dockerFile = path.Join(ctxDir, "docker/horcrux/Dockerfile")
 	t.Log("CWD", ctxDir)
 	t.Log("DOCKER", dockerFile)
+	var files []string
+	require.NoError(t, filepath.Walk(ctxDir, func(path string, info os.FileInfo, err error) error {
+		files = append(files, path)
+		return nil
+	}))
+	for _, file := range files {
+		t.Log(file)
+	}
+
 	testsDone := make(chan struct{})
 	contDone := make(chan struct{})
 
