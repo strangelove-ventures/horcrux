@@ -28,23 +28,6 @@ var configCmd = &cobra.Command{
 	Short: "Commands to configure the horcrux signer",
 }
 
-func addPeerCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "init [chain-id] [chain-nodes]",
-		Aliases: []string{"i"},
-		Short:   "initalize configuration file and home directory if one doesn't already exist",
-		Long: "initalize configuration file, use flags for cosigner configuration.\n\n" +
-			"[chain-id] is the chain id of the chain to validate\n" +
-			"[chain-nodes] is a comma seperated array of chain node addresses i.e.\n" +
-			"tcp://chain-node-1:1234,tcp://chain-node-2:1234",
-		Args: cobra.RangeArgs(1, 2),
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			return nil
-		},
-	}
-	return cmd
-}
-
 func initCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "init [chain-id] [chain-nodes]",
@@ -73,10 +56,10 @@ func initCmd() *cobra.Command {
 				homeDir = path.Join(home, ".horcrux")
 			}
 
-			//TODO double check that omitting directory check does not introduce unexpected behavior
-			//if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
-			//	return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
-			//}
+			if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
+				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
+			}
+
 			var cfg *Config
 			cs, _ := cmd.Flags().GetBool("cosigner")
 			if cs {

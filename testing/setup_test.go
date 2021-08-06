@@ -118,7 +118,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 		<-contDone
 	})
 
-	startSignerContainers(t, getDockerUserString(), testSigners, nodes[0], threshold, total, network)
+	startSignerContainers(t, testSigners, nodes[0], threshold, total, network)
 
 	// modify node config to listen for private validator connections
 	peers, err := peerString(nodes, t)
@@ -221,7 +221,7 @@ func startValidatorContainers(t *testing.T, net *docker.Network, nodes []*TestNo
 	require.NoError(t, eg.Wait())
 }
 
-func startSignerContainers(t *testing.T, usr string, testSigners TestSigners, node *TestNode, threshold, total int, network *docker.Network) {
+func startSignerContainers(t *testing.T, testSigners TestSigners, node *TestNode, threshold, total int, network *docker.Network) {
 	eg := new(errgroup.Group)
 	ctx := context.Background()
 

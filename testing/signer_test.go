@@ -82,7 +82,7 @@ func MakeTestSigners(count int, home string, pool *dockertest.Pool, t *testing.T
 			Key:       signer.CosignerKey{},
 			t:         t,
 		}
-		ts.MkDir()
+		//ts.MkDir()
 		out = append(out, ts)
 	}
 	return
@@ -132,8 +132,8 @@ func (ts *TestSigner) InitSignerConfig(ctx context.Context, listenNode string, p
 			Mounts: []docker.HostMount{
 				{
 					Type:        "bind",
-					Source:      ts.Dir(),
-					Target:      ts.Dir(),
+					Source:      ts.Home,
+					Target:      ts.Home,
 					ReadOnly:    false,
 					BindOptions: nil,
 				},
