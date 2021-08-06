@@ -30,6 +30,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
+      # todo: pull image from repo
+      - name: build simd image
+        run: make build-simd-docker
+
       # run tests
       - name: run horcrux tests
         run: make test
