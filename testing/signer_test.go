@@ -16,11 +16,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func init() {
+	dir, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+	ctxDir = dir
+}
+
 var (
+	ctxDir      string
 	imageName   = "horcrux-test"
 	imageVer    = "latest"
 	dockerFile  = "./docker/horcrux/Dockerfile"
-	ctxDir      = "/src/github.com/strangelove-ventures/horcrux/"
 	signerPorts = map[docker.Port]struct{}{
 		"2222/tcp": {},
 	}
@@ -56,7 +64,7 @@ func BuildTestSignerContainer(pool *dockertest.Pool) error {
 		ForceRmTmpContainer: false,
 		Auth:                docker.AuthConfiguration{},
 		AuthConfigs:         docker.AuthConfigurations{},
-		ContextDir:          fmt.Sprintf("%s%s", os.Getenv("GOPATH"), ctxDir),
+		ContextDir:          ctxDir,
 	})
 }
 
