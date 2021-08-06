@@ -3,13 +3,14 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/jackzampolin/horcrux/signer"
 	"log"
 	"net"
 	"os"
 	"path"
 	"sync"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/signer"
 
 	"github.com/spf13/cobra"
 	tmlog "github.com/tendermint/tendermint/libs/log"

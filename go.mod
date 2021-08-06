@@ -1,4 +1,4 @@
-module github.com/jackzampolin/horcrux
+module github.com/strangelove-ventures/horcrux
 
 go 1.15
 

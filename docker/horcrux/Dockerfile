@@ -4,7 +4,7 @@ ENV PACKAGES make
 
 RUN apk add --no-cache $PACKAGES
 
-WORKDIR /go/src/github.com/jackzampolin/horcrux
+WORKDIR /go/src/github.com/strangelove-ventures/horcrux
 
 ADD . .
 
@@ -16,6 +16,6 @@ RUN apk add --no-cache ca-certificates
 
 WORKDIR /root
 
-COPY --from=build-env /go/src/github.com/jackzampolin/horcrux/build/horcrux  /usr/bin/horcrux
+COPY --from=build-env /go/src/github.com/strangelove-ventures/horcrux/build/horcrux  /usr/bin/horcrux
 
 CMD ["horcrux"]

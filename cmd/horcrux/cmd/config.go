@@ -2,14 +2,15 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/jackzampolin/horcrux/signer"
-	"github.com/mitchellh/go-homedir"
 	"io/ioutil"
 	"net/url"
 	"os"
 	"path"
 	"strconv"
 	"strings"
+
+	"github.com/mitchellh/go-homedir"
+	"github.com/strangelove-ventures/horcrux/signer"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
