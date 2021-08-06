@@ -3,12 +3,6 @@ package testing
 import (
 	"context"
 	"fmt"
-	"github.com/avast/retry-go"
-	"github.com/ory/dockertest"
-	"github.com/ory/dockertest/docker"
-	"github.com/stretchr/testify/require"
-	tmcfg "github.com/tendermint/tendermint/config"
-	"golang.org/x/sync/errgroup"
 	"io/ioutil"
 	"log"
 	"net"
@@ -17,6 +11,14 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/avast/retry-go"
+	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
+	"github.com/ory/dockertest"
+	"github.com/ory/dockertest/docker"
+	"github.com/stretchr/testify/require"
+	tmcfg "github.com/tendermint/tendermint/config"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -148,7 +150,35 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	err = nodes[0].StartContainer(ctx)
 	require.NoError(t, err)
 
-	nodes[0].
+	// nodes[0].Client
+
+	time.Sleep(10 * time.Second) // TODO can turn this back down after debugging
+
+	consPub, err := nodes[0].GetConsPub()
+	require.NoError(t, err)
+
+	for i := 0; i < 10; i++ {
+		slashInfo, err := slashingtypes.NewQueryClient(nodes[0].CliContext()).SigningInfo(context.Background(), &slashingtypes.QuerySigningInfoRequest{
+			ConsAddress: consPub,
+		})
+		require.NoError(t, err)
+
+		t.Log("MISSED BLOCKS COUNTER", slashInfo.ValSigningInfo.MissedBlocksCounter)
+		t.Log("TOMBSTONED?", slashInfo.ValSigningInfo.Tombstoned)
+	}
+	// sdk.GetPubKeyFromBech32)
+
+	// pk, err := sdk.GetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, args[0])
+	// if err != nil {
+	// return err
+	// }
+
+	// consAddr := sdk.ConsAddress(pk.Address())
+	// params := &types.QuerySigningInfoRequest{ConsAddress: consAddr.String()}
+	// res, err := queryClient.SigningInfo(context.Background(), params)
+	// if err != nil {
+	// return err
+	// }
 
 	t.Log("nodes started waiting 60 seconds before teardown")
 	time.Sleep(120 * time.Second) // TODO can turn this back down after debugging

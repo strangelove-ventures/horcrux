@@ -5,10 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
-	"github.com/jackzampolin/horcrux/cmd/horcrux/cmd"
-	"github.com/jackzampolin/horcrux/internal/signer"
-	tmjson "github.com/tendermint/tendermint/libs/json"
-	"github.com/tendermint/tendermint/privval"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -17,8 +13,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackzampolin/horcrux/cmd/horcrux/cmd"
+	"github.com/jackzampolin/horcrux/internal/signer"
+	tmjson "github.com/tendermint/tendermint/libs/json"
+	"github.com/tendermint/tendermint/privval"
+
 	"github.com/avast/retry-go"
+	"github.com/cosmos/cosmos-sdk/client"
+	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
+	"github.com/cosmos/cosmos-sdk/simapp"
+	"github.com/cosmos/cosmos-sdk/simapp/params"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
 	"github.com/stretchr/testify/require"
@@ -69,12 +75,26 @@ type TestNode struct {
 	Client       rpcclient.Client
 	Container    *docker.Container
 	t            *testing.T
+	ec           params.EncodingConfig
+}
+
+func (tn *TestNode) CliContext() client.Context {
+	return client.Context{
+		Client:            tn.Client,
+		ChainID:           tn.ChainID,
+		JSONMarshaler:     tn.ec.Marshaler,
+		InterfaceRegistry: tn.ec.InterfaceRegistry,
+		Input:             os.Stdin,
+		Output:            os.Stdout,
+		OutputFormat:      "json",
+		LegacyAmino:       tn.ec.Amino,
+	}
 }
 
 // MakeTestNodes create the test node objects required for bootstrapping tests
 func MakeTestNodes(count int, home, chainid string, chainType *ChainType, pool *dockertest.Pool, t *testing.T) (out TestNodes) {
 	for i := 0; i < count; i++ {
-		tn := &TestNode{Home: home, Index: i, Chain: chainType, ChainID: chainid, Pool: pool, t: t}
+		tn := &TestNode{Home: home, Index: i, Chain: chainType, ChainID: chainid, Pool: pool, t: t, ec: simapp.MakeTestEncodingConfig()}
 		tn.MkDir()
 		out = append(out, tn)
 	}
@@ -417,17 +437,39 @@ func (tn TestNodes) LogGenesisHashes(t *testing.T) {
 	}
 }
 
-func (tn TestNode) CreateKeyShares(threshold, total int64) ([]signer.CosignerKey, error) {
-	tn.t.Logf("{%s} -> Creating Private Key Shares...", tn.Name())
+func (tn *TestNode) GetPrivVal() (privval.FilePVKey, error) {
 	pvKey := privval.FilePVKey{}
 	keyPath := fmt.Sprintf("%sconfig/priv_validator_key.json", tn.Dir())
 
 	keyFile, err := ioutil.ReadFile(keyPath)
 	if err != nil {
-		return nil, err
+		return pvKey, err
 	}
 
 	err = tmjson.Unmarshal(keyFile, &pvKey)
+	if err != nil {
+		return pvKey, err
+	}
+	return pvKey, nil
+}
+
+func (tn *TestNode) GetConsPub() (string, error) {
+	pv, err := tn.GetPrivVal()
+	if err != nil {
+		return "", err
+	}
+
+	pubkey, err := cryptocodec.FromTmPubKeyInterface(pv.PubKey)
+	if err != nil {
+		return "", err
+	}
+
+	return sdk.Bech32ifyPubKey(sdk.Bech32PubKeyTypeConsPub, pubkey)
+}
+
+func (tn *TestNode) CreateKeyShares(threshold, total int64) ([]signer.CosignerKey, error) {
+	tn.t.Logf("{%s} -> Creating Private Key Shares...", tn.Name())
+	pvKey, err := tn.GetPrivVal()
 	if err != nil {
 		return nil, err
 	}
