@@ -1,6 +1,6 @@
 mode = "mpc"
-key_file = "/Users/johnzampolin/go/src/github.com/jackzampolin/horcrux/data/signer2/priv-key-shard.json"
-state_dir = "/Users/johnzampolin/go/src/github.com/jackzampolin/horcrux/data/signer2/"
+key_file = "/Users/johnzampolin/go/src/github.com/strangelove-ventures/horcrux/data/signer2/priv-key-shard.json"
+state_dir = "/Users/johnzampolin/go/src/github.com/strangelove-ventures/horcrux/data/signer2/"
 chain_id = "test-chain-id"
 cosigner_threshold = 2
 cosigner_listen_address = "tcp://0.0.0.0:2223"

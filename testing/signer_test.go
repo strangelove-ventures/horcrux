@@ -3,12 +3,13 @@ package testing
 import (
 	"context"
 	"fmt"
-	"github.com/jackzampolin/horcrux/signer"
 	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/signer"
 
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
@@ -19,7 +20,7 @@ var (
 	imageName   = "horcrux-test"
 	imageVer    = "latest"
 	dockerFile  = "./docker/horcrux/Dockerfile"
-	ctxDir      = "/src/github.com/jackzampolin/horcrux/"
+	ctxDir      = "/src/github.com/strangelove-ventures/horcrux/"
 	signerPorts = map[docker.Port]struct{}{
 		"2222/tcp": {},
 	}

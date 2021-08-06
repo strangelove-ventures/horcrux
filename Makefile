@@ -27,4 +27,4 @@ build-simd-docker:
 	docker build -t jackzampolin/simd:v0.42.3 -f ./docker/simd/Dockerfile ./docker/simd/
 
 build-horcrux-docker:
-	docker build -t jackzampolin/horcrux:v0.1.0 -f ./docker/horcrux/Dockerfile .
+	docker build -t strangelove-ventures/horcrux:v0.1.0 -f ./docker/horcrux/Dockerfile .
