@@ -10,6 +10,9 @@ jobs:
   build:
     name: run tests
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: $GOPATH/src/github.com/strangelove-ventures/
     steps:
       # Install and setup go
       - name: Set up Go 1.16
@@ -18,6 +21,7 @@ jobs:
           go-version: 1.16
         id: go
 
+      
       # checkout horcrux
       - name: checkout horcrux
         uses: actions/checkout@v2
