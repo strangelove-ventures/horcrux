@@ -1,10 +1,12 @@
 package test
 
 import (
+	"os"
 	"testing"
 	"time"
 
 	"github.com/ory/dockertest"
+	"github.com/ory/dockertest/docker"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 )
@@ -25,7 +27,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	totalSigners := 3
 	threshold := 2
 
-	ctx, home, pool, network, nodes, testsDone, contDone := SetupTestRun(t, numNodes)
+	ctx, home, pool, network, nodes := SetupTestRun(t, numNodes)
 	testSigners := MakeTestSigners(totalSigners, home, pool, t)
 
 	// start building the cosigner container first
@@ -48,11 +50,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	require.NoError(t, nodes[0].StopContainer())
 
 	// set the test cleanup function
-	go cleanUpTest(t, testsDone, contDone, pool, nodes, testSigners, network, home)
-	t.Cleanup(func() {
-		testsDone <- struct{}{}
-		<-contDone
-	})
+	t.Cleanup(Cleanup(pool, t.Name(), home))
 
 	// start signer processes
 	StartSignerContainers(t, testSigners, nodes[0], threshold, totalSigners, network)
@@ -76,4 +74,27 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	time.Sleep(10 * time.Second)
 
 	nodes[0].EnsureNotSlashed()
+}
+
+// TODO: use this cleanup function
+func Cleanup(pool *dockertest.Pool, testName, testDir string) func() {
+	return func() {
+		cont, _ := pool.Client.ListContainers(docker.ListContainersOptions{All: true})
+		for _, c := range cont {
+			for k, v := range c.Labels {
+				if k == "horcrux-test" && v == testName {
+					pool.Client.StopContainer(c.ID, 10)
+				}
+			}
+		}
+		nets, _ := pool.Client.ListNetworks()
+		for _, n := range nets {
+			for k, v := range n.Labels {
+				if k == "horcrux-test" && v == testName {
+					pool.Client.RemoveNetwork(n.ID)
+				}
+			}
+		}
+		os.RemoveAll(testDir)
+	}
 }

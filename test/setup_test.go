@@ -21,7 +21,7 @@ var (
 	chainid = "horcrux"
 )
 
-func SetupTestRun(t *testing.T, numNodes int) (context.Context, string, *dockertest.Pool, *docker.Network, TestNodes, chan struct{}, chan struct{}) {
+func SetupTestRun(t *testing.T, numNodes int) (context.Context, string, *dockertest.Pool, *docker.Network, TestNodes) {
 
 	home, err := ioutil.TempDir("", "")
 	require.NoError(t, err)
@@ -29,10 +29,10 @@ func SetupTestRun(t *testing.T, numNodes int) (context.Context, string, *dockert
 	pool, err := dockertest.NewPool("")
 	require.NoError(t, err)
 
-	network, err := CreateTestNetwork(pool, fmt.Sprintf("horcrux-%s", RandLowerCaseLetterString(8)))
+	network, err := CreateTestNetwork(pool, fmt.Sprintf("horcrux-%s", RandLowerCaseLetterString(8)), t)
 	require.NoError(t, err)
 
-	return context.Background(), home, pool, network, MakeTestNodes(numNodes, home, chainid, simdChain, pool, t), make(chan struct{}), make(chan struct{})
+	return context.Background(), home, pool, network, MakeTestNodes(numNodes, home, chainid, simdChain, pool, t)
 }
 
 // StartNodeContainers is passed a chain id and arrays of validators and full nodes to configure
@@ -208,7 +208,7 @@ func cleanUpTest(t *testing.T, testsDone <-chan struct{}, contDone chan<- struct
 	require.NoError(t, pool.Client.RemoveNetwork(net.ID))
 
 	// clean up the tmp dir
-	require.NoError(t, os.RemoveAll(dir))
+	// require.NoError(t, os.RemoveAll(dir))
 
 	// Notify the t.Cleanup that cleanup is done
 	contDone <- struct{}{}
@@ -232,12 +232,12 @@ func GetHostPort(cont *docker.Container, portID string) string {
 	return net.JoinHostPort(ip, m[0].HostPort)
 }
 
-func CreateTestNetwork(pool *dockertest.Pool, name string) (*docker.Network, error) {
+func CreateTestNetwork(pool *dockertest.Pool, name string, t *testing.T) (*docker.Network, error) {
 	return pool.Client.CreateNetwork(docker.CreateNetworkOptions{
 		Name:           name,
-		Labels:         map[string]string{},
 		CheckDuplicate: true,
 		Internal:       false,
 		Context:        context.Background(),
+		Labels:         map[string]string{"horcrux-test": t.Name()},
 	})
 }

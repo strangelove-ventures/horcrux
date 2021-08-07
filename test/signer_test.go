@@ -120,8 +120,9 @@ func (ts *TestSigner) InitSignerConfig(ctx context.Context, listenNode string, p
 			ExposedPorts: map[docker.Port]struct{}{
 				docker.Port(fmt.Sprintf("%s/tcp", signerPort)): {},
 			},
-			Image: signerImage,
-			Cmd:   cmd,
+			Image:  signerImage,
+			Cmd:    cmd,
+			Labels: map[string]string{"horcrux-test": ts.t.Name()},
 		},
 		HostConfig: &docker.HostConfig{
 			PublishAllPorts: true,
@@ -181,8 +182,9 @@ func (ts *TestSigner) CreateSignerContainer(networkID string) error {
 			ExposedPorts: map[docker.Port]struct{}{
 				docker.Port(fmt.Sprintf("%s/tcp", signerPort)): {},
 			},
-			DNS:   []string{},
-			Image: signerImage,
+			DNS:    []string{},
+			Image:  signerImage,
+			Labels: map[string]string{"horcrux-test": ts.t.Name()},
 		},
 		HostConfig: &docker.HostConfig{
 			PublishAllPorts: true,

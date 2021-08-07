@@ -243,6 +243,7 @@ func (tn *TestNode) NodeJob(ctx context.Context, cmd []string) (int, error) {
 			DNS:          []string{},
 			Image:        fmt.Sprintf("%s:%s", tn.Chain.Repository, tn.Chain.Version),
 			Cmd:          cmd,
+			Labels:       map[string]string{"horcrux-test": tn.t.Name()},
 		},
 		HostConfig: &docker.HostConfig{
 			Binds:           tn.Bind(),
@@ -318,6 +319,7 @@ func (tn *TestNode) CreateNodeContainer(networkID string) error {
 			ExposedPorts: tn.Chain.Ports,
 			DNS:          []string{},
 			Image:        fmt.Sprintf("%s:%s", tn.Chain.Repository, tn.Chain.Version),
+			Labels:       map[string]string{"horcrux-test": tn.t.Name()},
 		},
 		HostConfig: &docker.HostConfig{
 			Binds:           tn.Bind(),
@@ -489,7 +491,8 @@ func (tn TestNodes) WaitForHeight(height int64) {
 				}
 				n.t.Logf("{%s} => reached block 15\n", n.Name())
 				return nil
-			})
+				// TODO: setup backup delay here
+			}, retry.Delay(500*time.Millisecond))
 		})
 	}
 	require.NoError(tn[0].t, eg.Wait())
