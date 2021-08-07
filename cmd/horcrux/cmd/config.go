@@ -51,7 +51,7 @@ func initCmd() *cobra.Command {
 
 			var homeDir string
 			if cfgFile != "" {
-				homeDir = cfgFile
+				homeDir = path.Dir(cfgFile)
 			} else {
 				home, _ := homedir.Dir()
 				homeDir = path.Join(home, ".horcrux")
@@ -67,6 +67,7 @@ func initCmd() *cobra.Command {
 				p, _ := cmd.Flags().GetString("peers")
 				threshold, _ := cmd.Flags().GetInt("threshold")
 				peers, err := peersFromFlag(p)
+				listen, _ := cmd.Flags().GetString("listen")
 				if err != nil {
 					return err
 				}
@@ -75,7 +76,7 @@ func initCmd() *cobra.Command {
 					ChainID: cid,
 					CosignerConfig: &CosignerConfig{
 						Threshold: threshold,
-						P2PListen: "tcp://0.0.0.0:2222",
+						P2PListen: listen,
 						Peers:     peers,
 					},
 					ChainNodes: cn,
@@ -122,6 +123,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().BoolP("cosigner", "c", false, "set to initialize a cosigner node, requires --peers and --threshold")
 	cmd.Flags().StringP("peers", "p", "", "cosigner peer addresses in format tcp://{addr}:{port}|{share-id} (i.e. \"tcp://node-1:2222|2,tcp://node-2:2222|3\")")
 	cmd.Flags().IntP("threshold", "t", 0, "indicate number of signatures required for threshold signature")
+	cmd.Flags().StringP("listen", "l", "tcp://0.0.0.0:2222", "listen address of the signer")
 	return cmd
 }
 

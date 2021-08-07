@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/strangelove-ventures/horcrux/signer"
+	"golang.org/x/sync/errgroup"
 
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/privval"
@@ -26,6 +27,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/simapp"
 	"github.com/cosmos/cosmos-sdk/simapp/params"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
 	"github.com/stretchr/testify/require"
@@ -179,6 +181,35 @@ func (tn *TestNode) SetValidatorConfigAndPeers(peers string) {
 	tmconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
 }
 
+func (tn *TestNode) SetPrivValdidatorListen(peers string) {
+	cfg := tmconfig.DefaultConfig()
+	cfg.BaseConfig.PrivValidatorListenAddr = "tcp://0.0.0.0:1234"
+	stdconfigchanges(cfg, peers) // Reapply the changes made to the config file in SetValidatorConfigAndPeers()
+	tmconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
+}
+
+func (tn *TestNode) EnsureNotSlashed() {
+	consPub, err := tn.GetConsPub()
+	require.NoError(tn.t, err)
+
+	missed := int64(0)
+	for i := 0; i < 10; i++ {
+		time.Sleep(1 * time.Second)
+		slashInfo, err := slashingtypes.NewQueryClient(tn.CliContext()).SigningInfo(context.Background(), &slashingtypes.QuerySigningInfoRequest{
+			ConsAddress: consPub,
+		})
+		require.NoError(tn.t, err)
+
+		if i == 0 {
+			missed = slashInfo.ValSigningInfo.MissedBlocksCounter
+			continue
+		}
+		require.Equal(tn.t, missed, slashInfo.ValSigningInfo.MissedBlocksCounter)
+		require.False(tn.t, slashInfo.ValSigningInfo.Tombstoned)
+	}
+
+}
+
 func stdconfigchanges(cfg *tmconfig.Config, peers string) {
 	// turn down blocktimes to make the chain faster
 	cfg.Consensus.TimeoutCommit = 1 * time.Second
@@ -330,14 +361,16 @@ func (tn *TestNode) StartContainer(ctx context.Context) error {
 		return err
 	}
 
+	// time.Sleep(3 * time.Second)
 	return retry.Do(func() error {
 		stat, err := tn.Client.Status(ctx)
 		if err != nil {
 			//tn.t.Log(err)
 			return err
 		}
-		if stat != nil && !stat.SyncInfo.CatchingUp {
-			return fmt.Errorf("still catching up")
+		// TODO: reenable this check, having trouble with it for some reason
+		if stat != nil && stat.SyncInfo.CatchingUp {
+			return fmt.Errorf("still catching up: height(%d) catching-up(%t)", stat.SyncInfo.LatestBlockHeight, stat.SyncInfo.CatchingUp)
 		}
 		return nil
 	})
@@ -437,6 +470,29 @@ func (tn TestNodes) LogGenesisHashes(t *testing.T) {
 		require.NoError(t, err)
 		t.Log(fmt.Sprintf("{node-%d} genesis hash %x", n.Index, sha256.Sum256(gen)))
 	}
+}
+
+func (tn TestNodes) WaitForHeight(height int64) {
+	var eg errgroup.Group
+	tn[0].t.Logf("Waiting For Nodes To Reach Block Height %d...", height)
+	for _, n := range tn {
+		n := n
+		eg.Go(func() error {
+			return retry.Do(func() error {
+				stat, err := n.Client.Status(context.Background())
+				if err != nil {
+					return err
+				}
+
+				if stat.SyncInfo.CatchingUp || stat.SyncInfo.LatestBlockHeight < height {
+					return fmt.Errorf("node still under block %d: %d", height, stat.SyncInfo.LatestBlockHeight)
+				}
+				n.t.Logf("{%s} => reached block 15\n", n.Name())
+				return nil
+			})
+		})
+	}
+	require.NoError(tn[0].t, eg.Wait())
 }
 
 func (tn *TestNode) GetPrivVal() (privval.FilePVKey, error) {

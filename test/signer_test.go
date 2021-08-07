@@ -39,8 +39,7 @@ func BuildTestSignerContainer(pool *dockertest.Pool, t *testing.T) error {
 	if err != nil {
 		return err
 	}
-	dockerfile := path.Join(path.Dir(dir), "docker/horcrux/Dockerfile")
-	fmt.Println(dockerfile)
+	dockerfile := path.Join("docker/horcrux/Dockerfile")
 	return pool.Client.BuildImage(docker.BuildImageOptions{
 		Name:                signerImage,
 		Dockerfile:          dockerfile,

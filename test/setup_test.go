@@ -21,12 +21,7 @@ var (
 	chainid = "horcrux"
 )
 
-func init() {
-	// disable logging from dockertest
-	// log.Default().SetOutput(ioutil.Discard)
-}
-
-func setupTestRun(t *testing.T, numNodes int) (context.Context, string, *dockertest.Pool, *docker.Network, TestNodes, chan struct{}, chan struct{}) {
+func SetupTestRun(t *testing.T, numNodes int) (context.Context, string, *dockertest.Pool, *docker.Network, TestNodes, chan struct{}, chan struct{}) {
 
 	home, err := ioutil.TempDir("", "")
 	require.NoError(t, err)
@@ -34,14 +29,14 @@ func setupTestRun(t *testing.T, numNodes int) (context.Context, string, *dockert
 	pool, err := dockertest.NewPool("")
 	require.NoError(t, err)
 
-	network, err := createTestNetwork(pool, fmt.Sprintf("horcrux-%s", RandLowerCaseLetterString(8)))
+	network, err := CreateTestNetwork(pool, fmt.Sprintf("horcrux-%s", RandLowerCaseLetterString(8)))
 	require.NoError(t, err)
 
 	return context.Background(), home, pool, network, MakeTestNodes(numNodes, home, chainid, simdChain, pool, t), make(chan struct{}), make(chan struct{})
 }
 
-// startValidatorContainers is passed a chain id and arrays of validators and full nodes to configure
-func startValidatorContainers(t *testing.T, ctx context.Context, net *docker.Network, validators, fullnodes []*TestNode) {
+// StartNodeContainers is passed a chain id and arrays of validators and full nodes to configure
+func StartNodeContainers(t *testing.T, ctx context.Context, net *docker.Network, validators, fullnodes []*TestNode) {
 	var eg errgroup.Group
 
 	// sign gentx for each validator
@@ -119,7 +114,7 @@ func startValidatorContainers(t *testing.T, ctx context.Context, net *docker.Net
 	require.NoError(t, eg.Wait())
 }
 
-func startSignerContainers(t *testing.T, testSigners TestSigners, node *TestNode, threshold, total int, network *docker.Network) {
+func StartSignerContainers(t *testing.T, testSigners TestSigners, node *TestNode, threshold, total int, network *docker.Network) {
 	eg := new(errgroup.Group)
 	ctx := context.Background()
 
@@ -237,7 +232,7 @@ func GetHostPort(cont *docker.Container, portID string) string {
 	return net.JoinHostPort(ip, m[0].HostPort)
 }
 
-func createTestNetwork(pool *dockertest.Pool, name string) (*docker.Network, error) {
+func CreateTestNetwork(pool *dockertest.Pool, name string) (*docker.Network, error) {
 	return pool.Client.CreateNetwork(docker.CreateNetworkOptions{
 		Name:           name,
 		Labels:         map[string]string{},
