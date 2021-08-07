@@ -1,4 +1,4 @@
-package testing
+package test
 
 import (
 	"context"
@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/strangelove-ventures/horcrux/signer"
+	"golang.org/x/sync/errgroup"
 
-	tmjson "github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/privval"
 
 	"github.com/avast/retry-go"
@@ -26,6 +26,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/simapp"
 	"github.com/cosmos/cosmos-sdk/simapp/params"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
 	"github.com/stretchr/testify/require"
@@ -34,12 +35,24 @@ import (
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	rpchttp "github.com/tendermint/tendermint/rpc/client/http"
 	libclient "github.com/tendermint/tendermint/rpc/jsonrpc/client"
-	// "github.com/testcontainers/testcontainers-go/wait"
 )
 
 var (
-	valKey   = "validator"
-	genCoins = "1000000000000stake"
+	valKey = "validator"
+
+	// ChainType instance for simd
+	simdChain = &ChainType{
+		Repository: "jackzampolin/simd",
+		Version:    "v0.42.3",
+		Bin:        "simd",
+		Ports: map[docker.Port]struct{}{
+			"26656/tcp": {},
+			"26657/tcp": {},
+			"9090/tcp":  {},
+			"1337/tcp":  {},
+			"1234/tcp":  {},
+		},
+	}
 )
 
 // ChainType represents the type of chain to instantiate
@@ -48,20 +61,6 @@ type ChainType struct {
 	Version    string
 	Bin        string
 	Ports      map[docker.Port]struct{}
-}
-
-// ChainType instance for simd
-var simdChain = &ChainType{
-	Repository: "jackzampolin/simd",
-	Version:    "v0.42.3",
-	Bin:        "simd",
-	Ports: map[docker.Port]struct{}{
-		"26656/tcp": {},
-		"26657/tcp": {},
-		"9090/tcp":  {},
-		"1337/tcp":  {},
-		"1234/tcp":  {},
-	},
 }
 
 // TestNode represents a node in the test network that is being created
@@ -102,6 +101,84 @@ func MakeTestNodes(count int, home, chainid string, chainType *ChainType, pool *
 	return
 }
 
+// StartNodeContainers is passed a chain id and arrays of validators and full nodes to configure
+func StartNodeContainers(t *testing.T, ctx context.Context, net *docker.Network, validators, fullnodes []*TestNode) {
+	var eg errgroup.Group
+
+	// sign gentx for each validator
+	for _, v := range validators {
+		v := v
+		eg.Go(func() error { return v.InitValidatorFiles(ctx) })
+	}
+
+	// just initialize folder for any full nodes
+	for _, n := range fullnodes {
+		n := n
+		eg.Go(func() error { return n.InitFullNodeFiles(ctx) })
+	}
+
+	// wait for this to finish
+	require.NoError(t, eg.Wait())
+
+	// for the validators we need to collect the gentxs and the accounts
+	// to the first node's genesis file
+	validator0 := validators[0]
+	for i := 1; i < len(validators); i++ {
+		i := i
+		eg.Go(func() error {
+			validatorN := validators[i]
+			n0key, err := validatorN.GetKey(valKey)
+			if err != nil {
+				return err
+			}
+
+			if err := validator0.AddGenesisAccount(ctx, n0key.GetAddress().String()); err != nil {
+				return err
+			}
+			nNid, err := validatorN.NodeID()
+			if err != nil {
+				return err
+			}
+			oldPath := path.Join(validatorN.Dir(), "config", "gentx", fmt.Sprintf("gentx-%s.json", nNid))
+			newPath := path.Join(validator0.Dir(), "config", "gentx", fmt.Sprintf("gentx-%s.json", nNid))
+			return os.Rename(oldPath, newPath)
+		})
+	}
+	require.NoError(t, eg.Wait())
+	require.NoError(t, validator0.CollectGentxs(ctx))
+
+	genbz, err := ioutil.ReadFile(validator0.GenesisFilePath())
+	require.NoError(t, err)
+
+	nodes := append(validators, fullnodes...)
+
+	for i := 1; i < len(nodes); i++ {
+		require.NoError(t, ioutil.WriteFile(nodes[i].GenesisFilePath(), genbz, 0644))
+	}
+
+	TestNodes(nodes).LogGenesisHashes()
+
+	for _, n := range nodes {
+		n := n
+		eg.Go(func() error {
+			return n.CreateNodeContainer(net.ID, true)
+		})
+	}
+	require.NoError(t, eg.Wait())
+
+	peers := TestNodes(nodes).PeerString()
+
+	for _, n := range nodes {
+		n := n
+		t.Logf("{%s} => starting container...", n.Name())
+		eg.Go(func() error {
+			n.SetValidatorConfigAndPeers(peers)
+			return n.StartContainer(ctx)
+		})
+	}
+	require.NoError(t, eg.Wait())
+}
+
 func (tn *TestNode) NewClient(addr string) error {
 	httpClient, err := libclient.DefaultHTTPClient(addr)
 	if err != nil {
@@ -121,7 +198,7 @@ func (tn *TestNode) NewClient(addr string) error {
 
 // Name is the hostname of the test node container
 func (tn *TestNode) Name() string {
-	return fmt.Sprintf("node-%d", tn.Index)
+	return fmt.Sprintf("node-%d-%s", tn.Index, tn.t.Name())
 }
 
 // Dir is the directory where the test node files are stored
@@ -180,6 +257,33 @@ func (tn *TestNode) SetValidatorConfigAndPeers(peers string) {
 	tmconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
 }
 
+func (tn *TestNode) SetPrivValdidatorListen(peers string) {
+	cfg := tmconfig.DefaultConfig()
+	cfg.BaseConfig.PrivValidatorListenAddr = "tcp://0.0.0.0:1234"
+	stdconfigchanges(cfg, peers) // Reapply the changes made to the config file in SetValidatorConfigAndPeers()
+	tmconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
+}
+
+func (tn *TestNode) EnsureNotSlashed() {
+
+	missed := int64(0)
+	for i := 0; i < 10; i++ {
+		time.Sleep(1 * time.Second)
+		slashInfo, err := slashingtypes.NewQueryClient(tn.CliContext()).SigningInfo(context.Background(), &slashingtypes.QuerySigningInfoRequest{
+			ConsAddress: tn.GetConsPub(),
+		})
+		require.NoError(tn.t, err)
+
+		if i == 0 {
+			missed = slashInfo.ValSigningInfo.MissedBlocksCounter
+			continue
+		}
+		require.Equal(tn.t, missed, slashInfo.ValSigningInfo.MissedBlocksCounter)
+		require.False(tn.t, slashInfo.ValSigningInfo.Tombstoned)
+	}
+
+}
+
 func stdconfigchanges(cfg *tmconfig.Config, peers string) {
 	// turn down blocktimes to make the chain faster
 	cfg.Consensus.TimeoutCommit = 1 * time.Second
@@ -213,6 +317,7 @@ func (tn *TestNode) NodeJob(ctx context.Context, cmd []string) (int, error) {
 			DNS:          []string{},
 			Image:        fmt.Sprintf("%s:%s", tn.Chain.Repository, tn.Chain.Version),
 			Cmd:          cmd,
+			Labels:       map[string]string{"horcrux-test": tn.t.Name()},
 		},
 		HostConfig: &docker.HostConfig{
 			Binds:           tn.Bind(),
@@ -278,7 +383,7 @@ func (tn *TestNode) CollectGentxs(ctx context.Context) error {
 	return handleNodeJobError(tn.NodeJob(ctx, command))
 }
 
-func (tn *TestNode) CreateNodeContainer(networkID string) error {
+func (tn *TestNode) CreateNodeContainer(networkID string, rm bool) error {
 	cont, err := tn.Pool.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: tn.Name(),
 		Config: &docker.Config{
@@ -288,11 +393,12 @@ func (tn *TestNode) CreateNodeContainer(networkID string) error {
 			ExposedPorts: tn.Chain.Ports,
 			DNS:          []string{},
 			Image:        fmt.Sprintf("%s:%s", tn.Chain.Repository, tn.Chain.Version),
+			Labels:       map[string]string{"horcrux-test": tn.t.Name()},
 		},
 		HostConfig: &docker.HostConfig{
 			Binds:           tn.Bind(),
 			PublishAllPorts: true,
-			AutoRemove:      true,
+			AutoRemove:      rm,
 		},
 		NetworkingConfig: &docker.NetworkingConfig{
 			EndpointsConfig: map[string]*docker.EndpointConfig{
@@ -331,21 +437,23 @@ func (tn *TestNode) StartContainer(ctx context.Context) error {
 		return err
 	}
 
+	// time.Sleep(3 * time.Second)
 	return retry.Do(func() error {
 		stat, err := tn.Client.Status(ctx)
 		if err != nil {
 			//tn.t.Log(err)
 			return err
 		}
-		if stat != nil && !stat.SyncInfo.CatchingUp {
-			return fmt.Errorf("still catching up")
+		// TODO: reenable this check, having trouble with it for some reason
+		if stat != nil && stat.SyncInfo.CatchingUp {
+			return fmt.Errorf("still catching up: height(%d) catching-up(%t)", stat.SyncInfo.LatestBlockHeight, stat.SyncInfo.CatchingUp)
 		}
 		return nil
-	})
+	}, retry.DelayType(retry.BackOffDelay))
 }
 
-// InitNodeFilesAndGentx creates the node files and signs a genesis transaction
-func (tn *TestNode) InitNodeFilesAndGentx(ctx context.Context) error {
+// InitValidatorFiles creates the node files and signs a genesis transaction
+func (tn *TestNode) InitValidatorFiles(ctx context.Context) error {
 	if err := tn.InitHomeFolder(ctx); err != nil {
 		return err
 	}
@@ -360,6 +468,10 @@ func (tn *TestNode) InitNodeFilesAndGentx(ctx context.Context) error {
 		return err
 	}
 	return tn.Gentx(ctx, valKey)
+}
+
+func (tn *TestNode) InitFullNodeFiles(ctx context.Context) error {
+	return tn.InitHomeFolder(ctx)
 }
 
 func handleNodeJobError(i int, err error) error {
@@ -403,18 +515,19 @@ func RandLowerCaseLetterString(length int) string {
 // TestNodes is a collection of TestNode
 type TestNodes []*TestNode
 
-// PeerString returns the peer identifiers for a given set of nodes
-// TODO: probably needs refactor
-func (tn TestNodes) PeerString() (string, error) {
-	out := []string{}
+// PeerString returns the string for connecting the nodes passed in
+func (tn TestNodes) PeerString() string {
+	bldr := new(strings.Builder)
 	for _, n := range tn {
-		nid, err := n.NodeID()
+		id, err := n.NodeID()
 		if err != nil {
-			return "", err
+			return bldr.String()
 		}
-		out = append(out, fmt.Sprintf("%s@%s:%s", nid, n.Name(), "26656"))
+		ps := fmt.Sprintf("%s@%s:26656,", id, n.Name())
+		tn[0].t.Logf("{%s} peering (%s)", n.Name(), strings.TrimSuffix(ps, ","))
+		bldr.WriteString(ps)
 	}
-	return strings.Join(out, ","), nil
+	return strings.TrimSuffix(bldr.String(), ",")
 }
 
 // Peers returns the peer nodes for a given node if it is included in a set of nodes
@@ -427,53 +540,67 @@ func (tn TestNodes) Peers(node *TestNode) (out TestNodes) {
 	return
 }
 
+func (tn TestNodes) ListenAddrs() string {
+	out := []string{}
+	for _, n := range tn {
+		out = append(out, fmt.Sprintf("%s:%s", n.Name(), "1234"))
+	}
+	return strings.Join(out, ",")
+}
+
 // LogGenesisHashes logs the genesis hashes for the various nodes
-func (tn TestNodes) LogGenesisHashes(t *testing.T) {
+func (tn TestNodes) LogGenesisHashes() {
 	for _, n := range tn {
 		gen, err := ioutil.ReadFile(path.Join(n.Dir(), "config", "genesis.json"))
-		require.NoError(t, err)
-		t.Log(fmt.Sprintf("{node-%d} genesis hash %x", n.Index, sha256.Sum256(gen)))
+		require.NoError(tn[0].t, err)
+		tn[0].t.Log(fmt.Sprintf("{node-%d} genesis hash %x", n.Index, sha256.Sum256(gen)))
 	}
+}
+
+func (tn TestNodes) WaitForHeight(height int64) {
+	var eg errgroup.Group
+	tn[0].t.Logf("Waiting For Nodes To Reach Block Height %d...", height)
+	for _, n := range tn {
+		n := n
+		eg.Go(func() error {
+			return retry.Do(func() error {
+				stat, err := n.Client.Status(context.Background())
+				if err != nil {
+					return err
+				}
+
+				if stat.SyncInfo.CatchingUp || stat.SyncInfo.LatestBlockHeight < height {
+					return fmt.Errorf("node still under block %d: %d", height, stat.SyncInfo.LatestBlockHeight)
+				}
+				n.t.Logf("{%s} => reached block 15\n", n.Name())
+				return nil
+				// TODO: setup backup delay here
+			}, retry.DelayType(retry.BackOffDelay))
+		})
+	}
+	require.NoError(tn[0].t, eg.Wait())
 }
 
 func (tn *TestNode) GetPrivVal() (privval.FilePVKey, error) {
-	pvKey := privval.FilePVKey{}
-	keyPath := fmt.Sprintf("%sconfig/priv_validator_key.json", tn.Dir())
-
-	keyFile, err := ioutil.ReadFile(keyPath)
-	if err != nil {
-		return pvKey, err
-	}
-
-	err = tmjson.Unmarshal(keyFile, &pvKey)
-	if err != nil {
-		return pvKey, err
-	}
-	return pvKey, nil
+	return signer.ReadPrivValidatorFile(path.Join(tn.Dir(), "config", "priv_validator_key.json"))
 }
 
-func (tn *TestNode) GetConsPub() (string, error) {
+func (tn *TestNode) GetConsPub() string {
 	pv, err := tn.GetPrivVal()
-	if err != nil {
-		return "", err
-	}
+	require.NoError(tn.t, err)
 
 	pubkey, err := cryptocodec.FromTmPubKeyInterface(pv.PubKey)
-	if err != nil {
-		return "", err
-	}
+	require.NoError(tn.t, err)
 
-	return sdk.ConsAddress(pubkey.Address()).String(), nil
+	return sdk.ConsAddress(pubkey.Address()).String()
 
 	//return sdk.Bech32ifyPubKey(sdk.Bech32PubKeyTypeValPub, pubkey)
 }
 
-func (tn *TestNode) CreateKeyShares(threshold, total int64) ([]signer.CosignerKey, error) {
-	tn.t.Logf("{%s} -> Creating Private Key Shares...", tn.Name())
-
-	keyPath := fmt.Sprintf("%sconfig/priv_validator_key.json", tn.Dir())
-
-	return signer.CreateCosignerSharesFromFile(keyPath, threshold, total)
+func (tn *TestNode) CreateKeyShares(threshold, total int64) []signer.CosignerKey {
+	shares, err := signer.CreateCosignerSharesFromFile(path.Join(tn.Dir(), "config", "priv_validator_key.json"), threshold, total)
+	require.NoError(tn.t, err)
+	return shares
 }
 
 func getDockerUserString() string {

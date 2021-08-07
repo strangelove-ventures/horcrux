@@ -32,7 +32,7 @@ func init() {
 // CreateCosignerSharesCmd is a cobra command for creating cosigner shares from a priv validator
 func CreateCosignerSharesCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "create-shares [priv_validator.json] [shares] [threshold]",
+		Use:     "create-shares [priv_validator.json] [threshold] [shares]",
 		Aliases: []string{"shard", "shares"},
 		Args:    validateCreateCosignerShares,
 		Short:   "create  cosigner shares",

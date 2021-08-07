@@ -1,0 +1,38 @@
+#!/bin/bash
+
+dev-env () {
+  commands () {
+    cat <<-EOF
+dev-env commands:
+  start -> start dev-env
+  stop  -> stop dev-env
+EOF
+  }
+
+  case $1 in
+    start)
+      read -r -p "You are about to delete ./data directory. ARE YOU SURE? [y/N] " response
+      case "$response" in
+          [yY][eE][sS]|[yY])
+              echo "installing binaries..."
+              make build > /dev/null 2>&1
+              rm -rf ./data
+              ./scripts/spin-up.bash
+              true
+              ;;
+          *)
+              false
+              ;;
+      esac
+      ;;
+    stop)
+      echo "stopping signer and gaiad instances"
+      pkill -9 signer
+      pkill -9 gaiad
+      ;;
+    *)
+      commands
+      ;;
+  esac
+}
+dev-env $1 $2

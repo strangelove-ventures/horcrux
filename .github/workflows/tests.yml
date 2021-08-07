@@ -1,0 +1,40 @@
+name: Run Go Tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: run tests
+    runs-on: ubuntu-latest
+    steps:
+      # Install and setup go
+      - name: Set up Go 1.16
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.16
+        id: go
+
+      
+      # checkout horcrux
+      - name: checkout horcrux
+        uses: actions/checkout@v2
+
+      # build cache
+      - uses: actions/cache@v1
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      # todo: pull image from repo
+      - name: build simd image
+        run: make build-simd-docker
+
+      # run tests
+      - name: run horcrux tests
+        run: make test
