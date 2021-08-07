@@ -1,4 +1,4 @@
-package testing
+package test
 
 import (
 	"context"
@@ -38,8 +38,21 @@ import (
 )
 
 var (
-	valKey   = "validator"
-	genCoins = "1000000000000stake"
+	valKey = "validator"
+
+	// ChainType instance for simd
+	simdChain = &ChainType{
+		Repository: "jackzampolin/simd",
+		Version:    "v0.42.3",
+		Bin:        "simd",
+		Ports: map[docker.Port]struct{}{
+			"26656/tcp": {},
+			"26657/tcp": {},
+			"9090/tcp":  {},
+			"1337/tcp":  {},
+			"1234/tcp":  {},
+		},
+	}
 )
 
 // ChainType represents the type of chain to instantiate
@@ -48,20 +61,6 @@ type ChainType struct {
 	Version    string
 	Bin        string
 	Ports      map[docker.Port]struct{}
-}
-
-// ChainType instance for simd
-var simdChain = &ChainType{
-	Repository: "jackzampolin/simd",
-	Version:    "v0.42.3",
-	Bin:        "simd",
-	Ports: map[docker.Port]struct{}{
-		"26656/tcp": {},
-		"26657/tcp": {},
-		"9090/tcp":  {},
-		"1337/tcp":  {},
-		"1234/tcp":  {},
-	},
 }
 
 // TestNode represents a node in the test network that is being created
@@ -344,8 +343,8 @@ func (tn *TestNode) StartContainer(ctx context.Context) error {
 	})
 }
 
-// InitNodeFilesAndGentx creates the node files and signs a genesis transaction
-func (tn *TestNode) InitNodeFilesAndGentx(ctx context.Context) error {
+// InitValidatorFiles creates the node files and signs a genesis transaction
+func (tn *TestNode) InitValidatorFiles(ctx context.Context) error {
 	if err := tn.InitHomeFolder(ctx); err != nil {
 		return err
 	}
@@ -360,6 +359,10 @@ func (tn *TestNode) InitNodeFilesAndGentx(ctx context.Context) error {
 		return err
 	}
 	return tn.Gentx(ctx, valKey)
+}
+
+func (tn *TestNode) InitFullNodeFiles(ctx context.Context) error {
+	return tn.InitHomeFolder(ctx)
 }
 
 func handleNodeJobError(i int, err error) error {
