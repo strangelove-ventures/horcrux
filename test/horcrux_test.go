@@ -55,6 +55,10 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	// start signer processes
 	StartSignerContainers(t, testSigners, nodes[0], threshold, totalSigners, network)
 
+	// TODO: how to block till signer containers start?
+	// once we have prometheus server we can poll that
+	time.Sleep(10 * time.Second)
+
 	// modify node config to listen for private validator connections
 	peers, err := peerString(nodes, t)
 	require.NoError(t, err)
@@ -65,11 +69,9 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	t.Logf("{%s} -> Restarting Node...", nodes[0].Name())
 
 	// TODO: can we just restart the container
-	err = nodes[0].CreateNodeContainer(network.ID)
-	require.NoError(t, err)
+	require.NoError(t, nodes[0].CreateNodeContainer(network.ID, true))
 
-	err = nodes[0].StartContainer(ctx)
-	require.NoError(t, err)
+	require.NoError(t, nodes[0].StartContainer(ctx))
 
 	time.Sleep(10 * time.Second)
 

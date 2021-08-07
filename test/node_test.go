@@ -187,14 +187,12 @@ func (tn *TestNode) SetPrivValdidatorListen(peers string) {
 }
 
 func (tn *TestNode) EnsureNotSlashed() {
-	consPub, err := tn.GetConsPub()
-	require.NoError(tn.t, err)
 
 	missed := int64(0)
 	for i := 0; i < 10; i++ {
 		time.Sleep(1 * time.Second)
 		slashInfo, err := slashingtypes.NewQueryClient(tn.CliContext()).SigningInfo(context.Background(), &slashingtypes.QuerySigningInfoRequest{
-			ConsAddress: consPub,
+			ConsAddress: tn.GetConsPub(),
 		})
 		require.NoError(tn.t, err)
 
@@ -307,7 +305,7 @@ func (tn *TestNode) CollectGentxs(ctx context.Context) error {
 	return handleNodeJobError(tn.NodeJob(ctx, command))
 }
 
-func (tn *TestNode) CreateNodeContainer(networkID string) error {
+func (tn *TestNode) CreateNodeContainer(networkID string, rm bool) error {
 	cont, err := tn.Pool.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: tn.Name(),
 		Config: &docker.Config{
@@ -322,7 +320,7 @@ func (tn *TestNode) CreateNodeContainer(networkID string) error {
 		HostConfig: &docker.HostConfig{
 			Binds:           tn.Bind(),
 			PublishAllPorts: true,
-			AutoRemove:      true,
+			AutoRemove:      rm,
 		},
 		NetworkingConfig: &docker.NetworkingConfig{
 			EndpointsConfig: map[string]*docker.EndpointConfig{
@@ -373,7 +371,7 @@ func (tn *TestNode) StartContainer(ctx context.Context) error {
 			return fmt.Errorf("still catching up: height(%d) catching-up(%t)", stat.SyncInfo.LatestBlockHeight, stat.SyncInfo.CatchingUp)
 		}
 		return nil
-	})
+	}, retry.DelayType(retry.BackOffDelay))
 }
 
 // InitValidatorFiles creates the node files and signs a genesis transaction
@@ -463,6 +461,14 @@ func (tn TestNodes) Peers(node *TestNode) (out TestNodes) {
 	return
 }
 
+func (tn TestNodes) ListenAddrs() string {
+	out := []string{}
+	for _, n := range tn {
+		out = append(out, fmt.Sprintf("%s:%s", n.Name(), "1234"))
+	}
+	return strings.Join(out, ",")
+}
+
 // LogGenesisHashes logs the genesis hashes for the various nodes
 func (tn TestNodes) LogGenesisHashes() {
 	for _, n := range tn {
@@ -490,14 +496,14 @@ func (tn TestNodes) WaitForHeight(height int64) {
 				n.t.Logf("{%s} => reached block 15\n", n.Name())
 				return nil
 				// TODO: setup backup delay here
-			}, retry.Delay(500*time.Millisecond))
+			}, retry.DelayType(retry.BackOffDelay))
 		})
 	}
 	require.NoError(tn[0].t, eg.Wait())
 }
 
 func (tn *TestNode) GetPrivVal() (privval.FilePVKey, error) {
-	return signer.ReadPrivValidatorFile(tn.Dir())
+	return signer.ReadPrivValidatorFile(path.Join(tn.Dir(), "config", "priv_validator_key.json"))
 }
 
 func (tn *TestNode) GetConsPub() string {
@@ -513,7 +519,7 @@ func (tn *TestNode) GetConsPub() string {
 }
 
 func (tn *TestNode) CreateKeyShares(threshold, total int64) []signer.CosignerKey {
-	shares, err := signer.CreateCosignerSharesFromFile(fmt.Sprintf("%sconfig/priv_validator_key.json", tn.Dir()), threshold, total)
+	shares, err := signer.CreateCosignerSharesFromFile(path.Join(tn.Dir(), "config", "priv_validator_key.json"), threshold, total)
 	require.NoError(tn.t, err)
 	return shares
 }

@@ -101,11 +101,11 @@ func (ts *TestSigner) Name() string {
 }
 
 // InitSignerConfig creates and runs a container to init a signer nodes config files, and blocks until the container exits
-func (ts *TestSigner) InitSignerConfig(ctx context.Context, listenNode string, peers TestSigners, skip, threshold int) error {
+func (ts *TestSigner) InitSignerConfig(ctx context.Context, listenNodes TestNodes, peers TestSigners, skip, threshold int) error {
 	container := RandLowerCaseLetterString(10)
 	cmd := []string{
 		chainid, "config", "init",
-		chainid, listenNode,
+		chainid, listenNodes.ListenAddrs(),
 		"--cosigner",
 		fmt.Sprintf("--peers=%s", peers.PeerString(skip)),
 		fmt.Sprintf("--threshold=%d", threshold),

@@ -90,12 +90,12 @@ func StartNodeContainers(t *testing.T, ctx context.Context, net *docker.Network,
 		require.NoError(t, ioutil.WriteFile(nodes[i].GenesisFilePath(), genbz, 0644))
 	}
 
-	TestNodes(nodes).LogGenesisHashes(t)
+	TestNodes(nodes).LogGenesisHashes()
 
 	for _, n := range nodes {
 		n := n
 		eg.Go(func() error {
-			return n.CreateNodeContainer(net.ID)
+			return n.CreateNodeContainer(net.ID, true)
 		})
 	}
 	require.NoError(t, eg.Wait())
@@ -121,14 +121,13 @@ func StartSignerContainers(t *testing.T, testSigners TestSigners, node *TestNode
 	// init config files/directory for each signer node
 	for _, s := range testSigners {
 		s := s
-		eg.Go(func() error { return s.InitSignerConfig(ctx, "tcp://node-0:1234", testSigners, s.Index, threshold) })
+		eg.Go(func() error { return s.InitSignerConfig(ctx, TestNodes{node}, testSigners, s.Index, threshold) })
 	}
 	require.NoError(t, eg.Wait())
 
 	// generate key shares from node private key
-	tn.t.Logf("{%s} -> Creating Private Key Shares...", tn.Name())
-	shares, err := node.CreateKeyShares(int64(threshold), int64(total))
-	require.NoError(t, err)
+	node.t.Logf("{%s} -> Creating Private Key Shares...", node.Name())
+	shares := node.CreateKeyShares(int64(threshold), int64(total))
 	for i, signer := range testSigners {
 		signer := signer
 		signer.Key = shares[i]
@@ -236,9 +235,11 @@ func GetHostPort(cont *docker.Container, portID string) string {
 func CreateTestNetwork(pool *dockertest.Pool, name string, t *testing.T) (*docker.Network, error) {
 	return pool.Client.CreateNetwork(docker.CreateNetworkOptions{
 		Name:           name,
+		Options:        map[string]interface{}{},
+		Labels:         map[string]string{"horcrux-test": t.Name()},
 		CheckDuplicate: true,
 		Internal:       false,
+		EnableIPv6:     false,
 		Context:        context.Background(),
-		Labels:         map[string]string{"horcrux-test": t.Name()},
 	})
 }
