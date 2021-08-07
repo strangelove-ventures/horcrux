@@ -17,7 +17,6 @@ import (
 	"github.com/strangelove-ventures/horcrux/signer"
 	"golang.org/x/sync/errgroup"
 
-	tmjson "github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/privval"
 
 	"github.com/avast/retry-go"
@@ -36,7 +35,6 @@ import (
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	rpchttp "github.com/tendermint/tendermint/rpc/client/http"
 	libclient "github.com/tendermint/tendermint/rpc/jsonrpc/client"
-	// "github.com/testcontainers/testcontainers-go/wait"
 )
 
 var (
@@ -122,7 +120,7 @@ func (tn *TestNode) NewClient(addr string) error {
 
 // Name is the hostname of the test node container
 func (tn *TestNode) Name() string {
-	return fmt.Sprintf("node-%d", tn.Index)
+	return fmt.Sprintf("node-%d-%s", tn.Index, tn.t.Name())
 }
 
 // Dir is the directory where the test node files are stored
@@ -466,11 +464,11 @@ func (tn TestNodes) Peers(node *TestNode) (out TestNodes) {
 }
 
 // LogGenesisHashes logs the genesis hashes for the various nodes
-func (tn TestNodes) LogGenesisHashes(t *testing.T) {
+func (tn TestNodes) LogGenesisHashes() {
 	for _, n := range tn {
 		gen, err := ioutil.ReadFile(path.Join(n.Dir(), "config", "genesis.json"))
-		require.NoError(t, err)
-		t.Log(fmt.Sprintf("{node-%d} genesis hash %x", n.Index, sha256.Sum256(gen)))
+		require.NoError(tn[0].t, err)
+		tn[0].t.Log(fmt.Sprintf("{node-%d} genesis hash %x", n.Index, sha256.Sum256(gen)))
 	}
 }
 
@@ -499,43 +497,25 @@ func (tn TestNodes) WaitForHeight(height int64) {
 }
 
 func (tn *TestNode) GetPrivVal() (privval.FilePVKey, error) {
-	pvKey := privval.FilePVKey{}
-	keyPath := fmt.Sprintf("%sconfig/priv_validator_key.json", tn.Dir())
-
-	keyFile, err := ioutil.ReadFile(keyPath)
-	if err != nil {
-		return pvKey, err
-	}
-
-	err = tmjson.Unmarshal(keyFile, &pvKey)
-	if err != nil {
-		return pvKey, err
-	}
-	return pvKey, nil
+	return signer.ReadPrivValidatorFile(tn.Dir())
 }
 
-func (tn *TestNode) GetConsPub() (string, error) {
+func (tn *TestNode) GetConsPub() string {
 	pv, err := tn.GetPrivVal()
-	if err != nil {
-		return "", err
-	}
+	require.NoError(tn.t, err)
 
 	pubkey, err := cryptocodec.FromTmPubKeyInterface(pv.PubKey)
-	if err != nil {
-		return "", err
-	}
+	require.NoError(tn.t, err)
 
-	return sdk.ConsAddress(pubkey.Address()).String(), nil
+	return sdk.ConsAddress(pubkey.Address()).String()
 
 	//return sdk.Bech32ifyPubKey(sdk.Bech32PubKeyTypeValPub, pubkey)
 }
 
-func (tn *TestNode) CreateKeyShares(threshold, total int64) ([]signer.CosignerKey, error) {
-	tn.t.Logf("{%s} -> Creating Private Key Shares...", tn.Name())
-
-	keyPath := fmt.Sprintf("%sconfig/priv_validator_key.json", tn.Dir())
-
-	return signer.CreateCosignerSharesFromFile(keyPath, threshold, total)
+func (tn *TestNode) CreateKeyShares(threshold, total int64) []signer.CosignerKey {
+	shares, err := signer.CreateCosignerSharesFromFile(fmt.Sprintf("%sconfig/priv_validator_key.json", tn.Dir()), threshold, total)
+	require.NoError(tn.t, err)
+	return shares
 }
 
 func getDockerUserString() string {

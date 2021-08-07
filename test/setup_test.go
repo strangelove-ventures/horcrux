@@ -126,6 +126,7 @@ func StartSignerContainers(t *testing.T, testSigners TestSigners, node *TestNode
 	require.NoError(t, eg.Wait())
 
 	// generate key shares from node private key
+	tn.t.Logf("{%s} -> Creating Private Key Shares...", tn.Name())
 	shares, err := node.CreateKeyShares(int64(threshold), int64(total))
 	require.NoError(t, err)
 	for i, signer := range testSigners {
