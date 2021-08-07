@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/strangelove-ventures/horcrux/signer"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
@@ -52,6 +54,52 @@ func BuildTestSignerContainer(pool *dockertest.Pool, t *testing.T) error {
 		AuthConfigs:         docker.AuthConfigurations{},
 		ContextDir:          path.Dir(dir),
 	})
+}
+
+func StartSignerContainers(t *testing.T, testSigners TestSigners, node *TestNode, threshold, total int, network *docker.Network) {
+	eg := new(errgroup.Group)
+	ctx := context.Background()
+
+	// init config files/directory for each signer node
+	for _, s := range testSigners {
+		s := s
+		eg.Go(func() error { return s.InitSignerConfig(ctx, TestNodes{node}, testSigners, s.Index, threshold) })
+	}
+	require.NoError(t, eg.Wait())
+
+	// generate key shares from node private key
+	node.t.Logf("{%s} -> Creating Private Key Shares...", node.Name())
+	shares := node.CreateKeyShares(int64(threshold), int64(total))
+	for i, signer := range testSigners {
+		signer := signer
+		signer.Key = shares[i]
+	}
+
+	// write key share to file in each signer nodes config directory
+	for _, s := range testSigners {
+		// signer := signer
+		s.t.Logf("{%s} -> Writing Key Share To File... ", s.Name())
+		privateFilename := fmt.Sprintf("%sshare.json", s.Dir())
+		require.NoError(t, signer.WriteCosignerShareFile(s.Key, privateFilename))
+	}
+
+	// create containers & start signer nodes
+	for _, signer := range testSigners {
+		signer := signer
+		eg.Go(func() error {
+			return signer.CreateSignerContainer(network.ID)
+		})
+	}
+	require.NoError(t, eg.Wait())
+
+	for _, s := range testSigners {
+		s := s
+		t.Logf("{%s} => starting container...", s.Name())
+		eg.Go(func() error {
+			return s.StartContainer()
+		})
+	}
+	require.NoError(t, eg.Wait())
 }
 
 // PeerString returns a string representing a signer nodes connectable private peers

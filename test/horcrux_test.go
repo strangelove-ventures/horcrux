@@ -57,12 +57,10 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 
 	// TODO: how to block till signer containers start?
 	// once we have prometheus server we can poll that
-	time.Sleep(10 * time.Second)
+	// time.Sleep(10 * time.Second)
 
 	// modify node config to listen for private validator connections
-	peers, err := peerString(nodes, t)
-	require.NoError(t, err)
-	nodes[0].SetPrivValdidatorListen(peers)
+	nodes[0].SetPrivValdidatorListen(TestNodes(nodes).PeerString())
 
 	// restart node and ensure that signer cluster is connected by
 	// checking if the node continues to miss blocks or is slashed

@@ -101,6 +101,84 @@ func MakeTestNodes(count int, home, chainid string, chainType *ChainType, pool *
 	return
 }
 
+// StartNodeContainers is passed a chain id and arrays of validators and full nodes to configure
+func StartNodeContainers(t *testing.T, ctx context.Context, net *docker.Network, validators, fullnodes []*TestNode) {
+	var eg errgroup.Group
+
+	// sign gentx for each validator
+	for _, v := range validators {
+		v := v
+		eg.Go(func() error { return v.InitValidatorFiles(ctx) })
+	}
+
+	// just initialize folder for any full nodes
+	for _, n := range fullnodes {
+		n := n
+		eg.Go(func() error { return n.InitFullNodeFiles(ctx) })
+	}
+
+	// wait for this to finish
+	require.NoError(t, eg.Wait())
+
+	// for the validators we need to collect the gentxs and the accounts
+	// to the first node's genesis file
+	validator0 := validators[0]
+	for i := 1; i < len(validators); i++ {
+		i := i
+		eg.Go(func() error {
+			validatorN := validators[i]
+			n0key, err := validatorN.GetKey(valKey)
+			if err != nil {
+				return err
+			}
+
+			if err := validator0.AddGenesisAccount(ctx, n0key.GetAddress().String()); err != nil {
+				return err
+			}
+			nNid, err := validatorN.NodeID()
+			if err != nil {
+				return err
+			}
+			oldPath := path.Join(validatorN.Dir(), "config", "gentx", fmt.Sprintf("gentx-%s.json", nNid))
+			newPath := path.Join(validator0.Dir(), "config", "gentx", fmt.Sprintf("gentx-%s.json", nNid))
+			return os.Rename(oldPath, newPath)
+		})
+	}
+	require.NoError(t, eg.Wait())
+	require.NoError(t, validator0.CollectGentxs(ctx))
+
+	genbz, err := ioutil.ReadFile(validator0.GenesisFilePath())
+	require.NoError(t, err)
+
+	nodes := append(validators, fullnodes...)
+
+	for i := 1; i < len(nodes); i++ {
+		require.NoError(t, ioutil.WriteFile(nodes[i].GenesisFilePath(), genbz, 0644))
+	}
+
+	TestNodes(nodes).LogGenesisHashes()
+
+	for _, n := range nodes {
+		n := n
+		eg.Go(func() error {
+			return n.CreateNodeContainer(net.ID, true)
+		})
+	}
+	require.NoError(t, eg.Wait())
+
+	peers := TestNodes(nodes).PeerString()
+
+	for _, n := range nodes {
+		n := n
+		t.Logf("{%s} => starting container...", n.Name())
+		eg.Go(func() error {
+			n.SetValidatorConfigAndPeers(peers)
+			return n.StartContainer(ctx)
+		})
+	}
+	require.NoError(t, eg.Wait())
+}
+
 func (tn *TestNode) NewClient(addr string) error {
 	httpClient, err := libclient.DefaultHTTPClient(addr)
 	if err != nil {
@@ -437,18 +515,19 @@ func RandLowerCaseLetterString(length int) string {
 // TestNodes is a collection of TestNode
 type TestNodes []*TestNode
 
-// PeerString returns the peer identifiers for a given set of nodes
-// TODO: probably needs refactor
-func (tn TestNodes) PeerString() (string, error) {
-	out := []string{}
+// PeerString returns the string for connecting the nodes passed in
+func (tn TestNodes) PeerString() string {
+	bldr := new(strings.Builder)
 	for _, n := range tn {
-		nid, err := n.NodeID()
+		id, err := n.NodeID()
 		if err != nil {
-			return "", err
+			return bldr.String()
 		}
-		out = append(out, fmt.Sprintf("%s@%s:%s", nid, n.Name(), "26656"))
+		ps := fmt.Sprintf("%s@%s:26656,", id, n.Name())
+		tn[0].t.Logf("{%s} peering (%s)", n.Name(), strings.TrimSuffix(ps, ","))
+		bldr.WriteString(ps)
 	}
-	return strings.Join(out, ","), nil
+	return strings.TrimSuffix(bldr.String(), ",")
 }
 
 // Peers returns the peer nodes for a given node if it is included in a set of nodes
