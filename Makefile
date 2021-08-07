@@ -1,24 +1,36 @@
-all: build
+
+VERSION := $(shell echo $(shell git describe --tags) | sed 's/^v//')
+SDKVERSION := $(shell go list -m -u -f '{{.Version}}' github.com/cosmos/cosmos-sdk)
+TMVERSION := $(shell go list -m -u -f '{{.Version}}' github.com/tendermint/tendermint)
+
+all: install
+
+LD_FLAGS = -X github.com/strangelove-ventures/horcrux/cmd.Version=$(VERSION) \
+	-X github.com/strangelove-ventures/horcrux/cmd.Commit=$(COMMIT) \
+	-X github.com/strangelove-ventures/horcrux/cmd.SDKCommit=$(SDKCOMMIT) \
+	-X github.com/strangelove-ventures/horcrux/cmd.TMCommit=$(TMVERSION)
+
+BUILD_FLAGS := -ldflags '$(LD_FLAGS)'
 
 build:
-	@go build --mod readonly -o build/ ./cmd/horcrux/...
+	@go build -mod readonly $(BUILD_FLAGS) -o build/ ./cmd/horcrux/...
 
 install:
-	@go install ./cmd/horcrux/...
+	@go install -mod readonly $(BUILD_FLAGS) ./cmd/horcrux/...
 
 build-linux:
-	@GOOS=linux GOARCH=amd64 go build -o ./build/horcrux ./cmd/horcrux
+	@GOOS=linux GOARCH=amd64 go build --mod readonly $(BUILD_FLAGS) -o ./build/horcrux ./cmd/horcrux
 
 test:
-	@go test -v ./...
+	@go test -mod readonly -v ./...
 
 clean:
 	rm -rf build
 
 build-simd-docker:
-	docker build -t jackzampolin/simd:v0.42.3 -f ./docker/simd/Dockerfile ./docker/simd/
+	docker build -t jackzampolin/simd:$(SDKVERSION) -f ./docker/simd/Dockerfile ./docker/simd/
 
 build-horcrux-docker:
-	docker build -t strangelove-ventures/horcrux:v0.1.0 -f ./docker/horcrux/Dockerfile .
+	docker build -t strangelove-ventures/horcrux:$(VERSION) -f ./docker/horcrux/Dockerfile .
 
 .PHONY: all lint test race msan tools clean build

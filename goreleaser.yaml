@@ -1,0 +1,30 @@
+project_name: sommelier
+
+env:
+  # Require use of Go modules.
+  - GO111MODULE=on
+
+builds:
+  - id: "sommelier"
+    main: ./cmd/sommelier/main.go
+    ldflags:
+      - -X github.com/strangelove-ventures/horcrux/version.Version={{ .Version }} -X github.com/strangelove-ventures/horcrux/version.Commit={{ .Commit }}
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+checksum:
+  name_template: SHA256SUMS-{{.Version}}.txt
+  algorithm: sha256
+
+release:
+  name_template: "Release {{.Version}}"
+
+archives:
+  - files:
+    - LICENSE
+    - README.md

@@ -11,6 +11,7 @@ import (
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/strangelove-ventures/horcrux/signer"
+	"github.com/strangelove-ventures/horcrux/version"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
@@ -21,6 +22,7 @@ func init() {
 	// TODO: config peers add/remove
 	// TODO: config chain-id set
 	configCmd.AddCommand(initCmd())
+	rootCmd.AddCommand(version.NewVersionCommand())
 	rootCmd.AddCommand(configCmd)
 }
 
