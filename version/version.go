@@ -35,7 +35,7 @@ var (
 type Info struct {
 	Version           string `json:"version" yaml:"version"`
 	GitCommit         string `json:"commit" yaml:"commit"`
-	GoVersion         string `json:"go" yaml:"go"`
+	GoVersion         string `json:"go_version" yaml:"go_version"`
 	CosmosSdkVersion  string `json:"cosmos_sdk_version" yaml:"cosmos_sdk_version"`
 	TendermintVersion string `json:"tendermint_version" yaml:"tendermint_version"`
 }
@@ -44,7 +44,7 @@ func NewInfo() Info {
 	return Info{
 		Version:           Version,
 		GitCommit:         Commit,
-		GoVersion:         fmt.Sprintf("go version %s %s/%s", runtime.Version(), runtime.GOOS, runtime.GOARCH),
+		GoVersion:         fmt.Sprintf("%s %s/%s", runtime.Version(), runtime.GOOS, runtime.GOARCH),
 		CosmosSdkVersion:  SDKVersion,
 		TendermintVersion: TMVersion,
 	}

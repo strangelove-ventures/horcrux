@@ -2,13 +2,14 @@
 VERSION := $(shell echo $(shell git describe --tags) | sed 's/^v//')
 SDKVERSION := $(shell go list -m -u -f '{{.Version}}' github.com/cosmos/cosmos-sdk)
 TMVERSION := $(shell go list -m -u -f '{{.Version}}' github.com/tendermint/tendermint)
+COMMIT  := $(shell git log -1 --format='%H')
 
 all: install
 
-LD_FLAGS = -X github.com/strangelove-ventures/horcrux/cmd.Version=$(VERSION) \
-	-X github.com/strangelove-ventures/horcrux/cmd.Commit=$(COMMIT) \
-	-X github.com/strangelove-ventures/horcrux/cmd.SDKCommit=$(SDKCOMMIT) \
-	-X github.com/strangelove-ventures/horcrux/cmd.TMCommit=$(TMVERSION)
+LD_FLAGS = -X github.com/strangelove-ventures/horcrux/version.Version=$(VERSION) \
+	-X github.com/strangelove-ventures/horcrux/version.Commit=$(COMMIT) \
+	-X github.com/strangelove-ventures/horcrux/version.SDKVersion=$(SDKVERSION) \
+	-X github.com/strangelove-ventures/horcrux/version.TMVersion=$(TMVERSION)
 
 BUILD_FLAGS := -ldflags '$(LD_FLAGS)'
 
