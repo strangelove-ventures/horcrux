@@ -4,3 +4,4 @@ build
 data
 private_share_*
 priv_validator_key.json
+dist/
