@@ -1,4 +1,4 @@
-ARG VERSION=v0.42.3
+ARG VERSION=v0.42.9
 FROM golang:1.16-alpine AS build-env
 ARG VERSION
 ENV PACKAGES curl make git libc-dev bash gcc linux-headers eudev-dev

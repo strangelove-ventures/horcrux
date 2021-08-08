@@ -43,7 +43,7 @@ var (
 	// ChainType instance for simd
 	simdChain = &ChainType{
 		Repository: "jackzampolin/simd",
-		Version:    "v0.42.3",
+		Version:    "v0.42.9",
 		Bin:        "simd",
 		Ports: map[docker.Port]struct{}{
 			"26656/tcp": {},

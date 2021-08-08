@@ -36,4 +36,11 @@ build-horcrux-docker:
 push-simd-docker:
 	docker push jackzampolin/simd:$(SDKVERSION)
 
+push-horcrux-docker:
+	docker push jackzampolin/simd:$(VERSION)
+
+build-push-simd: build-simd-docker push-simd-docker
+
+build-push-horcrux: build-horcrux-docker push-horcrux-docker
+
 .PHONY: all lint test race msan tools clean build
