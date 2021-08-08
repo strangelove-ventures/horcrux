@@ -30,5 +30,5 @@ release:
 
 archives:
   - files:
-    - LICENSE
+    - LICENSE.md
     - README.md
