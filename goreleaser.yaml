@@ -10,10 +10,10 @@ builds:
   - id: "horcrux"
     main: ./cmd/horcrux/main.go
     ldflags:
-      - -X github.com/strangelove-ventures/horcrux/version.Version={{ .Version }} \
-        -X github.com/strangelove-ventures/horcrux/version.Commit={{ .Commit }} \
-        -X github.com/strangelove-ventures/horcrux/version.SDKVersion=v0.43.2 \
-        -X github.com/strangelove-ventures/horcrux/version.TMVersion=v0.34.8
+      - -X "github.com/strangelove-ventures/horcrux/version.Version={{ .Version }}"
+      - -X "github.com/strangelove-ventures/horcrux/version.Commit={{ .Commit }}"
+      - -X "github.com/strangelove-ventures/horcrux/version.SDKVersion=v0.43.2"
+      - -X "github.com/strangelove-ventures/horcrux/version.TMVersion=v0.34.8"
     goos:
       - darwin
       - linux
