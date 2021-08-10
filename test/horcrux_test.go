@@ -49,12 +49,14 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 	t.Logf("{%s} -> Stopping Node...", validators[0].Name())
 	require.NoError(t, validators[0].StopContainer())
 
+	t.Logf("{%s} -> Stopping Node...", fullNodes[0].Name())
+	require.NoError(t, fullNodes[0].StopContainer())
+
 	// set the test cleanup function
 	t.Cleanup(Cleanup(pool, t.Name(), home))
 
 	// start signer processes
 	StartSingleSignerContainers(t, testSigners, validators[0], append(fullNodes, validators[0]), threshold, totalSigners, network)
-	//StartSignerContainers(t, testSigners, validators[0], append(fullNodes, validators[0]), threshold, totalSigners, network)
 
 	// TODO: how to block till signer containers start?
 	// once we have prometheus server we can poll that
@@ -62,15 +64,19 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 
 	// modify node config to listen for private validator connections
 	validators[0].SetPrivValdidatorListen(allNodes.PeerString())
+	fullNodes[0].SetPrivValdidatorListen(allNodes.PeerString())
 
 	// restart node and ensure that signer cluster is connected by
 	// checking if the node continues to miss blocks or is slashed
 	t.Logf("{%s} -> Restarting Node...", validators[0].Name())
+	t.Logf("{%s} -> Restarting Node...", fullNodes[0].Name())
 
 	// TODO: can we just restart the container
 	require.NoError(t, validators[0].CreateNodeContainer(network.ID, false))
+	require.NoError(t, fullNodes[0].CreateNodeContainer(network.ID, false))
 
 	require.NoError(t, validators[0].StartContainer(ctx))
+	require.NoError(t, fullNodes[0].StartContainer(ctx))
 
 	time.Sleep(10 * time.Second)
 
@@ -111,7 +117,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	t.Cleanup(Cleanup(pool, t.Name(), home))
 
 	// start signer processes
-	StartSignerContainers(t, testSigners, nodes[0], TestNodes{nodes[0]}, threshold, totalSigners, network)
+	StartCosignerContainers(t, testSigners, nodes[0], TestNodes{nodes[0]}, threshold, totalSigners, network)
 
 	// TODO: how to block till signer containers start?
 	// once we have prometheus server we can poll that
