@@ -322,7 +322,7 @@ func (tn *TestNode) NodeJob(ctx context.Context, cmd []string) (int, error) {
 		HostConfig: &docker.HostConfig{
 			Binds:           tn.Bind(),
 			PublishAllPorts: true,
-			AutoRemove:      false,
+			AutoRemove:      true,
 		},
 		NetworkingConfig: &docker.NetworkingConfig{
 			EndpointsConfig: map[string]*docker.EndpointConfig{},
@@ -437,7 +437,7 @@ func (tn *TestNode) StartContainer(ctx context.Context) error {
 		return err
 	}
 
-	 time.Sleep(3 * time.Second)
+	time.Sleep(3 * time.Second)
 	return retry.Do(func() error {
 		stat, err := tn.Client.Status(ctx)
 		if err != nil {

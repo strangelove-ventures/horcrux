@@ -1,6 +1,7 @@
 package test
 
 import (
+	"os"
 	"testing"
 	"time"
 
@@ -22,7 +23,6 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 	numValidators := 4
 	numFullNodes := 1
 	totalSigners := 1
-	threshold := 1
 
 	ctx, home, pool, network, validators := SetupTestRun(t, numValidators+numFullNodes)
 	testSigners := MakeTestSigners(totalSigners, home, pool, t)
@@ -56,7 +56,7 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 	t.Cleanup(Cleanup(pool, t.Name(), home))
 
 	// start signer processes
-	StartSingleSignerContainers(t, testSigners, validators[0], append(fullNodes, validators[0]), threshold, totalSigners, network)
+	StartSingleSignerContainers(t, testSigners, validators[0], append(fullNodes, validators[0]), network)
 
 	// TODO: how to block till signer containers start?
 	// once we have prometheus server we can poll that
@@ -72,8 +72,8 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 	t.Logf("{%s} -> Restarting Node...", fullNodes[0].Name())
 
 	// TODO: can we just restart the container
-	require.NoError(t, validators[0].CreateNodeContainer(network.ID, false))
-	require.NoError(t, fullNodes[0].CreateNodeContainer(network.ID, false))
+	require.NoError(t, validators[0].CreateNodeContainer(network.ID, true))
+	require.NoError(t, fullNodes[0].CreateNodeContainer(network.ID, true))
 
 	require.NoError(t, validators[0].StartContainer(ctx))
 	require.NoError(t, fullNodes[0].StartContainer(ctx))
@@ -159,6 +159,6 @@ func Cleanup(pool *dockertest.Pool, testName, testDir string) func() {
 				}
 			}
 		}
-		//os.RemoveAll(testDir)
+		os.RemoveAll(testDir)
 	}
 }

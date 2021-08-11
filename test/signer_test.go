@@ -57,7 +57,7 @@ func BuildTestSignerContainer(pool *dockertest.Pool, t *testing.T) error {
 	})
 }
 
-func StartSingleSignerContainers(t *testing.T, testSigners TestSigners, validator *TestNode, sentryNodes TestNodes, threshold, total int, network *docker.Network) {
+func StartSingleSignerContainers(t *testing.T, testSigners TestSigners, validator *TestNode, sentryNodes TestNodes, network *docker.Network) {
 	eg := new(errgroup.Group)
 	ctx := context.Background()
 
@@ -227,7 +227,7 @@ func (ts *TestSigner) InitSingleSignerConfig(ctx context.Context, listenNodes Te
 		},
 		HostConfig: &docker.HostConfig{
 			PublishAllPorts: true,
-			AutoRemove:      false,
+			AutoRemove:      true,
 			Mounts: []docker.HostMount{
 				{
 					Type:        "bind",
@@ -278,7 +278,7 @@ func (ts *TestSigner) InitCosignerConfig(ctx context.Context, listenNodes TestNo
 		},
 		HostConfig: &docker.HostConfig{
 			PublishAllPorts: true,
-			AutoRemove:      false,
+			AutoRemove:      true,
 			Mounts: []docker.HostMount{
 				{
 					Type:        "bind",
@@ -340,7 +340,7 @@ func (ts *TestSigner) CreateSingleSignerContainer(networkID string) error {
 		},
 		HostConfig: &docker.HostConfig{
 			PublishAllPorts: true,
-			AutoRemove:      false,
+			AutoRemove:      true,
 			Mounts: []docker.HostMount{
 				{
 					Type:        "bind",
@@ -382,7 +382,7 @@ func (ts *TestSigner) CreateCosignerContainer(networkID string) error {
 		},
 		HostConfig: &docker.HostConfig{
 			PublishAllPorts: true,
-			AutoRemove:      false,
+			AutoRemove:      true,
 			Mounts: []docker.HostMount{
 				{
 					Type:        "bind",
