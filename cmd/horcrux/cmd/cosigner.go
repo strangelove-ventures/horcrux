@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/tendermint/tendermint/privval"
 	"log"
 	"net"
 	"os"
@@ -10,12 +9,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/signer"
-
 	"github.com/spf13/cobra"
+	"github.com/strangelove-ventures/horcrux/signer"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmOS "github.com/tendermint/tendermint/libs/os"
 	tmService "github.com/tendermint/tendermint/libs/service"
+	"github.com/tendermint/tendermint/privval"
 	"github.com/tendermint/tendermint/types"
 )
 
@@ -90,11 +89,12 @@ func StartCosignerCmd() *cobra.Command {
 				stateFile := path.Join(cfg.PrivValStateDir, fmt.Sprintf("%s_priv_validator_state.json", chainID))
 
 				// TODO either stop creating state file at config init
-				//if _, err = os.Stat(stateFile); os.IsNotExist(err) {
-				//	val = privval.LoadFilePVEmptyState(cfg.PrivValKeyFile, stateFile)
-				//} else {
-				//	val = privval.LoadFilePV(cfg.PrivValKeyFile, stateFile)
-				//}
+				// Triple check that this is how we will handle state file and that this behaves as intended
+				// if f, err := os.Stat(stateFile); os.IsNotExist(err) || f.Size() == 0 {
+				//  	val = privval.LoadFilePVEmptyState(cfg.PrivValKeyFile, stateFile)
+				// 	} else {
+				//  	val = privval.LoadFilePV(cfg.PrivValKeyFile, stateFile)
+				//  }
 				val = privval.LoadFilePVEmptyState(cfg.PrivValKeyFile, stateFile)
 
 				pv = &signer.PvGuard{PrivValidator: val}

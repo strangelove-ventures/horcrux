@@ -1,5 +1,4 @@
-
-#!/bin/sh	
+#!/bin/sh
 # USAGE: ./one-chain test-chain-id ./data	
 
 CHAINID=test-chain-id	

@@ -16,13 +16,16 @@ func TestBuildSignerContainer(t *testing.T) {
 	t.Skip()
 	pool, err := dockertest.NewPool("")
 	require.NoError(t, err)
-	require.NoError(t, BuildTestSignerContainer(pool, t))
+	require.NoError(t, BuildTestSignerContainer(pool))
 }
 
+// TestSingleSignerTwoSentries will spin up a chain with four validators & one full node, stop one validator & full node,
+// configure those two nodes to be relays for the remote signer, spin up a single remote signer, restart the validator
+// and check that no slashing occurs
 func TestSingleSignerTwoSentries(t *testing.T) {
-	numValidators := 4
-	numFullNodes := 1
-	totalSigners := 1
+	const numValidators = 4
+	const numFullNodes = 1
+	const totalSigners = 1
 
 	ctx, home, pool, network, validators := SetupTestRun(t, numValidators+numFullNodes)
 	testSigners := MakeTestSigners(totalSigners, home, pool, t)
@@ -33,10 +36,10 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 	// start building the cosigner container first
 	var eg errgroup.Group
 	eg.Go(func() error {
-		return BuildTestSignerContainer(pool, t)
+		return BuildTestSignerContainer(pool)
 	})
 
-	// start nodes
+	// start validators and full node
 	StartNodeContainers(t, ctx, network, validators, fullNodes)
 
 	// Wait for all nodes to get to block 15
@@ -45,7 +48,7 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 	// wait for build to finish
 	require.NoError(t, eg.Wait())
 
-	// Stop one node before spinning up the mpc validators
+	// Stop the validator node and full node before spinning up the signer node
 	t.Logf("{%s} -> Stopping Node...", validators[0].Name())
 	require.NoError(t, validators[0].StopContainer())
 
@@ -80,16 +83,18 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 
 	time.Sleep(10 * time.Second)
 
+	t.Logf("{%s} -> Checking that slashing has not occurred...", validators[0].Name())
 	validators[0].EnsureNotSlashed()
 }
 
+// TestUpgradeValidatorToHorcrux will spin up a chain with four validators, stop one validator, configure that validator
+// to be a relay for the remote signers, spin up a 2/3 threshold signer cluster, restart the validator and check that no slashing occurs
 func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	// NOTE: have this test skipped because we are debugging the docker build in CI
 	// t.Skip()
-
-	numNodes := 4
-	totalSigners := 3
-	threshold := 2
+	const numNodes = 4
+	const totalSigners = 3
+	const threshold = 2
 
 	ctx, home, pool, network, nodes := SetupTestRun(t, numNodes)
 	testSigners := MakeTestSigners(totalSigners, home, pool, t)
@@ -97,19 +102,19 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	// start building the cosigner container first
 	var eg errgroup.Group
 	eg.Go(func() error {
-		return BuildTestSignerContainer(pool, t)
+		return BuildTestSignerContainer(pool)
 	})
 
 	// start validators
 	StartNodeContainers(t, ctx, network, nodes, []*TestNode{})
 
 	// Wait for all nodes to get to block 15
-	TestNodes(nodes).WaitForHeight(15)
+	nodes.WaitForHeight(15)
 
 	// wait for build to finish
 	require.NoError(t, eg.Wait())
 
-	// Stop one node before spinning up the mpc nodes
+	// Stop one validator node before spinning up the mpc nodes
 	t.Logf("{%s} -> Stopping Node...", nodes[0].Name())
 	require.NoError(t, nodes[0].StopContainer())
 
@@ -124,7 +129,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	// time.Sleep(10 * time.Second)
 
 	// modify node config to listen for private validator connections
-	nodes[0].SetPrivValdidatorListen(TestNodes(nodes).PeerString())
+	nodes[0].SetPrivValdidatorListen(nodes.PeerString())
 
 	// restart node and ensure that signer cluster is connected by
 	// checking if the node continues to miss blocks or is slashed
@@ -137,17 +142,18 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 
 	time.Sleep(10 * time.Second)
 
+	t.Logf("{%s} -> Checking that slashing has not occurred...", nodes[0].Name())
 	nodes[0].EnsureNotSlashed()
 }
 
-// TODO: use this cleanup function
+// Cleanup will clean up Docker containers, networks, and the other various config files generated in testing
 func Cleanup(pool *dockertest.Pool, testName, testDir string) func() {
 	return func() {
 		cont, _ := pool.Client.ListContainers(docker.ListContainersOptions{All: true})
 		for _, c := range cont {
 			for k, v := range c.Labels {
 				if k == "horcrux-test" && v == testName {
-					pool.Client.StopContainer(c.ID, 10)
+					_ = pool.Client.StopContainer(c.ID, 10)
 				}
 			}
 		}
@@ -155,10 +161,10 @@ func Cleanup(pool *dockertest.Pool, testName, testDir string) func() {
 		for _, n := range nets {
 			for k, v := range n.Labels {
 				if k == "horcrux-test" && v == testName {
-					pool.Client.RemoveNetwork(n.ID)
+					_ = pool.Client.RemoveNetwork(n.ID)
 				}
 			}
 		}
-		os.RemoveAll(testDir)
+		_ = os.RemoveAll(testDir)
 	}
 }

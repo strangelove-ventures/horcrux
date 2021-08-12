@@ -10,8 +10,6 @@ import (
 	"io/ioutil"
 )
 
-
-
 // CreateCosignerSharesFromFile creates cosigner key objects from a priv_validator_key.json file
 func CreateCosignerSharesFromFile(priv string, threshold, shares int64) ([]CosignerKey, error) {
 	pv, err := ReadPrivValidatorFile(priv)
@@ -75,4 +73,3 @@ func makeRSAKeys(num int) (rsaKeys []*rsa.PrivateKey, pubKeys []*rsa.PublicKey, 
 	}
 	return
 }
-

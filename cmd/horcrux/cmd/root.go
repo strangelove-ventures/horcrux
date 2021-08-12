@@ -6,11 +6,10 @@ import (
 	"os"
 	"path"
 
-	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
-
 	homedir "github.com/mitchellh/go-homedir"
+	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v2"
 )
 
 var (
