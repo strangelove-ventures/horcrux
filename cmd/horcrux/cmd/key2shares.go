@@ -19,10 +19,9 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/signer"
 	"github.com/tendermint/tendermint/libs/os"
-
-	"github.com/spf13/cobra"
 )
 
 func init() {

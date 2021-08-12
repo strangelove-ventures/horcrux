@@ -14,11 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/signer"
-	"golang.org/x/sync/errgroup"
-
-	"github.com/tendermint/tendermint/privval"
-
 	"github.com/avast/retry-go"
 	"github.com/cosmos/cosmos-sdk/client"
 	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
@@ -29,12 +24,15 @@ import (
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
+	"github.com/strangelove-ventures/horcrux/signer"
 	"github.com/stretchr/testify/require"
 	tmconfig "github.com/tendermint/tendermint/config"
 	"github.com/tendermint/tendermint/p2p"
+	"github.com/tendermint/tendermint/privval"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	rpchttp "github.com/tendermint/tendermint/rpc/client/http"
 	libclient "github.com/tendermint/tendermint/rpc/jsonrpc/client"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -78,6 +76,7 @@ type TestNode struct {
 	ec           params.EncodingConfig
 }
 
+// CliContext creates a new Cosmos SDK client context
 func (tn *TestNode) CliContext() client.Context {
 	return client.Context{
 		Client:            tn.Client,
@@ -91,7 +90,7 @@ func (tn *TestNode) CliContext() client.Context {
 	}
 }
 
-// MakeTestNodes create the test node objects required for bootstrapping tests
+// MakeTestNodes creates the test node objects required for bootstrapping tests
 func MakeTestNodes(count int, home, chainid string, chainType *ChainType, pool *dockertest.Pool, t *testing.T) (out TestNodes) {
 	for i := 0; i < count; i++ {
 		tn := &TestNode{Home: home, Index: i, Chain: chainType, ChainID: chainid, Pool: pool, t: t, ec: simapp.MakeTestEncodingConfig()}
@@ -179,6 +178,7 @@ func StartNodeContainers(t *testing.T, ctx context.Context, net *docker.Network,
 	require.NoError(t, eg.Wait())
 }
 
+// NewClient creates and assigns a new Tendermint RPC client to the TestNode
 func (tn *TestNode) NewClient(addr string) error {
 	httpClient, err := libclient.DefaultHTTPClient(addr)
 	if err != nil {
@@ -265,7 +265,6 @@ func (tn *TestNode) SetPrivValdidatorListen(peers string) {
 }
 
 func (tn *TestNode) EnsureNotSlashed() {
-
 	missed := int64(0)
 	for i := 0; i < 10; i++ {
 		time.Sleep(1 * time.Second)
@@ -437,7 +436,7 @@ func (tn *TestNode) StartContainer(ctx context.Context) error {
 		return err
 	}
 
-	// time.Sleep(3 * time.Second)
+	time.Sleep(3 * time.Second)
 	return retry.Do(func() error {
 		stat, err := tn.Client.Status(ctx)
 		if err != nil {

@@ -9,12 +9,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/signer"
-
 	"github.com/spf13/cobra"
+	"github.com/strangelove-ventures/horcrux/signer"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmOS "github.com/tendermint/tendermint/libs/os"
 	tmService "github.com/tendermint/tendermint/libs/service"
+	"github.com/tendermint/tendermint/privval"
 	"github.com/tendermint/tendermint/types"
 )
 
@@ -30,11 +30,20 @@ var cosignerCmd = &cobra.Command{
 
 func StartCosignerCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "start",
+		Use:   "start [single-signer]",
 		Short: "start cosigner process",
+		Long:  "[single-signer] specifies that horcrux should be ran as a single signer",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			if err = validateCosignerConfig(config); err != nil {
+			single, _ := cmd.Flags().GetBool("single")
+
+			if single {
+				err = validateSingleSignerConfig(config)
+			} else {
+				err = validateCosignerConfig(config)
+			}
+
+			if err != nil {
 				return
 			}
 
@@ -45,7 +54,19 @@ func StartCosignerCmd() *cobra.Command {
 				pv       types.PrivValidator
 				chainID  = config.ChainID
 				logger   = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator")
-				config   = signer.Config{
+				cfg      signer.Config
+			)
+
+			if single {
+				cfg = signer.Config{
+					Mode:            "single",
+					PrivValKeyFile:  path.Join(config.HomeDir, "priv_validator_key.json"),
+					PrivValStateDir: path.Join(config.HomeDir, "state"),
+					ChainID:         config.ChainID,
+					Nodes:           config.Nodes(),
+				}
+			} else {
+				cfg = signer.Config{
 					Mode:              "mpc",
 					PrivValKeyFile:    path.Join(config.HomeDir, "share.json"),
 					PrivValStateDir:   path.Join(config.HomeDir, "state"),
@@ -55,92 +76,108 @@ func StartCosignerCmd() *cobra.Command {
 					Nodes:             config.Nodes(),
 					Cosigners:         config.CosignerPeers(),
 				}
-			)
-
-			if _, err = os.Stat(config.PrivValKeyFile); os.IsNotExist(err) {
-				return fmt.Errorf("private key share doesn't exist at path(%s)", config.PrivValKeyFile)
 			}
 
-			logger.Info("Tendermint Validator", "mode", config.Mode, "priv-key", config.PrivValKeyFile, "priv-state-dir", config.PrivValStateDir)
-
-			key, err := signer.LoadCosignerKey(config.PrivValKeyFile)
-			if err != nil {
-				return fmt.Errorf("error reading cosigner key: %s", err)
+			if _, err = os.Stat(cfg.PrivValKeyFile); os.IsNotExist(err) {
+				return fmt.Errorf("private key share doesn't exist at path(%s)", cfg.PrivValKeyFile)
 			}
 
-			// ok to auto initialize on disk since the cosigner share is the one that actually
-			// protects against double sign - this exists as a cache for the final signature
-			stateFile := path.Join(config.PrivValStateDir, fmt.Sprintf("%s_priv_validator_state.json", chainID))
-			signState, err := signer.LoadOrCreateSignState(stateFile)
-			if err != nil {
-				panic(err)
-			}
+			logger.Info("Tendermint Validator", "mode", cfg.Mode, "priv-key", cfg.PrivValKeyFile, "priv-state-dir", cfg.PrivValStateDir)
 
-			// state for our cosigner share
-			// Not automatically initialized on disk to avoid double sign risk
-			shareStateFile := path.Join(config.PrivValStateDir, fmt.Sprintf("%s_share_sign_state.json", chainID))
-			shareSignState, err := signer.LoadSignState(shareStateFile)
-			if err != nil {
-				panic(err)
-			}
+			var val types.PrivValidator
+			if single {
+				stateFile := path.Join(cfg.PrivValStateDir, fmt.Sprintf("%s_priv_validator_state.json", chainID))
 
-			cosigners := []signer.Cosigner{}
-			remoteCosigners := []signer.RemoteCosigner{}
+				// TODO either stop creating state file at config init
+				// Triple check that this is how we will handle state file and that this behaves as intended
+				// if f, err := os.Stat(stateFile); os.IsNotExist(err) || f.Size() == 0 {
+				//  	val = privval.LoadFilePVEmptyState(cfg.PrivValKeyFile, stateFile)
+				// 	} else {
+				//  	val = privval.LoadFilePV(cfg.PrivValKeyFile, stateFile)
+				//  }
+				val = privval.LoadFilePVEmptyState(cfg.PrivValKeyFile, stateFile)
 
-			// add ourselves as a peer so localcosigner can handle GetEphSecPart requests
-			peers := []signer.CosignerPeer{{
-				ID:        key.ID,
-				PublicKey: key.RSAKey.PublicKey,
-			}}
-
-			for _, cosignerConfig := range config.Cosigners {
-				cosigner := signer.NewRemoteCosigner(cosignerConfig.ID, cosignerConfig.Address)
-				cosigners = append(cosigners, cosigner)
-				remoteCosigners = append(remoteCosigners, *cosigner)
-
-				if cosignerConfig.ID < 1 || cosignerConfig.ID > len(key.CosignerKeys) {
-					log.Fatalf("Unexpected cosigner ID %d", cosignerConfig.ID)
+				pv = &signer.PvGuard{PrivValidator: val}
+			} else {
+				key, err := signer.LoadCosignerKey(cfg.PrivValKeyFile)
+				if err != nil {
+					return fmt.Errorf("error reading cosigner key: %s", err)
 				}
 
-				pubKey := key.CosignerKeys[cosignerConfig.ID-1]
-				peers = append(peers, signer.CosignerPeer{
-					ID:        cosigner.GetID(),
-					PublicKey: *pubKey,
+				// ok to auto initialize on disk since the cosigner share is the one that actually
+				// protects against double sign - this exists as a cache for the final signature
+				stateFile := path.Join(cfg.PrivValStateDir, fmt.Sprintf("%s_priv_validator_state.json", chainID))
+				signState, err := signer.LoadOrCreateSignState(stateFile)
+				if err != nil {
+					panic(err)
+				}
+
+				// state for our cosigner share
+				// Not automatically initialized on disk to avoid double sign risk
+				shareStateFile := path.Join(cfg.PrivValStateDir, fmt.Sprintf("%s_share_sign_state.json", chainID))
+				shareSignState, err := signer.LoadSignState(shareStateFile)
+				if err != nil {
+					panic(err)
+				}
+
+				cosigners := []signer.Cosigner{}
+				remoteCosigners := []signer.RemoteCosigner{}
+
+				// add ourselves as a peer so localcosigner can handle GetEphSecPart requests
+				peers := []signer.CosignerPeer{{
+					ID:        key.ID,
+					PublicKey: key.RSAKey.PublicKey,
+				}}
+
+				for _, cosignerConfig := range cfg.Cosigners {
+					cosigner := signer.NewRemoteCosigner(cosignerConfig.ID, cosignerConfig.Address)
+					cosigners = append(cosigners, cosigner)
+					remoteCosigners = append(remoteCosigners, *cosigner)
+
+					if cosignerConfig.ID < 1 || cosignerConfig.ID > len(key.CosignerKeys) {
+						log.Fatalf("Unexpected cosigner ID %d", cosignerConfig.ID)
+					}
+
+					pubKey := key.CosignerKeys[cosignerConfig.ID-1]
+					peers = append(peers, signer.CosignerPeer{
+						ID:        cosigner.GetID(),
+						PublicKey: *pubKey,
+					})
+				}
+
+				total := len(cfg.Cosigners) + 1
+				localCosignerConfig := signer.LocalCosignerConfig{
+					CosignerKey: key,
+					SignState:   &shareSignState,
+					RsaKey:      key.RSAKey,
+					Peers:       peers,
+					Total:       uint8(total),
+					Threshold:   uint8(cfg.CosignerThreshold),
+				}
+
+				localCosigner := signer.NewLocalCosigner(localCosignerConfig)
+
+				val := signer.NewThresholdValidator(&signer.ThresholdValidatorOpt{
+					Pubkey:    key.PubKey,
+					Threshold: cfg.CosignerThreshold,
+					SignState: signState,
+					Cosigner:  localCosigner,
+					Peers:     cosigners,
 				})
+
+				rpcServerConfig := signer.CosignerRpcServerConfig{
+					Logger:        logger,
+					ListenAddress: cfg.ListenAddress,
+					Cosigner:      localCosigner,
+					Peers:         remoteCosigners,
+				}
+
+				rpcServer := signer.NewCosignerRpcServer(&rpcServerConfig)
+				rpcServer.Start()
+				services = append(services, rpcServer)
+
+				pv = &signer.PvGuard{PrivValidator: val}
 			}
-
-			total := len(config.Cosigners) + 1
-			localCosignerConfig := signer.LocalCosignerConfig{
-				CosignerKey: key,
-				SignState:   &shareSignState,
-				RsaKey:      key.RSAKey,
-				Peers:       peers,
-				Total:       uint8(total),
-				Threshold:   uint8(config.CosignerThreshold),
-			}
-
-			localCosigner := signer.NewLocalCosigner(localCosignerConfig)
-
-			val := signer.NewThresholdValidator(&signer.ThresholdValidatorOpt{
-				Pubkey:    key.PubKey,
-				Threshold: config.CosignerThreshold,
-				SignState: signState,
-				Cosigner:  localCosigner,
-				Peers:     cosigners,
-			})
-
-			rpcServerConfig := signer.CosignerRpcServerConfig{
-				Logger:        logger,
-				ListenAddress: config.ListenAddress,
-				Cosigner:      localCosigner,
-				Peers:         remoteCosigners,
-			}
-
-			rpcServer := signer.NewCosignerRpcServer(&rpcServerConfig)
-			rpcServer.Start()
-			services = append(services, rpcServer)
-
-			pv = &signer.PvGuard{PrivValidator: val}
 
 			pubkey, err := pv.GetPubKey()
 			if err != nil {
@@ -148,9 +185,9 @@ func StartCosignerCmd() *cobra.Command {
 			}
 			logger.Info("Signer", "pubkey", pubkey)
 
-			for _, node := range config.Nodes {
+			for _, node := range cfg.Nodes {
 				dialer := net.Dialer{Timeout: 30 * time.Second}
-				s := signer.NewReconnRemoteSigner(node.Address, logger, config.ChainID, pv, dialer)
+				s := signer.NewReconnRemoteSigner(node.Address, logger, cfg.ChainID, pv, dialer)
 
 				err := s.Start()
 				if err != nil {
@@ -176,5 +213,7 @@ func StartCosignerCmd() *cobra.Command {
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolP("single", "s", false, "set to start horcrux as a single signer")
 	return cmd
 }

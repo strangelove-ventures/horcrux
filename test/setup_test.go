@@ -17,7 +17,6 @@ var (
 )
 
 func SetupTestRun(t *testing.T, numNodes int) (context.Context, string, *dockertest.Pool, *docker.Network, TestNodes) {
-
 	home, err := ioutil.TempDir("", "")
 	require.NoError(t, err)
 

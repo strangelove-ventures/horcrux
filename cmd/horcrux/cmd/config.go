@@ -10,9 +10,8 @@ import (
 	"strings"
 
 	"github.com/mitchellh/go-homedir"
-	"github.com/strangelove-ventures/horcrux/signer"
-
 	"github.com/spf13/cobra"
+	"github.com/strangelove-ventures/horcrux/signer"
 	"gopkg.in/yaml.v2"
 )
 
