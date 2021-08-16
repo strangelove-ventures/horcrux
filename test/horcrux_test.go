@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"os"
 	"testing"
 	"time"
@@ -16,15 +17,18 @@ func TestBuildSignerContainer(t *testing.T) {
 	t.Skip()
 	pool, err := dockertest.NewPool("")
 	require.NoError(t, err)
-	require.NoError(t, BuildTestSignerContainer(pool))
+	require.NoError(t, BuildTestSignerImage(pool))
 }
 
-func Test2Of3SignerUniqueSentry(t *testing.T) {
+// Test3Of7SignerTwoSentries will spin up a chain with four validators and 13 full nodes, stop one validator and all
+// full nodes, configure that validator and the full nodes to be a relay for the remote signers, spin up a 3/7 threshold
+// signer cluster, restart the validator/full nodes and check that no slashing occurs
+func Test3Of7SignerTwoSentries(t *testing.T) {
 	const numValidators = 4
-	const numFullNodes = 2
-	const totalSigners = 3
-	const threshold = 2
-	const sentriesPerSigner = 1
+	const numFullNodes = 13
+	const totalSigners = 7
+	const threshold = 3
+	const sentriesPerSigner = 2
 
 	ctx, home, pool, network, validators := SetupTestRun(t, numValidators+numFullNodes)
 	testSigners := MakeTestSigners(totalSigners, home, pool, t)
@@ -35,7 +39,97 @@ func Test2Of3SignerUniqueSentry(t *testing.T) {
 	// start building the cosigner container first
 	var eg errgroup.Group
 	eg.Go(func() error {
-		return BuildTestSignerContainer(pool)
+		return BuildTestSignerImage(pool)
+	})
+
+	// start validators and full nodes
+	StartNodeContainers(t, ctx, network, validators, fullNodes)
+
+	// Wait for all nodes to get to block 15
+	allNodes.WaitForHeight(15)
+
+	// wait for build to finish
+	require.NoError(t, eg.Wait())
+
+	// Stop the validator node and full nodes before spinning up the signer nodes
+	t.Logf("{%s} -> Stopping Node...", validators[0].Name())
+	require.NoError(t, validators[0].StopContainer())
+
+	for _, fn := range fullNodes {
+		fn := fn
+		t.Logf("{%s} -> Stopping Node...", fn.Name())
+		require.NoError(t, fn.StopContainer())
+	}
+
+	// set the test cleanup function
+	t.Cleanup(Cleanup(pool, t.Name(), home))
+
+	// start signer processes
+	StartCosignerContainers(t, testSigners, validators[0], append(fullNodes, validators[0]), threshold, totalSigners, sentriesPerSigner, network)
+
+	// TODO: how to block till signer containers start?
+	// once we have prometheus server we can poll that
+	time.Sleep(10 * time.Second) // Adding more signers creates some overhead, we need to wait before restarting the nodes
+
+	// modify node config to listen for private validator connections
+	peerString := allNodes.PeerString()
+	validators[0].SetPrivValdidatorListen(peerString)
+
+	for _, fn := range fullNodes {
+		fn := fn
+		fn.SetPrivValdidatorListen(peerString)
+	}
+
+	// restart node and ensure that signer cluster is connected by
+	// checking if the node continues to miss blocks or is slashed
+	t.Logf("{%s} -> Restarting Node...", validators[0].Name())
+
+	for _, fn := range fullNodes {
+		fn := fn
+		t.Logf("{%s} -> Restarting Node...", fn.Name())
+	}
+
+	require.NoError(t, validators[0].CreateNodeContainer(network.ID, true))
+	for _, fn := range fullNodes {
+		fn := fn
+		require.NoError(t, fn.CreateNodeContainer(network.ID, true))
+	}
+
+	require.NoError(t, validators[0].StartContainer(ctx))
+	for _, fn := range fullNodes {
+		fn := fn
+		eg.Go(func() error {
+			return fn.StartContainer(ctx)
+		})
+	}
+	require.NoError(t, eg.Wait())
+
+	time.Sleep(10 * time.Second)
+
+	t.Logf("{%s} -> Checking that slashing has not occurred...", validators[0].Name())
+	validators[0].EnsureNotSlashed()
+}
+
+// Test2Of3SignerTwoSentries will spin up a chain with four validators and five full nodes, stop one validator and all
+// full nodes, configure that validator and the full nodes to be a relay for the remote signers, spin up a 2/3 threshold
+// signer cluster, restart the validator/full nodes and check that no slashing occurs
+func Test2Of3SignerTwoSentries(t *testing.T) {
+	const numValidators = 4
+	const numFullNodes = 5
+	const totalSigners = 3
+	const threshold = 2
+	const sentriesPerSigner = 2
+
+	ctx, home, pool, network, validators := SetupTestRun(t, numValidators+numFullNodes)
+	testSigners := MakeTestSigners(totalSigners, home, pool, t)
+	fullNodes := validators[numValidators:]
+	validators = validators[:numValidators]
+	allNodes := append(validators, fullNodes...)
+
+	// start building the cosigner container first
+	var eg errgroup.Group
+	eg.Go(func() error {
+		return BuildTestSignerImage(pool)
 	})
 
 	// start validators and full nodes
@@ -68,11 +162,12 @@ func Test2Of3SignerUniqueSentry(t *testing.T) {
 	// time.Sleep(10 * time.Second)
 
 	// modify node config to listen for private validator connections
-	validators[0].SetPrivValdidatorListen(allNodes.PeerString())
+	peerString := allNodes.PeerString()
+	validators[0].SetPrivValdidatorListen(peerString)
 
 	for _, fn := range fullNodes {
 		fn := fn
-		fn.SetPrivValdidatorListen(allNodes.PeerString())
+		fn.SetPrivValdidatorListen(peerString)
 	}
 
 	// restart node and ensure that signer cluster is connected by
@@ -84,7 +179,6 @@ func Test2Of3SignerUniqueSentry(t *testing.T) {
 		t.Logf("{%s} -> Restarting Node...", fn.Name())
 	}
 
-	// TODO: can we just restart the container
 	require.NoError(t, validators[0].CreateNodeContainer(network.ID, true))
 	for _, fn := range fullNodes {
 		fn := fn
@@ -103,9 +197,96 @@ func Test2Of3SignerUniqueSentry(t *testing.T) {
 	validators[0].EnsureNotSlashed()
 }
 
-// TestSingleSignerTwoSentries will spin up a chain with four validators & one full node, stop one validator & full node,
-// configure those two nodes to be relays for the remote signer, spin up a single remote signer, restart the validator
-// and check that no slashing occurs
+// Test2Of3SignerUniqueSentry will spin up a chain with four validators and two full nodes, stop one validator and all
+// full nodes, configure that validator and the full nodes to be a relay for the remote signers, spin up a 2/3 threshold
+// signer cluster, restart the validator/full nodes and check that no slashing occurs
+func Test2Of3SignerUniqueSentry(t *testing.T) {
+	const numValidators = 4
+	const numFullNodes = 2
+	const totalSigners = 3
+	const threshold = 2
+	const sentriesPerSigner = 1
+
+	ctx, home, pool, network, validators := SetupTestRun(t, numValidators+numFullNodes)
+	testSigners := MakeTestSigners(totalSigners, home, pool, t)
+	fullNodes := validators[numValidators:]
+	validators = validators[:numValidators]
+	allNodes := append(validators, fullNodes...)
+
+	// start building the cosigner container first
+	var eg errgroup.Group
+	eg.Go(func() error {
+		return BuildTestSignerImage(pool)
+	})
+
+	// start validators and full nodes
+	StartNodeContainers(t, ctx, network, validators, fullNodes)
+
+	// Wait for all nodes to get to block 15
+	allNodes.WaitForHeight(15)
+
+	// wait for build to finish
+	require.NoError(t, eg.Wait())
+
+	// Stop the validator node and full nodes before spinning up the signer nodes
+	t.Logf("{%s} -> Stopping Node...", validators[0].Name())
+	require.NoError(t, validators[0].StopContainer())
+
+	for _, fn := range fullNodes {
+		fn := fn
+		t.Logf("{%s} -> Stopping Node...", fn.Name())
+		require.NoError(t, fn.StopContainer())
+	}
+
+	// set the test cleanup function
+	t.Cleanup(Cleanup(pool, t.Name(), home))
+
+	// start signer processes
+	StartCosignerContainers(t, testSigners, validators[0], append(fullNodes, validators[0]), threshold, totalSigners, sentriesPerSigner, network)
+
+	// TODO: how to block till signer containers start?
+	// once we have prometheus server we can poll that
+	// time.Sleep(10 * time.Second)
+
+	// modify node config to listen for private validator connections
+	peerString := allNodes.PeerString()
+	validators[0].SetPrivValdidatorListen(peerString)
+
+	for _, fn := range fullNodes {
+		fn := fn
+		fn.SetPrivValdidatorListen(peerString)
+	}
+
+	// restart node and ensure that signer cluster is connected by
+	// checking if the node continues to miss blocks or is slashed
+	t.Logf("{%s} -> Restarting Node...", validators[0].Name())
+
+	for _, fn := range fullNodes {
+		fn := fn
+		t.Logf("{%s} -> Restarting Node...", fn.Name())
+	}
+
+	require.NoError(t, validators[0].CreateNodeContainer(network.ID, true))
+	for _, fn := range fullNodes {
+		fn := fn
+		require.NoError(t, fn.CreateNodeContainer(network.ID, true))
+	}
+
+	require.NoError(t, validators[0].StartContainer(ctx))
+	for _, fn := range fullNodes {
+		fn := fn
+		require.NoError(t, fn.StartContainer(ctx))
+	}
+
+	time.Sleep(10 * time.Second)
+
+	t.Logf("{%s} -> Checking that slashing has not occurred...", validators[0].Name())
+	validators[0].EnsureNotSlashed()
+}
+
+// TestSingleSignerTwoSentries will spin up a chain with four validators & one full node, stop one validator & full
+// node, configure those two nodes to be relays for the remote signer, spin up a single remote signer, restart the
+// validator/full node and check that no slashing occurs
 func TestSingleSignerTwoSentries(t *testing.T) {
 	const numValidators = 4
 	const numFullNodes = 1
@@ -120,7 +301,7 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 	// start building the cosigner container first
 	var eg errgroup.Group
 	eg.Go(func() error {
-		return BuildTestSignerContainer(pool)
+		return BuildTestSignerImage(pool)
 	})
 
 	// start validators and full node
@@ -158,7 +339,6 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 	t.Logf("{%s} -> Restarting Node...", validators[0].Name())
 	t.Logf("{%s} -> Restarting Node...", fullNodes[0].Name())
 
-	// TODO: can we just restart the container
 	require.NoError(t, validators[0].CreateNodeContainer(network.ID, true))
 	require.NoError(t, fullNodes[0].CreateNodeContainer(network.ID, true))
 
@@ -172,7 +352,8 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 }
 
 // TestUpgradeValidatorToHorcrux will spin up a chain with four validators, stop one validator, configure that validator
-// to be a relay for the remote signers, spin up a 2/3 threshold signer cluster, restart the validator and check that no slashing occurs
+// to be a relay for the remote signers, spin up a 2/3 threshold signer cluster, restart the validator and check that no
+// slashing occurs
 func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	// NOTE: have this test skipped because we are debugging the docker build in CI
 	// t.Skip()
@@ -187,7 +368,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	// start building the cosigner container first
 	var eg errgroup.Group
 	eg.Go(func() error {
-		return BuildTestSignerContainer(pool)
+		return BuildTestSignerImage(pool)
 	})
 
 	// start validators
@@ -219,16 +400,36 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	// restart node and ensure that signer cluster is connected by
 	// checking if the node continues to miss blocks or is slashed
 	t.Logf("{%s} -> Restarting Node...", nodes[0].Name())
-
-	// TODO: can we just restart the container
 	require.NoError(t, nodes[0].CreateNodeContainer(network.ID, true))
-
 	require.NoError(t, nodes[0].StartContainer(ctx))
 
 	time.Sleep(10 * time.Second)
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", nodes[0].Name())
 	nodes[0].EnsureNotSlashed()
+}
+
+func startRollingRestart(fullNodes TestNodes, signers TestSigners, peers string, network *docker.Network, t *testing.T) {
+	for _, fn := range fullNodes {
+		fn := fn
+		t.Logf("{%s} -> Stopping Node...", fn.Name())
+		require.NoError(t, fn.StopContainer())
+
+		fn.SetPrivValdidatorListen(peers)
+
+		t.Logf("{%s} -> Restarting Node...", fn.Name())
+		require.NoError(t, fn.CreateNodeContainer(network.ID, true))
+		require.NoError(t, fn.StartContainer(context.Background()))
+	}
+
+	// TODO rolling restart of signers using StartCosignerContainers() would involve shutting down all the signers at once or rewriting a large part of StartCosignerContainers()
+	// Possibly break up signer conig init logic to generate chain-nodes list properly here also?
+	//for _, s := range signers {
+	//	s := s
+	//	require.NoError(t, s.StopContainer())
+	//	require.NoError(t, s.CreateCosignerContainer(network.ID))
+	//	require.NoError(t, s.StartContainer())
+	//}
 }
 
 // Cleanup will clean up Docker containers, networks, and the other various config files generated in testing

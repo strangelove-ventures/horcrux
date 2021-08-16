@@ -35,8 +35,8 @@ type TestSigner struct {
 
 type TestSigners []*TestSigner
 
-// BuildTestSignerContainer builds a Docker image for horcrux from current Dockerfile
-func BuildTestSignerContainer(pool *dockertest.Pool) error {
+// BuildTestSignerImage builds a Docker image for horcrux from current Dockerfile
+func BuildTestSignerImage(pool *dockertest.Pool) error {
 	dir, err := os.Getwd()
 	if err != nil {
 		return err
@@ -99,21 +99,15 @@ func StartSingleSignerContainers(t *testing.T, testSigners TestSigners, validato
 }
 
 // StartCosignerContainers will generate the necessary config files for the signer nodes, shard the validator's
-// priv_validator_key.json file, write the sharded key shares to the appropriate signer nodes directory and starts the signer nodes.
-// If sentriesPerSigner is set equal to 0, the signer nodes will all connect to the same provided validator node
+// priv_validator_key.json file, write the sharded key shares to the appropriate signer nodes directory and start the
+// signer nodes. Passing a negative number or zero will enable the default behavior of connecting all signers to the
+// same validator node
 func StartCosignerContainers(t *testing.T, testSigners TestSigners, validator *TestNode, sentryNodes TestNodes, threshold, total, sentriesPerSigner int, network *docker.Network) {
 	eg := new(errgroup.Group)
 	ctx := context.Background()
 
 	// init config files/directory for each signer node
 	switch {
-	// All signer nodes are connected to the same validator
-	case sentriesPerSigner == 0:
-		for _, s := range testSigners {
-			s := s
-			eg.Go(func() error { return s.InitCosignerConfig(ctx, TestNodes{validator}, testSigners, s.Index, threshold) })
-		}
-
 	// Each signer node is connected to a unique sentry node
 	case sentriesPerSigner == 1:
 		var peers TestNodes
@@ -154,9 +148,12 @@ func StartCosignerContainers(t *testing.T, testSigners TestSigners, validator *T
 			eg.Go(func() error { return s.InitCosignerConfig(ctx, peers, testSigners, s.Index, threshold) })
 		}
 
-	// cannot have negative sentries per signer
+	// All signer nodes are connected to the same validator
 	default:
-		os.Exit(1)
+		for _, s := range testSigners {
+			s := s
+			eg.Go(func() error { return s.InitCosignerConfig(ctx, TestNodes{validator}, testSigners, s.Index, threshold) })
+		}
 	}
 	require.NoError(t, eg.Wait())
 
