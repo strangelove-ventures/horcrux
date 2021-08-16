@@ -30,13 +30,14 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(initConfig)
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.horcrux/config.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "home", "", "directory for config and data (default is $HOME/.horcrux/)")
 }
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
 	cfg := Config{}
 	if cfgFile != "" {
+		cfgFile = path.Join(cfgFile, "config.yaml")
 		viper.SetConfigFile(cfgFile)
 	} else {
 		home, err := homedir.Dir()
