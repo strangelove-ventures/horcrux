@@ -69,7 +69,7 @@ func Test3Of7SignerTwoSentries(t *testing.T) {
 
 	// TODO: how to block till signer containers start?
 	// once we have prometheus server we can poll that
-	time.Sleep(10 * time.Second) // Adding more signers creates some overhead, we need to wait before restarting the nodes
+	time.Sleep(5 * time.Second) // Adding more signers creates some overhead, we need to wait before restarting the nodes
 
 	// modify node config to listen for private validator connections
 	peerString := allNodes.PeerString()
