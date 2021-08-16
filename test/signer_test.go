@@ -123,7 +123,7 @@ func StartCosignerContainers(t *testing.T, testSigners TestSigners, validator *T
 	for _, s := range testSigners {
 		// s := s
 		s.t.Logf("{%s} -> Writing Key Share To File... ", s.Name())
-		privateFilename := fmt.Sprintf("%sshare.json", s.Dir())
+		privateFilename := path.Join(s.Dir(), "share.json")
 		require.NoError(t, signer.WriteCosignerShareFile(s.Key, privateFilename))
 	}
 

@@ -48,12 +48,12 @@ func initCmd() *cobra.Command {
 				}
 			}
 
-			var homeDir string
-			if cfgFile != "" {
-				homeDir = path.Dir(cfgFile)
+			var home string // In root.go we end up with our
+			if homeDir != "" {
+				home = homeDir
 			} else {
-				home, _ := homedir.Dir()
-				homeDir = path.Join(home, ".horcrux")
+				home, _ = homedir.Dir()
+				home = path.Join(home, ".horcrux")
 			}
 
 			if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
@@ -71,7 +71,7 @@ func initCmd() *cobra.Command {
 					return err
 				}
 				cfg = &Config{
-					HomeDir: homeDir,
+					HomeDir: home,
 					ChainID: cid,
 					CosignerConfig: &CosignerConfig{
 						Threshold: threshold,
@@ -88,7 +88,7 @@ func initCmd() *cobra.Command {
 					return fmt.Errorf("must input at least one node")
 				}
 				cfg = &Config{
-					HomeDir:    homeDir,
+					HomeDir:    home,
 					ChainID:    cid,
 					ChainNodes: cn,
 				}
@@ -97,22 +97,22 @@ func initCmd() *cobra.Command {
 				}
 			}
 			// create all directories up to the state directory
-			if err = os.MkdirAll(path.Join(homeDir, "state"), 0755); err != nil {
+			if err = os.MkdirAll(path.Join(home, "state"), 0755); err != nil {
 				return err
 			}
 			// create the config file
-			if err = writeConfigFile(path.Join(homeDir, "config.yaml"), cfg); err != nil {
+			if err = writeConfigFile(path.Join(home, "config.yaml"), cfg); err != nil {
 				return err
 			}
 
 			// initialize state/{chainid}_priv_validator_state.json file
-			if _, err = signer.LoadOrCreateSignState(path.Join(homeDir, "state", fmt.Sprintf("%s_priv_validator_state.json", cid))); err != nil {
+			if _, err = signer.LoadOrCreateSignState(path.Join(home, "state", fmt.Sprintf("%s_priv_validator_state.json", cid))); err != nil {
 				return err
 			}
 
 			// if node is a cosigner initialize state/{chainid}_priv_validator_state.json file
 			if cs {
-				if _, err = signer.LoadOrCreateSignState(path.Join(homeDir, "state", fmt.Sprintf("%s_share_sign_state.json", cid))); err != nil {
+				if _, err = signer.LoadOrCreateSignState(path.Join(home, "state", fmt.Sprintf("%s_share_sign_state.json", cid))); err != nil {
 					return err
 				}
 			}
