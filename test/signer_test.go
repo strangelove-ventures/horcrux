@@ -123,7 +123,7 @@ func StartCosignerContainers(t *testing.T, testSigners TestSigners, validator *T
 	for _, s := range testSigners {
 		// s := s
 		s.t.Logf("{%s} -> Writing Key Share To File... ", s.Name())
-		privateFilename := fmt.Sprintf("%sshare.json", s.Dir())
+		privateFilename := path.Join(s.Dir(), "share.json")
 		require.NoError(t, signer.WriteCosignerShareFile(s.Key, privateFilename))
 	}
 
@@ -202,7 +202,7 @@ func (ts *TestSigner) InitSingleSignerConfig(ctx context.Context, listenNodes Te
 	cmd := []string{
 		chainid, "config", "init",
 		chainid, listenNodes.ListenAddrs(),
-		fmt.Sprintf("--config=%s", ts.Dir()),
+		fmt.Sprintf("--home=%s", ts.Dir()),
 	}
 	ts.t.Logf("{%s}[%s] -> '%s'", ts.Name(), container, strings.Join(cmd, " "))
 	cont, err := ts.Pool.Client.CreateContainer(docker.CreateContainerOptions{
@@ -253,7 +253,7 @@ func (ts *TestSigner) InitCosignerConfig(ctx context.Context, listenNodes TestNo
 		"--cosigner",
 		fmt.Sprintf("--peers=%s", peers.PeerString(skip)),
 		fmt.Sprintf("--threshold=%d", threshold),
-		fmt.Sprintf("--config=%s", ts.Dir()),
+		fmt.Sprintf("--home=%s", ts.Dir()),
 	}
 	ts.t.Logf("{%s}[%s] -> '%s'", ts.Name(), container, strings.Join(cmd, " "))
 	cont, err := ts.Pool.Client.CreateContainer(docker.CreateContainerOptions{
@@ -321,7 +321,7 @@ func (ts *TestSigner) CreateSingleSignerContainer(networkID string) error {
 		Name: ts.Name(),
 		Config: &docker.Config{
 			User:     getDockerUserString(),
-			Cmd:      []string{"horcrux", "cosigner", "start", "--single", fmt.Sprintf("--config=%s", ts.GetConfigFile())},
+			Cmd:      []string{"horcrux", "cosigner", "start", "--single", fmt.Sprintf("--home=%s", ts.Dir())},
 			Hostname: ts.Name(),
 			ExposedPorts: map[docker.Port]struct{}{
 				docker.Port(fmt.Sprintf("%s/tcp", signerPort)): {},
@@ -363,7 +363,7 @@ func (ts *TestSigner) CreateCosignerContainer(networkID string) error {
 		Name: ts.Name(),
 		Config: &docker.Config{
 			User:     getDockerUserString(),
-			Cmd:      []string{"horcrux", "cosigner", "start", fmt.Sprintf("--config=%s", ts.GetConfigFile())},
+			Cmd:      []string{"horcrux", "cosigner", "start", fmt.Sprintf("--home=%s", ts.Dir())},
 			Hostname: ts.Name(),
 			ExposedPorts: map[docker.Port]struct{}{
 				docker.Port(fmt.Sprintf("%s/tcp", signerPort)): {},
