@@ -51,6 +51,9 @@ func Test3Of7SignerTwoSentries(t *testing.T) {
 	// wait for build to finish
 	require.NoError(t, eg.Wait())
 
+	// start signer processes
+	StartCosignerContainers(t, testSigners, validators[0], append(fullNodes, validators[0]), threshold, totalSigners, sentriesPerSigner, network)
+
 	// Stop the validator node and full nodes before spinning up the signer nodes
 	t.Logf("{%s} -> Stopping Node...", validators[0].Name())
 	require.NoError(t, validators[0].StopContainer())
@@ -64,12 +67,9 @@ func Test3Of7SignerTwoSentries(t *testing.T) {
 	// set the test cleanup function
 	t.Cleanup(Cleanup(pool, t.Name(), home))
 
-	// start signer processes
-	StartCosignerContainers(t, testSigners, validators[0], append(fullNodes, validators[0]), threshold, totalSigners, sentriesPerSigner, network)
-
 	// TODO: how to block till signer containers start?
 	// once we have prometheus server we can poll that
-	time.Sleep(5 * time.Second) // Adding more signers creates some overhead, we need to wait before restarting the nodes
+	// time.Sleep(5 * time.Second) // Adding more signers creates some overhead, we need to wait before restarting the nodes
 
 	// modify node config to listen for private validator connections
 	peerString := allNodes.PeerString()
