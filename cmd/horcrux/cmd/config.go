@@ -8,6 +8,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
@@ -67,7 +68,7 @@ func initCmd() *cobra.Command {
 				threshold, _ := cmd.Flags().GetInt("threshold")
 				peers, err := peersFromFlag(p)
 				listen, _ := cmd.Flags().GetString("listen")
-				timeout, _ := cmd.Flags().GetInt("timeout")
+				timeout, _ := cmd.Flags().GetString("timeout")
 
 				if err != nil {
 					return err
@@ -123,11 +124,12 @@ func initCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolP("cosigner", "c", false, "set to initialize a cosigner node, requires --peers and --threshold")
-	cmd.Flags().StringP("peers", "p", "", "cosigner peer addresses in format tcp://{addr}:{port}|{share-id} (i.e. \"tcp://node-1:2222|2,tcp://node-2:2222|3\")")
+	cmd.Flags().StringP("peers", "p", "", "cosigner peer addresses in format tcp://{addr}:{port}|{share-id} \n"+
+		"(i.e. \"tcp://node-1:2222|2,tcp://node-2:2222|3\")")
 	cmd.Flags().IntP("threshold", "t", 0, "indicate number of signatures required for threshold signature")
 	cmd.Flags().StringP("listen", "l", "tcp://0.0.0.0:2222", "listen address of the signer")
-	cmd.Flags().Int("timeout", 1500, "configure cosigner rpc server timeout value, "+
-		"units are in milliseconds e.g. 1000 = 1 second ")
+	cmd.Flags().String("timeout", "1500ms", "configure cosigner rpc server timeout value, \n"+
+		"accepts valid duration strings for Go's time.ParseDuration() e.g. 1s, 1000ms, 1.5m")
 	return cmd
 }
 
@@ -158,12 +160,10 @@ func validateCosignerConfig(cfg *Config) error {
 	if len(cfg.CosignerConfig.Peers)+1 < cfg.CosignerConfig.Threshold {
 		return fmt.Errorf("number of peers + 1 (%d) must be greater than threshold (%d)", len(cfg.CosignerConfig.Peers)+1, cfg.CosignerConfig.Threshold)
 	}
-	if cfg.CosignerConfig.Threshold < 2 {
-		return fmt.Errorf("threshold must be 2 or greater")
-	}
-	if cfg.CosignerConfig.Timeout < 1 {
-		return fmt.Errorf("(%d) is an invalid timeout value. cosigner RPC server timeout must be greater than 0ms ",
-			cfg.CosignerConfig.Timeout)
+
+	_, err := time.ParseDuration(cfg.CosignerConfig.Timeout)
+	if err != nil {
+		return fmt.Errorf("%s is not a valid duration string for --timeout ", cfg.CosignerConfig.Timeout)
 	}
 	if _, err := url.Parse(cfg.CosignerConfig.P2PListen); err != nil {
 		return fmt.Errorf("failed to parse p2p listen address")
@@ -203,7 +203,7 @@ type CosignerConfig struct {
 	Threshold int            `json:"threshold"   yaml:"threshold"`
 	P2PListen string         `json:"p2p-listen"  yaml:"p2p-listen"`
 	Peers     []CosignerPeer `json:"peers"       yaml:"peers"`
-	Timeout   int            `json:"rpc-timeout" yaml:"rpc-timeout"`
+	Timeout   string         `json:"rpc-timeout" yaml:"rpc-timeout"`
 }
 
 func (c *Config) CosignerPeers() (out []signer.CosignerConfig) {

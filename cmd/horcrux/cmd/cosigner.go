@@ -163,11 +163,7 @@ func StartCosignerCmd() *cobra.Command {
 					Peers:     cosigners,
 				})
 
-				duration := fmt.Sprintf("%d%s", config.CosignerConfig.Timeout, "ms")
-				timeout, err := time.ParseDuration(duration)
-				if err != nil {
-					return fmt.Errorf("%s is not a valid duration string for --timeout ", timeout)
-				}
+				timeout, _ := time.ParseDuration(config.CosignerConfig.Timeout)
 				rpcServerConfig := signer.CosignerRpcServerConfig{
 					Logger:        logger,
 					ListenAddress: cfg.ListenAddress,
