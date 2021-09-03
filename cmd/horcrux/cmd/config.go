@@ -126,7 +126,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringP("peers", "p", "", "cosigner peer addresses in format tcp://{addr}:{port}|{share-id} (i.e. \"tcp://node-1:2222|2,tcp://node-2:2222|3\")")
 	cmd.Flags().IntP("threshold", "t", 0, "indicate number of signatures required for threshold signature")
 	cmd.Flags().StringP("listen", "l", "tcp://0.0.0.0:2222", "listen address of the signer")
-	cmd.Flags().Int("timeout", 1000, "configure cosigner rpc server timeout value, "+
+	cmd.Flags().Int("timeout", 1500, "configure cosigner rpc server timeout value, "+
 		"units are in milliseconds e.g. 1000 = 1 second ")
 	return cmd
 }
@@ -161,9 +161,9 @@ func validateCosignerConfig(cfg *Config) error {
 	if cfg.CosignerConfig.Threshold < 2 {
 		return fmt.Errorf("threshold must be 2 or greater")
 	}
-	if cfg.CosignerConfig.Timeout < 1 || cfg.CosignerConfig.Timeout > 1500 {
-		return fmt.Errorf("(%d) is an invalid timeout value. "+
-			"cosigner RPC server timeout must be greater than 0ms and less than 1500ms", cfg.CosignerConfig.Timeout)
+	if cfg.CosignerConfig.Timeout < 1 {
+		return fmt.Errorf("(%d) is an invalid timeout value. cosigner RPC server timeout must be greater than 0ms ",
+			cfg.CosignerConfig.Timeout)
 	}
 	if _, err := url.Parse(cfg.CosignerConfig.P2PListen); err != nil {
 		return fmt.Errorf("failed to parse p2p listen address")
