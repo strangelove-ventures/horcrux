@@ -574,7 +574,7 @@ func (tn TestNodes) WaitForHeight(height int64) {
 				n.t.Logf("{%s} => reached block %d\n", n.Name(), height)
 				return nil
 				// TODO: setup backup delay here
-			}, retry.DelayType(retry.BackOffDelay))
+			}, retry.DelayType(retry.BackOffDelay), retry.Attempts(15))
 		})
 	}
 	require.NoError(tn[0].t, eg.Wait())

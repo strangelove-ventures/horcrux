@@ -45,8 +45,8 @@ func Test3Of7SignerTwoSentries(t *testing.T) {
 	// start validators and full nodes
 	StartNodeContainers(t, ctx, network, validators, fullNodes)
 
-	// Wait for all nodes to get to given block heigh
-	allNodes.WaitForHeight(10)
+	// Wait for all nodes to get to given block height
+	allNodes.WaitForHeight(5)
 
 	// wait for build to finish
 	require.NoError(t, eg.Wait())
@@ -61,8 +61,11 @@ func Test3Of7SignerTwoSentries(t *testing.T) {
 	for _, fn := range fullNodes {
 		fn := fn
 		t.Logf("{%s} -> Stopping Node...", fn.Name())
-		require.NoError(t, fn.StopContainer())
+		eg.Go(func() error {
+			return fn.StopContainer()
+		})
 	}
+	require.NoError(t, eg.Wait())
 
 	// set the test cleanup function
 	t.Cleanup(Cleanup(pool, t.Name(), home))
@@ -83,17 +86,16 @@ func Test3Of7SignerTwoSentries(t *testing.T) {
 	// restart node and ensure that signer cluster is connected by
 	// checking if the node continues to miss blocks or is slashed
 	t.Logf("{%s} -> Restarting Node...", validators[0].Name())
-
-	for _, fn := range fullNodes {
-		fn := fn
-		t.Logf("{%s} -> Restarting Node...", fn.Name())
-	}
-
 	require.NoError(t, validators[0].CreateNodeContainer(network.ID, true))
+
 	for _, fn := range fullNodes {
+		t.Logf("{%s} -> Restarting Node...", fn.Name())
 		fn := fn
-		require.NoError(t, fn.CreateNodeContainer(network.ID, true))
+		eg.Go(func() error {
+			return fn.CreateNodeContainer(network.ID, true)
+		})
 	}
+	require.NoError(t, eg.Wait())
 
 	require.NoError(t, validators[0].StartContainer(ctx))
 	for _, fn := range fullNodes {
