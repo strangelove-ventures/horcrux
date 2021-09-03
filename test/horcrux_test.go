@@ -45,8 +45,8 @@ func Test3Of7SignerTwoSentries(t *testing.T) {
 	// start validators and full nodes
 	StartNodeContainers(t, ctx, network, validators, fullNodes)
 
-	// Wait for all nodes to get to block 15
-	allNodes.WaitForHeight(15)
+	// Wait for all nodes to get to given block heigh
+	allNodes.WaitForHeight(10)
 
 	// wait for build to finish
 	require.NoError(t, eg.Wait())
@@ -135,8 +135,8 @@ func Test2Of3SignerTwoSentries(t *testing.T) {
 	// start validators and full nodes
 	StartNodeContainers(t, ctx, network, validators, fullNodes)
 
-	// Wait for all nodes to get to block 15
-	allNodes.WaitForHeight(15)
+	// Wait for all nodes to get to given block heigh
+	allNodes.WaitForHeight(10)
 
 	// wait for build to finish
 	require.NoError(t, eg.Wait())
@@ -222,8 +222,8 @@ func Test2Of3SignerUniqueSentry(t *testing.T) {
 	// start validators and full nodes
 	StartNodeContainers(t, ctx, network, validators, fullNodes)
 
-	// Wait for all nodes to get to block 15
-	allNodes.WaitForHeight(15)
+	// Wait for all nodes to get to given block heigh
+	allNodes.WaitForHeight(10)
 
 	// wait for build to finish
 	require.NoError(t, eg.Wait())
@@ -307,8 +307,8 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 	// start validators and full node
 	StartNodeContainers(t, ctx, network, validators, fullNodes)
 
-	// Wait for all nodes to get to block 15
-	allNodes.WaitForHeight(15)
+	// Wait for all nodes to get to given block heigh
+	allNodes.WaitForHeight(10)
 
 	// wait for build to finish
 	require.NoError(t, eg.Wait())
@@ -374,8 +374,8 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	// start validators
 	StartNodeContainers(t, ctx, network, nodes, []*TestNode{})
 
-	// Wait for all nodes to get to block 15
-	nodes.WaitForHeight(15)
+	// Wait for all nodes to get to given block heigh
+	nodes.WaitForHeight(10)
 
 	// wait for build to finish
 	require.NoError(t, eg.Wait())
