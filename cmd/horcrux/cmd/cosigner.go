@@ -30,14 +30,11 @@ var cosignerCmd = &cobra.Command{
 
 func StartCosignerCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "start [single-signer] [rpc-timeout]",
+		Use:   "start",
 		Short: "start cosigner process",
-		Long: "[single-signer] specifies that horcrux should be ran as a single signer \n" +
-			"[rpc-timout] specifies the timeout for the cosigner rpc server ",
-		Args: cobra.RangeArgs(0, 2),
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			single, _ := cmd.Flags().GetBool("single")
-			timeout, _ := cmd.Flags().GetString("timeout")
 
 			if single {
 				err = validateSingleSignerConfig(config)
@@ -49,7 +46,6 @@ func StartCosignerCmd() *cobra.Command {
 				return
 			}
 
-			fmt.Println(config)
 			var (
 				// services to stop on shutdown
 				services []tmService.Service
@@ -167,7 +163,8 @@ func StartCosignerCmd() *cobra.Command {
 					Peers:     cosigners,
 				})
 
-				duration, err := time.ParseDuration(timeout)
+				duration := fmt.Sprintf("%d%s", config.CosignerConfig.Timeout, "ms")
+				timeout, err := time.ParseDuration(duration)
 				if err != nil {
 					return fmt.Errorf("%s is not a valid duration string for --timeout ", timeout)
 				}
@@ -176,7 +173,7 @@ func StartCosignerCmd() *cobra.Command {
 					ListenAddress: cfg.ListenAddress,
 					Cosigner:      localCosigner,
 					Peers:         remoteCosigners,
-					Timeout:       duration,
+					Timeout:       timeout,
 				}
 
 				rpcServer := signer.NewCosignerRpcServer(&rpcServerConfig)
@@ -222,7 +219,5 @@ func StartCosignerCmd() *cobra.Command {
 	}
 
 	cmd.Flags().BoolP("single", "s", false, "set to start horcrux as a single signer")
-	cmd.Flags().StringP("timeout", "t", "1s", "configure cosigner rpc server timeout value, "+
-		"[accepts valid duration strings for Go's time.ParseDuration() e.g. 1s, 1000ms, 1.5m]")
 	return cmd
 }
