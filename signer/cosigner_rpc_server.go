@@ -42,6 +42,7 @@ type CosignerRpcServerConfig struct {
 	ListenAddress string
 	Cosigner      Cosigner
 	Peers         []RemoteCosigner
+	Timeout       time.Duration
 }
 
 // CosignerRpcServer responds to rpc sign requests using a cosigner instance
@@ -53,6 +54,7 @@ type CosignerRpcServer struct {
 	listener      net.Listener
 	cosigner      Cosigner
 	peers         []RemoteCosigner
+	timeout       time.Duration
 }
 
 // NewCosignerRpcServer instantiates a local cosigner with the specified key and sign state
@@ -62,6 +64,7 @@ func NewCosignerRpcServer(config *CosignerRpcServerConfig) *CosignerRpcServer {
 		listenAddress: config.ListenAddress,
 		peers:         config.Peers,
 		logger:        config.Logger,
+		timeout:       config.Timeout,
 	}
 
 	cosignerRpcServer.BaseService = *service.NewBaseService(config.Logger, "CosignerRpcServer", cosignerRpcServer)
@@ -124,7 +127,7 @@ func (rpcServer *CosignerRpcServer) rpcSignRequest(ctx *rpc_types.Context, req R
 
 			// RPC requests are blocking
 			// to prevent it from hanging our process indefinitely, we use a timeout context and a goroutine
-			partReqCtx, partReqCtxCancel := context.WithTimeout(context.Background(), time.Second)
+			partReqCtx, partReqCtxCancel := context.WithTimeout(context.Background(), rpcServer.timeout)
 
 			go func() {
 				partRequest := CosignerGetEphemeralSecretPartRequest{

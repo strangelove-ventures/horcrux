@@ -30,9 +30,8 @@ var cosignerCmd = &cobra.Command{
 
 func StartCosignerCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "start [single-signer]",
+		Use:   "start",
 		Short: "start cosigner process",
-		Long:  "[single-signer] specifies that horcrux should be ran as a single signer",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			single, _ := cmd.Flags().GetBool("single")
@@ -47,7 +46,6 @@ func StartCosignerCmd() *cobra.Command {
 				return
 			}
 
-			fmt.Println(config)
 			var (
 				// services to stop on shutdown
 				services []tmService.Service
@@ -165,11 +163,13 @@ func StartCosignerCmd() *cobra.Command {
 					Peers:     cosigners,
 				})
 
+				timeout, _ := time.ParseDuration(config.CosignerConfig.Timeout)
 				rpcServerConfig := signer.CosignerRpcServerConfig{
 					Logger:        logger,
 					ListenAddress: cfg.ListenAddress,
 					Cosigner:      localCosigner,
 					Peers:         remoteCosigners,
+					Timeout:       timeout,
 				}
 
 				rpcServer := signer.NewCosignerRpcServer(&rpcServerConfig)
