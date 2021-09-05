@@ -285,8 +285,8 @@ func (tn *TestNode) EnsureNotSlashed() {
 
 func stdconfigchanges(cfg *tmconfig.Config, peers string) {
 	// turn down blocktimes to make the chain faster
-	cfg.Consensus.TimeoutCommit = 1 * time.Second
-	cfg.Consensus.TimeoutPropose = 1 * time.Second
+	cfg.Consensus.TimeoutCommit = 5 * time.Second
+	cfg.Consensus.TimeoutPropose = 5 * time.Second
 
 	// Open up rpc address
 	cfg.RPC.ListenAddress = "tcp://0.0.0.0:26657"
@@ -571,10 +571,10 @@ func (tn TestNodes) WaitForHeight(height int64) {
 				if stat.SyncInfo.CatchingUp || stat.SyncInfo.LatestBlockHeight < height {
 					return fmt.Errorf("node still under block %d: %d", height, stat.SyncInfo.LatestBlockHeight)
 				}
-				n.t.Logf("{%s} => reached block 15\n", n.Name())
+				n.t.Logf("{%s} => reached block %d\n", n.Name(), height)
 				return nil
 				// TODO: setup backup delay here
-			}, retry.DelayType(retry.BackOffDelay))
+			}, retry.DelayType(retry.BackOffDelay), retry.Attempts(15))
 		})
 	}
 	require.NoError(tn[0].t, eg.Wait())

@@ -35,8 +35,8 @@ type TestSigner struct {
 
 type TestSigners []*TestSigner
 
-// BuildTestSignerContainer builds a Docker image for horcrux from current Dockerfile
-func BuildTestSignerContainer(pool *dockertest.Pool) error {
+// BuildTestSignerImage builds a Docker image for horcrux from current Dockerfile
+func BuildTestSignerImage(pool *dockertest.Pool) error {
 	dir, err := os.Getwd()
 	if err != nil {
 		return err
@@ -99,15 +99,61 @@ func StartSingleSignerContainers(t *testing.T, testSigners TestSigners, validato
 }
 
 // StartCosignerContainers will generate the necessary config files for the signer nodes, shard the validator's
-// priv_validator_key.json file, write the sharded key shares to the appropriate signer nodes directory and starts the signer nodes
-func StartCosignerContainers(t *testing.T, testSigners TestSigners, validator *TestNode, sentryNodes TestNodes, threshold, total int, network *docker.Network) {
+// priv_validator_key.json file, write the sharded key shares to the appropriate signer nodes directory and start the
+// signer nodes. Passing a negative number or zero will enable the default behavior of connecting all signers to the
+// same validator node
+func StartCosignerContainers(t *testing.T, testSigners TestSigners, validator *TestNode, sentryNodes TestNodes, threshold, total, sentriesPerSigner int, network *docker.Network) {
 	eg := new(errgroup.Group)
 	ctx := context.Background()
 
 	// init config files/directory for each signer node
-	for _, s := range testSigners {
-		s := s
-		eg.Go(func() error { return s.InitCosignerConfig(ctx, sentryNodes, testSigners, s.Index, threshold) })
+	switch {
+	// Each signer node is connected to a unique sentry node
+	case sentriesPerSigner == 1:
+		var peers TestNodes
+
+		for i, s := range testSigners {
+			s := s
+
+			// for the last signer don't use an ending index to avoid index out of range err
+			if i == len(testSigners)-1 {
+				peers = sentryNodes[i:]
+			} else {
+				peers = sentryNodes[i : i+1]
+			}
+
+			peers := peers
+			eg.Go(func() error { return s.InitCosignerConfig(ctx, peers, testSigners, s.Index, threshold) })
+		}
+
+	// Each signer node is connected to the number of sentry nodes specified by sentriesPerSigner
+	case sentriesPerSigner > 1:
+		leftIndex := 0
+		rightIndex := sentriesPerSigner
+		var peers TestNodes
+
+		for i, s := range testSigners {
+			s := s
+
+			// for the last signer don't use an ending index to avoid index out of range err
+			if i == len(testSigners)-1 {
+				peers = sentryNodes[i+leftIndex:]
+			} else {
+				peers = sentryNodes[i+leftIndex : i+rightIndex]
+			}
+
+			leftIndex += sentriesPerSigner - 1
+			rightIndex += sentriesPerSigner - 1
+			peers := peers
+			eg.Go(func() error { return s.InitCosignerConfig(ctx, peers, testSigners, s.Index, threshold) })
+		}
+
+	// All signer nodes are connected to the same validator
+	default:
+		for _, s := range testSigners {
+			s := s
+			eg.Go(func() error { return s.InitCosignerConfig(ctx, TestNodes{validator}, testSigners, s.Index, threshold) })
+		}
 	}
 	require.NoError(t, eg.Wait())
 
@@ -121,7 +167,7 @@ func StartCosignerContainers(t *testing.T, testSigners TestSigners, validator *T
 
 	// write key share to file in each signer nodes config directory
 	for _, s := range testSigners {
-		// s := s
+		s := s
 		s.t.Logf("{%s} -> Writing Key Share To File... ", s.Name())
 		privateFilename := path.Join(s.Dir(), "share.json")
 		require.NoError(t, signer.WriteCosignerShareFile(s.Key, privateFilename))
