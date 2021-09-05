@@ -1,7 +1,6 @@
 package test
 
 import (
-	"context"
 	"os"
 	"testing"
 	"time"
@@ -53,7 +52,8 @@ func Test3Of7SignerTwoSentries(t *testing.T) {
 	require.NoError(t, eg.Wait())
 
 	// start signer processes
-	StartCosignerContainers(t, testSigners, validators[0], append(fullNodes, validators[0]), threshold, totalSigners, sentriesPerSigner, network)
+	StartCosignerContainers(t, testSigners, validators[0], append(fullNodes, validators[0]), threshold,
+		totalSigners, sentriesPerSigner, network)
 
 	// Stop the validator node and full nodes before spinning up the signer nodes
 	t.Logf("{%s} -> Stopping Node...", validators[0].Name())
@@ -73,7 +73,7 @@ func Test3Of7SignerTwoSentries(t *testing.T) {
 
 	// TODO: how to block till signer containers start?
 	// once we have prometheus server we can poll that
-	// time.Sleep(5 * time.Second) // Adding more signers creates some overhead, we need to wait before restarting the nodes
+	// time.Sleep(5 * time.Second)
 
 	// modify node config to listen for private validator connections
 	peerString := allNodes.PeerString()
@@ -158,7 +158,8 @@ func Test2Of3SignerTwoSentries(t *testing.T) {
 	t.Cleanup(Cleanup(pool, t.Name(), home))
 
 	// start signer processes
-	StartCosignerContainers(t, testSigners, validators[0], append(fullNodes, validators[0]), threshold, totalSigners, sentriesPerSigner, network)
+	StartCosignerContainers(t, testSigners, validators[0], append(fullNodes, validators[0]),
+		threshold, totalSigners, sentriesPerSigner, network)
 
 	// TODO: how to block till signer containers start?
 	// once we have prometheus server we can poll that
@@ -245,7 +246,8 @@ func Test2Of3SignerUniqueSentry(t *testing.T) {
 	t.Cleanup(Cleanup(pool, t.Name(), home))
 
 	// start signer processes
-	StartCosignerContainers(t, testSigners, validators[0], append(fullNodes, validators[0]), threshold, totalSigners, sentriesPerSigner, network)
+	StartCosignerContainers(t, testSigners, validators[0], append(fullNodes, validators[0]), threshold,
+		totalSigners, sentriesPerSigner, network)
 
 	// TODO: how to block till signer containers start?
 	// once we have prometheus server we can poll that
@@ -410,29 +412,6 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", nodes[0].Name())
 	nodes[0].EnsureNotSlashed()
-}
-
-func startRollingRestart(fullNodes TestNodes, signers TestSigners, peers string, network *docker.Network, t *testing.T) {
-	for _, fn := range fullNodes {
-		fn := fn
-		t.Logf("{%s} -> Stopping Node...", fn.Name())
-		require.NoError(t, fn.StopContainer())
-
-		fn.SetPrivValdidatorListen(peers)
-
-		t.Logf("{%s} -> Restarting Node...", fn.Name())
-		require.NoError(t, fn.CreateNodeContainer(network.ID, true))
-		require.NoError(t, fn.StartContainer(context.Background()))
-	}
-
-	// TODO rolling restart of signers using StartCosignerContainers() would involve shutting down all the signers at once or rewriting a large part of StartCosignerContainers()
-	// Possibly break up signer conig init logic to generate chain-nodes list properly here also?
-	//for _, s := range signers {
-	//	s := s
-	//	require.NoError(t, s.StopContainer())
-	//	require.NoError(t, s.CreateCosignerContainer(network.ID))
-	//	require.NoError(t, s.StartContainer())
-	//}
 }
 
 // Cleanup will clean up Docker containers, networks, and the other various config files generated in testing
