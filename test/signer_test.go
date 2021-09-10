@@ -367,7 +367,7 @@ func (ts *TestSigner) CreateSingleSignerContainer(networkID string) error {
 		Name: ts.Name(),
 		Config: &docker.Config{
 			User:     getDockerUserString(),
-			Cmd:      []string{"horcrux", "cosigner", "start", "--single", fmt.Sprintf("--home=%s", ts.Dir())},
+			Cmd:      []string{"horcrux", "signer", "start", fmt.Sprintf("--home=%s", ts.Dir())},
 			Hostname: ts.Name(),
 			ExposedPorts: map[docker.Port]struct{}{
 				docker.Port(fmt.Sprintf("%s/tcp", signerPort)): {},
