@@ -25,7 +25,7 @@ func init() {
 
 var cosignerCmd = &cobra.Command{
 	Use:   "cosigner",
-	Short: "A brief description of your command",
+	Short: "Threshold mpc signer for TM based nodes",
 }
 
 func StartCosignerCmd() *cobra.Command {
@@ -214,6 +214,5 @@ func StartCosignerCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolP("single", "s", false, "set to start horcrux as a single signer")
 	return cmd
 }
