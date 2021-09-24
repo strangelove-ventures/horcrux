@@ -3,16 +3,13 @@ package cmd
 import (
 	"fmt"
 	"log"
-	"net"
 	"os"
 	"path"
-	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/signer"
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	tmOS "github.com/tendermint/tendermint/libs/os"
 	tmService "github.com/tendermint/tendermint/libs/service"
 	"github.com/tendermint/tendermint/types"
 )
@@ -33,7 +30,6 @@ func StartCosignerCmd() *cobra.Command {
 		Short: "start cosigner process",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-
 			err = validateCosignerConfig(config)
 			if err != nil {
 				return
@@ -59,8 +55,8 @@ func StartCosignerCmd() *cobra.Command {
 				Cosigners:         config.CosignerPeers(),
 			}
 
-			if _, err = os.Stat(cfg.PrivValKeyFile); os.IsNotExist(err) {
-				return fmt.Errorf("private key share doesn't exist at path(%s)", cfg.PrivValKeyFile)
+			if err = cfg.KeyFileExists(); err != nil {
+				return err
 			}
 
 			logger.Info("Tendermint Validator", "mode", cfg.Mode, "priv-key", cfg.PrivValKeyFile, "priv-state-dir", cfg.PrivValStateDir)
@@ -154,30 +150,12 @@ func StartCosignerCmd() *cobra.Command {
 			}
 			logger.Info("Signer", "pubkey", pubkey)
 
-			for _, node := range cfg.Nodes {
-				dialer := net.Dialer{Timeout: 30 * time.Second}
-				s := signer.NewReconnRemoteSigner(node.Address, logger, cfg.ChainID, pv, dialer)
-
-				err := s.Start()
-				if err != nil {
-					panic(err)
-				}
-
-				services = append(services, s)
+			services, err = signer.StartRemoteSigners(services, logger, cfg.ChainID, pv, cfg.Nodes)
+			if err != nil {
+				panic(err)
 			}
 
-			wg := sync.WaitGroup{}
-			wg.Add(1)
-			tmOS.TrapSignal(logger, func() {
-				for _, service := range services {
-					err := service.Stop()
-					if err != nil {
-						panic(err)
-					}
-				}
-				wg.Done()
-			})
-			wg.Wait()
+			signer.WaitAndTerminate(logger, services)
 
 			return nil
 		},

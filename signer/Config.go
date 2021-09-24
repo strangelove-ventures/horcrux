@@ -1,6 +1,7 @@
 package signer
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/BurntSushi/toml"
@@ -38,4 +39,11 @@ func LoadConfigFromFile(file string) (Config, error) {
 	}
 	_, err = toml.DecodeReader(reader, &config)
 	return config, err
+}
+
+func (cfg *Config) KeyFileExists() error {
+	if _, err := os.Stat(cfg.PrivValKeyFile); os.IsNotExist(err) {
+		return fmt.Errorf("private key share doesn't exist at path(%s)", cfg.PrivValKeyFile)
+	}
+	return nil
 }

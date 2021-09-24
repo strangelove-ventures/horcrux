@@ -3,16 +3,12 @@ package cmd
 import (
 	"fmt"
 	"log"
-	"net"
 	"os"
 	"path"
-	"sync"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/signer"
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	tmOS "github.com/tendermint/tendermint/libs/os"
 	tmService "github.com/tendermint/tendermint/libs/service"
 	"github.com/tendermint/tendermint/privval"
 	"github.com/tendermint/tendermint/types"
@@ -25,7 +21,7 @@ func init() {
 
 var signerCmd = &cobra.Command{
 	Use:   "signer",
-	Short: "Single signer mode for TM remote tx signer.",
+	Short: "Remote tx signer for TM based nodes.",
 }
 
 func StartSignerCmd() *cobra.Command {
@@ -34,9 +30,7 @@ func StartSignerCmd() *cobra.Command {
 		Short: "start single signer process",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-
 			err = validateSingleSignerConfig(config)
-
 			if err != nil {
 				return
 			}
@@ -58,8 +52,8 @@ func StartSignerCmd() *cobra.Command {
 				Nodes:           config.Nodes(),
 			}
 
-			if _, err = os.Stat(cfg.PrivValKeyFile); os.IsNotExist(err) {
-				return fmt.Errorf("private key share doesn't exist at path(%s)", cfg.PrivValKeyFile)
+			if err = cfg.KeyFileExists(); err != nil {
+				return err
 			}
 
 			logger.Info("Tendermint Validator", "mode", cfg.Mode, "priv-key", cfg.PrivValKeyFile, "priv-state-dir", cfg.PrivValStateDir)
@@ -67,7 +61,6 @@ func StartSignerCmd() *cobra.Command {
 			var val types.PrivValidator
 			stateFile := path.Join(cfg.PrivValStateDir, fmt.Sprintf("%s_priv_validator_state.json", chainID))
 
-			// TODO either stop creating state file at config init
 			// Triple check that this is how we will handle state file and that this behaves as intended
 			// if f, err := os.Stat(stateFile); os.IsNotExist(err) || f.Size() == 0 {
 			//  	val = privval.LoadFilePVEmptyState(cfg.PrivValKeyFile, stateFile)
@@ -84,30 +77,12 @@ func StartSignerCmd() *cobra.Command {
 			}
 			logger.Info("Signer", "pubkey", pubkey)
 
-			for _, node := range cfg.Nodes {
-				dialer := net.Dialer{Timeout: 30 * time.Second}
-				s := signer.NewReconnRemoteSigner(node.Address, logger, cfg.ChainID, pv, dialer)
-
-				err := s.Start()
-				if err != nil {
-					panic(err)
-				}
-
-				services = append(services, s)
+			services, err = signer.StartRemoteSigners(services, logger, cfg.ChainID, pv, cfg.Nodes)
+			if err != nil {
+				panic(err)
 			}
 
-			wg := sync.WaitGroup{}
-			wg.Add(1)
-			tmOS.TrapSignal(logger, func() {
-				for _, service := range services {
-					err := service.Stop()
-					if err != nil {
-						panic(err)
-					}
-				}
-				wg.Done()
-			})
-			wg.Wait()
+			signer.WaitAndTerminate(logger, services)
 
 			return nil
 		},
