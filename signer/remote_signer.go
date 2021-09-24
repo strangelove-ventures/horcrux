@@ -199,3 +199,19 @@ func (rs *ReconnRemoteSigner) handleRequest(req tmProtoPrivval.Message) (tmProto
 
 	return msg, err
 }
+
+func StartRemoteSigners(services []tmService.Service, logger tmLog.Logger, chainID string, privVal tm.PrivValidator, nodes []NodeConfig) ([]tmService.Service, error) {
+	var err error
+	for _, node := range nodes {
+		dialer := net.Dialer{Timeout: 30 * time.Second}
+		s := NewReconnRemoteSigner(node.Address, logger, chainID, privVal, dialer)
+
+		err = s.Start()
+		if err != nil {
+			return nil, err
+		}
+
+		services = append(services, s)
+	}
+	return services, err
+}
