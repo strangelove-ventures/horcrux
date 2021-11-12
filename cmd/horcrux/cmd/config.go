@@ -18,6 +18,8 @@ import (
 
 func init() {
 	// TODO: config nodes add/remove
+	nodesCmd.AddCommand(addCmd())
+	configCmd.AddCommand(nodesCmd)
 	// TODO: config peers add/remove
 	// TODO: config chain-id set
 	configCmd.AddCommand(initCmd())
@@ -175,6 +177,58 @@ func validateCosignerConfig(cfg *Config) error {
 		return err
 	}
 	return nil
+}
+
+var nodesCmd = &cobra.Command{
+	Use:   "nodes",
+	Short: "Commands to configure the chain nodes",
+}
+
+func addCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:     "add [chain-nodes]",
+		Aliases: []string{"a"},
+		Short:   "add chain node(s) to the cosigner's configuration",
+		Long: "add chain node(s) to the cosigner's configuration.\n\n" +
+			"[chain-nodes] is a comma seperated array of chain node addresses i.e.\n" +
+			"tcp://chain-node-1:1234,tcp://chain-node-2:1234",
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
+			if isDuplicate(config.ChainNodes, args[0]) {
+				return fmt.Errorf("can't add %v: duplicate chain node", args[0])
+			}
+			if err := validateChainNodes([]ChainNode{{PrivValAddr: args[0]}}); err != nil {
+				return err
+			}
+
+			var home string // In root.go we end up with our
+			if homeDir != "" {
+				home = homeDir
+			} else {
+				home, _ = homedir.Dir()
+				home = path.Join(home, ".horcrux")
+			}
+
+			if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
+				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
+			}
+
+			config.ChainNodes = append(config.ChainNodes, ChainNode{PrivValAddr: args[0]})
+			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+}
+
+func isDuplicate(nodes []ChainNode, node string) bool {
+	for _, n := range nodes {
+		if n.PrivValAddr == node {
+			return true
+		}
+	}
+	return false
 }
 
 type Config struct {
