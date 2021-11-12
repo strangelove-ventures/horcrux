@@ -19,6 +19,7 @@ import (
 func init() {
 	// TODO: config nodes add/remove
 	nodesCmd.AddCommand(addCmd())
+	nodesCmd.AddCommand(removeCmd())
 	configCmd.AddCommand(nodesCmd)
 	// TODO: config peers add/remove
 	// TODO: config chain-id set
@@ -194,8 +195,8 @@ func addCmd() *cobra.Command {
 			"tcp://chain-node-1:1234,tcp://chain-node-2:1234",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			if isDuplicate(config.ChainNodes, args[0]) {
-				return fmt.Errorf("can't add %v: duplicate chain node", args[0])
+			if exists(config.ChainNodes, args[0]) != -1 {
+				return fmt.Errorf("chain node %v already exists", args[0])
 			}
 			if err := validateChainNodes([]ChainNode{{PrivValAddr: args[0]}}); err != nil {
 				return err
@@ -222,13 +223,52 @@ func addCmd() *cobra.Command {
 	}
 }
 
-func isDuplicate(nodes []ChainNode, node string) bool {
-	for _, n := range nodes {
+func removeCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:     "remove [chain-nodes]",
+		Aliases: []string{"r"},
+		Short:   "remove chain node(s) from the cosigner's configuration",
+		Long: "remove chain node(s) from the cosigner's configuration.\n\n" +
+			"[chain-nodes] is a comma seperated array of chain node addresses i.e.\n" +
+			"tcp://chain-node-1:1234,tcp://chain-node-2:1234",
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
+			idx := exists(config.ChainNodes, args[0])
+			if idx == -1 {
+				return fmt.Errorf("chain node %v already exists", args[0])
+			}
+			if err := validateChainNodes([]ChainNode{{PrivValAddr: args[0]}}); err != nil {
+				return err
+			}
+
+			var home string // In root.go we end up with our
+			if homeDir != "" {
+				home = homeDir
+			} else {
+				home, _ = homedir.Dir()
+				home = path.Join(home, ".horcrux")
+			}
+
+			if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
+				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
+			}
+
+			config.ChainNodes = append(config.ChainNodes[:idx], config.ChainNodes[idx+1:]...)
+			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+}
+
+func exists(nodes []ChainNode, node string) int {
+	for idx, n := range nodes {
 		if n.PrivValAddr == node {
-			return true
+			return idx
 		}
 	}
-	return false
+	return -1
 }
 
 type Config struct {
