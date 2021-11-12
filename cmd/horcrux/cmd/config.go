@@ -235,7 +235,7 @@ func removeCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			idx := exists(config.ChainNodes, args[0])
 			if idx == -1 {
-				return fmt.Errorf("chain node %v already exists", args[0])
+				return fmt.Errorf("chain node %v doesn't exist", args[0])
 			}
 			if err := validateChainNodes([]ChainNode{{PrivValAddr: args[0]}}); err != nil {
 				return err
