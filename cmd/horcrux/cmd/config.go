@@ -213,12 +213,11 @@ func addNodesCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-
-			newNodes := diffSetChainNode(config.ChainNodes, argNodes)
-			if len(newNodes) == 0 {
+			diffSet := diffSetChainNode(config.ChainNodes, argNodes)
+			if len(diffSet) == 0 {
 				return errors.New("no new chain nodes specified in args")
 			}
-			config.ChainNodes = append(config.ChainNodes, newNodes...)
+			config.ChainNodes = append(config.ChainNodes, diffSet...)
 
 			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
 				return err
@@ -253,12 +252,11 @@ func removeNodesCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-
-			truncatedNodes := diffSetChainNode(argNodes, config.ChainNodes)
-			if truncatedNodes == nil {
+			diffSet := diffSetChainNode(argNodes, config.ChainNodes)
+			if len(diffSet) == 0 {
 				return errors.New("cannot remove all chain nodes from config, please leave at least one")
 			}
-			config.ChainNodes = truncatedNodes
+			config.ChainNodes = diffSet
 
 			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
 				return err
