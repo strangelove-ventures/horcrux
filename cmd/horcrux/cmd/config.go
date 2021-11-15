@@ -198,16 +198,6 @@ func addNodesCmd() *cobra.Command {
 			"tcp://chain-node-1:1234,tcp://chain-node-2:1234",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			argNodes, err := chainNodesFromArg(args[0])
-			if err != nil {
-				return err
-			}
-
-			newNodes := diff(config.ChainNodes, argNodes)
-			if newNodes == nil {
-				return errors.New("no new chain nodes specified in args")
-			}
-
 			var home string // In root.go we end up with our
 			if homeDir != "" {
 				home = homeDir
@@ -215,12 +205,21 @@ func addNodesCmd() *cobra.Command {
 				home, _ = homedir.Dir()
 				home = path.Join(home, ".horcrux")
 			}
-
 			if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
 				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
 			}
 
+			argNodes, err := chainNodesFromArg(args[0])
+			if err != nil {
+				return err
+			}
+
+			newNodes := diffSet(config.ChainNodes, argNodes)
+			if len(newNodes) == 0 {
+				return errors.New("no new chain nodes specified in args")
+			}
 			config.ChainNodes = append(config.ChainNodes, newNodes...)
+
 			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
 				return err
 			}
@@ -239,17 +238,6 @@ func removeNodesCmd() *cobra.Command {
 			"tcp://chain-node-1:1234,tcp://chain-node-2:1234",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			argNodes, err := chainNodesFromArg(args[0])
-			if err != nil {
-				return err
-			}
-
-			truncatedNodes := diff(config.ChainNodes, argNodes)
-			if truncatedNodes == nil {
-				return errors.New("cannot remove all chain nodes from config, please leave at least one")
-			}
-			config.ChainNodes = truncatedNodes
-
 			var home string // In root.go we end up with our
 			if homeDir != "" {
 				home = homeDir
@@ -257,10 +245,21 @@ func removeNodesCmd() *cobra.Command {
 				home, _ = homedir.Dir()
 				home = path.Join(home, ".horcrux")
 			}
-
 			if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
 				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
 			}
+
+			argNodes, err := chainNodesFromArg(args[0])
+			if err != nil {
+				return err
+			}
+
+			// truncatedNodes := removeNodesFromConfig(config.ChainNodes, argNodes)
+			truncatedNodes := diffSet(argNodes, config.ChainNodes)
+			if truncatedNodes == nil {
+				return errors.New("cannot remove all chain nodes from config, please leave at least one")
+			}
+			config.ChainNodes = truncatedNodes
 
 			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
 				return err
@@ -270,22 +269,18 @@ func removeNodesCmd() *cobra.Command {
 	}
 }
 
-func diff(nodes1, nodes2 []ChainNode) (diff []ChainNode) {
-	for i := 0; i < 2; i++ {
-		for _, node := range nodes1 {
-			found := false
-			for _, arg := range nodes2 {
-				if node == arg {
-					found = true
-					break
-				}
-			}
-			if !found {
-				diff = append(diff, node)
+// diffSet decribes the difference set of setA-setB, which are all values of setA
+// that are also part of setB.
+func diffSet(setA, setB []ChainNode) (newNodes []ChainNode) {
+	for _, b := range setB {
+		found := false
+		for _, a := range setA {
+			if b == a {
+				found = true
 			}
 		}
-		if i == 0 {
-			nodes1, nodes2 = nodes2, nodes1
+		if !found {
+			newNodes = append(newNodes, b)
 		}
 	}
 	return
