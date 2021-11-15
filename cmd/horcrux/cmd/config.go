@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/url"
@@ -195,11 +196,14 @@ func addCmd() *cobra.Command {
 			"tcp://chain-node-1:1234,tcp://chain-node-2:1234",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			if exists(config.ChainNodes, args[0]) != -1 {
-				return fmt.Errorf("chain node %v already exists", args[0])
-			}
-			if err := validateChainNodes([]ChainNode{{PrivValAddr: args[0]}}); err != nil {
+			argNodes, err := chainNodesFromArg(args[0])
+			if err != nil {
 				return err
+			}
+
+			newNodes := diff(config.ChainNodes, argNodes)
+			if newNodes == nil {
+				return errors.New("no new chain nodes specified in args")
 			}
 
 			var home string // In root.go we end up with our
@@ -214,7 +218,7 @@ func addCmd() *cobra.Command {
 				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
 			}
 
-			config.ChainNodes = append(config.ChainNodes, ChainNode{PrivValAddr: args[0]})
+			config.ChainNodes = append(config.ChainNodes, newNodes...)
 			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
 				return err
 			}
@@ -233,13 +237,16 @@ func removeCmd() *cobra.Command {
 			"tcp://chain-node-1:1234,tcp://chain-node-2:1234",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			idx := exists(config.ChainNodes, args[0])
-			if idx == -1 {
-				return fmt.Errorf("chain node %v doesn't exist", args[0])
-			}
-			if err := validateChainNodes([]ChainNode{{PrivValAddr: args[0]}}); err != nil {
+			argNodes, err := chainNodesFromArg(args[0])
+			if err != nil {
 				return err
 			}
+
+			truncatedNodes := diff(config.ChainNodes, argNodes)
+			if truncatedNodes == nil {
+				return errors.New("cannot remove all chain nodes from config, please leave at least one")
+			}
+			config.ChainNodes = truncatedNodes
 
 			var home string // In root.go we end up with our
 			if homeDir != "" {
@@ -253,7 +260,6 @@ func removeCmd() *cobra.Command {
 				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
 			}
 
-			config.ChainNodes = append(config.ChainNodes[:idx], config.ChainNodes[idx+1:]...)
 			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
 				return err
 			}
@@ -262,13 +268,25 @@ func removeCmd() *cobra.Command {
 	}
 }
 
-func exists(nodes []ChainNode, node string) int {
-	for idx, n := range nodes {
-		if n.PrivValAddr == node {
-			return idx
+func diff(nodes1, nodes2 []ChainNode) (diff []ChainNode) {
+	for i := 0; i < 2; i++ {
+		for _, node := range nodes1 {
+			found := false
+			for _, arg := range nodes2 {
+				if node == arg {
+					found = true
+					break
+				}
+			}
+			if !found {
+				diff = append(diff, node)
+			}
+		}
+		if i == 0 {
+			nodes1, nodes2 = nodes2, nodes1
 		}
 	}
-	return -1
+	return
 }
 
 type Config struct {
