@@ -214,7 +214,7 @@ func addNodesCmd() *cobra.Command {
 				return err
 			}
 
-			newNodes := diffSet(config.ChainNodes, argNodes)
+			newNodes := diffSetChainNode(config.ChainNodes, argNodes)
 			if len(newNodes) == 0 {
 				return errors.New("no new chain nodes specified in args")
 			}
@@ -254,8 +254,7 @@ func removeNodesCmd() *cobra.Command {
 				return err
 			}
 
-			// truncatedNodes := removeNodesFromConfig(config.ChainNodes, argNodes)
-			truncatedNodes := diffSet(argNodes, config.ChainNodes)
+			truncatedNodes := diffSetChainNode(argNodes, config.ChainNodes)
 			if truncatedNodes == nil {
 				return errors.New("cannot remove all chain nodes from config, please leave at least one")
 			}
@@ -269,9 +268,9 @@ func removeNodesCmd() *cobra.Command {
 	}
 }
 
-// diffSet decribes the difference set of setA-setB, which are all values of setA
-// that are also part of setB.
-func diffSet(setA, setB []ChainNode) (newNodes []ChainNode) {
+// diffSetChainNode decribes the difference set of setA-setB, which are all ChainNodes
+// of setA that are also part of setB.
+func diffSetChainNode(setA, setB []ChainNode) (newNodes []ChainNode) {
 	for _, b := range setB {
 		found := false
 		for _, a := range setA {
