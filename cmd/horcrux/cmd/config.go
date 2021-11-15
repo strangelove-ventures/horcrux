@@ -24,6 +24,8 @@ func init() {
 	configCmd.AddCommand(nodesCmd)
 	// TODO: config peers add/remove
 	// TODO: config chain-id set
+	configCmd.AddCommand(setChainIdCmd)
+
 	configCmd.AddCommand(initCmd())
 	rootCmd.AddCommand(configCmd)
 }
@@ -287,6 +289,35 @@ func diff(nodes1, nodes2 []ChainNode) (diff []ChainNode) {
 		}
 	}
 	return
+}
+
+var setChainIdCmd = &cobra.Command{
+	Use:     "set-chain-id [chain-ID]",
+	Aliases: []string{"id"},
+	Short:   "set the chain ID",
+	Long: "set the chain ID.\n\n" +
+		"[chain-id] is a string i.e.\n" +
+		"cosmoshub-4",
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) (err error) {
+		var home string // In root.go we end up with our
+		if homeDir != "" {
+			home = homeDir
+		} else {
+			home, _ = homedir.Dir()
+			home = path.Join(home, ".horcrux")
+		}
+
+		if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
+			return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
+		}
+
+		config.ChainID = args[0]
+		if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
+			return err
+		}
+		return nil
+	},
 }
 
 type Config struct {
