@@ -354,6 +354,8 @@ func removePeersCmd() *cobra.Command {
 				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
 			}
 
+			// TODO: Instead of having to pass in the whole address and peer ID,
+			// just pass in the ID to remove a peer.
 			argPeers, err := peersFromFlag(args[0])
 			if err != nil {
 				return err
