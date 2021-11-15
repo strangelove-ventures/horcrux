@@ -19,8 +19,8 @@ import (
 
 func init() {
 	// TODO: config nodes add/remove
-	nodesCmd.AddCommand(addCmd())
-	nodesCmd.AddCommand(removeCmd())
+	nodesCmd.AddCommand(addNodesCmd())
+	nodesCmd.AddCommand(removeNodesCmd())
 	configCmd.AddCommand(nodesCmd)
 	// TODO: config peers add/remove
 	// TODO: config chain-id set
@@ -188,7 +188,7 @@ var nodesCmd = &cobra.Command{
 	Short: "Commands to configure the chain nodes",
 }
 
-func addCmd() *cobra.Command {
+func addNodesCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:     "add [chain-nodes]",
 		Aliases: []string{"a"},
@@ -229,7 +229,7 @@ func addCmd() *cobra.Command {
 	}
 }
 
-func removeCmd() *cobra.Command {
+func removeNodesCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:     "remove [chain-nodes]",
 		Aliases: []string{"r"},
