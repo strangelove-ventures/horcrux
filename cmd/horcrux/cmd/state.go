@@ -70,6 +70,9 @@ func resetPvCmd() *cobra.Command {
 		Short:   "Reset the priv validator state",
 		Args:    cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// TODO: Resetting the priv_validator_state.json should only be allowed if
+			// the signer is not running.
+
 			var stateDir string // In root.go we end up with our
 			if homeDir != "" {
 				stateDir = path.Join(homeDir, "state")
@@ -144,6 +147,9 @@ func resetShareCmd() *cobra.Command {
 		Short:   "Reset the share sign state",
 		Args:    cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// TODO: Resetting the share_sign_state.json should only be allowed if the
+			// signer is not running.
+
 			var stateDir string // In root.go we end up with our
 			if homeDir != "" {
 				stateDir = path.Join(homeDir, "state")
