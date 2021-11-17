@@ -66,7 +66,6 @@ func initCmd() *cobra.Command {
 				home, _ = homedir.Dir()
 				home = path.Join(home, ".horcrux")
 			}
-
 			if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
 				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
 			}
@@ -178,7 +177,7 @@ func validateCosignerConfig(cfg *Config) error {
 	if _, err := url.Parse(cfg.CosignerConfig.P2PListen); err != nil {
 		return fmt.Errorf("failed to parse p2p listen address")
 	}
-	if err := validateCosignerPeers(cfg.CosignerConfig.Peers); err != nil {
+	if err := validateCosignerPeers(&cfg.CosignerConfig.Peers); err != nil {
 		return err
 	}
 	if err := validateChainNodes(cfg.ChainNodes); err != nil {
@@ -321,10 +320,10 @@ func addPeersCmd() *cobra.Command {
 			if len(diffSet) == 0 {
 				return errors.New("no new peer nodes specified in args")
 			}
-			if err := validateCosignerPeers(diffSet); err != nil {
-				fmt.Println(err)
-			}
 			config.CosignerConfig.Peers = append(config.CosignerConfig.Peers, diffSet...)
+			if err := validateCosignerPeers(&config.CosignerConfig.Peers); err != nil {
+				return err
+			}
 
 			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
 				return err
@@ -500,36 +499,38 @@ func readKeyShare() (*signer.CosignerKey, error) {
 	return &key, nil
 }
 
-func validateCosignerPeers(peers []CosignerPeer) error {
+func validateCosignerPeers(peers *[]CosignerPeer) error {
 	// Check IDs to make sure none are duplicated
+	if dupl := duplicatePeers(*peers); len(dupl) != 0 {
+		return fmt.Errorf("found duplicate share IDs in args: %v", dupl)
+	}
+
+	// Check that the key share which is configured for the local node
+	// is the last remaining share
+	key, err := readKeyShare()
+	if err != nil {
+		return err
+	}
+	for _, peer := range config.CosignerPeers() {
+		if peer.ID == key.ID {
+			// Remove the peer with the same share ID as the local node from the peers
+			fmt.Printf("local node is configured with key share ID %v, so a peer with that ID cannot be added anymore\n", key.ID)
+			*peers = diffSetCosignerPeer([]CosignerPeer{{peer.ID, peer.Address}}, config.CosignerConfig.Peers)
+		}
+	}
+	return nil
+}
+
+func duplicatePeers(peers []CosignerPeer) (duplicates []CosignerPeer) {
 	encountered := make(map[int]string)
-	duplicates := []int{}
 	for _, peer := range peers {
 		if _, found := encountered[peer.ShareID]; !found {
 			encountered[peer.ShareID] = peer.P2PAddr
 		} else {
-			duplicates = append(duplicates, peer.ShareID)
+			duplicates = append(duplicates, CosignerPeer{peer.ShareID, peer.P2PAddr})
 		}
 	}
-	if len(duplicates) != 0 {
-		return fmt.Errorf("found duplicates for peer IDs: %v", duplicates)
-	}
-
-	// TODO
-	// key, err := readKeyShare()
-	// if err != nil {
-	// 	return err
-	// }
-
-	// // Check that the key share which is configured for the local node
-	// // is the last remaining share
-	// for _, peer := range config.CosignerPeers() {
-	// 	if peer.ID == key.ID {
-	// 		return fmt.Errorf("conflict: local node's key share ID %v matches with another peer in the config, please make sure you're using the correct share", key.ID)
-	// 	}
-	// }
-
-	return nil
+	return
 }
 
 func peersFromFlag(peers string) (out []CosignerPeer, err error) {
