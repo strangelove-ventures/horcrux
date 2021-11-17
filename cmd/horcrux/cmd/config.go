@@ -335,12 +335,12 @@ func addPeersCmd() *cobra.Command {
 
 func removePeersCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:     "remove [peer-nodes]",
+		Use:     "remove [peer-node-ids]",
 		Aliases: []string{"r"},
 		Short:   "remove peer node(s) from the cosigner's configuration",
 		Long: "remove peer node(s) from the cosigner's configuration.\n\n" +
-			"[peer-nodes] is a comma seperated array of peer node addresses i.e.\n" +
-			"tcp://peer-node-1:1234,tcp://peer-node-2:1234",
+			"[peer-node-ids] is a comma seperated array of peer node IDs i.e.\n" +
+			"1,2",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			var home string // In root.go we end up with our
@@ -354,12 +354,16 @@ func removePeersCmd() *cobra.Command {
 				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
 			}
 
-			// TODO: Instead of having to pass in the whole address and peer ID,
-			// just pass in the ID to remove a peer.
-			argPeers, err := peersFromFlag(args[0])
-			if err != nil {
-				return err
+			argPeers := []CosignerPeer{}
+			ids := strings.Split(args[0], ",")
+			for _, peer := range config.CosignerConfig.Peers {
+				for _, id := range ids {
+					if strconv.Itoa(peer.ShareID) == id {
+						argPeers = append(argPeers, peer)
+					}
+				}
 			}
+
 			diffSet := diffSetCosignerPeer(argPeers, config.CosignerConfig.Peers)
 			if len(diffSet) == 0 {
 				return errors.New("cannot remove all peer nodes from config, please leave at least one")
