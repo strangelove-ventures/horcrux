@@ -411,19 +411,17 @@ func setChainIdCmd() *cobra.Command {
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			var home string // In root.go we end up with our
-			var stateDir string
 			if homeDir != "" {
 				home = homeDir
-				stateDir = path.Join(homeDir, "state")
 			} else {
 				home, _ = homedir.Dir()
 				home = path.Join(home, ".horcrux")
-				stateDir = path.Join(home, "state")
 			}
 			if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
 				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
 			}
 
+			stateDir := path.Join(home, "state")
 			pvOldPath := path.Join(stateDir, config.ChainID+"_priv_validator_state.json")
 			pvNewPath := path.Join(stateDir, args[0]+"_priv_validator_state.json")
 			shareOldPath := path.Join(stateDir, config.ChainID+"_share_sign_state.json")
