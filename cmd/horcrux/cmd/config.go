@@ -374,7 +374,7 @@ func removePeersCmd() *cobra.Command {
 	}
 }
 
-// diffSetCosignerPeer decribes the difference set of setA-setB, which are all
+// diffSetCosignerPeer returns the difference set of setA-setB, which includes all
 // CosignerPeers of setA that are also part of setB.
 func diffSetCosignerPeer(setA, setB []CosignerPeer) (diffSet []CosignerPeer) {
 	for _, b := range setB {
