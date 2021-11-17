@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path"
 
 	"github.com/mitchellh/go-homedir"
@@ -70,8 +72,11 @@ func resetPvCmd() *cobra.Command {
 		Short:   "Reset the priv validator state",
 		Args:    cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// TODO: Resetting the priv_validator_state.json should only be allowed if
-			// the signer is not running.
+			// Resetting the priv_validator_state.json should only be allowed if the
+			// signer is not running.
+			if isRunning() {
+				return errors.New("cannot modify priv validator state while horcrux is running")
+			}
 
 			var stateDir string // In root.go we end up with our
 			if homeDir != "" {
@@ -147,8 +152,11 @@ func resetShareCmd() *cobra.Command {
 		Short:   "Reset the share sign state",
 		Args:    cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// TODO: Resetting the share_sign_state.json should only be allowed if the
+			// Resetting the share_sign_state.json should only be allowed if the
 			// signer is not running.
+			if isRunning() {
+				return errors.New("cannot modify priv validator state while horcrux is running")
+			}
 
 			var stateDir string // In root.go we end up with our
 			if homeDir != "" {
@@ -180,6 +188,12 @@ func resetShareCmd() *cobra.Command {
 	}
 	cmd.Flags().Int64("height", 0, "set to reset the share sign state to the specified height")
 	return cmd
+}
+
+func isRunning() bool {
+	pipe := "ps -ax | pgrep horcrux"
+	bz, _ := exec.Command("bash", "-c", pipe).Output()
+	return len(bz) != 0
 }
 
 func printSignState(ss signer.SignState) {
