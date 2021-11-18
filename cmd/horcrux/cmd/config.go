@@ -529,8 +529,7 @@ func validateCosignerPeers(peers *[]CosignerPeer) error {
 	}
 	for _, peer := range config.CosignerPeers() {
 		if peer.ID == key.ID {
-			// Remove the peer with the same share ID as the local node from the peers
-			fmt.Printf("local node is configured with key share ID %v, so a peer with that ID cannot be added anymore\n", key.ID)
+			fmt.Printf("skipping peer with share ID %v as local node is configured with that key share ID\n", key.ID)
 			*peers = diffSetCosignerPeer([]CosignerPeer{{peer.ID, peer.Address}}, config.CosignerConfig.Peers)
 		}
 	}
