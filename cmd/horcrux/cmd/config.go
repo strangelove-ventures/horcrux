@@ -177,7 +177,7 @@ func validateCosignerConfig(cfg *Config) error {
 	if _, err := url.Parse(cfg.CosignerConfig.P2PListen); err != nil {
 		return fmt.Errorf("failed to parse p2p listen address")
 	}
-	if err := validateCosignerPeers(&cfg.CosignerConfig.Peers); err != nil {
+	if err := validateCosignerPeers(cfg.CosignerConfig.Peers); err != nil {
 		return err
 	}
 	if err := validateChainNodes(cfg.ChainNodes); err != nil {
@@ -321,7 +321,7 @@ func addPeersCmd() *cobra.Command {
 				return errors.New("no new peer nodes specified in args")
 			}
 			config.CosignerConfig.Peers = append(config.CosignerConfig.Peers, diffSet...)
-			if err := validateCosignerPeers(&config.CosignerConfig.Peers); err != nil {
+			if err := validateCosignerPeers(config.CosignerConfig.Peers); err != nil {
 				return err
 			}
 
@@ -515,9 +515,9 @@ func readKeyShare() (*signer.CosignerKey, error) {
 	return &key, nil
 }
 
-func validateCosignerPeers(peers *[]CosignerPeer) error {
+func validateCosignerPeers(peers []CosignerPeer) error {
 	// Check IDs to make sure none are duplicated
-	if dupl := duplicatePeers(*peers); len(dupl) != 0 {
+	if dupl := duplicatePeers(peers); len(dupl) != 0 {
 		return fmt.Errorf("found duplicate share IDs in args: %v", dupl)
 	}
 
@@ -529,8 +529,7 @@ func validateCosignerPeers(peers *[]CosignerPeer) error {
 	}
 	for _, peer := range config.CosignerPeers() {
 		if peer.ID == key.ID {
-			fmt.Printf("skipping peer with share ID %v as local node is configured with that key share ID\n", key.ID)
-			*peers = diffSetCosignerPeer([]CosignerPeer{{peer.ID, peer.Address}}, config.CosignerConfig.Peers)
+			return fmt.Errorf("peer with share ID %v cannot be added", key.ID)
 		}
 	}
 	return nil
