@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -484,37 +483,6 @@ type CosignerPeer struct {
 	P2PAddr string `json:"p2p-addr" yaml:"p2p-addr"`
 }
 
-func readKeyShare() (*signer.CosignerKey, error) {
-	// Read ID from local key share
-	var home string // In root.go we end up with our
-	if homeDir != "" {
-		home = homeDir
-	} else {
-		home, _ = homedir.Dir()
-		home = path.Join(home, ".horcrux")
-	}
-
-	if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
-		return nil, fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
-	}
-
-	file, err := os.Open(path.Join(home, "share.json"))
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	bz, err := ioutil.ReadAll(file)
-	if err != nil {
-		return nil, err
-	}
-	var key signer.CosignerKey
-	if err := json.Unmarshal(bz, &key); err != nil {
-		return nil, err
-	}
-	return &key, nil
-}
-
 func validateCosignerPeers(peers []CosignerPeer) error {
 	// Check IDs to make sure none are duplicated
 	if dupl := duplicatePeers(peers); len(dupl) != 0 {
@@ -523,13 +491,10 @@ func validateCosignerPeers(peers []CosignerPeer) error {
 
 	// Check that the key share which is configured for the local node
 	// is the last remaining share
-	key, err := readKeyShare()
-	if err != nil {
-		return err
-	}
-	for _, peer := range config.CosignerPeers() {
-		if peer.ID == key.ID {
-			return fmt.Errorf("peer with share ID %v cannot be added", key.ID)
+	localID := findRemainingShareID(peers)
+	for _, peer := range peers {
+		if peer.ShareID == localID {
+			return fmt.Errorf("peer with share ID %v cannot be added", peer.ShareID)
 		}
 	}
 	return nil
@@ -545,6 +510,15 @@ func duplicatePeers(peers []CosignerPeer) (duplicates []CosignerPeer) {
 		}
 	}
 	return
+}
+
+func findRemainingShareID(peers []CosignerPeer) int {
+	for i, peer := range peers {
+		if peer.ShareID == i+2 {
+			return i + 1
+		}
+	}
+	return len(peers) + 1
 }
 
 func peersFromFlag(peers string) (out []CosignerPeer, err error) {
