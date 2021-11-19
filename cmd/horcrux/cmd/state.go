@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"strconv"
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
@@ -14,32 +15,22 @@ import (
 )
 
 func init() {
-	pvCmd.AddCommand(showPvCmd())
-	pvCmd.AddCommand(resetPvCmd())
-	stateCmd.AddCommand(pvCmd)
-
-	shareCmd.AddCommand(showShareCmd())
-	shareCmd.AddCommand(resetShareCmd())
-	stateCmd.AddCommand(shareCmd)
+	stateCmd.AddCommand(showCmd())
+	stateCmd.AddCommand(setCmd())
 
 	rootCmd.AddCommand(stateCmd)
 }
 
 var stateCmd = &cobra.Command{
 	Use:   "state",
-	Short: "Commands to configure the state",
+	Short: "Commands to configure the horcrux signer's state",
 }
 
-var pvCmd = &cobra.Command{
-	Use:   "pv",
-	Short: "Commands to configure the priv validator state",
-}
-
-func showPvCmd() *cobra.Command {
+func showCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:     "show",
 		Aliases: []string{"s"},
-		Short:   "Show the priv validator state",
+		Short:   "Show the priv validator and share sign state",
 		Args:    cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var stateDir string // In root.go we end up with our
@@ -53,29 +44,38 @@ func showPvCmd() *cobra.Command {
 				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
 			}
 
-			stateFilePath := path.Join(stateDir, config.ChainID+"_priv_validator_state.json")
-			ss, err := signer.LoadSignState(stateFilePath)
+			filepath := path.Join(stateDir, config.ChainID+"_priv_validator_state.json")
+			pv, err := signer.LoadSignState(filepath)
 			if err != nil {
 				return err
 			}
 
-			printSignState(ss)
+			filepath = path.Join(stateDir, config.ChainID+"_share_sign_state.json")
+			share, err := signer.LoadSignState(filepath)
+			if err != nil {
+				return err
+			}
+
+			fmt.Println("Private Validator State:")
+			printSignState(pv)
+			fmt.Println("Share Sign State:")
+			printSignState(share)
 			return nil
 		},
 	}
 }
 
-func resetPvCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "reset",
-		Aliases: []string{"r"},
-		Short:   "Reset the priv validator state",
-		Args:    cobra.ExactArgs(0),
+func setCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:     "set [height]",
+		Aliases: []string{"s"},
+		Short:   "Set the height for both the priv validator and the share sign state",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Resetting the priv_validator_state.json should only be allowed if the
 			// signer is not running.
 			if isRunning() {
-				return errors.New("cannot modify priv validator state while horcrux is running")
+				return errors.New("cannot modify state while horcrux is running")
 			}
 
 			var stateDir string // In root.go we end up with our
@@ -89,105 +89,34 @@ func resetPvCmd() *cobra.Command {
 				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
 			}
 
-			h, err := cmd.Flags().GetInt64("height")
+			filepath := path.Join(stateDir, config.ChainID+"_priv_validator_state.json")
+			pv, err := signer.LoadSignState(filepath)
 			if err != nil {
 				return err
 			}
 
-			stateFilePath := path.Join(stateDir, config.ChainID+"_priv_validator_state.json")
-			ss, err := signer.LoadSignState(stateFilePath)
+			filepath = path.Join(stateDir, config.ChainID+"_share_sign_state.json")
+			share, err := signer.LoadSignState(filepath)
 			if err != nil {
 				return err
 			}
 
-			ss.Height, ss.Round, ss.Step = h, 0, 0
-			ss.EphemeralPublic, ss.Signature, ss.SignBytes = nil, nil, nil
-			ss.Save()
+			height, err := strconv.ParseInt(args[0], 10, 64)
+			if err != nil {
+				return err
+			}
+
+			pv.Height, share.Height = height, height
+			pv.Round, share.Round = 0, 0
+			pv.Step, share.Step = 0, 0
+			pv.EphemeralPublic, share.EphemeralPublic = nil, nil
+			pv.Signature, share.Signature = nil, nil
+			pv.SignBytes, share.SignBytes = nil, nil
+			pv.Save()
+			share.Save()
 			return nil
 		},
 	}
-	cmd.Flags().Int64("height", 0, "set to reset the priv validator state to the specified height")
-	return cmd
-}
-
-var shareCmd = &cobra.Command{
-	Use:   "share",
-	Short: "Commands to configure the share sign state",
-}
-
-func showShareCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:     "show",
-		Aliases: []string{"s"},
-		Short:   "Show the share sign state",
-		Args:    cobra.ExactArgs(0),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			var stateDir string // In root.go we end up with our
-			if homeDir != "" {
-				stateDir = path.Join(homeDir, "state")
-			} else {
-				home, _ := homedir.Dir()
-				stateDir = path.Join(home, ".horcrux", "state")
-			}
-			if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
-				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
-			}
-
-			stateFilePath := path.Join(stateDir, config.ChainID+"_share_sign_state.json")
-			ss, err := signer.LoadSignState(stateFilePath)
-			if err != nil {
-				return err
-			}
-
-			printSignState(ss)
-			return nil
-		},
-	}
-}
-
-func resetShareCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "reset",
-		Aliases: []string{"r"},
-		Short:   "Reset the share sign state",
-		Args:    cobra.ExactArgs(0),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			// Resetting the share_sign_state.json should only be allowed if the
-			// signer is not running.
-			if isRunning() {
-				return errors.New("cannot modify priv validator state while horcrux is running")
-			}
-
-			var stateDir string // In root.go we end up with our
-			if homeDir != "" {
-				stateDir = path.Join(homeDir, "state")
-			} else {
-				home, _ := homedir.Dir()
-				stateDir = path.Join(home, ".horcrux", "state")
-			}
-			if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
-				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
-			}
-
-			h, err := cmd.Flags().GetInt64("height")
-			if err != nil {
-				return err
-			}
-
-			stateFilePath := path.Join(stateDir, config.ChainID+"_share_sign_state.json")
-			ss, err := signer.LoadSignState(stateFilePath)
-			if err != nil {
-				return err
-			}
-
-			ss.Height, ss.Round, ss.Step = h, 0, 0
-			ss.EphemeralPublic, ss.Signature, ss.SignBytes = nil, nil, nil
-			ss.Save()
-			return nil
-		},
-	}
-	cmd.Flags().Int64("height", 0, "set to reset the share sign state to the specified height")
-	return cmd
 }
 
 func isRunning() bool {
@@ -197,20 +126,18 @@ func isRunning() bool {
 }
 
 func printSignState(ss signer.SignState) {
-	fmt.Printf("Height:    %v\n"+
-		"Round:     %v\n"+
-		"Step:      %v\n",
+	fmt.Printf("  Height:    %v\n"+
+		"  Round:     %v\n"+
+		"  Step:      %v\n",
 		ss.Height, ss.Round, ss.Step)
 
 	if ss.EphemeralPublic != nil {
-		encPub := base64.StdEncoding.EncodeToString(ss.EphemeralPublic)
-		fmt.Println("Ephemeral Public Key:", encPub)
+		fmt.Println("  Ephemeral Public Key:", base64.StdEncoding.EncodeToString(ss.EphemeralPublic))
 	}
 	if ss.Signature != nil {
-		encSig := base64.StdEncoding.EncodeToString(ss.Signature)
-		fmt.Println("Signature:", encSig)
+		fmt.Println("  Signature:", base64.StdEncoding.EncodeToString(ss.Signature))
 	}
 	if ss.SignBytes != nil {
-		fmt.Println("SignBytes:", ss.SignBytes)
+		fmt.Println("  SignBytes:", ss.SignBytes)
 	}
 }
