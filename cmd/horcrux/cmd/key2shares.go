@@ -34,7 +34,7 @@ func CreateCosignerSharesCmd() *cobra.Command {
 		Use:     "create-shares [priv_validator.json] [threshold] [shares]",
 		Aliases: []string{"shard", "shares"},
 		Args:    validateCreateCosignerShares,
-		Short:   "create  cosigner shares",
+		Short:   "Create  cosigner shares",
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			threshold, _ := strconv.ParseInt(args[1], 10, 64)
 			numShares, _ := strconv.ParseInt(args[2], 10, 64)
