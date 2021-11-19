@@ -315,7 +315,7 @@ func addPeersCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			diff := diffSet(config.CosignerConfig.Peers, argPeers)
+			diff := diffSet(argPeers, config.CosignerConfig.Peers)
 			if len(diff) == 0 {
 				return errors.New("no new peer nodes specified in args")
 			}
@@ -363,7 +363,7 @@ func removePeersCmd() *cobra.Command {
 				}
 			}
 
-			diff := diffSet(argPeers, config.CosignerConfig.Peers)
+			diff := diffSet(config.CosignerConfig.Peers, argPeers)
 			if len(diff) == 0 {
 				return errors.New("cannot remove all peer nodes from config, please leave at least one")
 			}
@@ -377,18 +377,18 @@ func removePeersCmd() *cobra.Command {
 	}
 }
 
-// diffSet returns the difference set of setA-setB, which includes all
-// CosignerPeers of setA that are also part of setB.
+// diffSet returns the difference set of setA-setB.
+// Example: [1,2,3] & [2,3,4] => [1]
 func diffSet(setA, setB []CosignerPeer) (diff []CosignerPeer) {
-	for _, b := range setB {
+	for _, a := range setA {
 		found := false
-		for _, a := range setA {
-			if b == a {
+		for _, b := range setB {
+			if a == b {
 				found = true
 			}
 		}
 		if !found {
-			diff = append(diff, b)
+			diff = append(diff, a)
 		}
 	}
 	return
