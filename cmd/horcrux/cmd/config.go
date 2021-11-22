@@ -416,25 +416,27 @@ func setChainIdCmd() *cobra.Command {
 				home, _ = homedir.Dir()
 				home = path.Join(home, ".horcrux")
 			}
-			if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
+			if _, err = os.Stat(homeDir); !os.IsNotExist(err) {
 				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
 			}
 
 			stateDir := path.Join(home, "state")
-			pvOldPath := path.Join(stateDir, config.ChainID+"_priv_validator_state.json")
-			pvNewPath := path.Join(stateDir, args[0]+"_priv_validator_state.json")
-			shareOldPath := path.Join(stateDir, config.ChainID+"_share_sign_state.json")
-			shareNewPath := path.Join(stateDir, args[0]+"_share_sign_state.json")
-
-			if os.Rename(pvOldPath, pvNewPath); err != nil {
+			files, err := ioutil.ReadDir(stateDir)
+			if err != nil {
 				return err
 			}
-			if os.Rename(shareOldPath, shareNewPath); err != nil {
-				return err
+			for _, file := range files {
+				if strings.HasPrefix(file.Name(), config.ChainID) {
+					oldPath := path.Join(stateDir, file.Name())
+					newPath := path.Join(stateDir, strings.Replace(file.Name(), config.ChainID, args[0], 1))
+					if err = os.Rename(oldPath, newPath); err != nil {
+						return err
+					}
+				}
 			}
 
 			config.ChainID = args[0]
-			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
+			if err = writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
 				return err
 			}
 			return nil
