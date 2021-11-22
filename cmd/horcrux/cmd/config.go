@@ -215,11 +215,11 @@ func addNodesCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			diffSet := diffSetChainNode(config.ChainNodes, argNodes)
-			if len(diffSet) == 0 {
-				return errors.New("no new chain nodes specified in args")
+			diff := diffSetChainNode(argNodes, config.ChainNodes)
+			if len(diff) == 0 {
+				return errors.New("no new chain nodes in args")
 			}
-			config.ChainNodes = append(config.ChainNodes, diffSet...)
+			config.ChainNodes = append(config.ChainNodes, diff...)
 
 			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
 				return err
@@ -254,11 +254,13 @@ func removeNodesCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			diffSet := diffSetChainNode(argNodes, config.ChainNodes)
-			if len(diffSet) == 0 {
+			diff := diffSetChainNode(config.ChainNodes, argNodes)
+			if len(diff) == 0 {
 				return errors.New("cannot remove all chain nodes from config, please leave at least one")
 			}
-			config.ChainNodes = diffSet
+			// If none of the chain nodes in the args are listed in the config, just continue
+			// without throwing an error, as the chain nodes in the config remain untouched.
+			config.ChainNodes = diff
 
 			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
 				return err
@@ -268,18 +270,18 @@ func removeNodesCmd() *cobra.Command {
 	}
 }
 
-// diffSetChainNode decribes the difference set of setA-setB, which are all ChainNodes
-// of setA that are also part of setB.
-func diffSetChainNode(setA, setB []ChainNode) (diffSet []ChainNode) {
-	for _, b := range setB {
+// diffSetCosignerPeer returns the difference set for ChainNodes of setA-setB.
+// Example: [1,2,3] & [2,3,4] => [1]
+func diffSetChainNode(setA, setB []ChainNode) (diff []ChainNode) {
+	for _, a := range setA {
 		found := false
-		for _, a := range setA {
-			if b == a {
+		for _, b := range setB {
+			if a == b {
 				found = true
 			}
 		}
 		if !found {
-			diffSet = append(diffSet, b)
+			diff = append(diff, a)
 		}
 	}
 	return
@@ -315,9 +317,9 @@ func addPeersCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			diff := diffSet(argPeers, config.CosignerConfig.Peers)
+			diff := diffSetCosignerPeer(argPeers, config.CosignerConfig.Peers)
 			if len(diff) == 0 {
-				return errors.New("no new peer nodes specified in args")
+				return errors.New("no new peer nodes in args")
 			}
 			config.CosignerConfig.Peers = append(config.CosignerConfig.Peers, diff...)
 			if err := validateCosignerPeers(config.CosignerConfig.Peers); err != nil {
@@ -363,10 +365,12 @@ func removePeersCmd() *cobra.Command {
 				}
 			}
 
-			diff := diffSet(config.CosignerConfig.Peers, argPeers)
+			diff := diffSetCosignerPeer(config.CosignerConfig.Peers, argPeers)
 			if len(diff) == 0 {
 				return errors.New("cannot remove all peer nodes from config, please leave at least one")
 			}
+			// If none of the peer nodes in the args are listed in the config, just continue
+			// without throwing an error, as the peer nodes in the config remain untouched.
 			config.CosignerConfig.Peers = diff
 
 			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
@@ -377,9 +381,9 @@ func removePeersCmd() *cobra.Command {
 	}
 }
 
-// diffSet returns the difference set of setA-setB.
+// diffSetCosignerPeer returns the difference set for CosignerPeers of setA-setB.
 // Example: [1,2,3] & [2,3,4] => [1]
-func diffSet(setA, setB []CosignerPeer) (diff []CosignerPeer) {
+func diffSetCosignerPeer(setA, setB []CosignerPeer) (diff []CosignerPeer) {
 	for _, a := range setA {
 		found := false
 		for _, b := range setB {
