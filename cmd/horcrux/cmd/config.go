@@ -45,7 +45,7 @@ func initCmd() *cobra.Command {
 		Short:   "initalize configuration file and home directory if one doesn't already exist",
 		Long: "initalize configuration file, use flags for cosigner configuration.\n\n" +
 			"[chain-id] is the chain id of the chain to validate\n" +
-			"[chain-nodes] is a comma seperated array of chain node addresses i.e.\n" +
+			"[chain-nodes] is a comma separated array of chain node addresses i.e.\n" +
 			"tcp://chain-node-1:1234,tcp://chain-node-2:1234",
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
@@ -196,7 +196,7 @@ func addNodesCmd() *cobra.Command {
 		Aliases: []string{"a"},
 		Short:   "add chain node(s) to the cosigner's configuration",
 		Long: "add chain node(s) to the cosigner's configuration.\n\n" +
-			"[chain-nodes] is a comma seperated array of chain node addresses i.e.\n" +
+			"[chain-nodes] is a comma separated array of chain node addresses i.e.\n" +
 			"tcp://chain-node-1:1234,tcp://chain-node-2:1234",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
@@ -235,7 +235,7 @@ func removeNodesCmd() *cobra.Command {
 		Aliases: []string{"r"},
 		Short:   "remove chain node(s) from the cosigner's configuration",
 		Long: "remove chain node(s) from the cosigner's configuration.\n\n" +
-			"[chain-nodes] is a comma seperated array of chain node addresses i.e.\n" +
+			"[chain-nodes] is a comma separated array of chain node addresses i.e.\n" +
 			"tcp://chain-node-1:1234,tcp://chain-node-2:1234",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
@@ -298,7 +298,7 @@ func addPeersCmd() *cobra.Command {
 		Aliases: []string{"a"},
 		Short:   "add peer node(s) to the cosigner's configuration",
 		Long: "add peer node(s) to the cosigner's configuration.\n\n" +
-			"[peer-nodes] is a comma seperated array of peer node addresses i.e.\n" +
+			"[peer-nodes] is a comma separated array of peer node addresses i.e.\n" +
 			"tcp://peer-node-1:1234,tcp://peer-node-2:1234",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
@@ -340,7 +340,7 @@ func removePeersCmd() *cobra.Command {
 		Aliases: []string{"r"},
 		Short:   "remove peer node(s) from the cosigner's configuration",
 		Long: "remove peer node(s) from the cosigner's configuration.\n\n" +
-			"[peer-node-ids] is a comma seperated array of peer node IDs i.e.\n" +
+			"[peer-node-ids] is a comma separated array of peer node IDs i.e.\n" +
 			"1,2",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
