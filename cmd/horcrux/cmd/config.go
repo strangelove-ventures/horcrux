@@ -24,6 +24,7 @@ func init() {
 
 	peersCmd.AddCommand(addPeersCmd())
 	peersCmd.AddCommand(removePeersCmd())
+	peersCmd.AddCommand(setSharesCmd())
 	configCmd.AddCommand(peersCmd)
 
 	chainIdCmd.AddCommand(setChainIdCmd())
@@ -86,6 +87,7 @@ func initCmd() *cobra.Command {
 					ChainID: cid,
 					CosignerConfig: &CosignerConfig{
 						Threshold: threshold,
+						Shares:    len(peers) + 1,
 						P2PListen: listen,
 						Peers:     peers,
 						Timeout:   timeout,
@@ -176,7 +178,7 @@ func validateCosignerConfig(cfg *Config) error {
 	if _, err := url.Parse(cfg.CosignerConfig.P2PListen); err != nil {
 		return fmt.Errorf("failed to parse p2p listen address")
 	}
-	if err := validateCosignerPeers(cfg.CosignerConfig.Peers); err != nil {
+	if err := validateCosignerPeers(cfg.CosignerConfig.Peers, cfg.CosignerConfig.Shares); err != nil {
 		return err
 	}
 	if err := validateChainNodes(cfg.ChainNodes); err != nil {
@@ -219,8 +221,12 @@ func addNodesCmd() *cobra.Command {
 			if len(diff) == 0 {
 				return errors.New("no new chain nodes in args")
 			}
-			config.ChainNodes = append(config.ChainNodes, diff...)
+			tmpChainNodes := append(config.ChainNodes, diff...)
+			if err := validateChainNodes(tmpChainNodes); err != nil {
+				return err
+			}
 
+			config.ChainNodes = tmpChainNodes
 			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
 				return err
 			}
@@ -260,8 +266,11 @@ func removeNodesCmd() *cobra.Command {
 			}
 			// If none of the chain nodes in the args are listed in the config, just continue
 			// without throwing an error, as the chain nodes in the config remain untouched.
-			config.ChainNodes = diff
+			if err := validateChainNodes(diff); err != nil {
+				return err
+			}
 
+			config.ChainNodes = diff
 			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
 				return err
 			}
@@ -321,11 +330,12 @@ func addPeersCmd() *cobra.Command {
 			if len(diff) == 0 {
 				return errors.New("no new peer nodes in args")
 			}
-			config.CosignerConfig.Peers = append(config.CosignerConfig.Peers, diff...)
-			if err := validateCosignerPeers(config.CosignerConfig.Peers); err != nil {
+			tmpPeers := append(config.CosignerConfig.Peers, diff...)
+			if err := validateCosignerPeers(tmpPeers, config.CosignerConfig.Shares); err != nil {
 				return err
 			}
 
+			config.CosignerConfig.Peers = tmpPeers
 			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
 				return err
 			}
@@ -355,11 +365,14 @@ func removePeersCmd() *cobra.Command {
 				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
 			}
 
-			argPeers := []CosignerPeer{}
-			ids := strings.Split(args[0], ",")
+			var argPeers []CosignerPeer
 			for _, peer := range config.CosignerConfig.Peers {
-				for _, id := range ids {
-					if strconv.Itoa(peer.ShareID) == id {
+				for _, id := range strings.Split(args[0], ",") {
+					id, err := strconv.Atoi(id)
+					if err != nil {
+						return err
+					}
+					if peer.ShareID == id {
 						argPeers = append(argPeers, peer)
 					}
 				}
@@ -371,8 +384,46 @@ func removePeersCmd() *cobra.Command {
 			}
 			// If none of the peer nodes in the args are listed in the config, just continue
 			// without throwing an error, as the peer nodes in the config remain untouched.
-			config.CosignerConfig.Peers = diff
+			if err := validateCosignerPeers(diff, config.CosignerConfig.Shares); err != nil {
+				return err
+			}
 
+			config.CosignerConfig.Peers = diff
+			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+}
+
+func setSharesCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:     "set-shares [num-shares]",
+		Aliases: []string{"shares"},
+		Short:   "Set the number of key shares",
+		Long: "Set the number of key shares.\n\n" +
+			"[num-shares] is the number of generated key shares, used to limit the number of peers i.e." +
+			"3",
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var home string // In root.go we end up with our
+			if homeDir != "" {
+				home = homeDir
+			} else {
+				home, _ = homedir.Dir()
+				home = path.Join(home, ".horcrux")
+			}
+			if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
+				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
+			}
+
+			numShares, err := strconv.Atoi(args[0])
+			if err != nil {
+				return err
+			}
+
+			config.CosignerConfig.Shares = numShares
 			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
 				return err
 			}
@@ -470,6 +521,7 @@ func (c *Config) MustMarshalYaml() []byte {
 
 type CosignerConfig struct {
 	Threshold int            `json:"threshold"   yaml:"threshold"`
+	Shares    int            `json:"shares" yaml:"shares"`
 	P2PListen string         `json:"p2p-listen"  yaml:"p2p-listen"`
 	Peers     []CosignerPeer `json:"peers"       yaml:"peers"`
 	Timeout   string         `json:"rpc-timeout" yaml:"rpc-timeout"`
@@ -487,19 +539,25 @@ type CosignerPeer struct {
 	P2PAddr string `json:"p2p-addr" yaml:"p2p-addr"`
 }
 
-func validateCosignerPeers(peers []CosignerPeer) error {
+func validateCosignerPeers(peers []CosignerPeer, shares int) error {
 	// Check IDs to make sure none are duplicated
 	if dupl := duplicatePeers(peers); len(dupl) != 0 {
 		return fmt.Errorf("found duplicate share IDs in args: %v", dupl)
 	}
 
-	// Check that the key share which is configured for the local node
-	// is the last remaining share
-	localID := findRemainingShareID(peers)
+	// Make sure that the peers' IDs match the number of shares.
 	for _, peer := range peers {
-		if peer.ShareID == localID {
-			return fmt.Errorf("peer with share ID %v cannot be added", peer.ShareID)
+		if peer.ShareID < 1 || peer.ShareID > shares {
+			return fmt.Errorf("peer ID %v in args is out of range, must be between 1 and %v",
+				peer.ShareID, shares)
 		}
+	}
+
+	// Check that no more than {num-shares}-1 peers are in the peer list, assuming
+	// the remaining peer ID is the ID the local node is configured with.
+	if len(peers) == shares {
+		return fmt.Errorf("too many peers (%v+local node = %v) for the specified number of key shares (%v)",
+			len(peers), len(peers)+1, shares)
 	}
 	return nil
 }
@@ -514,15 +572,6 @@ func duplicatePeers(peers []CosignerPeer) (duplicates []CosignerPeer) {
 		}
 	}
 	return
-}
-
-func findRemainingShareID(peers []CosignerPeer) int {
-	for i, peer := range peers {
-		if peer.ShareID == i+2 {
-			return i + 1
-		}
-	}
-	return len(peers) + 1
 }
 
 func peersFromFlag(peers string) (out []CosignerPeer, err error) {
