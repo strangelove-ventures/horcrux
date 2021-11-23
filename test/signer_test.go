@@ -115,40 +115,26 @@ func StartCosignerContainers(t *testing.T, testSigners TestSigners, validator *T
 		for i, s := range testSigners {
 			s := s
 
-			// for the last signer don't use an ending index to avoid index out of range err
 			if i == len(testSigners)-1 {
-				peers = sentryNodes[i:]
+				peers = sentryNodes[i:] // for the last signer don't use an ending index to avoid index out of range err
 			} else {
 				peers = sentryNodes[i : i+1]
 			}
 
-			peers := peers
 			eg.Go(func() error { return s.InitCosignerConfig(ctx, peers, testSigners, s.Index, threshold) })
 		}
 
 	// Each signer node is connected to the number of sentry nodes specified by sentriesPerSigner
 	case sentriesPerSigner > 1:
-		leftIndex := 0
-		rightIndex := sentriesPerSigner
 		var peers TestNodes
 
-		for i, s := range testSigners {
+		for _, s := range testSigners {
 			s := s
-
-			// for the last signer don't use an ending index to avoid index out of range err
-			if i == len(testSigners)-1 {
-				peers = sentryNodes[i+leftIndex:]
-			} else {
-				peers = sentryNodes[i+leftIndex : i+rightIndex]
-			}
-
-			leftIndex += sentriesPerSigner - 1
-			rightIndex += sentriesPerSigner - 1
-			peers := peers
+			peers = buildSentryPeerList(sentryNodes, sentriesPerSigner)
 			eg.Go(func() error { return s.InitCosignerConfig(ctx, peers, testSigners, s.Index, threshold) })
 		}
 
-	// All signer nodes are connected to the same validator
+	// All signer nodes are connected to the same sentry node
 	default:
 		for _, s := range testSigners {
 			s := s
@@ -192,12 +178,43 @@ func StartCosignerContainers(t *testing.T, testSigners TestSigners, validator *T
 	require.NoError(t, eg.Wait())
 }
 
-// PeerString returns a string representing a signer nodes connectable private peers
+// buildSentryPeerList builds a slice of TestNodes that will be used as sentry nodes in our signing cluster
+func buildSentryPeerList(sentryNodes TestNodes, sentriesPerSigner int) TestNodes {
+	var peers TestNodes
+	sentriesIndex := 0
+
+	if sentriesIndex+sentriesPerSigner-1 == len(sentryNodes)-1 {
+		// if we are indexing sentryNodes up to the end of the slice
+		peers = append(peers, sentryNodes[sentriesIndex:]...)
+		sentriesIndex += 1
+
+	} else if sentriesIndex+sentriesPerSigner-1 > len(sentryNodes)-1 {
+		// if there aren't enough sentries left in the slice use what we have, keep tabs on how many more
+		// we will need, then start back at the beginning of the slice to grab the rest
+		sentriesLeftInSlice := len(sentryNodes[sentriesIndex:])
+
+		peers = append(peers, sentryNodes[sentriesIndex:]...)
+
+		neededSentries := sentriesPerSigner - sentriesLeftInSlice
+		peers = append(peers, sentryNodes[0:neededSentries]...)
+
+		sentriesIndex += 1
+		if sentriesIndex > len(sentryNodes)-1 {
+			sentriesIndex = 0
+		}
+	} else {
+		peers = sentryNodes[sentriesIndex : sentriesIndex+sentriesPerSigner]
+		sentriesIndex += 1
+	}
+	return peers
+}
+
+// PeerString returns a string representing a TestSigner's connectable private peers, skip is the calling TestSigner's index
 func (ts TestSigners) PeerString(skip int) string {
 	var out strings.Builder
-	for i, s := range ts {
-		// Skip over the calling signer so its peer list does not include itself; we use i+1 to keep Cosigner IDs >0 as required in cosigner.go
-		if i+1 != skip {
+	for _, s := range ts {
+		// Skip over the calling signer so its peer list does not include itself
+		if s.Index != skip {
 			out.WriteString(fmt.Sprintf("tcp://%s:%s|%d,", s.Name(), signerPort, s.Index))
 		}
 	}
@@ -359,6 +376,14 @@ func (ts *TestSigner) StartContainer() error {
 // StopContainer stops a TestSigners docker container
 func (ts *TestSigner) StopContainer() error {
 	return ts.Pool.Client.StopContainer(ts.Container.ID, uint(time.Second*30))
+}
+
+func (ts *TestSigner) PauseContainer() error {
+	return ts.Pool.Client.PauseContainer(ts.Container.ID)
+}
+
+func (ts *TestSigner) UnpauseContainer() error {
+	return ts.Pool.Client.UnpauseContainer(ts.Container.ID)
 }
 
 // CreateSingleSignerContainer creates a docker container to run a single signer
