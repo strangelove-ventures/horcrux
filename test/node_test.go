@@ -280,7 +280,17 @@ func (tn *TestNode) EnsureNotSlashed() {
 		require.Equal(tn.t, missed, slashInfo.ValSigningInfo.MissedBlocksCounter)
 		require.False(tn.t, slashInfo.ValSigningInfo.Tombstoned)
 	}
+}
 
+func (tn *TestNode) EnsureNoMissedBlocks() {
+	for i := 0; i < 10; i++ {
+		time.Sleep(1 * time.Second)
+		slashInfo, err := slashingtypes.NewQueryClient(tn.CliContext()).SigningInfo(context.Background(), &slashingtypes.QuerySigningInfoRequest{
+			ConsAddress: tn.GetConsPub(),
+		})
+		require.NoError(tn.t, err)
+		require.Equal(tn.t, 0, slashInfo.ValSigningInfo.MissedBlocksCounter)
+	}
 }
 
 func stdconfigchanges(cfg *tmconfig.Config, peers string) {
