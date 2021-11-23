@@ -425,18 +425,16 @@ func setChainIdCmd() *cobra.Command {
 			}
 
 			stateDir := path.Join(home, "state")
-			files, err := ioutil.ReadDir(stateDir)
-			if err != nil {
+			pvOldPath := path.Join(stateDir, config.ChainID+"_priv_validator_state.json")
+			pvNewPath := path.Join(stateDir, args[0]+"_priv_validator_state.json")
+			shareOldPath := path.Join(stateDir, config.ChainID+"_share_sign_state.json")
+			shareNewPath := path.Join(stateDir, args[0]+"_share_sign_state.json")
+
+			if err = os.Rename(pvOldPath, pvNewPath); err != nil {
 				return err
 			}
-			for _, file := range files {
-				if strings.HasPrefix(file.Name(), config.ChainID) {
-					oldPath := path.Join(stateDir, file.Name())
-					newPath := path.Join(stateDir, strings.Replace(file.Name(), config.ChainID, args[0], 1))
-					if err = os.Rename(oldPath, newPath); err != nil {
-						return err
-					}
-				}
+			if err = os.Rename(shareOldPath, shareNewPath); err != nil {
+				return err
 			}
 
 			config.ChainID = args[0]
