@@ -401,8 +401,8 @@ func setSharesCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:     "set-shares [num-shares]",
 		Aliases: []string{"shares"},
-		Short:   "Set the number of key shares",
-		Long: "Set the number of key shares.\n\n" +
+		Short:   "set the number of key shares",
+		Long: "set the number of key shares.\n\n" +
 			"[num-shares] is the number of generated key shares, used to limit the number of peers i.e." +
 			"3",
 		Args: cobra.ExactArgs(1),
