@@ -23,9 +23,8 @@ func TestBuildSignerContainer(t *testing.T) {
 // full nodes, configure that validator and the full nodes to be a relay for the remote signers, spin up a 3/7 threshold
 // signer cluster, restart the validator/full nodes and check that no slashing occurs
 func Test3Of7SignerTwoSentries(t *testing.T) {
-	t.Skip()
 	const numValidators = 4
-	const numFullNodes = 13
+	const numFullNodes = 4
 	const totalSigners = 7
 	const threshold = 3
 	const sentriesPerSigner = 2
@@ -118,7 +117,7 @@ func Test3Of7SignerTwoSentries(t *testing.T) {
 // signer cluster, restart the validator/full nodes and check that no slashing occurs
 func Test2Of3SignerTwoSentries(t *testing.T) {
 	const numValidators = 4
-	const numFullNodes = 5
+	const numFullNodes = 2
 	const totalSigners = 3
 	const threshold = 2
 	const sentriesPerSigner = 2
