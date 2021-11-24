@@ -15,8 +15,8 @@ import (
 )
 
 func init() {
-	stateCmd.AddCommand(showCmd())
-	stateCmd.AddCommand(setCmd())
+	stateCmd.AddCommand(showStateCmd())
+	stateCmd.AddCommand(setStateCmd())
 
 	rootCmd.AddCommand(stateCmd)
 }
@@ -26,7 +26,7 @@ var stateCmd = &cobra.Command{
 	Short: "Commands to configure the horcrux signer's state",
 }
 
-func showCmd() *cobra.Command {
+func showStateCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:     "show",
 		Aliases: []string{"s"},
@@ -65,7 +65,7 @@ func showCmd() *cobra.Command {
 	}
 }
 
-func setCmd() *cobra.Command {
+func setStateCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:     "set [height]",
 		Aliases: []string{"s"},

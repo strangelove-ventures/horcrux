@@ -50,7 +50,7 @@ func TestStateSetCmd(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			cmd := setCmd()
+			cmd := setStateCmd()
 			cmd.SetArgs(tc.args)
 			err = cmd.Execute()
 			if tc.expectErr {
