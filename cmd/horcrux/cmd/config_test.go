@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -66,8 +67,10 @@ func TestConfigInitCmd(t *testing.T) {
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			cmd := initCmd()
+			cmd.SetOutput(ioutil.Discard)
 			cmd.SetArgs(tc.args)
 			err = cmd.Execute()
+
 			if tc.expectErr {
 				require.Error(t, err)
 			} else {
@@ -108,6 +111,7 @@ func TestConfigChainIDSetCmd(t *testing.T) {
 	require.NoError(t, err)
 
 	cmd := initCmd()
+	cmd.SetOutput(ioutil.Discard)
 	cmd.SetArgs([]string{
 		chainID,
 		"tcp://10.168.0.1:1234",
@@ -138,8 +142,10 @@ func TestConfigChainIDSetCmd(t *testing.T) {
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			cmd := setChainIDCmd()
+			cmd.SetOutput(ioutil.Discard)
 			cmd.SetArgs(tc.args)
 			err := cmd.Execute()
+
 			if tc.expectErr {
 				require.Error(t, err)
 			} else {
@@ -163,6 +169,7 @@ func TestConfigNodesAddAndRemove(t *testing.T) {
 	require.NoError(t, err)
 
 	cmd := initCmd()
+	cmd.SetOutput(ioutil.Discard)
 	cmd.SetArgs([]string{
 		chainID,
 		"tcp://10.168.0.1:1234",
@@ -278,13 +285,16 @@ func TestConfigNodesAddAndRemove(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
+			tc.cmd.SetOutput(ioutil.Discard)
 			tc.cmd.SetArgs(tc.args)
 			err = tc.cmd.Execute()
+
 			if tc.expectErr {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
 			}
+
 			require.Equal(t, tc.expectNodes, config.ChainNodes)
 		})
 	}
@@ -303,6 +313,7 @@ func TestConfigPeersAddAndRemove(t *testing.T) {
 	require.NoError(t, err)
 
 	cmd := initCmd()
+	cmd.SetOutput(ioutil.Discard)
 	cmd.SetArgs([]string{
 		chainID,
 		"tcp://10.168.0.1:1234",
@@ -419,13 +430,16 @@ func TestConfigPeersAddAndRemove(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
+			tc.cmd.SetOutput(ioutil.Discard)
 			tc.cmd.SetArgs(tc.args)
 			err = tc.cmd.Execute()
+
 			if tc.expectErr {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
 			}
+
 			require.Equal(t, tc.expectPeers, config.CosignerConfig.Peers)
 		})
 	}

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
@@ -51,8 +52,10 @@ func TestStateSetCmd(t *testing.T) {
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			cmd := setStateCmd()
+			cmd.SetOutput(ioutil.Discard)
 			cmd.SetArgs(tc.args)
 			err = cmd.Execute()
+
 			if tc.expectErr {
 				require.Error(t, err)
 			} else {
