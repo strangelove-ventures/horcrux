@@ -27,8 +27,8 @@ func init() {
 	peersCmd.AddCommand(setSharesCmd())
 	configCmd.AddCommand(peersCmd)
 
-	chainIdCmd.AddCommand(setChainIdCmd())
-	configCmd.AddCommand(chainIdCmd)
+	chainIDCmd.AddCommand(setChainIDCmd())
+	configCmd.AddCommand(chainIDCmd)
 
 	configCmd.AddCommand(initCmd())
 	rootCmd.AddCommand(configCmd)
@@ -221,12 +221,12 @@ func addNodesCmd() *cobra.Command {
 			if len(diff) == 0 {
 				return errors.New("no new chain nodes in args")
 			}
-			tmpChainNodes := append(config.ChainNodes, diff...)
-			if err := validateChainNodes(tmpChainNodes); err != nil {
+			diff = append(config.ChainNodes, diff...)
+			if err := validateChainNodes(diff); err != nil {
 				return err
 			}
 
-			config.ChainNodes = tmpChainNodes
+			config.ChainNodes = diff
 			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
 				return err
 			}
@@ -330,12 +330,12 @@ func addPeersCmd() *cobra.Command {
 			if len(diff) == 0 {
 				return errors.New("no new peer nodes in args")
 			}
-			tmpPeers := append(config.CosignerConfig.Peers, diff...)
-			if err := validateCosignerPeers(tmpPeers, config.CosignerConfig.Shares); err != nil {
+			diff = append(config.CosignerConfig.Peers, diff...)
+			if err := validateCosignerPeers(diff, config.CosignerConfig.Shares); err != nil {
 				return err
 			}
 
-			config.CosignerConfig.Peers = tmpPeers
+			config.CosignerConfig.Peers = diff
 			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
 				return err
 			}
@@ -449,12 +449,12 @@ func diffSetCosignerPeer(setA, setB []CosignerPeer) (diff []CosignerPeer) {
 	return
 }
 
-var chainIdCmd = &cobra.Command{
+var chainIDCmd = &cobra.Command{
 	Use:   "chain-id",
 	Short: "Commands to configure the chain ID",
 }
 
-func setChainIdCmd() *cobra.Command {
+func setChainIDCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:     "set [chain-ID]",
 		Aliases: []string{"s"},

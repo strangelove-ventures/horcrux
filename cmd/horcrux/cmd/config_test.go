@@ -10,10 +10,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	chainID = "horcrux-1"
+)
+
 func TestConfigInitCmd(t *testing.T) {
 	tmpHome := "/tmp/TestConfigInitCmd"
 	tmpConfig := path.Join(tmpHome, ".horcrux")
-	chainid := "horcrux-1"
 
 	err := os.Setenv("HOME", tmpHome)
 	require.NoError(t, err)
@@ -28,7 +31,7 @@ func TestConfigInitCmd(t *testing.T) {
 		{
 			name: "valid init",
 			args: []string{
-				chainid,
+				chainID,
 				"tcp://10.168.0.1:1234",
 				"-c",
 				"-p", "tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3",
@@ -39,7 +42,7 @@ func TestConfigInitCmd(t *testing.T) {
 		{
 			name: "invalid chain-nodes",
 			args: []string{
-				chainid,
+				chainID,
 				"://10.168.0.1:1234", // Missing/malformed protocol scheme
 				"-c",
 				"-p", "tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3",
@@ -50,7 +53,7 @@ func TestConfigInitCmd(t *testing.T) {
 		{
 			name: "invalid peer-nodes",
 			args: []string{
-				chainid,
+				chainID,
 				"tcp://10.168.0.1:1234",
 				"-c",
 				"-p", "tcp://10.168.1.2:2222,tcp://10.168.1.3:2222", // Missing share IDs
@@ -70,7 +73,7 @@ func TestConfigInitCmd(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 
-				ss, err := signer.LoadSignState(path.Join(tmpConfig, "state", chainid+"_priv_validator_state.json"))
+				ss, err := signer.LoadSignState(path.Join(tmpConfig, "state", chainID+"_priv_validator_state.json"))
 				require.NoError(t, err)
 				require.Equal(t, int64(0), ss.Height)
 				require.Equal(t, int64(0), ss.Round)
@@ -79,7 +82,7 @@ func TestConfigInitCmd(t *testing.T) {
 				require.Nil(t, ss.Signature)
 				require.Nil(t, ss.SignBytes)
 
-				ss, err = signer.LoadSignState(path.Join(tmpConfig, "state", chainid+"_share_sign_state.json"))
+				ss, err = signer.LoadSignState(path.Join(tmpConfig, "state", chainID+"_share_sign_state.json"))
 				require.NoError(t, err)
 				require.Equal(t, int64(0), ss.Height)
 				require.Equal(t, int64(0), ss.Round)
@@ -99,7 +102,6 @@ func TestConfigInitCmd(t *testing.T) {
 
 func TestConfigChainIDSetCmd(t *testing.T) {
 	tmpHome := "/tmp/TestConfigChainIDSetCmd"
-	chainid := "horcrux-1"
 
 	err := os.Setenv("HOME", tmpHome)
 	require.NoError(t, err)
@@ -108,7 +110,7 @@ func TestConfigChainIDSetCmd(t *testing.T) {
 
 	cmd := initCmd()
 	cmd.SetArgs([]string{
-		chainid,
+		chainID,
 		"tcp://10.168.0.1:1234",
 		"-c",
 		"-p", "tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3",
@@ -136,7 +138,7 @@ func TestConfigChainIDSetCmd(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			cmd := setChainIdCmd()
+			cmd := setChainIDCmd()
 			cmd.SetArgs(tc.args)
 			err := cmd.Execute()
 			if tc.expectErr {
@@ -156,7 +158,6 @@ func TestConfigChainIDSetCmd(t *testing.T) {
 
 func TestConfigNodesAddAndRemove(t *testing.T) {
 	tmpHome := "/tmp/TestConfigNodesAddAndRemove"
-	chainid := "horcrux-1"
 
 	err := os.Setenv("HOME", tmpHome)
 	require.NoError(t, err)
@@ -165,7 +166,7 @@ func TestConfigNodesAddAndRemove(t *testing.T) {
 
 	cmd := initCmd()
 	cmd.SetArgs([]string{
-		chainid,
+		chainID,
 		"tcp://10.168.0.1:1234",
 		"-c",
 		"-p", "tcp://10.168.1.1:2222|1,tcp://10.168.1.2:2222|2",
@@ -298,7 +299,6 @@ func TestConfigNodesAddAndRemove(t *testing.T) {
 
 func TestConfigPeersAddAndRemove(t *testing.T) {
 	tmpHome := "/tmp/TestConfigPeersAddAndRemove"
-	chainid := "horcrux-1"
 
 	err := os.Setenv("HOME", tmpHome)
 	require.NoError(t, err)
@@ -307,7 +307,7 @@ func TestConfigPeersAddAndRemove(t *testing.T) {
 
 	cmd := initCmd()
 	cmd.SetArgs([]string{
-		chainid,
+		chainID,
 		"tcp://10.168.0.1:1234",
 		"-c",
 		"-p", "tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3,tcp://10.168.1.4:2222|4",
