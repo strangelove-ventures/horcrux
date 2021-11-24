@@ -17,20 +17,15 @@ const (
 
 func TestConfigInitCmd(t *testing.T) {
 	tmpHome := "/tmp/TestConfigInitCmd"
-	tmpConfig := path.Join(tmpHome, ".horcrux")
-
-	err := os.Setenv("HOME", tmpHome)
-	require.NoError(t, err)
-	err = os.MkdirAll(tmpHome, 0777)
-	require.NoError(t, err)
-
 	tcs := []struct {
 		name      string
+		home      string
 		args      []string
 		expectErr bool
 	}{
 		{
 			name: "valid init",
+			home: tmpHome + "_valid_init",
 			args: []string{
 				chainID,
 				"tcp://10.168.0.1:1234",
@@ -42,6 +37,7 @@ func TestConfigInitCmd(t *testing.T) {
 		},
 		{
 			name: "invalid chain-nodes",
+			home: tmpHome + "_invalid_chain-nodes",
 			args: []string{
 				chainID,
 				"://10.168.0.1:1234", // Missing/malformed protocol scheme
@@ -53,6 +49,7 @@ func TestConfigInitCmd(t *testing.T) {
 		},
 		{
 			name: "invalid peer-nodes",
+			home: tmpHome + "_invalid_peer-nodes",
 			args: []string{
 				chainID,
 				"tcp://10.168.0.1:1234",
@@ -66,6 +63,13 @@ func TestConfigInitCmd(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
+			tmpConfig := path.Join(tc.home, ".horcrux")
+
+			err := os.Setenv("HOME", tc.home)
+			require.NoError(t, err)
+			err = os.MkdirAll(tc.home, 0777)
+			require.NoError(t, err)
+
 			cmd := initCmd()
 			cmd.SetOutput(ioutil.Discard)
 			cmd.SetArgs(tc.args)
