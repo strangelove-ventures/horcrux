@@ -83,7 +83,6 @@ func TestStateSetCmd(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
-		err := os.RemoveAll(tmpHome)
-		require.NoError(t, err)
+		os.RemoveAll(tmpHome)
 	})
 }

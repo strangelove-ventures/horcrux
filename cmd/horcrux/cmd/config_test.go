@@ -95,8 +95,7 @@ func TestConfigInitCmd(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
-		err := os.RemoveAll(tmpHome)
-		require.NoError(t, err)
+		os.RemoveAll(tmpHome)
 	})
 }
 
@@ -151,8 +150,7 @@ func TestConfigChainIDSetCmd(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
-		err := os.RemoveAll(tmpHome)
-		require.NoError(t, err)
+		os.RemoveAll(tmpHome)
 	})
 }
 
@@ -292,8 +290,7 @@ func TestConfigNodesAddAndRemove(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
-		err := os.RemoveAll(tmpHome)
-		require.NoError(t, err)
+		os.RemoveAll(tmpHome)
 	})
 }
 
@@ -434,8 +431,7 @@ func TestConfigPeersAddAndRemove(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
-		err := os.RemoveAll(tmpHome)
-		require.NoError(t, err)
+		os.RemoveAll(tmpHome)
 	})
 }
 
