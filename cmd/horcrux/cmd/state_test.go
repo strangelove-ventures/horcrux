@@ -22,6 +22,7 @@ func TestStateSetCmd(t *testing.T) {
 	require.NoError(t, err)
 
 	cmd := initCmd()
+	cmd.SetOutput(ioutil.Discard)
 	cmd.SetArgs([]string{
 		chainid,
 		"tcp://10.168.0.1:1234",
