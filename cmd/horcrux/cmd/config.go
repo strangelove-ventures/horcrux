@@ -422,6 +422,9 @@ func setSharesCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if err := validateCosignerPeers(config.CosignerConfig.Peers, numShares); err != nil {
+				return err
+			}
 
 			config.CosignerConfig.Shares = numShares
 			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
