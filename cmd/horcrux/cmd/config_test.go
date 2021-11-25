@@ -32,6 +32,7 @@ func TestConfigInitCmd(t *testing.T) {
 				"tcp://10.168.0.1:1234",
 				"-c",
 				"-p", "tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3",
+				"-t", "2",
 				"--timeout", "1500ms",
 			},
 			expectErr: false,
@@ -44,6 +45,7 @@ func TestConfigInitCmd(t *testing.T) {
 				"://10.168.0.1:1234", // Missing/malformed protocol scheme
 				"-c",
 				"-p", "tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3",
+				"-t", "2",
 				"--timeout", "1500ms",
 			},
 			expectErr: true,
@@ -56,6 +58,7 @@ func TestConfigInitCmd(t *testing.T) {
 				"tcp://10.168.0.1:1234",
 				"-c",
 				"-p", "tcp://10.168.1.2:2222,tcp://10.168.1.3:2222", // Missing share IDs
+				"-t", "2",
 				"--timeout", "1500ms",
 			},
 			expectErr: true,
@@ -127,6 +130,7 @@ func TestConfigChainIDSetCmd(t *testing.T) {
 		"tcp://10.168.0.1:1234",
 		"-c",
 		"-p", "tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3",
+		"-t", "2",
 		"--timeout", "1500ms",
 	})
 	err = cmd.Execute()
@@ -185,6 +189,7 @@ func TestConfigNodesAddAndRemove(t *testing.T) {
 		"tcp://10.168.0.1:1234",
 		"-c",
 		"-p", "tcp://10.168.1.1:2222|1,tcp://10.168.1.2:2222|2",
+		"-t", "2",
 		"--timeout", "1500ms",
 	})
 	err = cmd.Execute()
@@ -329,6 +334,7 @@ func TestConfigPeersAddAndRemove(t *testing.T) {
 		"tcp://10.168.0.1:1234",
 		"-c",
 		"-p", "tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3,tcp://10.168.1.4:2222|4",
+		"-t", "2",
 		"--timeout", "1500ms",
 	})
 	err = cmd.Execute()
