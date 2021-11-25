@@ -598,5 +598,70 @@ func TestDiffSetCosignerPeer(t *testing.T) {
 }
 
 func TestSetShares(t *testing.T) {
-	// TODO: Implement logic
+	tmpHome := "/tmp/TestSetShares"
+
+	err := os.Setenv("HOME", tmpHome)
+	require.NoError(t, err)
+	err = os.MkdirAll(tmpHome, 0777)
+	require.NoError(t, err)
+
+	cmd := initCmd()
+	cmd.SetOutput(ioutil.Discard)
+	cmd.SetArgs([]string{
+		chainID,
+		"tcp://10.168.0.1:1234",
+		"-c",
+		"-p", "tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3",
+		"-t", "2",
+		"--timeout", "1500ms",
+	})
+	err = cmd.Execute()
+	require.NoError(t, err)
+
+	tcs := []struct {
+		name         string
+		args         []string
+		expectShares int
+		expectErr    bool
+	}{ // Do NOT change the order of the test cases!
+		{
+			name:         "valid number of shares",
+			args:         []string{"4"},
+			expectShares: 4,
+			expectErr:    false,
+		},
+		{
+			name:         "too few shares for number of peers",
+			args:         []string{"1"},
+			expectShares: 4,
+			expectErr:    true,
+		},
+		{
+			name:         "invalid number of shares",
+			args:         []string{"-1"},
+			expectShares: 4,
+			expectErr:    true,
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := setSharesCmd()
+			cmd.SetOutput(ioutil.Discard)
+			cmd.SetArgs(tc.args)
+			err = cmd.Execute()
+
+			if tc.expectErr {
+				require.Error(t, err)
+				require.Equal(t, tc.expectShares, config.CosignerConfig.Shares)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.expectShares, config.CosignerConfig.Shares)
+			}
+		})
+	}
+
+	t.Cleanup(func() {
+		os.RemoveAll(tmpHome)
+	})
 }
