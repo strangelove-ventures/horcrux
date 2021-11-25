@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -102,7 +103,12 @@ func TestConfigInitCmd(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
-		os.RemoveAll(tmpHome)
+		files, err := filepath.Glob(tmpHome + "*")
+		require.NoError(t, err)
+
+		for _, file := range files {
+			os.RemoveAll(file)
+		}
 	})
 }
 
@@ -583,4 +589,8 @@ func TestDiffSetCosignerPeer(t *testing.T) {
 			require.Equal(t, diff, tc.expectDiff)
 		})
 	}
+}
+
+func TestSetShares(t *testing.T) {
+	// TODO: Implement logic
 }
