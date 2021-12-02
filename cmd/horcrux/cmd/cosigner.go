@@ -27,7 +27,7 @@ var cosignerCmd = &cobra.Command{
 func StartCosignerCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "start",
-		Short: "start cosigner process",
+		Short: "Start cosigner process",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			err = validateCosignerConfig(config)
