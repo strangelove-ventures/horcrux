@@ -289,7 +289,7 @@ func (tn *TestNode) EnsureNoMissedBlocks() {
 			ConsAddress: tn.GetConsPub(),
 		})
 		require.NoError(tn.t, err)
-		require.Equal(tn.t, 0, slashInfo.ValSigningInfo.MissedBlocksCounter)
+		require.Equal(tn.t, int64(0), slashInfo.ValSigningInfo.MissedBlocksCounter)
 	}
 }
 
