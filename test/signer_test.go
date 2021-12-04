@@ -98,47 +98,73 @@ func StartSingleSignerContainers(t *testing.T, testSigners TestSigners, validato
 	require.NoError(t, eg.Wait())
 }
 
-// StartCosignerContainers will generate the necessary config files for the signer nodes, shard the validator's
-// priv_validator_key.json file, write the sharded key shares to the appropriate signer nodes directory and start the
-// signer nodes. Passing a negative number or zero will enable the default behavior of connecting all signers to the
-// same validator node
-func StartCosignerContainers(t *testing.T, testSigners TestSigners, validator *TestNode, sentryNodes TestNodes, threshold, total, sentriesPerSigner int, network *docker.Network) {
+// StartCosignerContainers will generate the necessary config files for the nodes in the signer cluster, shard the validator's
+// priv_validator_key.json key, write the sharded key shares to the appropriate signer nodes directory and start the
+// signer cluster.
+// NOTE: Zero or negative values for sentriesPerSigner configures the nodes in the signer cluster to connect to the
+//       same sentry node.
+func StartCosignerContainers(t *testing.T, signers TestSigners, validator *TestNode, sentries TestNodes, threshold, total, sentriesPerSigner int, network *docker.Network) {
 	eg := new(errgroup.Group)
 	ctx := context.Background()
 
-	// init config files/directory for each signer node
+	// init config files, for each node in the signer cluster, with the appropriate number of sentries in front of the node
 	switch {
-	// Each signer node is connected to a unique sentry node
+	// Each node in the signer cluster is connected to a unique sentry node
 	case sentriesPerSigner == 1:
 		var peers TestNodes
-
-		for i, s := range testSigners {
+		for i, s := range signers {
 			s := s
 
-			if i == len(testSigners)-1 {
-				peers = sentryNodes[i:] // for the last signer don't use an ending index to avoid index out of range err
+			if i == len(signers)-1 {
+				// for the last signer don't use an ending index to avoid index out of range err
+				peers = sentries[i:]
 			} else {
-				peers = sentryNodes[i : i+1]
+				peers = sentries[i : i+1]
 			}
 
-			eg.Go(func() error { return s.InitCosignerConfig(ctx, peers, testSigners, s.Index, threshold) })
+			p := peers
+			eg.Go(func() error { return s.InitCosignerConfig(ctx, p, signers, s.Index, threshold) })
 		}
 
-	// Each signer node is connected to the number of sentry nodes specified by sentriesPerSigner
+	// Each node in the signer cluster is connected to the number of sentry nodes specified by sentriesPerSigner
 	case sentriesPerSigner > 1:
 		var peers TestNodes
-
-		for _, s := range testSigners {
+		sentriesIndex := 0
+		for _, s := range signers {
 			s := s
-			peers = buildSentryPeerList(sentryNodes, sentriesPerSigner)
-			eg.Go(func() error { return s.InitCosignerConfig(ctx, peers, testSigners, s.Index, threshold) })
+			peers = nil
+			// if we are indexing sentries up to the end of the slice
+			if sentriesIndex+sentriesPerSigner-1 == len(sentries)-1 {
+				peers = append(peers, sentries[sentriesIndex:]...)
+				sentriesIndex += 1
+
+				// if there aren't enough sentries left in the slice use the sentries left in slice,
+				// calculate how many more are needed, then start back at the beginning of
+				// the slice to grab the rest. After, check if index into slice of sentries needs reset
+			} else if sentriesIndex+sentriesPerSigner-1 > len(sentries)-1 {
+				sentriesLeftInSlice := len(sentries[sentriesIndex:])
+				peers = append(peers, sentries[sentriesIndex:]...)
+
+				neededSentries := sentriesPerSigner - sentriesLeftInSlice
+				peers = append(peers, sentries[0:neededSentries]...)
+
+				sentriesIndex += 1
+				if sentriesIndex > len(sentries)-1 {
+					sentriesIndex = 0
+				}
+			} else {
+				peers = sentries[sentriesIndex : sentriesIndex+sentriesPerSigner]
+				sentriesIndex += 1
+			}
+			p := peers
+			eg.Go(func() error { return s.InitCosignerConfig(ctx, p, signers, s.Index, threshold) })
 		}
 
-	// All signer nodes are connected to the same sentry node
+	// All nodes in the signer cluster are connected to the same sentry node
 	default:
-		for _, s := range testSigners {
+		for _, s := range signers {
 			s := s
-			eg.Go(func() error { return s.InitCosignerConfig(ctx, TestNodes{validator}, testSigners, s.Index, threshold) })
+			eg.Go(func() error { return s.InitCosignerConfig(ctx, TestNodes{validator}, signers, s.Index, threshold) })
 		}
 	}
 	require.NoError(t, eg.Wait())
@@ -146,13 +172,13 @@ func StartCosignerContainers(t *testing.T, testSigners TestSigners, validator *T
 	// generate key shares from validator private key
 	validator.t.Logf("{%s} -> Creating Private Key Shares...", validator.Name())
 	shares := validator.CreateKeyShares(int64(threshold), int64(total))
-	for i, s := range testSigners {
+	for i, s := range signers {
 		s := s
 		s.Key = shares[i]
 	}
 
 	// write key share to file in each signer nodes config directory
-	for _, s := range testSigners {
+	for _, s := range signers {
 		s := s
 		s.t.Logf("{%s} -> Writing Key Share To File... ", s.Name())
 		privateFilename := path.Join(s.Dir(), "share.json")
@@ -160,7 +186,7 @@ func StartCosignerContainers(t *testing.T, testSigners TestSigners, validator *T
 	}
 
 	// create containers & start signer nodes
-	for _, s := range testSigners {
+	for _, s := range signers {
 		s := s
 		eg.Go(func() error {
 			return s.CreateCosignerContainer(network.ID)
@@ -168,7 +194,7 @@ func StartCosignerContainers(t *testing.T, testSigners TestSigners, validator *T
 	}
 	require.NoError(t, eg.Wait())
 
-	for _, s := range testSigners {
+	for _, s := range signers {
 		s := s
 		t.Logf("{%s} => starting container...", s.Name())
 		eg.Go(func() error {
@@ -176,37 +202,6 @@ func StartCosignerContainers(t *testing.T, testSigners TestSigners, validator *T
 		})
 	}
 	require.NoError(t, eg.Wait())
-}
-
-// buildSentryPeerList builds a slice of TestNodes that will be used as sentry nodes in our signing cluster
-func buildSentryPeerList(sentryNodes TestNodes, sentriesPerSigner int) TestNodes {
-	var peers TestNodes
-	sentriesIndex := 0
-
-	if sentriesIndex+sentriesPerSigner-1 == len(sentryNodes)-1 {
-		// if we are indexing sentryNodes up to the end of the slice
-		peers = append(peers, sentryNodes[sentriesIndex:]...)
-		sentriesIndex += 1
-
-	} else if sentriesIndex+sentriesPerSigner-1 > len(sentryNodes)-1 {
-		// if there aren't enough sentries left in the slice use what we have, keep tabs on how many more
-		// we will need, then start back at the beginning of the slice to grab the rest
-		sentriesLeftInSlice := len(sentryNodes[sentriesIndex:])
-
-		peers = append(peers, sentryNodes[sentriesIndex:]...)
-
-		neededSentries := sentriesPerSigner - sentriesLeftInSlice
-		peers = append(peers, sentryNodes[0:neededSentries]...)
-
-		sentriesIndex += 1
-		if sentriesIndex > len(sentryNodes)-1 {
-			sentriesIndex = 0
-		}
-	} else {
-		peers = sentryNodes[sentriesIndex : sentriesIndex+sentriesPerSigner]
-		sentriesIndex += 1
-	}
-	return peers
 }
 
 // PeerString returns a string representing a TestSigner's connectable private peers, skip is the calling TestSigner's index
