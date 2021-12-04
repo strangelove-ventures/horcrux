@@ -419,7 +419,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 }
 
 func TestDownedSigners(t *testing.T) {
-	//t.Skip()
+	t.Skip()
 	const totalValidators = 4
 	const totalSigners = 3
 	const threshold = 2
