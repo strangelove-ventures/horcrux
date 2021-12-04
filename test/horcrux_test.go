@@ -401,7 +401,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 
 	// TODO: how to block till signer containers start?
 	// once we have prometheus server we can poll that
-	// time.Sleep(10 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	// modify node config to listen for private validator connections
 	ourValidator.SetPrivValdidatorListen(validators.PeerString())
