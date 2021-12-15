@@ -27,7 +27,7 @@ var signerCmd = &cobra.Command{
 func StartSignerCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "start",
-		Short: "start single signer process",
+		Short: "Start single signer process",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			err = validateSingleSignerConfig(config)
