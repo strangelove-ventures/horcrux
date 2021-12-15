@@ -81,7 +81,7 @@ func (tn *TestNode) CliContext() client.Context {
 	return client.Context{
 		Client:            tn.Client,
 		ChainID:           tn.ChainID,
-		JSONMarshaler:     tn.ec.Marshaler,
+		Codec:             tn.ec.Marshaler,
 		InterfaceRegistry: tn.ec.InterfaceRegistry,
 		Input:             os.Stdin,
 		Output:            os.Stdout,
@@ -123,27 +123,16 @@ func StartNodeContainers(t *testing.T, ctx context.Context, net *docker.Network,
 	// to the first node's genesis file
 	validator0 := validators[0]
 	for i := 1; i < len(validators); i++ {
-		i := i
-		eg.Go(func() error {
-			validatorN := validators[i]
-			n0key, err := validatorN.GetKey(valKey)
-			if err != nil {
-				return err
-			}
-
-			if err := validator0.AddGenesisAccount(ctx, n0key.GetAddress().String()); err != nil {
-				return err
-			}
-			nNid, err := validatorN.NodeID()
-			if err != nil {
-				return err
-			}
-			oldPath := path.Join(validatorN.Dir(), "config", "gentx", fmt.Sprintf("gentx-%s.json", nNid))
-			newPath := path.Join(validator0.Dir(), "config", "gentx", fmt.Sprintf("gentx-%s.json", nNid))
-			return os.Rename(oldPath, newPath)
-		})
+		validatorN := validators[i]
+		n0key, err := validatorN.GetKey(valKey)
+		require.NoError(t, err)
+		require.NoError(t, validator0.AddGenesisAccount(ctx, n0key.GetAddress().String()))
+		nNid, err := validatorN.NodeID()
+		require.NoError(t, err)
+		oldPath := path.Join(validatorN.Dir(), "config", "gentx", fmt.Sprintf("gentx-%s.json", nNid))
+		newPath := path.Join(validator0.Dir(), "config", "gentx", fmt.Sprintf("gentx-%s.json", nNid))
+		require.NoError(t, os.Rename(oldPath, newPath))
 	}
-	require.NoError(t, eg.Wait())
 	require.NoError(t, validator0.CollectGentxs(ctx))
 
 	genbz, err := ioutil.ReadFile(validator0.GenesisFilePath())
@@ -285,8 +274,8 @@ func (tn *TestNode) EnsureNotSlashed() {
 
 func stdconfigchanges(cfg *tmconfig.Config, peers string) {
 	// turn down blocktimes to make the chain faster
-	cfg.Consensus.TimeoutCommit = 5 * time.Second
-	cfg.Consensus.TimeoutPropose = 5 * time.Second
+	cfg.Consensus.TimeoutCommit = 1 * time.Second
+	cfg.Consensus.TimeoutPropose = 1 * time.Second
 
 	// Open up rpc address
 	cfg.RPC.ListenAddress = "tcp://0.0.0.0:26657"

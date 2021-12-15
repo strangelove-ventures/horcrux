@@ -319,6 +319,8 @@ func (pv *ThresholdValidator) signBlock(chainID string, block *block) ([]byte, t
 	}
 
 	if len(sigIds) < pv.threshold {
+		fmt.Println("ERROR: Not enough signatures")
+		fmt.Println(len(sigIds), pv.threshold)
 		return nil, stamp, errors.New("Not enough co-signers")
 	}
 

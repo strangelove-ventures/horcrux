@@ -47,7 +47,7 @@ function setConfigValidator() {
     sed -i '' "s#external_address = \"\"#external_address = \"tcp://127.0.0.1:$p2p\"#g" $cfgdir/config.toml	
 }
 
-echo "Creating gaiad instance with home=$CHAINDIR chain-id=$CHAINID..."	
+# echo "Creating gaiad instance with home=$CHAINDIR chain-id=$CHAINID..."	
 # Build genesis file incl account for passed address	
 coins="100000000000stake,100000000000samoleans"	
 
@@ -90,48 +90,48 @@ n5cfg="$n5cfgDir/config.toml"
 kbt="--keyring-backend="test""	
 
 # Initialize the 2 home directories	
-gaiad $home0 --chain-id $CHAINID init n0 #&>/dev/null	
-gaiad $home1 --chain-id $CHAINID init n1 #&>/dev/null	
-gaiad $home2 --chain-id $CHAINID init n2 #&>/dev/null	
-gaiad $home3 --chain-id $CHAINID init n3 #&>/dev/null	
-gaiad $home4 --chain-id $CHAINID init n4 #&>/dev/null	
-gaiad $home5 --chain-id $CHAINID init n5 #&>/dev/null	
+gaiad $home0 --chain-id $CHAINID init n0 &>/dev/null	
+gaiad $home1 --chain-id $CHAINID init n1 &>/dev/null	
+gaiad $home2 --chain-id $CHAINID init n2 &>/dev/null	
+gaiad $home3 --chain-id $CHAINID init n3 &>/dev/null	
+gaiad $home4 --chain-id $CHAINID init n4 &>/dev/null	
+gaiad $home5 --chain-id $CHAINID init n5 &>/dev/null	
 
 # Add some keys for funds	
 # Add horcrux validator key
-gaiad $home0 keys add validator $kbt #&>/dev/null	
+gaiad $home0 keys add validator $kbt &>/dev/null	
 # Add other validator keys
-gaiad $home3 keys add validator $kbt #&>/dev/null	
-gaiad $home4 keys add validator $kbt #&>/dev/null	
-gaiad $home5 keys add validator $kbt #&>/dev/null	
+gaiad $home3 keys add validator $kbt &>/dev/null	
+gaiad $home4 keys add validator $kbt &>/dev/null	
+gaiad $home5 keys add validator $kbt &>/dev/null	
 # have a key with some extra funds
-gaiad $home0 keys add extra $kbt #&>/dev/null	
+gaiad $home0 keys add extra $kbt &>/dev/null	
 
 # Add addresses to genesis	
 # Add all validator addresses keys to node0 genesis
-gaiad $home0 add-genesis-account $(gaiad $home0 keys $kbt show validator -a) $coins #&>/dev/null	
-gaiad $home0 add-genesis-account $(gaiad $home3 keys $kbt show validator -a) $coins #&>/dev/null	
-gaiad $home0 add-genesis-account $(gaiad $home4 keys $kbt show validator -a) $coins #&>/dev/null	
-gaiad $home0 add-genesis-account $(gaiad $home5 keys $kbt show validator -a) $coins #&>/dev/null
+gaiad $home0 add-genesis-account $(gaiad $home0 keys $kbt show validator -a) $coins &>/dev/null	
+gaiad $home0 add-genesis-account $(gaiad $home3 keys $kbt show validator -a) $coins &>/dev/null	
+gaiad $home0 add-genesis-account $(gaiad $home4 keys $kbt show validator -a) $coins &>/dev/null	
+gaiad $home0 add-genesis-account $(gaiad $home5 keys $kbt show validator -a) $coins &>/dev/null
 # Add extra funds key to node0 genesis
-gaiad $home0 add-genesis-account $(gaiad $home0 keys $kbt show extra -a) $coins #&>/dev/null	
+gaiad $home0 add-genesis-account $(gaiad $home0 keys $kbt show extra -a) $coins &>/dev/null	
 # Add validator addresses for gentxs to other validators home folders
-gaiad $home3 add-genesis-account $(gaiad $home3 keys $kbt show validator -a) $coins #&>/dev/null	
-gaiad $home4 add-genesis-account $(gaiad $home4 keys $kbt show validator -a) $coins #&>/dev/null	
-gaiad $home5 add-genesis-account $(gaiad $home5 keys $kbt show validator -a) $coins #&>/dev/null	
+gaiad $home3 add-genesis-account $(gaiad $home3 keys $kbt show validator -a) $coins &>/dev/null	
+gaiad $home4 add-genesis-account $(gaiad $home4 keys $kbt show validator -a) $coins &>/dev/null	
+gaiad $home5 add-genesis-account $(gaiad $home5 keys $kbt show validator -a) $coins &>/dev/null	
 
 # Gentxs for each node
-gaiad $home0 gentx validator 100000000000stake $kbt --chain-id $CHAINID #&>/dev/null	
-gaiad $home3 gentx validator 100000000000stake $kbt --chain-id $CHAINID #&>/dev/null	
-gaiad $home4 gentx validator 100000000000stake $kbt --chain-id $CHAINID #&>/dev/null	
-gaiad $home5 gentx validator 100000000000stake $kbt --chain-id $CHAINID #&>/dev/null	
+gaiad $home0 gentx validator 100000000000stake $kbt --chain-id $CHAINID &>/dev/null	
+gaiad $home3 gentx validator 100000000000stake $kbt --chain-id $CHAINID &>/dev/null	
+gaiad $home4 gentx validator 100000000000stake $kbt --chain-id $CHAINID &>/dev/null	
+gaiad $home5 gentx validator 100000000000stake $kbt --chain-id $CHAINID &>/dev/null	
 # Move gentxs to node0 config dir
-mv $n3cfgDir/gentx/* $n0cfgDir/gentx #&>/dev/null
-mv $n4cfgDir/gentx/* $n0cfgDir/gentx #&>/dev/null
-mv $n5cfgDir/gentx/* $n0cfgDir/gentx #&>/dev/null
+mv $n3cfgDir/gentx/* $n0cfgDir/gentx &>/dev/null
+mv $n4cfgDir/gentx/* $n0cfgDir/gentx &>/dev/null
+mv $n5cfgDir/gentx/* $n0cfgDir/gentx &>/dev/null
 
 # finalize genesis
-gaiad $home0 collect-gentxs #&>/dev/null	
+gaiad $home0 collect-gentxs &>/dev/null	
 
 # Copy genesis over to other nodes
 cp $n0cfgDir/genesis.json $n1cfgDir/genesis.json	
@@ -165,11 +165,11 @@ sed -i '' 's#persistent_peers = ""#persistent_peers = "'$peer0','$peer1','$peer2
 
 # Copy priv validator over from node that signed gentx to the signer	
 cp $n0cfgDir/priv_validator_key.json $CHAINDIR/priv_validator_key.json	
-cd $CHAINDIR	
+cd $CHAINDIR
 $HORCRUX create-shares ./priv_validator_key.json 2 3
-$HORCRUX config init $CHAINID localhost:1234,localhost:1235,localhost:1236 --home $(pwd)/signer1 --cosigner --peers "tcp://localhost:2223|2,tcp://localhost:2224|3" --threshold 2 --listen "tcp://0.0.0.0:2222"
-$HORCRUX config init $CHAINID localhost:1234,localhost:1235,localhost:1236 --home $(pwd)/signer2 --cosigner --peers "tcp://localhost:2222|1,tcp://localhost:2224|3" --threshold 2 --listen "tcp://0.0.0.0:2223"
-$HORCRUX config init $CHAINID localhost:1234,localhost:1235,localhost:1236 --home $(pwd)/signer3 --cosigner --peers "tcp://localhost:2222|1,tcp://localhost:2223|2" --threshold 2 --listen "tcp://0.0.0.0:2224"
+$HORCRUX config init $CHAINID localhost:1234 --home $(pwd)/signer1 --cosigner --peers "tcp://localhost:2223|2,tcp://localhost:2224|3" --threshold 2 --listen "tcp://0.0.0.0:2222"
+$HORCRUX config init $CHAINID localhost:1235 --home $(pwd)/signer2 --cosigner --peers "tcp://localhost:2222|1,tcp://localhost:2224|3" --threshold 2 --listen "tcp://0.0.0.0:2223"
+$HORCRUX config init $CHAINID localhost:1236 --home $(pwd)/signer3 --cosigner --peers "tcp://localhost:2222|1,tcp://localhost:2223|2" --threshold 2 --listen "tcp://0.0.0.0:2224"
 cp ./private_share_1.json ./signer1/share.json	
 cp ./private_share_2.json ./signer2/share.json	
 cp ./private_share_3.json ./signer3/share.json		

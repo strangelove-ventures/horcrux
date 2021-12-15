@@ -365,6 +365,7 @@ func (cosigner *LocalCosigner) SetEphemeralSecretPart(req CosignerSetEphemeralSe
 		peerPub := peer.PublicKey
 		err = rsa.VerifyPSS(&peerPub, crypto.SHA256, digest[:], req.SourceSig, nil)
 		if err != nil {
+			fmt.Println("VerifyPSS failed:", err)
 			return err
 		}
 	}

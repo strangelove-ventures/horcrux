@@ -110,6 +110,7 @@ func Test3Of7SignerTwoSentries(t *testing.T) {
 	time.Sleep(10 * time.Second)
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", validators[0].Name())
+	time.Sleep(5 * time.Second)
 	validators[0].EnsureNotSlashed()
 }
 
@@ -198,6 +199,7 @@ func Test2Of3SignerTwoSentries(t *testing.T) {
 	time.Sleep(10 * time.Second)
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", validators[0].Name())
+	time.Sleep(5 * time.Second)
 	validators[0].EnsureNotSlashed()
 }
 
@@ -286,6 +288,7 @@ func Test2Of3SignerUniqueSentry(t *testing.T) {
 	time.Sleep(10 * time.Second)
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", validators[0].Name())
+	time.Sleep(5 * time.Second)
 	validators[0].EnsureNotSlashed()
 }
 
@@ -353,6 +356,7 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 	time.Sleep(10 * time.Second)
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", validators[0].Name())
+	time.Sleep(5 * time.Second)
 	validators[0].EnsureNotSlashed()
 }
 
