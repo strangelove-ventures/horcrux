@@ -288,6 +288,7 @@ func Test2Of3SignerUniqueSentry(t *testing.T) {
 	time.Sleep(10 * time.Second)
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
+	time.Sleep(10 * time.Second)
 	ourValidator.EnsureNotSlashed()
 }
 

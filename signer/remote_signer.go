@@ -102,16 +102,19 @@ func (rs *ReconnRemoteSigner) loop() {
 			return
 		}
 
-		req, err := ReadMsg(conn)
-		if err != nil {
+		var (
+			req, res tmProtoPrivval.Message
+			err      error
+		)
+
+		if req, err = ReadMsg(conn); err != nil {
 			rs.Logger.Error("readMsg", "err", err)
 			conn.Close()
 			conn = nil
 			continue
 		}
 
-		res, err := rs.handleRequest(req)
-		if err != nil {
+		if res, err = rs.handleRequest(req); err != nil {
 			// only log the error; we reply with an error in handleRequest since the reply needs to be typed based on error
 			rs.Logger.Error("handleRequest", "err", err)
 		}
@@ -160,7 +163,7 @@ func (rs *ReconnRemoteSigner) handleRequest(req tmProtoPrivval.Message) (tmProto
 		vote := typedReq.SignVoteRequest.Vote
 		err = rs.privVal.SignVote(rs.chainID, vote)
 		if err != nil {
-			rs.Logger.Error("Failed to sign vote", "address", rs.address, "error", err, "vote", vote)
+			rs.Logger.Error("Failed to sign vote", "address", rs.address, "error", err, "vote_type", vote.Type, "height", vote.Height, "round", vote.Round, "validator", fmt.Sprintf("%X", vote.ValidatorAddress))
 			msg.Sum = &tmProtoPrivval.Message_SignedVoteResponse{SignedVoteResponse: &tmProtoPrivval.SignedVoteResponse{
 				Vote: tmProto.Vote{},
 				Error: &tmProtoPrivval.RemoteSignerError{
