@@ -24,6 +24,9 @@ build-linux:
 test:
 	@go test -mod readonly -v ./...
 
+test-short:
+	@go test -mod readonly -run Test2Of3SignerUniqueSentry -v ./... 
+
 clean:
 	rm -rf build
 
