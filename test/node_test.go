@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/big"
+	"net"
 	"os"
 	"path"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -75,6 +77,14 @@ type TestNode struct {
 	t            *testing.T
 	ec           params.EncodingConfig
 }
+
+type ContainerPort struct {
+	Name      string
+	Container *docker.Container
+	Port      docker.Port
+}
+
+type Hosts []ContainerPort
 
 // CliContext creates a new Cosmos SDK client context
 func (tn *TestNode) CliContext() client.Context {
@@ -187,6 +197,89 @@ func (tn *TestNode) NewClient(addr string) error {
 
 }
 
+func (n *TestNode) GetHosts() (out Hosts) {
+	name := n.Name()
+	for k, _ := range n.Chain.Ports {
+		host := ContainerPort{
+			Name:      name,
+			Container: n.Container,
+			Port:      k,
+		}
+		out = append(out, host)
+		break
+	}
+	return
+}
+
+func (tn TestNodes) GetHosts() (out Hosts) {
+	for _, n := range tn {
+		out = append(out, n.GetHosts()...)
+	}
+	return
+}
+
+func connectionAttempt(t *testing.T, host ContainerPort) bool {
+	port := string(host.Port)
+	hostname := GetHostPort(host.Container, port)
+
+	t.Logf("Attempting to reach {%s} {%s} local hostname: %s", host.Name, port, hostname)
+
+	conn, err := net.DialTimeout("tcp", hostname, time.Duration(1)*time.Second)
+
+	if err != nil {
+		t.Logf("Error: %s\n", err)
+		return false
+	}
+
+	defer conn.Close()
+
+	t.Logf("{%s} is reachable", hostname)
+	return true
+}
+
+func isReachable(wg *sync.WaitGroup, t *testing.T, host ContainerPort, ch chan<- bool) {
+	defer wg.Done()
+
+	ch <- connectionAttempt(t, host)
+}
+
+func (hosts Hosts) WaitForAllToStart(t *testing.T, timeout int) {
+	if len(hosts) == 0 {
+		return
+	}
+	for seconds := 1; seconds <= timeout; seconds++ {
+		var wg sync.WaitGroup
+
+		results := make(chan bool, len(hosts))
+		for i := 0; i < len(hosts); i++ {
+			host := hosts[i]
+			wg.Add(1)
+			go isReachable(&wg, t, host, results)
+		}
+
+		go func() {
+			wg.Wait()
+			close(results)
+		}()
+
+		found_unreachable := false
+
+		for reachable := range results {
+			if !reachable {
+				t.Logf("A signer node is not reachable")
+				found_unreachable = true
+				break
+			}
+		}
+		if found_unreachable {
+			continue
+		}
+		t.Logf("All signers are reachable after %d seconds", seconds)
+		return
+	}
+	t.Logf("Timed out after %d seconds waiting for signers", timeout)
+}
+
 // Name is the hostname of the test node container
 func (tn *TestNode) Name() string {
 	return fmt.Sprintf("node-%d-%s", tn.Index, tn.t.Name())
@@ -255,7 +348,7 @@ func (tn *TestNode) SetPrivValdidatorListen(peers string) {
 	tmconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
 }
 
-func (tn *TestNode) EnsureNotSlashed() {
+func (tn *TestNode) EnsureNotSlashed() int64 {
 	missed := int64(0)
 	for i := 0; i < 50; i++ {
 		time.Sleep(1 * time.Second)
@@ -277,16 +370,17 @@ func (tn *TestNode) EnsureNotSlashed() {
 		}
 		require.False(tn.t, slashInfo.ValSigningInfo.Tombstoned)
 	}
+	return missed
 }
 
-func (tn *TestNode) EnsureNoMissedBlocks() {
+func (tn *TestNode) EnsureNoMissedBlocks(initialMissed int64) {
 	for i := 0; i < 10; i++ {
 		time.Sleep(1 * time.Second)
 		slashInfo, err := slashingtypes.NewQueryClient(tn.CliContext()).SigningInfo(context.Background(), &slashingtypes.QuerySigningInfoRequest{
 			ConsAddress: tn.GetConsPub(),
 		})
 		require.NoError(tn.t, err)
-		require.Equal(tn.t, int64(0), slashInfo.ValSigningInfo.MissedBlocksCounter)
+		require.Equal(tn.t, initialMissed, slashInfo.ValSigningInfo.MissedBlocksCounter)
 	}
 }
 
@@ -443,7 +537,7 @@ func (tn *TestNode) StartContainer(ctx context.Context) error {
 		return err
 	}
 
-	time.Sleep(3 * time.Second)
+	time.Sleep(5 * time.Second)
 	return retry.Do(func() error {
 		stat, err := tn.Client.Status(ctx)
 		if err != nil {
@@ -559,7 +653,7 @@ func (tn TestNodes) LogGenesisHashes() {
 	for _, n := range tn {
 		gen, err := ioutil.ReadFile(path.Join(n.Dir(), "config", "genesis.json"))
 		require.NoError(tn[0].t, err)
-		tn[0].t.Log(fmt.Sprintf("{node-%d} genesis hash %x", n.Index, sha256.Sum256(gen)))
+		tn[0].t.Log(fmt.Sprintf("{%s} genesis hash %x", n.Name(), sha256.Sum256(gen)))
 	}
 }
 

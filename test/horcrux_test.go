@@ -71,16 +71,14 @@ func Test3Of7SignerTwoSentries(t *testing.T) {
 	// set the test cleanup function
 	t.Cleanup(Cleanup(pool, t.Name(), home))
 
-	// TODO: how to block till signer containers start?
-	// once we have prometheus server we can poll that
-	// time.Sleep(5 * time.Second)
+	// wait until signer containers are reachable on port 2222
+	signers.GetHosts().WaitForAllToStart(t, 10)
 
 	// modify node config to listen for private validator connections
 	peerString := allNodes.PeerString()
 	ourValidator.SetPrivValdidatorListen(peerString)
 
 	for _, fn := range sentries {
-		fn := fn
 		fn.SetPrivValdidatorListen(peerString)
 	}
 
@@ -107,7 +105,10 @@ func Test3Of7SignerTwoSentries(t *testing.T) {
 	}
 	require.NoError(t, eg.Wait())
 
-	time.Sleep(10 * time.Second)
+	// wait for our validator and all sentries to be reachable
+	hosts := ourValidator.GetHosts()
+	nodesToWaitFor := append(hosts, sentries.GetHosts()...)
+	nodesToWaitFor.WaitForAllToStart(t, 10)
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
 	ourValidator.EnsureNotSlashed()
@@ -154,7 +155,6 @@ func Test2Of3SignerTwoSentries(t *testing.T) {
 	require.NoError(t, ourValidator.StopContainer())
 
 	for _, fn := range sentries {
-		fn := fn
 		t.Logf("{%s} -> Stopping Node...", fn.Name())
 		require.NoError(t, fn.StopContainer())
 	}
@@ -162,16 +162,14 @@ func Test2Of3SignerTwoSentries(t *testing.T) {
 	// set the test cleanup function
 	t.Cleanup(Cleanup(pool, t.Name(), home))
 
-	// TODO: how to block till signer containers start?
-	// once we have prometheus server we can poll that
-	// time.Sleep(10 * time.Second)
+	// wait for all signers to be reachable on port 2222
+	signers.GetHosts().WaitForAllToStart(t, 10)
 
 	// modify node config to listen for private validator connections
 	peerString := allNodes.PeerString()
 	ourValidator.SetPrivValdidatorListen(peerString)
 
 	for _, fn := range sentries {
-		fn := fn
 		fn.SetPrivValdidatorListen(peerString)
 	}
 
@@ -181,22 +179,17 @@ func Test2Of3SignerTwoSentries(t *testing.T) {
 	require.NoError(t, ourValidator.CreateNodeContainer(network.ID, true))
 
 	for _, fn := range sentries {
-		fn := fn
 		t.Logf("{%s} -> Restarting Node...", fn.Name())
-	}
-
-	for _, fn := range sentries {
-		fn := fn
 		require.NoError(t, fn.CreateNodeContainer(network.ID, true))
 	}
 
 	require.NoError(t, ourValidator.StartContainer(ctx))
 	for _, fn := range sentries {
-		fn := fn
 		require.NoError(t, fn.StartContainer(ctx))
 	}
 
-	time.Sleep(10 * time.Second)
+	// wait for validator to be reachable
+	ourValidator.GetHosts().WaitForAllToStart(t, 10)
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
 	ourValidator.EnsureNotSlashed()
@@ -243,7 +236,6 @@ func Test2Of3SignerUniqueSentry(t *testing.T) {
 	require.NoError(t, ourValidator.StopContainer())
 
 	for _, fn := range sentries {
-		fn := fn
 		t.Logf("{%s} -> Stopping Node...", fn.Name())
 		require.NoError(t, fn.StopContainer())
 	}
@@ -251,16 +243,14 @@ func Test2Of3SignerUniqueSentry(t *testing.T) {
 	// set the test cleanup function
 	t.Cleanup(Cleanup(pool, t.Name(), home))
 
-	// TODO: how to block till signer containers start?
-	// once we have prometheus server we can poll that
-	// time.Sleep(10 * time.Second)
+	// wait for all signers to be reachable on port 2222
+	signers.GetHosts().WaitForAllToStart(t, 10)
 
 	// modify node config to listen for private validator connections
 	peerString := allNodes.PeerString()
 	ourValidator.SetPrivValdidatorListen(peerString)
 
 	for _, fn := range sentries {
-		fn := fn
 		fn.SetPrivValdidatorListen(peerString)
 	}
 
@@ -270,22 +260,19 @@ func Test2Of3SignerUniqueSentry(t *testing.T) {
 	require.NoError(t, ourValidator.CreateNodeContainer(network.ID, true))
 
 	for _, fn := range sentries {
-		fn := fn
 		t.Logf("{%s} -> Restarting Node...", fn.Name())
-	}
-
-	for _, fn := range sentries {
-		fn := fn
 		require.NoError(t, fn.CreateNodeContainer(network.ID, true))
 	}
 
 	require.NoError(t, ourValidator.StartContainer(ctx))
 	for _, fn := range sentries {
-		fn := fn
 		require.NoError(t, fn.StartContainer(ctx))
 	}
 
-	time.Sleep(10 * time.Second)
+	// wait for our validator and all sentries to be reachable
+	hosts := ourValidator.GetHosts()
+	nodesToWaitFor := append(hosts, sentries.GetHosts()...)
+	nodesToWaitFor.WaitForAllToStart(t, 10)
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
 	time.Sleep(15 * time.Second)
@@ -335,9 +322,8 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 	// set the test cleanup function
 	t.Cleanup(Cleanup(pool, t.Name(), home))
 
-	// TODO: how to block till signer containers start?
-	// once we have prometheus server we can poll that
-	// time.Sleep(10 * time.Second)
+	// wait for all signers to be reachable on port 2222
+	signers.GetHosts().WaitForAllToStart(t, 10)
 
 	// modify node config to listen for private validator connections
 	ourValidator.SetPrivValdidatorListen(allNodes.PeerString())
@@ -354,7 +340,10 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 	require.NoError(t, ourValidator.StartContainer(ctx))
 	require.NoError(t, sentries[0].StartContainer(ctx))
 
-	time.Sleep(10 * time.Second)
+	// wait for our validator and all sentries to be reachable
+	hosts := ourValidator.GetHosts()
+	nodesToWaitFor := append(hosts, sentries[0].GetHosts()...)
+	nodesToWaitFor.WaitForAllToStart(t, 10)
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
 	ourValidator.EnsureNotSlashed()
@@ -400,9 +389,8 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	// set the test cleanup function
 	t.Cleanup(Cleanup(pool, t.Name(), home))
 
-	// TODO: how to block till signer containers start?
-	// once we have prometheus server we can poll that
-	time.Sleep(5 * time.Second)
+	// wait for all signers to be reachable on port 2222
+	signers.GetHosts().WaitForAllToStart(t, 10)
 
 	// modify node config to listen for private validator connections
 	ourValidator.SetPrivValdidatorListen(validators.PeerString())
@@ -413,14 +401,14 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	require.NoError(t, ourValidator.CreateNodeContainer(network.ID, true))
 	require.NoError(t, ourValidator.StartContainer(ctx))
 
-	time.Sleep(10 * time.Second)
+	// wait for validator to be reachable
+	ourValidator.GetHosts().WaitForAllToStart(t, 10)
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
 	ourValidator.EnsureNotSlashed()
 }
 
 func TestDownedSigners(t *testing.T) {
-	t.Skip()
 	const totalValidators = 4
 	const totalSigners = 3
 	const threshold = 2
@@ -455,9 +443,8 @@ func TestDownedSigners(t *testing.T) {
 	// set the test cleanup function
 	t.Cleanup(Cleanup(pool, t.Name(), home))
 
-	// TODO: how to block till signer containers start?
-	// once we have prometheus server we can poll that
-	// time.Sleep(10 * time.Second)
+	// wait until signer containers are reachable on port 2222
+	signers.GetHosts().WaitForAllToStart(t, 10)
 
 	// modify node config to listen for private validator connections
 	ourValidator.SetPrivValdidatorListen(validators.PeerString())
@@ -468,10 +455,11 @@ func TestDownedSigners(t *testing.T) {
 	require.NoError(t, ourValidator.CreateNodeContainer(network.ID, true))
 	require.NoError(t, ourValidator.StartContainer(ctx))
 
-	time.Sleep(10 * time.Second)
+	// wait for validator to be reachable
+	ourValidator.GetHosts().WaitForAllToStart(t, 10)
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
-	ourValidator.EnsureNotSlashed()
+	initialMissed := ourValidator.EnsureNotSlashed()
 
 	// Test taking down each node in the signer cluster for a period of time
 	for _, signer := range signers {
@@ -481,11 +469,11 @@ func TestDownedSigners(t *testing.T) {
 		time.Sleep(5 * time.Second)
 
 		t.Logf("{%s} -> Checking that no blocks were missed...", ourValidator.Name())
-		ourValidator.EnsureNoMissedBlocks()
+		ourValidator.EnsureNoMissedBlocks(initialMissed)
 
 		t.Logf("{%s} -> Restarting signer...", signer.Name())
 		require.NoError(t, signer.UnpauseContainer())
-		time.Sleep(10 * time.Second) // Wait to ensure signer is back up before bringing down the next one
+		signer.GetHosts().WaitForAllToStart(t, 10) // Wait to ensure signer is back up before bringing down the next one
 	}
 }
 
