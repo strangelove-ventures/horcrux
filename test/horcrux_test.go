@@ -23,6 +23,7 @@ func TestBuildSignerContainer(t *testing.T) {
 // the sentry nodes, configure that validator and the sentry nodes to be a relay for the remote signers, spin up a 3/7 threshold
 // signer cluster, restart the validator/sentry nodes and check that no slashing occurs
 func Test3Of7SignerTwoSentries(t *testing.T) {
+	t.Parallel()
 	const totalValidators = 4
 	const totalSentries = 4
 	const totalSigners = 7
@@ -107,8 +108,8 @@ func Test3Of7SignerTwoSentries(t *testing.T) {
 
 	// wait for our validator and all sentries to be reachable
 	hosts := ourValidator.GetHosts()
-	nodesToWaitFor := append(hosts, sentries.GetHosts()...)
-	nodesToWaitFor.WaitForAllToStart(t, 10)
+	hosts = append(hosts, sentries.GetHosts()...)
+	hosts.WaitForAllToStart(t, 10)
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
 	ourValidator.EnsureNotSlashed()
@@ -118,6 +119,7 @@ func Test3Of7SignerTwoSentries(t *testing.T) {
 // the sentry nodes, configure that validator and the sentry nodes to be a relay for the remote signers, spin up a 2/3 threshold
 // signer cluster, restart the validator/sentry nodes and check that no slashing occurs
 func Test2Of3SignerTwoSentries(t *testing.T) {
+	t.Parallel()
 	const totalValidators = 4
 	const totalSentries = 2
 	const totalSigners = 3
@@ -199,6 +201,7 @@ func Test2Of3SignerTwoSentries(t *testing.T) {
 // sentry nodes, configure that validator and the sentry nodes to be a relay for the remote signers, spin up a 2/3 threshold
 // signer cluster, restart the validator/sentry nodes and check that no slashing occurs
 func Test2Of3SignerUniqueSentry(t *testing.T) {
+	t.Parallel()
 	const totalValidators = 4
 	const totalSentries = 2
 	const totalSigners = 3
@@ -271,8 +274,8 @@ func Test2Of3SignerUniqueSentry(t *testing.T) {
 
 	// wait for our validator and all sentries to be reachable
 	hosts := ourValidator.GetHosts()
-	nodesToWaitFor := append(hosts, sentries.GetHosts()...)
-	nodesToWaitFor.WaitForAllToStart(t, 10)
+	hosts = append(hosts, sentries.GetHosts()...)
+	hosts.WaitForAllToStart(t, 10)
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
 	time.Sleep(15 * time.Second)
@@ -283,6 +286,7 @@ func Test2Of3SignerUniqueSentry(t *testing.T) {
 // sentry node, configure those two nodes to be relays for the remote signer, spin up a single remote signer, restart the
 // validator/sentry node and check that no slashing occurs
 func TestSingleSignerTwoSentries(t *testing.T) {
+	t.Parallel()
 	const totalValidators = 4
 	const totalSentries = 1
 	const totalSigners = 1
@@ -342,8 +346,8 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 
 	// wait for our validator and all sentries to be reachable
 	hosts := ourValidator.GetHosts()
-	nodesToWaitFor := append(hosts, sentries[0].GetHosts()...)
-	nodesToWaitFor.WaitForAllToStart(t, 10)
+	hosts = append(hosts, sentries[0].GetHosts()...)
+	hosts.WaitForAllToStart(t, 10)
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
 	ourValidator.EnsureNotSlashed()
@@ -353,6 +357,7 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 // to be a relay for the remote signer cluster, spin up a 2/3 threshold signer cluster, restart the validator and check that no
 // slashing occurs
 func TestUpgradeValidatorToHorcrux(t *testing.T) {
+	t.Parallel()
 	// NOTE: have this test skipped because we are debugging the docker build in CI
 	// t.Skip()
 	const totalValidators = 4
@@ -409,6 +414,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 }
 
 func TestDownedSigners(t *testing.T) {
+	t.Parallel()
 	const totalValidators = 4
 	const totalSigners = 3
 	const threshold = 2

@@ -199,7 +199,7 @@ func (tn *TestNode) NewClient(addr string) error {
 
 func (n *TestNode) GetHosts() (out Hosts) {
 	name := n.Name()
-	for k, _ := range n.Chain.Ports {
+	for k := range n.Chain.Ports {
 		host := ContainerPort{
 			Name:      name,
 			Container: n.Container,
@@ -262,16 +262,16 @@ func (hosts Hosts) WaitForAllToStart(t *testing.T, timeout int) {
 			close(results)
 		}()
 
-		found_unreachable := false
+		foundUnreachable := false
 
 		for reachable := range results {
 			if !reachable {
 				t.Logf("A signer node is not reachable")
-				found_unreachable = true
+				foundUnreachable = true
 				break
 			}
 		}
-		if found_unreachable {
+		if foundUnreachable {
 			continue
 		}
 		t.Logf("All signers are reachable after %d seconds", seconds)
