@@ -170,6 +170,8 @@ func (pv *ThresholdValidator) signBlock(chainID string, block *block) ([]byte, t
 					Step:   step,
 				})
 
+				fmt.Printf("cosigner %v has eph secret part? %t\n", peerId, hasResp.Exists)
+
 				// did we timeout or finish elsewhere?
 				select {
 				case <-signCtx.Done():
@@ -195,6 +197,8 @@ func (pv *ThresholdValidator) signBlock(chainID string, block *block) ([]byte, t
 					if err != nil {
 						fmt.Printf("ERROR GetEphemeralSecretPart %s\n", err)
 					}
+
+					fmt.Printf("Got eph secret part from %d\n", peerId)
 
 					// did we timeout or finish elsewhere?
 					select {
