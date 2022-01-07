@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 
-	//"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -130,7 +129,7 @@ func TestThresholdValidator2of2(test *testing.T) {
 		})
 		require.NoError(test, err)
 
-		cosigner2.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
+		err = cosigner2.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
 			SourceSig:                      cosigner1EphSecretPart.SourceSig,
 			SourceID:                       cosigner1EphSecretPart.SourceID,
 			SourceEphemeralSecretPublicKey: cosigner1EphSecretPart.SourceEphemeralSecretPublicKey,
@@ -139,6 +138,7 @@ func TestThresholdValidator2of2(test *testing.T) {
 			Round:                          int64(proposal.Round),
 			Step:                           ProposalToStep(&proposal),
 		})
+		require.NoError(test, err)
 	}
 
 	err = validator.SignProposal("chain-id", &proposal)
@@ -293,7 +293,7 @@ func TestThresholdValidator3of3(test *testing.T) {
 		})
 		require.NoError(test, err)
 
-		cosigner2.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
+		err = cosigner2.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
 			SourceSig:                      cosigner1EphSecretPart2.SourceSig,
 			SourceID:                       cosigner1EphSecretPart2.SourceID,
 			SourceEphemeralSecretPublicKey: cosigner1EphSecretPart2.SourceEphemeralSecretPublicKey,
@@ -302,6 +302,7 @@ func TestThresholdValidator3of3(test *testing.T) {
 			Round:                          int64(proposal.Round),
 			Step:                           ProposalToStep(&proposal),
 		})
+		require.NoError(test, err)
 
 		cosigner1EphSecretPart3, err := cosigner1.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
 			ID:           3,
@@ -312,7 +313,7 @@ func TestThresholdValidator3of3(test *testing.T) {
 		})
 		require.NoError(test, err)
 
-		cosigner3.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
+		err = cosigner3.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
 			SourceSig:                      cosigner1EphSecretPart3.SourceSig,
 			SourceID:                       cosigner1EphSecretPart3.SourceID,
 			SourceEphemeralSecretPublicKey: cosigner1EphSecretPart3.SourceEphemeralSecretPublicKey,
@@ -321,6 +322,7 @@ func TestThresholdValidator3of3(test *testing.T) {
 			Round:                          int64(proposal.Round),
 			Step:                           ProposalToStep(&proposal),
 		})
+		require.NoError(test, err)
 
 		cosigner2EphSecretPart3, err := cosigner2.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
 			ID:           3,
@@ -331,7 +333,7 @@ func TestThresholdValidator3of3(test *testing.T) {
 		})
 		require.NoError(test, err)
 
-		cosigner3.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
+		err = cosigner3.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
 			SourceSig:                      cosigner2EphSecretPart3.SourceSig,
 			SourceID:                       cosigner2EphSecretPart3.SourceID,
 			SourceEphemeralSecretPublicKey: cosigner2EphSecretPart3.SourceEphemeralSecretPublicKey,
@@ -340,6 +342,7 @@ func TestThresholdValidator3of3(test *testing.T) {
 			Round:                          int64(proposal.Round),
 			Step:                           ProposalToStep(&proposal),
 		})
+		require.NoError(test, err)
 
 		cosigner3EphSecretPart2, err := cosigner3.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
 			ID:           2,
@@ -350,7 +353,7 @@ func TestThresholdValidator3of3(test *testing.T) {
 		})
 		require.NoError(test, err)
 
-		cosigner2.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
+		err = cosigner2.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
 			SourceSig:                      cosigner3EphSecretPart2.SourceSig,
 			SourceID:                       cosigner3EphSecretPart2.SourceID,
 			SourceEphemeralSecretPublicKey: cosigner3EphSecretPart2.SourceEphemeralSecretPublicKey,
@@ -359,6 +362,7 @@ func TestThresholdValidator3of3(test *testing.T) {
 			Round:                          int64(proposal.Round),
 			Step:                           ProposalToStep(&proposal),
 		})
+		require.NoError(test, err)
 	}
 
 	err = validator.SignProposal("chain-id", &proposal)
@@ -525,7 +529,7 @@ func TestThresholdValidator2of3(test *testing.T) {
 		})
 		require.NoError(test, err)
 
-		cosigner3.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
+		err = cosigner3.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
 			SourceSig:                      cosigner1EphSecretPart3.SourceSig,
 			SourceID:                       cosigner1EphSecretPart3.SourceID,
 			SourceEphemeralSecretPublicKey: cosigner1EphSecretPart3.SourceEphemeralSecretPublicKey,
@@ -534,6 +538,7 @@ func TestThresholdValidator2of3(test *testing.T) {
 			Round:                          int64(proposal.Round),
 			Step:                           ProposalToStep(&proposal),
 		})
+		require.NoError(test, err)
 
 		// Note: purposefully left out interactions with cosigner2, to test it being "down"
 	}
