@@ -27,6 +27,9 @@ test:
 test-short:
 	@go test -mod readonly -run TestDownedSigners -v ./... 
 
+test-signer-short:
+	@go test -mod readonly -run TestThresholdValidator2of3 -v ./... 
+
 clean:
 	rm -rf build
 

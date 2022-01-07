@@ -249,6 +249,9 @@ func (cosigner *LocalCosigner) GetEphemeralSecretPart(req CosignerGetEphemeralSe
 	meta, ok := cosigner.hrsMeta[hrsKey]
 	// generate metadata placeholder
 	if !ok {
+		if !req.FindOrCreate {
+			return res, errors.New("no meta for that height, round, step")
+		}
 		secret := make([]byte, 32)
 		rand.Read(secret)
 
@@ -273,6 +276,7 @@ func (cosigner *LocalCosigner) GetEphemeralSecretPart(req CosignerGetEphemeralSe
 	// grab the peer info for the ID being requested
 	peer, ok := cosigner.peers[req.ID]
 	if !ok {
+		fmt.Printf("Error getting peer info for %d\n", req.ID)
 		return res, errors.New("Unknown peer ID")
 	}
 

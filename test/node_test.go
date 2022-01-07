@@ -373,15 +373,28 @@ func (tn *TestNode) EnsureNotSlashed() int64 {
 	return missed
 }
 
-func (tn *TestNode) EnsureNoMissedBlocks(initialMissed int64) {
-	for i := 0; i < 10; i++ {
+func (tn *TestNode) EnsureNoMissedBlocks(initialMissed int64, accepted int64) int64 {
+	missedBlocks := int64(0)
+	for i := 0; i < 50; i++ {
 		time.Sleep(1 * time.Second)
 		slashInfo, err := slashingtypes.NewQueryClient(tn.CliContext()).SigningInfo(context.Background(), &slashingtypes.QuerySigningInfoRequest{
 			ConsAddress: tn.GetConsPub(),
 		})
 		require.NoError(tn.t, err)
-		require.Equal(tn.t, initialMissed, slashInfo.ValSigningInfo.MissedBlocksCounter)
+		missedBlocks = slashInfo.ValSigningInfo.MissedBlocksCounter
+		if i == 0 {
+			tn.t.Log("Initial Missed blocks:", missedBlocks)
+			continue
+		}
+		if i%2 == 0 {
+			// require.Equal(tn.t, missed, slashInfo.ValSigningInfo.MissedBlocksCounter)
+			stat, err := tn.Client.Status(context.Background())
+			require.NoError(tn.t, err)
+			require.LessOrEqual(tn.t, missedBlocks-initialMissed, accepted)
+			tn.t.Log("Missed blocks:", missedBlocks, "block", stat.SyncInfo.LatestBlockHeight)
+		}
 	}
+	return missedBlocks
 }
 
 func stdconfigchanges(cfg *tmconfig.Config, peers string) {
