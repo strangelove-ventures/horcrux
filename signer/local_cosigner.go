@@ -250,7 +250,7 @@ func (cosigner *LocalCosigner) GetEphemeralSecretPart(req CosignerGetEphemeralSe
 	// generate metadata placeholder
 	if !ok {
 		if !req.FindOrCreate {
-			return res, errors.New("No meta for that height, round, step")
+			return res, errors.New("no meta for that height, round, step")
 		}
 		secret := make([]byte, 32)
 		rand.Read(secret)
