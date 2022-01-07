@@ -274,7 +274,6 @@ func (cosigner *LocalCosigner) GetEphemeralSecretPart(req CosignerGetEphemeralSe
 	meta.Peers[cosigner.key.ID-1].EphemeralSecretPublicKey = ourEphPublicKey
 
 	// grab the peer info for the ID being requested
-	fmt.Printf("Getting peer info for %d from %d\n", req.ID, cosigner.key.ID)
 	peer, ok := cosigner.peers[req.ID]
 	if !ok {
 		fmt.Printf("Error getting peer info for %d\n", req.ID)
@@ -292,9 +291,6 @@ func (cosigner *LocalCosigner) GetEphemeralSecretPart(req CosignerGetEphemeralSe
 	res.SourceID = cosigner.key.ID
 	res.SourceEphemeralSecretPublicKey = ourEphPublicKey
 	res.EncryptedSharePart = encrypted
-
-	fmt.Printf("our public key: %v\n", ourEphPublicKey)
-	fmt.Printf("share part: %v\n", encrypted)
 
 	// sign the response payload with our private key
 	// cosigners can verify the signature to confirm sender validity

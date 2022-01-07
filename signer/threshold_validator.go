@@ -123,7 +123,9 @@ func (pv *ThresholdValidator) signBlock(chainID string, block *block) ([]byte, t
 		return nil, stamp, errors.New("conflicting data")
 	}
 
-	total := uint8(len(pv.peers) + 1)
+	numPeers := len(pv.peers)
+
+	total := uint8(numPeers + 1)
 
 	// destination for share signatures
 	shareSignatures := make([][]byte, total)
@@ -132,16 +134,17 @@ func (pv *ThresholdValidator) signBlock(chainID string, block *block) ([]byte, t
 	shareSignaturesMutex := sync.Mutex{}
 
 	wg := sync.WaitGroup{}
-	wg.Add(len(pv.peers))
+	wg.Add(numPeers)
 
 	ourID := pv.cosigner.GetID()
 
 	// have our cosigner generate ephemeral info at the current height
 	_, err = pv.cosigner.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-		ID:     ourID,
-		Height: height,
-		Round:  round,
-		Step:   step,
+		ID:           ourID,
+		Height:       height,
+		Round:        round,
+		Step:         step,
+		FindOrCreate: true,
 	})
 	if err != nil {
 		return nil, stamp, err
@@ -170,8 +173,6 @@ func (pv *ThresholdValidator) signBlock(chainID string, block *block) ([]byte, t
 					Step:   step,
 				})
 
-				fmt.Printf("cosigner %v has eph secret part? %t\n", peerId, hasResp.Exists)
-
 				// did we timeout or finish elsewhere?
 				select {
 				case <-signCtx.Done():
@@ -188,17 +189,16 @@ func (pv *ThresholdValidator) signBlock(chainID string, block *block) ([]byte, t
 				if !hasResp.Exists {
 					// if we don't already have an ephemeral secret part for the HRS, we need to get one
 					ephSecretResp, err := peer.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-						ID:     ourID,
-						Height: height,
-						Round:  round,
-						Step:   step,
+						ID:           ourID,
+						Height:       height,
+						Round:        round,
+						Step:         step,
+						FindOrCreate: false,
 					})
 
 					if err != nil {
 						fmt.Printf("ERROR GetEphemeralSecretPart %s\n", err)
 					}
-
-					fmt.Printf("Got eph secret part from %d\n", peerId)
 
 					// did we timeout or finish elsewhere?
 					select {

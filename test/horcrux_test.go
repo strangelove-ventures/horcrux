@@ -69,6 +69,8 @@ func Test3Of7SignerTwoSentries(t *testing.T) {
 	}
 	require.NoError(t, eg.Wait())
 
+	time.Sleep(5 * time.Second) //Wait for all containers to stop
+
 	// set the test cleanup function
 	t.Cleanup(Cleanup(pool, t.Name(), home))
 
@@ -161,6 +163,8 @@ func Test2Of3SignerTwoSentries(t *testing.T) {
 		require.NoError(t, fn.StopContainer())
 	}
 
+	time.Sleep(5 * time.Second) //Wait for all containers to stop
+
 	// set the test cleanup function
 	t.Cleanup(Cleanup(pool, t.Name(), home))
 
@@ -243,6 +247,8 @@ func Test2Of3SignerUniqueSentry(t *testing.T) {
 		require.NoError(t, fn.StopContainer())
 	}
 
+	time.Sleep(5 * time.Second) //Wait for all containers to stop
+
 	// set the test cleanup function
 	t.Cleanup(Cleanup(pool, t.Name(), home))
 
@@ -323,6 +329,8 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 	t.Logf("{%s} -> Stopping Node...", sentries[0].Name())
 	require.NoError(t, sentries[0].StopContainer())
 
+	time.Sleep(5 * time.Second) //Wait for all containers to stop
+
 	// set the test cleanup function
 	t.Cleanup(Cleanup(pool, t.Name(), home))
 
@@ -391,6 +399,8 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	t.Logf("{%s} -> Stopping Node...", ourValidator.Name())
 	require.NoError(t, ourValidator.StopContainer())
 
+	time.Sleep(5 * time.Second) //Wait for all containers to stop
+
 	// set the test cleanup function
 	t.Cleanup(Cleanup(pool, t.Name(), home))
 
@@ -446,6 +456,8 @@ func TestDownedSigners(t *testing.T) {
 	t.Logf("{%s} -> Stopping Node...", ourValidator.Name())
 	require.NoError(t, ourValidator.StopContainer())
 
+	time.Sleep(5 * time.Second) //Wait for all containers to stop
+
 	// set the test cleanup function
 	t.Cleanup(Cleanup(pool, t.Name(), home))
 
@@ -470,16 +482,16 @@ func TestDownedSigners(t *testing.T) {
 	// Test taking down each node in the signer cluster for a period of time
 	for _, signer := range signers {
 		t.Logf("{%s} -> Stopping signer...", signer.Name())
-		require.NoError(t, signer.PauseContainer())
-
-		time.Sleep(5 * time.Second)
+		require.NoError(t, signer.StopContainer())
 
 		t.Logf("{%s} -> Checking that no blocks were missed...", ourValidator.Name())
-		ourValidator.EnsureNoMissedBlocks(initialMissed)
+		initialMissed = ourValidator.EnsureNoMissedBlocks(initialMissed, 3)
 
 		t.Logf("{%s} -> Restarting signer...", signer.Name())
-		require.NoError(t, signer.UnpauseContainer())
-		signer.GetHosts().WaitForAllToStart(t, 10) // Wait to ensure signer is back up before bringing down the next one
+		require.NoError(t, signer.CreateSingleSignerContainer(network.ID))
+		require.NoError(t, signer.StartContainer())
+		signer.GetHosts().WaitForAllToStart(t, 10) // Wait to ensure signer is back up
+		time.Sleep(5 * time.Second)                // let container have some runtime before taking down the next one
 	}
 }
 

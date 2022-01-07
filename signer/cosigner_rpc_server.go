@@ -131,10 +131,11 @@ func (rpcServer *CosignerRpcServer) rpcSignRequest(ctx *rpc_types.Context, req R
 
 			go func() {
 				partRequest := CosignerGetEphemeralSecretPartRequest{
-					ID:     rpcServer.cosigner.GetID(),
-					Height: height,
-					Round:  round,
-					Step:   step,
+					ID:           rpcServer.cosigner.GetID(),
+					Height:       height,
+					Round:        round,
+					Step:         step,
+					FindOrCreate: false,
 				}
 
 				// if we already have an ephemeral secret part for this HRS, we don't need to re-query for it
@@ -215,10 +216,11 @@ func (rpcServer *CosignerRpcServer) rpcGetEphemeralSecretPart(ctx *rpc_types.Con
 	response := &RpcGetEphemeralSecretPartResponse{}
 
 	partResp, err := rpcServer.cosigner.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-		ID:     req.ID,
-		Height: req.Height,
-		Round:  req.Round,
-		Step:   req.Step,
+		ID:           req.ID,
+		Height:       req.Height,
+		Round:        req.Round,
+		Step:         req.Step,
+		FindOrCreate: true,
 	})
 	if err != nil {
 		return response, nil
