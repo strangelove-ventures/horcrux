@@ -15,10 +15,11 @@ type CosignerSignResponse struct {
 }
 
 type CosignerGetEphemeralSecretPartRequest struct {
-	ID     int
-	Height int64
-	Round  int64
-	Step   int8
+	ID           int
+	Height       int64
+	Round        int64
+	Step         int8
+	FindOrCreate bool
 }
 
 type CosignerHasEphemeralSecretPartRequest struct {

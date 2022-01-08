@@ -232,6 +232,23 @@ func MakeTestSigners(count int, home string, pool *dockertest.Pool, t *testing.T
 	return
 }
 
+func (s *TestSigner) GetHosts() (out Hosts) {
+	host := ContainerPort{
+		Name:      s.Name(),
+		Container: s.Container,
+		Port:      docker.Port(fmt.Sprintf("%s/tcp", signerPort)),
+	}
+	out = append(out, host)
+	return
+}
+
+func (ts TestSigners) GetHosts() (out Hosts) {
+	for _, s := range ts {
+		out = append(out, s.GetHosts()...)
+	}
+	return
+}
+
 // MkDir creates the directory for the TestSigner files
 func (ts *TestSigner) MkDir() {
 	if err := os.MkdirAll(ts.Dir(), 0755); err != nil {
@@ -251,7 +268,7 @@ func (ts *TestSigner) GetConfigFile() string {
 
 // Name is the hostname of the TestSigner container
 func (ts *TestSigner) Name() string {
-	return fmt.Sprintf("signer-%d", ts.Index)
+	return fmt.Sprintf("signer-%d-%s", ts.Index, ts.t.Name())
 }
 
 // InitSingleSignerConfig creates and runs a container to init a single signers config files, and blocks until the container exits
