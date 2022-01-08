@@ -130,10 +130,11 @@ func TestLocalCosignerSign2of2(test *testing.T) {
 	// get part 2 from cosigner 1 and give to cosigner 2
 	{
 		resp, err := cosigner1.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-			ID:     2,
-			Height: 1,
-			Round:  0,
-			Step:   2,
+			ID:           2,
+			Height:       1,
+			Round:        0,
+			Step:         2,
+			FindOrCreate: true,
 		})
 		require.NoError(test, err)
 
@@ -154,10 +155,11 @@ func TestLocalCosignerSign2of2(test *testing.T) {
 	// get part 1 from cosigner 2 and give to cosigner 1
 	{
 		resp, err := cosigner2.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-			ID:     1,
-			Height: 1,
-			Round:  0,
-			Step:   2,
+			ID:           1,
+			Height:       1,
+			Round:        0,
+			Step:         2,
+			FindOrCreate: false,
 		})
 		require.NoError(test, err)
 

@@ -148,12 +148,14 @@ func StartCosignerCmd() *cobra.Command {
 			if err != nil {
 				log.Fatal(err)
 			}
-			logger.Info("Signer", "pubkey", pubkey)
+			logger.Info("Signer", "address", pubkey.Address())
 
 			services, err = signer.StartRemoteSigners(services, logger, cfg.ChainID, pv, cfg.Nodes)
 			if err != nil {
 				panic(err)
 			}
+
+			// TODO: get address from peers how to get address of the cluster?
 
 			signer.WaitAndTerminate(logger, services)
 
