@@ -523,11 +523,12 @@ func (c *Config) MustMarshalYaml() []byte {
 }
 
 type CosignerConfig struct {
-	Threshold int            `json:"threshold"   yaml:"threshold"`
-	Shares    int            `json:"shares" yaml:"shares"`
-	P2PListen string         `json:"p2p-listen"  yaml:"p2p-listen"`
-	Peers     []CosignerPeer `json:"peers"       yaml:"peers"`
-	Timeout   string         `json:"rpc-timeout" yaml:"rpc-timeout"`
+	Threshold  int            `json:"threshold"   yaml:"threshold"`
+	Shares     int            `json:"shares" yaml:"shares"`
+	P2PListen  string         `json:"p2p-listen"  yaml:"p2p-listen"`
+	RaftListen string         `json:"raft-listen"  yaml:"raft-listen"`
+	Peers      []CosignerPeer `json:"peers"       yaml:"peers"`
+	Timeout    string         `json:"rpc-timeout" yaml:"rpc-timeout"`
 }
 
 func (c *Config) CosignerPeers() (out []signer.CosignerConfig) {
