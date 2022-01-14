@@ -10,17 +10,16 @@ import (
 // Test_StoreInMemOpenSingleNode tests that a command can be applied to the log
 // stored in RAM.
 func Test_StoreInMemOpenSingleNode(t *testing.T) {
-	s := NewRaftStore()
 	tmpDir, _ := ioutil.TempDir("", "store_test")
 	defer os.RemoveAll(tmpDir)
 
-	s.RaftBind = "127.0.0.1:0"
-	s.RaftDir = tmpDir
+	s := NewRaftStore("1", tmpDir, "127.0.0.1:0", 1*time.Second, nil)
+
 	if s == nil {
 		t.Fatalf("failed to create store")
 	}
 
-	if err := s.Open(true, "node0"); err != nil {
+	if err := s.Open(); err != nil {
 		t.Fatalf("failed to open store: %s", err)
 	}
 

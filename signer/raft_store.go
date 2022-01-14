@@ -66,7 +66,7 @@ func NewRaftStore(nodeID string, directory string, bindAddress string, timeout t
 // OnStart starts the raft server
 func (s *RaftStore) OnStart() error {
 	go func() {
-		defer s.raft.Shutdown()
+		//defer s.raft.Shutdown()
 		if err := s.Open(); err != nil {
 			s.logger.Error("failed to open raft store", err.Error())
 		}

@@ -1,11 +1,8 @@
 package cmd
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"path"
 	"time"
@@ -97,8 +94,6 @@ func StartCosignerCmd() *cobra.Command {
 				PublicKey: key.RSAKey.PublicKey,
 			}}
 
-			raftJoinAddr := ""
-
 			for _, cosignerConfig := range cfg.Cosigners {
 				cosigner := signer.NewRemoteCosigner(cosignerConfig.ID, cosignerConfig.Address)
 				cosigners = append(cosigners, cosigner)
@@ -106,10 +101,6 @@ func StartCosignerCmd() *cobra.Command {
 
 				if cosignerConfig.ID < 1 || cosignerConfig.ID > len(key.CosignerKeys) {
 					log.Fatalf("Unexpected cosigner ID %d", cosignerConfig.ID)
-				}
-
-				if cosignerConfig.ID == 1 {
-					raftJoinAddr = cosignerConfig.Address
 				}
 
 				pubKey := key.CosignerKeys[cosignerConfig.ID-1]
@@ -141,7 +132,6 @@ func StartCosignerCmd() *cobra.Command {
 
 			timeout, _ := time.ParseDuration(config.CosignerConfig.Timeout)
 
-			/* [Begin] Adding RAFT */
 			raftDir := path.Join(config.HomeDir, "raft")
 			os.MkdirAll(raftDir, 0700)
 
@@ -153,30 +143,36 @@ func StartCosignerCmd() *cobra.Command {
 			raftStore.Start()
 			services = append(services, raftStore)
 
-			// Start RAFT http server listener
-			raftHttpService := signer.NewRaftHttpService(cfg.ListenAddress, raftStore, logger)
-			raftHttpService.Start()
-			services = append(services, raftHttpService)
-
-			// If not initial leader, ask leader to add us to cluster as follower
-			if raftJoinAddr != "" {
-				if err := join(raftJoinAddr, cfg.RaftListenAddress, nodeID); err != nil {
-					log.Fatalf("failed to join node at %s: %s", raftJoinAddr, err.Error())
-				}
-			}
-			/* [End] Adding RAFT */
-
 			rpcServerConfig := signer.CosignerRpcServerConfig{
 				Logger:        logger,
 				ListenAddress: cfg.ListenAddress,
 				Cosigner:      localCosigner,
 				Peers:         remoteCosigners,
 				Timeout:       timeout,
+				RaftStore:     raftStore,
 			}
 
 			rpcServer := signer.NewCosignerRpcServer(&rpcServerConfig)
 			rpcServer.Start()
 			services = append(services, rpcServer)
+
+			// If not initial leader, ask leader to add us to cluster as follower
+			if nodeID != "1" {
+				joined := false
+				for !joined {
+					time.Sleep(5 * time.Second) // Wait for other nodes to come up
+					for _, remoteCosigner := range remoteCosigners {
+						err := remoteCosigner.Join(nodeID, cfg.RaftListenAddress)
+						if err != nil {
+							log.Printf("failed to join node %d: %s", remoteCosigner.GetID(), err.Error())
+						} else {
+							log.Printf("Successfully joined raft cluster for node %d", remoteCosigner.GetID())
+							joined = true
+							break
+						}
+					}
+				}
+			}
 
 			pv = &signer.PvGuard{PrivValidator: val}
 
@@ -200,18 +196,4 @@ func StartCosignerCmd() *cobra.Command {
 	}
 
 	return cmd
-}
-
-func join(joinAddr, raftAddr, nodeID string) error {
-	b, err := json.Marshal(map[string]string{"addr": raftAddr, "id": nodeID})
-	if err != nil {
-		return err
-	}
-	resp, err := http.Post(fmt.Sprintf("http://%s/join", joinAddr), "application-type/json", bytes.NewReader(b))
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	return nil
 }

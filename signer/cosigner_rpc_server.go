@@ -30,6 +30,11 @@ type RpcGetEphemeralSecretPartRequest struct {
 	Step   int8
 }
 
+type RpcJoinRaftRequest struct {
+	NodeID  string
+	Address string
+}
+
 type RpcGetEphemeralSecretPartResponse struct {
 	SourceID                       int
 	SourceEphemeralSecretPublicKey []byte
@@ -43,7 +48,10 @@ type CosignerRpcServerConfig struct {
 	Cosigner      Cosigner
 	Peers         []RemoteCosigner
 	Timeout       time.Duration
+	RaftStore     *RaftStore
 }
+
+type RpcJoinRaftResponse struct{}
 
 // CosignerRpcServer responds to rpc sign requests using a cosigner instance
 type CosignerRpcServer struct {
@@ -55,6 +63,7 @@ type CosignerRpcServer struct {
 	cosigner      Cosigner
 	peers         []RemoteCosigner
 	timeout       time.Duration
+	raftStore     *RaftStore
 }
 
 // NewCosignerRpcServer instantiates a local cosigner with the specified key and sign state
@@ -65,6 +74,7 @@ func NewCosignerRpcServer(config *CosignerRpcServerConfig) *CosignerRpcServer {
 		peers:         config.Peers,
 		logger:        config.Logger,
 		timeout:       config.Timeout,
+		raftStore:     config.RaftStore,
 	}
 
 	cosignerRpcServer.BaseService = *service.NewBaseService(config.Logger, "CosignerRpcServer", cosignerRpcServer)
@@ -82,6 +92,7 @@ func (rpcServer *CosignerRpcServer) OnStart() error {
 	rpcServer.listener = lis
 
 	routes := map[string]*server.RPCFunc{
+		"Join":                   server.NewRPCFunc(rpcServer.rpcJoinRaftRequest, "arg"),
 		"Sign":                   server.NewRPCFunc(rpcServer.rpcSignRequest, "arg"),
 		"GetEphemeralSecretPart": server.NewRPCFunc(rpcServer.rpcGetEphemeralSecretPart, "arg"),
 	}
@@ -223,13 +234,23 @@ func (rpcServer *CosignerRpcServer) rpcGetEphemeralSecretPart(ctx *rpc_types.Con
 		FindOrCreate: true,
 	})
 	if err != nil {
-		return response, nil
+		return nil, err
 	}
 
 	response.SourceID = partResp.SourceID
 	response.SourceEphemeralSecretPublicKey = partResp.SourceEphemeralSecretPublicKey
 	response.EncryptedSharePart = partResp.EncryptedSharePart
 	response.SourceSig = partResp.SourceSig
+
+	return response, nil
+}
+
+func (rpcServer *CosignerRpcServer) rpcJoinRaftRequest(ctx *rpc_types.Context, req RpcJoinRaftRequest) (*RpcJoinRaftResponse, error) {
+	response := &RpcJoinRaftResponse{}
+
+	if err := rpcServer.raftStore.Join(req.NodeID, req.Address); err != nil {
+		return nil, err
+	}
 
 	return response, nil
 }

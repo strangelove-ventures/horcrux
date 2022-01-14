@@ -95,3 +95,24 @@ func (cosigner *RemoteCosigner) HasEphemeralSecretPart(req CosignerHasEphemeralS
 func (cosigner *RemoteCosigner) SetEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest) error {
 	return errors.New("Not Implemented")
 }
+
+func (cosigner *RemoteCosigner) Join(nodeID string, address string) error {
+	params := map[string]interface{}{
+		"arg": RpcJoinRaftRequest{
+			NodeID:  nodeID,
+			Address: address,
+		},
+	}
+
+	remoteClient, err := client.New(cosigner.address)
+	if err != nil {
+		return err
+	}
+	result := &CosignerSignResponse{}
+	_, err = remoteClient.Call(ctx, "Join", params, result)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

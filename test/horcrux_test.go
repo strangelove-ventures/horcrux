@@ -481,15 +481,16 @@ func TestDownedSigners(t *testing.T) {
 	initialMissed := ourValidator.EnsureNotSlashed()
 
 	// Test taking down each node in the signer cluster for a period of time
-	for _, signer := range signers {
+	for i := range signers {
+		signer := signers[len(signers)-1-i]
 		t.Logf("{%s} -> Stopping signer...", signer.Name())
 		require.NoError(t, signer.StopContainer())
 
 		t.Logf("{%s} -> Checking that no blocks were missed...", ourValidator.Name())
-		initialMissed = ourValidator.EnsureNoMissedBlocks(initialMissed, 3)
+		initialMissed = ourValidator.EnsureNoMissedBlocks(initialMissed, 8)
 
 		t.Logf("{%s} -> Restarting signer...", signer.Name())
-		require.NoError(t, signer.CreateSingleSignerContainer(network.ID))
+		require.NoError(t, signer.CreateCosignerContainer(network.ID))
 		require.NoError(t, signer.StartContainer())
 		signer.GetHosts().WaitForAllToStart(t, 10) // Wait to ensure signer is back up
 		time.Sleep(5 * time.Second)                // let container have some runtime before taking down the next one

@@ -77,6 +77,7 @@ func initCmd() *cobra.Command {
 				threshold, _ := cmd.Flags().GetInt("threshold")
 				peers, err := peersFromFlag(p)
 				listen, _ := cmd.Flags().GetString("listen")
+				raft, _ := cmd.Flags().GetString("raft")
 				timeout, _ := cmd.Flags().GetString("timeout")
 
 				if err != nil {
@@ -86,11 +87,12 @@ func initCmd() *cobra.Command {
 					HomeDir: home,
 					ChainID: cid,
 					CosignerConfig: &CosignerConfig{
-						Threshold: threshold,
-						Shares:    len(peers) + 1,
-						P2PListen: listen,
-						Peers:     peers,
-						Timeout:   timeout,
+						Threshold:  threshold,
+						Shares:     len(peers) + 1,
+						P2PListen:  listen,
+						RaftListen: raft,
+						Peers:      peers,
+						Timeout:    timeout,
 					},
 					ChainNodes: cn,
 				}
@@ -138,6 +140,7 @@ func initCmd() *cobra.Command {
 		"(i.e. \"tcp://node-1:2222|2,tcp://node-2:2222|3\")")
 	cmd.Flags().IntP("threshold", "t", 0, "indicate number of signatures required for threshold signature")
 	cmd.Flags().StringP("listen", "l", "tcp://0.0.0.0:2222", "listen address of the signer")
+	cmd.Flags().StringP("raft", "r", "", "raft listen address of the signer")
 	cmd.Flags().String("timeout", "1500ms", "configure cosigner rpc server timeout value, \n"+
 		"accepts valid duration strings for Go's time.ParseDuration() e.g. 1s, 1000ms, 1.5m")
 	return cmd
@@ -177,6 +180,9 @@ func validateCosignerConfig(cfg *Config) error {
 	}
 	if _, err := url.Parse(cfg.CosignerConfig.P2PListen); err != nil {
 		return fmt.Errorf("failed to parse p2p listen address")
+	}
+	if _, err := url.Parse(fmt.Sprintf("tcp://%s", cfg.CosignerConfig.RaftListen)); err != nil {
+		return fmt.Errorf("failed to parse raft listen address")
 	}
 	if err := validateCosignerPeers(cfg.CosignerConfig.Peers, cfg.CosignerConfig.Shares); err != nil {
 		return err

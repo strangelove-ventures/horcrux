@@ -20,6 +20,7 @@ import (
 
 var (
 	signerPort  = "2222"
+	raftPort    = "2223"
 	signerImage = "horcrux-test"
 )
 
@@ -326,6 +327,7 @@ func (ts *TestSigner) InitCosignerConfig(ctx context.Context, listenNodes TestNo
 		chainid, "config", "init",
 		chainid, listenNodes.ListenAddrs(),
 		"--cosigner",
+		fmt.Sprintf("--raft=%s:%s", ts.Name(), raftPort),
 		fmt.Sprintf("--peers=%s", peers.PeerString(skip)),
 		fmt.Sprintf("--threshold=%d", threshold),
 		fmt.Sprintf("--home=%s", ts.Dir()),
@@ -338,6 +340,7 @@ func (ts *TestSigner) InitCosignerConfig(ctx context.Context, listenNodes TestNo
 			Hostname: container,
 			ExposedPorts: map[docker.Port]struct{}{
 				docker.Port(fmt.Sprintf("%s/tcp", signerPort)): {},
+				docker.Port(fmt.Sprintf("%s/tcp", raftPort)):   {},
 			},
 			Image:  signerImage,
 			Cmd:    cmd,
@@ -450,6 +453,7 @@ func (ts *TestSigner) CreateCosignerContainer(networkID string) error {
 			Hostname: ts.Name(),
 			ExposedPorts: map[docker.Port]struct{}{
 				docker.Port(fmt.Sprintf("%s/tcp", signerPort)): {},
+				docker.Port(fmt.Sprintf("%s/tcp", raftPort)):   {},
 			},
 			DNS:    []string{},
 			Image:  signerImage,
