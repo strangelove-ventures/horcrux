@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 	"path"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -122,14 +124,6 @@ func StartCosignerCmd() *cobra.Command {
 
 			localCosigner := signer.NewLocalCosigner(localCosignerConfig)
 
-			val = signer.NewThresholdValidator(&signer.ThresholdValidatorOpt{
-				Pubkey:    key.PubKey,
-				Threshold: cfg.CosignerThreshold,
-				SignState: signState,
-				Cosigner:  localCosigner,
-				Peers:     cosigners,
-			})
-
 			timeout, _ := time.ParseDuration(config.CosignerConfig.Timeout)
 
 			raftDir := path.Join(config.HomeDir, "raft")
@@ -138,41 +132,47 @@ func StartCosignerCmd() *cobra.Command {
 			// RAFT node ID is the cosigner ID
 			nodeID := fmt.Sprint(key.ID)
 
+			var raftPeers []signer.RaftPeer
+
+			for _, cosignerConfig := range cfg.Cosigners {
+				cosignerAddressSplit := strings.Split(cosignerConfig.Address, ":")
+				cosignerPort, err := strconv.Atoi(cosignerAddressSplit[2])
+				if err != nil {
+					log.Printf("failed to parse port for cosigner address %s: %v\n", cosignerConfig.Address, err)
+				}
+				cosignerRaftAddress := fmt.Sprintf("%s:%d", cosignerAddressSplit[1][2:], cosignerPort+1)
+				raftPeers = append(raftPeers, signer.RaftPeer{NodeID: fmt.Sprint(cosignerConfig.ID), Address: cosignerRaftAddress})
+			}
+
 			// Start RAFT store listener
-			raftStore := signer.NewRaftStore(nodeID, raftDir, cfg.RaftListenAddress, timeout, logger)
+			raftStore := signer.NewRaftStore(nodeID, raftDir, cfg.RaftListenAddress, timeout, logger, localCosigner, raftPeers)
 			raftStore.Start()
 			services = append(services, raftStore)
 
+			val = signer.NewThresholdValidator(&signer.ThresholdValidatorOpt{
+				Pubkey:    key.PubKey,
+				Threshold: cfg.CosignerThreshold,
+				SignState: signState,
+				Cosigner:  localCosigner,
+				Peers:     cosigners,
+				RaftStore: raftStore,
+			})
+
+			raftStore.SetThresholdValidator(val.(*signer.ThresholdValidator))
+
 			rpcServerConfig := signer.CosignerRpcServerConfig{
-				Logger:        logger,
-				ListenAddress: cfg.ListenAddress,
-				Cosigner:      localCosigner,
-				Peers:         remoteCosigners,
-				Timeout:       timeout,
-				RaftStore:     raftStore,
+				Logger:             logger,
+				ListenAddress:      cfg.ListenAddress,
+				Cosigner:           localCosigner,
+				Peers:              remoteCosigners,
+				Timeout:            timeout,
+				RaftStore:          raftStore,
+				ThresholdValidator: val.(*signer.ThresholdValidator),
 			}
 
 			rpcServer := signer.NewCosignerRpcServer(&rpcServerConfig)
 			rpcServer.Start()
 			services = append(services, rpcServer)
-
-			// If not initial leader, ask leader to add us to cluster as follower
-			if nodeID != "1" {
-				joined := false
-				for !joined {
-					time.Sleep(5 * time.Second) // Wait for other nodes to come up
-					for _, remoteCosigner := range remoteCosigners {
-						err := remoteCosigner.Join(nodeID, cfg.RaftListenAddress)
-						if err != nil {
-							log.Printf("failed to join node %d: %s", remoteCosigner.GetID(), err.Error())
-						} else {
-							log.Printf("Successfully joined raft cluster for node %d", remoteCosigner.GetID())
-							joined = true
-							break
-						}
-					}
-				}
-			}
 
 			pv = &signer.PvGuard{PrivValidator: val}
 

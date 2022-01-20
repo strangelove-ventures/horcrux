@@ -161,6 +161,7 @@ func (rs *ReconnRemoteSigner) handleRequest(req tmProtoPrivval.Message) (tmProto
 		}
 	case *tmProtoPrivval.Message_SignVoteRequest:
 		vote := typedReq.SignVoteRequest.Vote
+		rs.Logger.Info("Got SignVoteRequest", "node", rs.address, "height", vote.Height, "round", vote.Round, "type", vote.Type)
 		err = rs.privVal.SignVote(rs.chainID, vote)
 		if err != nil {
 			rs.Logger.Error("Failed to sign vote", "address", rs.address, "error", err, "vote_type", vote.Type, "height", vote.Height, "round", vote.Round, "validator", fmt.Sprintf("%X", vote.ValidatorAddress))
@@ -177,6 +178,7 @@ func (rs *ReconnRemoteSigner) handleRequest(req tmProtoPrivval.Message) (tmProto
 		}
 	case *tmProtoPrivval.Message_SignProposalRequest:
 		proposal := typedReq.SignProposalRequest.Proposal
+		rs.Logger.Info("Got SignProposalRequest", "node", rs.address, "height", proposal.Height, "round", proposal.Round, "type", proposal.Type)
 		err = rs.privVal.SignProposal(rs.chainID, typedReq.SignProposalRequest.Proposal)
 		if err != nil {
 			rs.Logger.Error("Failed to sign proposal", "address", rs.address, "error", err, "proposal", proposal)

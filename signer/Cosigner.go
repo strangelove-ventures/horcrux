@@ -12,14 +12,16 @@ type CosignerSignResponse struct {
 	EphemeralPublic []byte
 	Timestamp       time.Time
 	Signature       []byte
+	Height          int64
+	Round           int64
+	Step            int8
 }
 
 type CosignerGetEphemeralSecretPartRequest struct {
-	ID           int
-	Height       int64
-	Round        int64
-	Step         int8
-	FindOrCreate bool
+	ID     int
+	Height int64
+	Round  int64
+	Step   int8
 }
 
 type CosignerHasEphemeralSecretPartRequest struct {
@@ -39,6 +41,9 @@ type CosignerGetEphemeralSecretPartResponse struct {
 	SourceEphemeralSecretPublicKey []byte
 	EncryptedSharePart             []byte
 	SourceSig                      []byte
+	Height                         int64
+	Round                          int64
+	Step                           int8
 }
 
 type CosignerSetEphemeralSecretPartRequest struct {

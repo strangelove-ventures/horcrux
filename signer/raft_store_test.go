@@ -13,7 +13,7 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 	tmpDir, _ := ioutil.TempDir("", "store_test")
 	defer os.RemoveAll(tmpDir)
 
-	s := NewRaftStore("1", tmpDir, "127.0.0.1:0", 1*time.Second, nil)
+	s := NewRaftStore("1", tmpDir, "127.0.0.1:0", 1*time.Second, nil, nil, []RaftPeer{})
 
 	if s == nil {
 		t.Fatalf("failed to create store")

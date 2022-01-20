@@ -3,11 +3,13 @@ package signer
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
 	"time"
 
+	"github.com/hashicorp/raft"
 	"github.com/tendermint/tendermint/crypto"
 	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tm "github.com/tendermint/tendermint/types"
@@ -28,6 +30,8 @@ type ThresholdValidator struct {
 
 	// peer cosigners
 	peers []Cosigner
+
+	raftStore *RaftStore
 }
 
 type ThresholdValidatorOpt struct {
@@ -36,6 +40,7 @@ type ThresholdValidatorOpt struct {
 	SignState SignState
 	Cosigner  Cosigner
 	Peers     []Cosigner
+	RaftStore *RaftStore
 }
 
 // NewThresholdValidator creates and returns a new ThresholdValidator
@@ -46,7 +51,16 @@ func NewThresholdValidator(opt *ThresholdValidatorOpt) *ThresholdValidator {
 	validator.threshold = opt.Threshold
 	validator.pubkey = opt.Pubkey
 	validator.lastSignState = opt.SignState
+	validator.raftStore = opt.RaftStore
 	return validator
+}
+
+func (pv *ThresholdValidator) GetLastSigned() HRSKey {
+	return HRSKey{
+		Height: pv.lastSignState.Height,
+		Round:  pv.lastSignState.Round,
+		Step:   pv.lastSignState.Step,
+	}
 }
 
 // GetPubKey returns the public key of the validator.
@@ -65,7 +79,7 @@ func (pv *ThresholdValidator) SignVote(chainID string, vote *tmProto.Vote) error
 		Timestamp: vote.Timestamp,
 		SignBytes: tm.VoteSignBytes(chainID, vote),
 	}
-	sig, stamp, err := pv.signBlock(chainID, block)
+	sig, stamp, err := pv.SignBlock(chainID, block)
 
 	vote.Signature = sig
 	vote.Timestamp = stamp
@@ -83,7 +97,7 @@ func (pv *ThresholdValidator) SignProposal(chainID string, proposal *tmProto.Pro
 		Timestamp: proposal.Timestamp,
 		SignBytes: tm.ProposalSignBytes(chainID, proposal),
 	}
-	sig, stamp, err := pv.signBlock(chainID, block)
+	sig, stamp, err := pv.SignBlock(chainID, block)
 
 	proposal.Signature = sig
 	proposal.Timestamp = stamp
@@ -99,8 +113,16 @@ type block struct {
 	Timestamp time.Time
 }
 
-func (pv *ThresholdValidator) signBlock(chainID string, block *block) ([]byte, time.Time, error) {
+func (pv *ThresholdValidator) SignBlock(chainID string, block *block) ([]byte, time.Time, error) {
 	height, round, step, stamp := block.Height, block.Round, block.Step, block.Timestamp
+
+	if pv.raftStore.raft.State() != raft.Leader {
+		signRes, err := pv.raftStore.LeaderSignBlock(RpcRaftSignBlockRequest{chainID, block})
+		if err != nil {
+			return nil, stamp, err
+		}
+		return signRes.Signature, stamp, nil
+	}
 
 	// the block sign state for caching full block signatures
 	lss := pv.lastSignState
@@ -123,6 +145,13 @@ func (pv *ThresholdValidator) signBlock(chainID string, block *block) ([]byte, t
 		return nil, stamp, errors.New("conflicting data")
 	}
 
+	signReq, err := json.Marshal(&CosignerSignRequest{
+		SignBytes: signBytes,
+	})
+	if err != nil {
+		fmt.Printf("ERROR GetEphemeralSecretPart %v\n", err)
+	}
+
 	numPeers := len(pv.peers)
 
 	total := uint8(numPeers + 1)
@@ -134,18 +163,38 @@ func (pv *ThresholdValidator) signBlock(chainID string, block *block) ([]byte, t
 	shareSignaturesMutex := sync.Mutex{}
 
 	wg := sync.WaitGroup{}
-	wg.Add(numPeers)
+
+	// Only wait until we have threshold sigs
+	wg.Add(pv.threshold - 1)
+	// Used to track how close we are to threshold
+	thresholdProgress := pv.threshold - 1
 
 	ourID := pv.cosigner.GetID()
 
 	// have our cosigner generate ephemeral info at the current height
 	_, err = pv.cosigner.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-		ID:           ourID,
-		Height:       height,
-		Round:        round,
-		Step:         step,
-		FindOrCreate: true,
+		ID:     ourID,
+		Height: height,
+		Round:  round,
+		Step:   step,
 	})
+	if err != nil {
+		return nil, stamp, err
+	}
+
+	hrs := HRSKey{
+		Height: height,
+		Round:  round,
+		Step:   step,
+	}
+	hrsJson, err := json.Marshal(hrs)
+	if err != nil {
+		return nil, stamp, err
+	}
+
+	// Send requested HRS to cluster to initiate ephemeral secret sharing amongst cosigners
+	err = pv.raftStore.Set("HRS", string(hrsJson))
+
 	if err != nil {
 		return nil, stamp, err
 	}
@@ -166,100 +215,65 @@ func (pv *ThresholdValidator) signBlock(chainID string, block *block) ([]byte, t
 			signCtx, signCtxCancel := context.WithTimeout(context.Background(), 4*time.Second)
 
 			go func() {
-				hasResp, err := pv.cosigner.HasEphemeralSecretPart(CosignerHasEphemeralSecretPartRequest{
-					ID:     peerId,
-					Height: height,
-					Round:  round,
-					Step:   step,
-				})
-
-				// did we timeout or finish elsewhere?
-				select {
-				case <-signCtx.Done():
-					return
-				default:
+				var doneSharingKeys []string
+				getDoneSharingKey := func(otherPeer int) string {
+					return fmt.Sprintf("EphDone.%d.%d.%d.%d.%d", height, round, step, peerId, otherPeer)
+				}
+				doneSharingKeys = append(doneSharingKeys, getDoneSharingKey(ourID))
+				for _, nestedPeer := range pv.peers {
+					nestedPeerId := nestedPeer.GetID()
+					if peerId == nestedPeerId {
+						continue
+					}
+					doneSharingKeys = append(doneSharingKeys, getDoneSharingKey(nestedPeerId))
 				}
 
-				if err != nil {
-					fmt.Printf("ERROR HasEphemeralSecretPart: %s\n", err)
-					signCtxCancel()
-					return
+				// Wait for (threshold - 1) cosigner ephemeral shares to be saved for this peer
+				for signCtx.Err() == nil {
+					time.Sleep(100 * time.Millisecond)
+
+					doneSharingWithCount := 0
+
+					for _, doneSharingKey := range doneSharingKeys {
+						doneSharing, _ := pv.raftStore.Get(doneSharingKey)
+						if doneSharing == "true" {
+							doneSharingWithCount += 1
+						}
+					}
+					if doneSharingWithCount >= pv.threshold-1 {
+						// We have reached threshold ephemeral secret sharing for peer. Break out of poll
+						break
+					}
 				}
 
-				if !hasResp.Exists {
-					// if we don't already have an ephemeral secret part for the HRS, we need to get one
-					ephSecretResp, err := peer.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-						ID:           ourID,
-						Height:       height,
-						Round:        round,
-						Step:         step,
-						FindOrCreate: false,
-					})
+				// Cleanup keys.
+				// TODO: Does not clean up doneSharingKeys that came in after threshold.
+				for _, doneSharingKey := range doneSharingKeys {
+					pv.raftStore.Delete(doneSharingKey)
+				}
 
+				// Request signature from this peer since it has enough shares
+				err = pv.raftStore.Set(fmt.Sprintf("SignReq.%d", peerId), string(signReq))
+
+				var sigResp = &CosignerSignResponse{}
+				peerSignWatchKey := fmt.Sprintf("SignRes.%d.%d.%d.%d", height, round, step, peerId)
+				// Wait for sign response from this peer (or timeout)
+				for signCtx.Err() == nil {
+					time.Sleep(100 * time.Millisecond)
+					value, err := pv.raftStore.Get(peerSignWatchKey)
+					if err != nil || len(value) == 0 {
+						continue
+					}
+					err = json.Unmarshal([]byte(value), sigResp)
 					if err != nil {
-						fmt.Printf("ERROR GetEphemeralSecretPart %s\n", err)
+						fmt.Printf("Error during sign response unmarshal %v\n", err)
+						continue
 					}
-
-					// did we timeout or finish elsewhere?
-					select {
-					case <-signCtx.Done():
-						return
-					default:
-					}
-
-					if err != nil {
-						signCtxCancel()
-						return
-					}
-
-					// set the response for ourselves
-					err = pv.cosigner.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
-						SourceSig:                      ephSecretResp.SourceSig,
-						SourceID:                       ephSecretResp.SourceID,
-						SourceEphemeralSecretPublicKey: ephSecretResp.SourceEphemeralSecretPublicKey,
-						EncryptedSharePart:             ephSecretResp.EncryptedSharePart,
-						Height:                         height,
-						Round:                          round,
-						Step:                           step,
-					})
-
-					if err != nil {
-						fmt.Printf("ERROR SetEphemeralSecretPart %s\n", err)
-					}
-
-					// did we timeout or finish elsewhere?
-					select {
-					case <-signCtx.Done():
-						return
-					default:
-					}
-
-					if err != nil {
-						signCtxCancel()
-						return
-					}
+					// Got signature from peer, break out of poll
+					break
 				}
 
-				// ask the cosigner to sign with their share
-				sigResp, err := peer.Sign(CosignerSignRequest{
-					SignBytes: signBytes,
-				})
-
-				if err != nil {
-					fmt.Printf("ERROR Sign %s\n", err)
-				}
-
-				// did we timeout or finish elsewhere?
-				select {
-				case <-signCtx.Done():
-					return
-				default:
-				}
-
-				if err != nil {
-					signCtxCancel()
-					return
-				}
+				pv.raftStore.Delete(peerSignWatchKey)
 
 				// The signCtx is done if it times out or if the blockCtx done cancels it
 				select {
@@ -282,14 +296,18 @@ func (pv *ThresholdValidator) signBlock(chainID string, block *block) ([]byte, t
 			case <-signCtx.Done():
 			}
 
-			wg.Done()
+			// need this check so that wg.Done is not called more than (threshold - 1) times, which causes hardlock
+			thresholdProgress -= 1
+			if thresholdProgress >= 0 {
+				wg.Done()
+			}
 		}
 
 		go request(peer)
 	}
 
-	// Wait for all cosigners to be complete
-	// A Cosigner will either respond in time, or be canceled with timeout
+	// Wait for (threshold - 1) cosigners to be complete
+	// A Cosigner will either respond in time, or be cancelled with timeout
 	wg.Wait()
 
 	shareSignaturesMutex.Lock()

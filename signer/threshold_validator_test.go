@@ -121,11 +121,10 @@ func TestThresholdValidator2of2(test *testing.T) {
 	// An enhancement could be to have Local cosigner logic directly interface their peers.
 	{
 		cosigner1EphSecretPart, err := cosigner1.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-			ID:           2,
-			Height:       proposal.Height,
-			Round:        int64(proposal.Round),
-			Step:         ProposalToStep(&proposal),
-			FindOrCreate: true,
+			ID:     2,
+			Height: proposal.Height,
+			Round:  int64(proposal.Round),
+			Step:   ProposalToStep(&proposal),
 		})
 		require.NoError(test, err)
 
@@ -285,11 +284,10 @@ func TestThresholdValidator3of3(test *testing.T) {
 	// An enhancement could be to have Local cosigner logic directly interface their peers.
 	{
 		cosigner1EphSecretPart2, err := cosigner1.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-			ID:           2,
-			Height:       proposal.Height,
-			Round:        int64(proposal.Round),
-			Step:         ProposalToStep(&proposal),
-			FindOrCreate: true,
+			ID:     2,
+			Height: proposal.Height,
+			Round:  int64(proposal.Round),
+			Step:   ProposalToStep(&proposal),
 		})
 		require.NoError(test, err)
 
@@ -305,11 +303,10 @@ func TestThresholdValidator3of3(test *testing.T) {
 		require.NoError(test, err)
 
 		cosigner1EphSecretPart3, err := cosigner1.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-			ID:           3,
-			Height:       proposal.Height,
-			Round:        int64(proposal.Round),
-			Step:         ProposalToStep(&proposal),
-			FindOrCreate: false,
+			ID:     3,
+			Height: proposal.Height,
+			Round:  int64(proposal.Round),
+			Step:   ProposalToStep(&proposal),
 		})
 		require.NoError(test, err)
 
@@ -325,11 +322,10 @@ func TestThresholdValidator3of3(test *testing.T) {
 		require.NoError(test, err)
 
 		cosigner2EphSecretPart3, err := cosigner2.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-			ID:           3,
-			Height:       proposal.Height,
-			Round:        int64(proposal.Round),
-			Step:         ProposalToStep(&proposal),
-			FindOrCreate: false,
+			ID:     3,
+			Height: proposal.Height,
+			Round:  int64(proposal.Round),
+			Step:   ProposalToStep(&proposal),
 		})
 		require.NoError(test, err)
 
@@ -345,11 +341,10 @@ func TestThresholdValidator3of3(test *testing.T) {
 		require.NoError(test, err)
 
 		cosigner3EphSecretPart2, err := cosigner3.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-			ID:           2,
-			Height:       proposal.Height,
-			Round:        int64(proposal.Round),
-			Step:         ProposalToStep(&proposal),
-			FindOrCreate: false,
+			ID:     2,
+			Height: proposal.Height,
+			Round:  int64(proposal.Round),
+			Step:   ProposalToStep(&proposal),
 		})
 		require.NoError(test, err)
 
@@ -511,21 +506,11 @@ func TestThresholdValidator2of3(test *testing.T) {
 	//
 	// An enhancement could be to have Local cosigner logic directly interface their peers.
 	{
-		_, err := cosigner1.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-			ID:           2,
-			Height:       proposal.Height,
-			Round:        int64(proposal.Round),
-			Step:         ProposalToStep(&proposal),
-			FindOrCreate: true,
-		})
-		require.NoError(test, err)
-
 		cosigner1EphSecretPart3, err := cosigner1.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-			ID:           3,
-			Height:       proposal.Height,
-			Round:        int64(proposal.Round),
-			Step:         ProposalToStep(&proposal),
-			FindOrCreate: false,
+			ID:     3,
+			Height: proposal.Height,
+			Round:  int64(proposal.Round),
+			Step:   ProposalToStep(&proposal),
 		})
 		require.NoError(test, err)
 

@@ -12,8 +12,9 @@ type NodeConfig struct {
 }
 
 type CosignerConfig struct {
-	ID      int    `toml:"id"`
-	Address string `toml:"remote_address"`
+	ID          int    `toml:"id"`
+	Address     string `toml:"remote_address"`
+	RaftAddress string `toml:"remote_raft_address"`
 }
 
 type Config struct {

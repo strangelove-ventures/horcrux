@@ -545,8 +545,9 @@ func (c *Config) CosignerPeers() (out []signer.CosignerConfig) {
 }
 
 type CosignerPeer struct {
-	ShareID int    `json:"share-id" yaml:"share-id"`
-	P2PAddr string `json:"p2p-addr" yaml:"p2p-addr"`
+	ShareID  int    `json:"share-id" yaml:"share-id"`
+	P2PAddr  string `json:"p2p-addr" yaml:"p2p-addr"`
+	RaftAddr string `json:"raft-addr" yaml:"raft-addr"`
 }
 
 func validateCosignerPeers(peers []CosignerPeer, shares int) error {
@@ -578,7 +579,7 @@ func duplicatePeers(peers []CosignerPeer) (duplicates []CosignerPeer) {
 		if _, found := encountered[peer.ShareID]; !found {
 			encountered[peer.ShareID] = peer.P2PAddr
 		} else {
-			duplicates = append(duplicates, CosignerPeer{peer.ShareID, peer.P2PAddr})
+			duplicates = append(duplicates, CosignerPeer{peer.ShareID, peer.P2PAddr, peer.RaftAddr})
 		}
 	}
 	return

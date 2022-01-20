@@ -424,7 +424,6 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 }
 
 func TestDownedSigners(t *testing.T) {
-	t.Skip()
 	t.Parallel()
 	const totalValidators = 4
 	const totalSigners = 3
@@ -481,19 +480,19 @@ func TestDownedSigners(t *testing.T) {
 	initialMissed := ourValidator.EnsureNotSlashed()
 
 	// Test taking down each node in the signer cluster for a period of time
-	for i := range signers {
-		signer := signers[len(signers)-1-i]
+	for i := 0; i < len(signers)*2; i++ {
+		signer := signers[i%len(signers)]
 		t.Logf("{%s} -> Stopping signer...", signer.Name())
 		require.NoError(t, signer.StopContainer())
 
 		t.Logf("{%s} -> Checking that no blocks were missed...", ourValidator.Name())
-		initialMissed = ourValidator.EnsureNoMissedBlocks(initialMissed, 8)
+		initialMissed = ourValidator.EnsureNoMissedBlocks(initialMissed, 2) // allow up to 2 missed blocks
 
 		t.Logf("{%s} -> Restarting signer...", signer.Name())
 		require.NoError(t, signer.CreateCosignerContainer(network.ID))
 		require.NoError(t, signer.StartContainer())
 		signer.GetHosts().WaitForAllToStart(t, 10) // Wait to ensure signer is back up
-		time.Sleep(5 * time.Second)                // let container have some runtime before taking down the next one
+		time.Sleep(10 * time.Second)               // let container have some runtime before taking down the next one
 	}
 }
 

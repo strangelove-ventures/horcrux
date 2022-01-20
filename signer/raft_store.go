@@ -9,16 +9,20 @@ package signer
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/hashicorp/raft"
 	"github.com/tendermint/tendermint/libs/log"
 	"github.com/tendermint/tendermint/libs/service"
+	client "github.com/tendermint/tendermint/rpc/jsonrpc/client"
 )
 
 const (
@@ -31,6 +35,11 @@ type command struct {
 	Value string `json:"value,omitempty"`
 }
 
+type RaftPeer struct {
+	NodeID  string
+	Address string
+}
+
 // Store is a simple key-value store, where all changes are made via Raft consensus.
 type RaftStore struct {
 	service.BaseService
@@ -39,17 +48,20 @@ type RaftStore struct {
 	RaftDir     string
 	RaftBind    string
 	RaftTimeout time.Duration
+	RaftPeers   []RaftPeer
 
 	mu sync.Mutex
 	m  map[string]string // The key-value store for the system.
 
 	raft *raft.Raft // The consensus mechanism
 
-	logger log.Logger
+	logger             log.Logger
+	cosigner           *LocalCosigner
+	thresholdValidator *ThresholdValidator
 }
 
 // New returns a new Store.
-func NewRaftStore(nodeID string, directory string, bindAddress string, timeout time.Duration, logger log.Logger) *RaftStore {
+func NewRaftStore(nodeID string, directory string, bindAddress string, timeout time.Duration, logger log.Logger, cosigner *LocalCosigner, raftPeers []RaftPeer) *RaftStore {
 	cosignerRaftStore := &RaftStore{
 		NodeID:      nodeID,
 		RaftDir:     directory,
@@ -57,10 +69,16 @@ func NewRaftStore(nodeID string, directory string, bindAddress string, timeout t
 		RaftTimeout: timeout,
 		m:           make(map[string]string),
 		logger:      logger,
+		cosigner:    cosigner,
+		RaftPeers:   raftPeers,
 	}
 
 	cosignerRaftStore.BaseService = *service.NewBaseService(logger, "CosignerRaftStore", cosignerRaftStore)
 	return cosignerRaftStore
+}
+
+func (s *RaftStore) SetThresholdValidator(thresholdValidator *ThresholdValidator) {
+	s.thresholdValidator = thresholdValidator
 }
 
 // OnStart starts the raft server
@@ -69,6 +87,14 @@ func (s *RaftStore) OnStart() error {
 		//defer s.raft.Shutdown()
 		if err := s.Open(); err != nil {
 			s.logger.Error("failed to open raft store", err.Error())
+			return
+		}
+		if s.NodeID == "1" {
+			// Wait until bootstrap node is the leader
+			for s.raft.State() != raft.Leader {
+				time.Sleep(1 * time.Second)
+			}
+			s.JoinCosigners()
 		}
 	}()
 
@@ -82,6 +108,7 @@ func (s *RaftStore) Open() error {
 	// Setup Raft configuration.
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(s.NodeID)
+	config.LogLevel = "ERROR"
 
 	// Setup Raft communication.
 	addr, err := net.ResolveTCPAddr("tcp", s.RaftBind)
@@ -125,6 +152,16 @@ func (s *RaftStore) Open() error {
 	}
 
 	return nil
+}
+
+func (s *RaftStore) JoinCosigners() {
+	for _, peer := range s.RaftPeers {
+		fmt.Printf("Adding node to cluster: %s %s\n", peer.NodeID, peer.Address)
+		err := s.Join(peer.NodeID, peer.Address)
+		if err != nil {
+			s.logger.Error("Error joining cosigner to Raft cluster", peer.NodeID, err.Error())
+		}
+	}
 }
 
 // Get returns the value for the given key.
@@ -176,8 +213,6 @@ func (s *RaftStore) Delete(key string) error {
 // Join joins a node, identified by nodeID and located at addr, to this store.
 // The node must be ready to respond to Raft communications at that address.
 func (s *RaftStore) Join(nodeID, addr string) error {
-	s.logger.Info("received join request for remote node", nodeID, addr)
-
 	configFuture := s.raft.GetConfiguration()
 	if err := configFuture.Error(); err != nil {
 		s.logger.Error("failed to get raft configuration", err)
@@ -208,6 +243,10 @@ func (s *RaftStore) Join(nodeID, addr string) error {
 	}
 	s.logger.Info("node joined successfully", nodeID, addr)
 	return nil
+}
+
+func (s *RaftStore) GetLeader() raft.ServerAddress {
+	return s.raft.Leader()
 }
 
 type fsm RaftStore
@@ -257,7 +296,53 @@ func (f *fsm) Restore(rc io.ReadCloser) error {
 	return nil
 }
 
+func (f *fsm) shouldRetain(key string) bool {
+	// HRS are handled as events only
+	if key == "HRS" {
+		return false
+	}
+
+	if len(key) < 9 {
+		return true
+	}
+
+	// Sign Requests are handled as events only
+	if key[:8] == "SignReq." {
+		return false
+	}
+	// Drop receipts for old HRS
+	if key[:8] == "EphDone." {
+		keySplit := strings.Split(key, ".")
+		height, err := strconv.ParseInt(keySplit[1], 10, 64)
+		if err == nil {
+			lastSigned := (*RaftStore)(f).thresholdValidator.GetLastSigned()
+			if height == lastSigned.Height {
+				round, err := strconv.ParseInt(keySplit[2], 10, 64)
+				if err == nil {
+					if round == lastSigned.Round {
+						step, err := strconv.ParseInt(keySplit[3], 10, 8)
+						if err == nil {
+							if int8(step) <= lastSigned.Step {
+								return false
+							}
+						}
+					} else if round < lastSigned.Round {
+						return false
+					}
+				}
+			} else if height < lastSigned.Round {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func (f *fsm) applySet(key, value string) interface{} {
+	go f.handleSetEvents(key, value)
+	if !f.shouldRetain(key) {
+		return nil
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.m[key] = value
@@ -300,3 +385,221 @@ func (f *fsmSnapshot) Persist(sink raft.SnapshotSink) error {
 }
 
 func (f *fsmSnapshot) Release() {}
+
+func (s *RaftStore) GetLeaderRPCAddress() string {
+	leader := s.GetLeader()
+	leaderSplit := strings.Split(string(leader), ":")
+	leaderAddress := leaderSplit[0]
+	return fmt.Sprintf("tcp://%s:%s", leaderAddress, "2222")
+}
+
+func (s *RaftStore) LeaderSignBlock(req RpcRaftSignBlockRequest) (*RpcRaftSignBlockResponse, error) {
+	remoteClient, err := client.New(s.GetLeaderRPCAddress())
+	if err != nil {
+		return nil, err
+	}
+	params := map[string]interface{}{
+		"arg": req,
+	}
+	result := &RpcRaftSignBlockResponse{}
+	_, err = remoteClient.Call(ctx, "SignBlock", params, result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s *RaftStore) LeaderDelete(req RpcRaftRequest) (*RpcRaftResponse, error) {
+	remoteClient, err := client.New(s.GetLeaderRPCAddress())
+	if err != nil {
+		return nil, err
+	}
+	params := map[string]interface{}{
+		"arg": req,
+	}
+	result := &RpcRaftResponse{}
+	_, err = remoteClient.Call(ctx, "Delete", params, result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s *RaftStore) LeaderEmitEphemeralSecretPart(req RpcRaftEmitEphemeralSecretRequest) (*RpcRaftResponse, error) {
+	if s.raft.State() != raft.Leader {
+		return nil, errors.New("Not raft leader")
+	}
+	emitKey := fmt.Sprintf("Eph.%d.%d", req.DestinationID, req.SourceID)
+
+	ephScrtResJson, err := json.Marshal(req.EphemeralSecretPart)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.Set(emitKey, string(ephScrtResJson)); err != nil {
+		return nil, err
+	}
+
+	return &RpcRaftResponse{Key: emitKey}, nil
+}
+
+func (s *RaftStore) LeaderEmitEphemeralSecretPartReceipt(req RpcRaftEmitEphemeralSecretReceiptRequest) (*RpcRaftResponse, error) {
+	if s.raft.State() != raft.Leader {
+		return nil, errors.New("Not raft leader")
+	}
+	doneSharingKey := fmt.Sprintf("EphDone.%d.%d.%d.%d.%d", req.HRS.Height, req.HRS.Round, req.HRS.Step, req.DestinationID, req.SourceID)
+
+	if err := s.Set(doneSharingKey, "true"); err != nil {
+		return nil, err
+	}
+
+	return &RpcRaftResponse{Key: doneSharingKey}, nil
+}
+
+func (s *RaftStore) LeaderEmitSignature(req RpcRaftEmitSignatureRequest) (*RpcRaftResponse, error) {
+	if s.raft.State() != raft.Leader {
+		return nil, errors.New("Not raft leader")
+	}
+	signKey := fmt.Sprintf("SignRes.%d.%d.%d.%d", req.HRS.Height, req.HRS.Round, req.HRS.Step, req.SourceID)
+
+	signJson, err := json.Marshal(req.SignResponse)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.Set(signKey, string(signJson)); err != nil {
+		return nil, err
+	}
+
+	return &RpcRaftResponse{Key: signKey}, nil
+}
+
+func (f *fsm) handleHRSEvent(hrsKey *HRSKey) {
+	for _, peer := range f.cosigner.GetPeers() {
+		peerID := peer.ID
+		// needed since we are included in peers
+		if peerID == f.cosigner.GetID() {
+			continue
+		}
+		ephScrtRes, err := f.cosigner.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
+			ID:     peerID,
+			Height: hrsKey.Height,
+			Round:  hrsKey.Round,
+			Step:   hrsKey.Step,
+		})
+		if err != nil {
+			fmt.Printf("Eph Scrt Req Error: %v\n", err)
+			continue
+		}
+		(*RaftStore)(f).EmitEphemeralSecretPart(RpcRaftEmitEphemeralSecretRequest{
+			SourceID:            f.cosigner.GetID(),
+			DestinationID:       peerID,
+			EphemeralSecretPart: ephScrtRes,
+		})
+	}
+}
+
+func (f *fsm) handleSetEvents(key, value string) {
+	if key == "HRS" {
+		hrsKey := &HRSKey{}
+		err := json.Unmarshal([]byte(value), hrsKey)
+		if err != nil {
+			fmt.Printf("HRS Unmarshal Error: %v\n", err)
+			return
+		}
+		f.handleHRSEvent(hrsKey)
+		return
+	}
+	for _, peer := range f.cosigner.GetPeers() {
+		peerWatchKey := fmt.Sprintf("Eph.%d.%d", f.cosigner.GetID(), peer.ID)
+		if key == peerWatchKey {
+			var ephScrtRes = &CosignerGetEphemeralSecretPartResponse{}
+			err := json.Unmarshal([]byte(value), ephScrtRes)
+			if err != nil {
+				fmt.Printf("Eph Scrt Unmarshal Error: %v\n", err)
+				continue
+			}
+			err = f.cosigner.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
+				SourceSig:                      ephScrtRes.SourceSig,
+				SourceID:                       ephScrtRes.SourceID,
+				SourceEphemeralSecretPublicKey: ephScrtRes.SourceEphemeralSecretPublicKey,
+				EncryptedSharePart:             ephScrtRes.EncryptedSharePart,
+				Height:                         ephScrtRes.Height,
+				Round:                          ephScrtRes.Round,
+				Step:                           ephScrtRes.Step,
+			})
+			if err != nil {
+				fmt.Printf("Eph Scrt Set Error: %v\n", err)
+				continue
+			}
+			(*RaftStore)(f).EmitEphemeralSecretPartReceipt(RpcRaftEmitEphemeralSecretReceiptRequest{
+				DestinationID: f.cosigner.GetID(),
+				SourceID:      peer.ID,
+				HRS: HRSKey{
+					Height: ephScrtRes.Height,
+					Round:  ephScrtRes.Round,
+					Step:   ephScrtRes.Step,
+				},
+			})
+			return
+		}
+	}
+
+	signWatchKey := fmt.Sprintf("SignReq.%d", f.cosigner.GetID())
+	if key == signWatchKey {
+		var req = &CosignerSignRequest{}
+		err := json.Unmarshal([]byte(value), req)
+		signRes, err := f.cosigner.Sign(*req)
+		if err != nil {
+			fmt.Printf("Sign Req Error: %v\n", err)
+			return
+		}
+		(*RaftStore)(f).EmitSignature(RpcRaftEmitSignatureRequest{
+			HRS: HRSKey{
+				Height: signRes.Height,
+				Round:  signRes.Round,
+				Step:   signRes.Step,
+			},
+			SourceID:     f.cosigner.GetID(),
+			SignResponse: signRes,
+		})
+		return
+	}
+}
+
+func (s *RaftStore) callLeaderRPC(method string, req interface{}) (*RpcRaftResponse, error) {
+	remoteClient, err := client.New(s.GetLeaderRPCAddress())
+	if err != nil {
+		return nil, err
+	}
+	params := map[string]interface{}{
+		"arg": req,
+	}
+	result := &RpcRaftResponse{}
+	_, err = remoteClient.Call(ctx, method, params, result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s *RaftStore) EmitEphemeralSecretPart(req RpcRaftEmitEphemeralSecretRequest) (*RpcRaftResponse, error) {
+	if s.raft.State() == raft.Leader {
+		return s.LeaderEmitEphemeralSecretPart(req)
+	}
+	return s.callLeaderRPC("EmitEphemeralSecretPart", req)
+}
+
+func (s *RaftStore) EmitEphemeralSecretPartReceipt(req RpcRaftEmitEphemeralSecretReceiptRequest) (*RpcRaftResponse, error) {
+	if s.raft.State() == raft.Leader {
+		return s.LeaderEmitEphemeralSecretPartReceipt(req)
+	}
+	return s.callLeaderRPC("EmitEphemeralSecretPartReceipt", req)
+}
+
+func (s *RaftStore) EmitSignature(req RpcRaftEmitSignatureRequest) (*RpcRaftResponse, error) {
+	if s.raft.State() == raft.Leader {
+		return s.LeaderEmitSignature(req)
+	}
+	return s.callLeaderRPC("EmitSignature", req)
+}
