@@ -117,7 +117,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *block) ([]byte, t
 	height, round, step, stamp := block.Height, block.Round, block.Step, block.Timestamp
 
 	if pv.raftStore.raft.State() != raft.Leader {
-		signRes, err := pv.raftStore.LeaderSignBlock(RpcRaftSignBlockRequest{chainID, block})
+		signRes, err := pv.raftStore.LeaderSignBlock(RPCRaftSignBlockRequest{chainID, block})
 		if err != nil {
 			return nil, stamp, err
 		}
@@ -187,13 +187,13 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *block) ([]byte, t
 		Round:  round,
 		Step:   step,
 	}
-	hrsJson, err := json.Marshal(hrs)
+	hrsJSON, err := json.Marshal(hrs)
 	if err != nil {
 		return nil, stamp, err
 	}
 
 	// Send requested HRS to cluster to initiate ephemeral secret sharing amongst cosigners
-	err = pv.raftStore.Set("HRS", string(hrsJson))
+	err = pv.raftStore.Set("HRS", string(hrsJSON))
 
 	if err != nil {
 		return nil, stamp, err
@@ -221,11 +221,11 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *block) ([]byte, t
 				}
 				doneSharingKeys = append(doneSharingKeys, getDoneSharingKey(ourID))
 				for _, nestedPeer := range pv.peers {
-					nestedPeerId := nestedPeer.GetID()
-					if peerId == nestedPeerId {
+					nestedPeerID := nestedPeer.GetID()
+					if peerId == nestedPeerID {
 						continue
 					}
-					doneSharingKeys = append(doneSharingKeys, getDoneSharingKey(nestedPeerId))
+					doneSharingKeys = append(doneSharingKeys, getDoneSharingKey(nestedPeerID))
 				}
 
 				// Wait for (threshold - 1) cosigner ephemeral shares to be saved for this peer

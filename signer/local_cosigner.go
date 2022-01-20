@@ -400,7 +400,7 @@ func (cosigner *LocalCosigner) SetEphemeralSecretPart(req CosignerSetEphemeralSe
 		peer, ok := cosigner.peers[req.SourceID]
 
 		if !ok {
-			return fmt.Errorf("Unknown cosigner: %d", req.SourceID)
+			return fmt.Errorf("unknown cosigner: %d", req.SourceID)
 		}
 
 		peerPub := peer.PublicKey

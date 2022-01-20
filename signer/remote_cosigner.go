@@ -31,17 +31,19 @@ func (cosigner *RemoteCosigner) GetID() int {
 }
 
 func (cosigner *RemoteCosigner) Sign(signReq CosignerSignRequest) (CosignerSignResponse, error) {
-	return CosignerSignResponse{}, errors.New("Not Implemented")
+	return CosignerSignResponse{}, errors.New("not Implemented")
 }
 
-func (cosigner *RemoteCosigner) GetEphemeralSecretPart(req CosignerGetEphemeralSecretPartRequest) (CosignerGetEphemeralSecretPartResponse, error) {
-	return CosignerGetEphemeralSecretPartResponse{}, errors.New("Not Implemented")
+func (cosigner *RemoteCosigner) GetEphemeralSecretPart(
+	req CosignerGetEphemeralSecretPartRequest) (CosignerGetEphemeralSecretPartResponse, error) {
+	return CosignerGetEphemeralSecretPartResponse{}, errors.New("not Implemented")
 }
 
-func (cosigner *RemoteCosigner) HasEphemeralSecretPart(req CosignerHasEphemeralSecretPartRequest) (CosignerHasEphemeralSecretPartResponse, error) {
-	return CosignerHasEphemeralSecretPartResponse{}, errors.New("Not Implemented")
+func (cosigner *RemoteCosigner) HasEphemeralSecretPart(
+	req CosignerHasEphemeralSecretPartRequest) (CosignerHasEphemeralSecretPartResponse, error) {
+	return CosignerHasEphemeralSecretPartResponse{}, errors.New("not Implemented")
 }
 
 func (cosigner *RemoteCosigner) SetEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest) error {
-	return errors.New("Not Implemented")
+	return errors.New("not Implemented")
 }

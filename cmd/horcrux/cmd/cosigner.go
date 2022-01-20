@@ -133,7 +133,8 @@ func StartCosignerCmd() *cobra.Command {
 			nodeID := fmt.Sprint(key.ID)
 
 			// Start RAFT store listener
-			raftStore := signer.NewRaftStore(nodeID, raftDir, cfg.RaftListenAddress, timeout, logger, localCosigner, cfg.Cosigners)
+			raftStore := signer.NewRaftStore(nodeID,
+				raftDir, cfg.RaftListenAddress, timeout, logger, localCosigner, cfg.Cosigners)
 			if err := raftStore.Start(); err != nil {
 				log.Fatalf("Error starting raft store: %v\n", err)
 			}

@@ -39,7 +39,7 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 		CosignerKey: key,
 		SignState:   &signState,
 		RsaKey:      *rsaKey,
-		Peers: []CosignerPeer{CosignerPeer{
+		Peers: []CosignerPeer{{
 			ID:        1,
 			PublicKey: rsaKey.PublicKey,
 		}},

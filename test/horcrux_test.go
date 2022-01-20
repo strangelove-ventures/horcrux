@@ -485,7 +485,7 @@ func TestDownedSigners(t *testing.T) {
 		require.NoError(t, signer.StopContainer())
 
 		t.Logf("{%s} -> Checking that no blocks were missed...", ourValidator.Name())
-		initialMissed = ourValidator.EnsureNoMissedBlocks(initialMissed, 2) // allow up to 2 missed blocks
+		initialMissed = ourValidator.EnsureNoMissedBlocks(initialMissed, 5) // allow up to 5 missed blocks
 
 		t.Logf("{%s} -> Restarting signer...", signer.Name())
 		require.NoError(t, signer.CreateCosignerContainer(network.ID))

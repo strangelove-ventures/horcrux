@@ -37,7 +37,7 @@ func TestLocalCosignerGetID(test *testing.T) {
 		CosignerKey: key,
 		SignState:   &signState,
 		RsaKey:      *rsaKey,
-		Peers: []CosignerPeer{CosignerPeer{
+		Peers: []CosignerPeer{{
 			ID:        1,
 			PublicKey: rsaKey.PublicKey,
 		}},
@@ -60,10 +60,10 @@ func TestLocalCosignerSign2of2(test *testing.T) {
 	rsaKey2, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(test, err)
 
-	peers := []CosignerPeer{CosignerPeer{
+	peers := []CosignerPeer{{
 		ID:        1,
 		PublicKey: rsaKey1.PublicKey,
-	}, CosignerPeer{
+	}, {
 		ID:        2,
 		PublicKey: rsaKey2.PublicKey,
 	}}

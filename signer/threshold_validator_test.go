@@ -186,10 +186,10 @@ func TestThresholdValidator2of2(test *testing.T) {
 
 		signKey2 := fmt.Sprintf("SignRes.%d.%d.%d.%d", HRS.Height, HRS.Round, HRS.Step, 2)
 
-		signJson2, err := json.Marshal(signRes2)
+		signJSON2, err := json.Marshal(signRes2)
 		require.NoError(test, err)
 
-		err = raftStore.Set(signKey2, string(signJson2))
+		err = raftStore.Set(signKey2, string(signJSON2))
 		require.NoError(test, err)
 		time.Sleep(500 * time.Millisecond) // Wait for raft key to apply
 	}
@@ -517,10 +517,10 @@ func TestThresholdValidator3of3(test *testing.T) {
 
 		signKey2 := fmt.Sprintf("SignRes.%d.%d.%d.%d", HRS.Height, HRS.Round, HRS.Step, 2)
 
-		signJson2, err := json.Marshal(signRes2)
+		signJSON2, err := json.Marshal(signRes2)
 		require.NoError(test, err)
 
-		err = raftStore.Set(signKey2, string(signJson2))
+		err = raftStore.Set(signKey2, string(signJSON2))
 		require.NoError(test, err)
 		time.Sleep(500 * time.Millisecond) // Wait for raft key to apply
 
@@ -531,10 +531,10 @@ func TestThresholdValidator3of3(test *testing.T) {
 
 		signKey3 := fmt.Sprintf("SignRes.%d.%d.%d.%d", HRS.Height, HRS.Round, HRS.Step, 3)
 
-		signJson3, err := json.Marshal(signRes3)
+		signJSON3, err := json.Marshal(signRes3)
 		require.NoError(test, err)
 
-		err = raftStore.Set(signKey3, string(signJson3))
+		err = raftStore.Set(signKey3, string(signJSON3))
 		require.NoError(test, err)
 		time.Sleep(500 * time.Millisecond) // Wait for raft key to apply
 	}
@@ -731,10 +731,10 @@ func TestThresholdValidator2of3(test *testing.T) {
 
 		signKey3 := fmt.Sprintf("SignRes.%d.%d.%d.%d", HRS.Height, HRS.Round, HRS.Step, 3)
 
-		signJson3, err := json.Marshal(signRes3)
+		signJSON3, err := json.Marshal(signRes3)
 		require.NoError(test, err)
 
-		err = raftStore.Set(signKey3, string(signJson3))
+		err = raftStore.Set(signKey3, string(signJSON3))
 		require.NoError(test, err)
 		time.Sleep(500 * time.Millisecond) // Wait for raft key to apply
 

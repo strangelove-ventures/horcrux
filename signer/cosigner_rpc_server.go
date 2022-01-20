@@ -13,30 +13,30 @@ import (
 	rpc_types "github.com/tendermint/tendermint/rpc/jsonrpc/types"
 )
 
-type RpcRaftEmitEphemeralSecretRequest struct {
+type RPCRaftEmitEphemeralSecretRequest struct {
 	SourceID            int
 	DestinationID       int
 	EphemeralSecretPart CosignerGetEphemeralSecretPartResponse
 }
 
-type RpcRaftEmitEphemeralSecretReceiptRequest struct {
+type RPCRaftEmitEphemeralSecretReceiptRequest struct {
 	HRS           HRSKey
 	SourceID      int
 	DestinationID int
 }
 
-type RpcRaftEmitSignatureRequest struct {
+type RPCRaftEmitSignatureRequest struct {
 	HRS          HRSKey
 	SourceID     int
 	SignResponse CosignerSignResponse
 }
 
-type RpcJoinRaftRequest struct {
+type RPCJoinRaftRequest struct {
 	NodeID  string
 	Address string
 }
 
-type RpcRaftRequest struct {
+type RPCRaftRequest struct {
 	Key   string
 	Value string
 }
@@ -51,19 +51,19 @@ type CosignerRpcServerConfig struct {
 	ThresholdValidator *ThresholdValidator
 }
 
-type RpcJoinRaftResponse struct{}
+type RPCJoinRaftResponse struct{}
 
-type RpcRaftResponse struct {
+type RPCRaftResponse struct {
 	Key   string
 	Value string
 }
 
-type RpcRaftSignBlockRequest struct {
+type RPCRaftSignBlockRequest struct {
 	ChainID string
 	Block   *block
 }
 
-type RpcRaftSignBlockResponse struct {
+type RPCRaftSignBlockResponse struct {
 	Signature []byte
 }
 
@@ -137,28 +137,33 @@ func (rpcServer *CosignerRpcServer) Addr() net.Addr {
 	return rpcServer.listener.Addr()
 }
 
-func (rpcServer *CosignerRpcServer) rpcRaftGetLeaderRequest(ctx *rpc_types.Context, req RpcRaftRequest) (raft.ServerAddress, error) {
+func (rpcServer *CosignerRpcServer) rpcRaftGetLeaderRequest(
+	ctx *rpc_types.Context, req RPCRaftRequest) (raft.ServerAddress, error) {
 	return rpcServer.raftStore.GetLeader(), nil
 }
 
-func (rpcServer *CosignerRpcServer) rpcRaftSignBlockRequest(ctx *rpc_types.Context, req RpcRaftSignBlockRequest) (*RpcRaftSignBlockResponse, error) {
+func (rpcServer *CosignerRpcServer) rpcRaftSignBlockRequest(
+	ctx *rpc_types.Context, req RPCRaftSignBlockRequest) (*RPCRaftSignBlockResponse, error) {
 	res, _, err := rpcServer.thresholdValidator.SignBlock(req.ChainID, req.Block)
 	if err != nil {
 		return nil, err
 	}
-	return &RpcRaftSignBlockResponse{
+	return &RPCRaftSignBlockResponse{
 		Signature: res,
 	}, nil
 }
 
-func (rpcServer *CosignerRpcServer) rpcRaftEmitEphemeralSecretPartRequest(ctx *rpc_types.Context, req RpcRaftEmitEphemeralSecretRequest) (*RpcRaftResponse, error) {
+func (rpcServer *CosignerRpcServer) rpcRaftEmitEphemeralSecretPartRequest(
+	ctx *rpc_types.Context, req RPCRaftEmitEphemeralSecretRequest) (*RPCRaftResponse, error) {
 	return rpcServer.raftStore.LeaderEmitEphemeralSecretPart(req)
 }
 
-func (rpcServer *CosignerRpcServer) rpcRaftEmitEphemeralSecretPartReceiptRequest(ctx *rpc_types.Context, req RpcRaftEmitEphemeralSecretReceiptRequest) (*RpcRaftResponse, error) {
+func (rpcServer *CosignerRpcServer) rpcRaftEmitEphemeralSecretPartReceiptRequest(
+	ctx *rpc_types.Context, req RPCRaftEmitEphemeralSecretReceiptRequest) (*RPCRaftResponse, error) {
 	return rpcServer.raftStore.LeaderEmitEphemeralSecretPartReceipt(req)
 }
 
-func (rpcServer *CosignerRpcServer) rpcRaftEmitSignatureRequest(ctx *rpc_types.Context, req RpcRaftEmitSignatureRequest) (*RpcRaftResponse, error) {
+func (rpcServer *CosignerRpcServer) rpcRaftEmitSignatureRequest(
+	ctx *rpc_types.Context, req RPCRaftEmitSignatureRequest) (*RPCRaftResponse, error) {
 	return rpcServer.raftStore.LeaderEmitSignature(req)
 }
