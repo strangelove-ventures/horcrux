@@ -541,6 +541,9 @@ func (f *fsm) handleSetEvents(key, value string) {
 				fmt.Printf("Eph Scrt Set Error: %v\n", err)
 				continue
 			}
+			// fmt.Printf("Emitting ephemeral sharing receipt from signer %d for HRS %d.%d.%d\n", peer.ID, ephScrtRes.Height,
+			// 	ephScrtRes.Round,
+			// 	ephScrtRes.Step)
 			_, err = (*RaftStore)(f).EmitEphemeralSecretPartReceipt(RPCRaftEmitEphemeralSecretReceiptRequest{
 				DestinationID: f.cosigner.GetID(),
 				SourceID:      peer.ID,
@@ -570,6 +573,9 @@ func (f *fsm) handleSetEvents(key, value string) {
 			fmt.Printf("Sign Req Error: %v\n", err)
 			return
 		}
+		// fmt.Printf("Emitting signature for %d.%d.%d\n", signRes.Height,
+		// 	signRes.Round,
+		// 	signRes.Step)
 		_, err = (*RaftStore)(f).EmitSignature(RPCRaftEmitSignatureRequest{
 			HRS: HRSKey{
 				Height: signRes.Height,

@@ -117,12 +117,15 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *block) ([]byte, t
 	height, round, step, stamp := block.Height, block.Round, block.Step, block.Timestamp
 
 	if pv.raftStore.raft.State() != raft.Leader {
+		// fmt.Printf("I am NOT the raft leader. Proxying request to the leader\n")
 		signRes, err := pv.raftStore.LeaderSignBlock(RPCRaftSignBlockRequest{chainID, block})
 		if err != nil {
 			return nil, stamp, err
 		}
 		return signRes.Signature, stamp, nil
 	}
+
+	// fmt.Printf("I am the raft leader. Managing the sign process for this block\n")
 
 	// the block sign state for caching full block signatures
 	lss := pv.lastSignState
