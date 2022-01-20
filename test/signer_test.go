@@ -211,7 +211,7 @@ func (ts TestSigners) PeerString(skip int) string {
 	for _, s := range ts {
 		// Skip over the calling signer so its peer list does not include itself
 		if s.Index != skip {
-			out.WriteString(fmt.Sprintf("tcp://%s:%s|%d,", s.Name(), signerPort, s.Index))
+			out.WriteString(fmt.Sprintf("tcp://%s:%s|%s|%d,", s.Name(), signerPort, raftPort, s.Index))
 		}
 	}
 	return strings.TrimSuffix(out.String(), ",")

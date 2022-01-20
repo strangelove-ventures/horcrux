@@ -135,10 +135,6 @@ func (cosigner *LocalCosigner) GetID() int {
 	return cosigner.key.ID
 }
 
-func (cosigner *LocalCosigner) GetPeers() map[int]CosignerPeer {
-	return cosigner.peers
-}
-
 // Sign the sign request using the cosigner's share
 // Return the signed bytes or an error
 // Implements Cosigner interface
@@ -239,7 +235,7 @@ func (cosigner *LocalCosigner) Sign(req CosignerSignRequest) (CosignerSignRespon
 	return res, nil
 }
 
-func (cosigner *LocalCosigner) DealShares(req CosignerGetEphemeralSecretPartRequest) HrsMetadata {
+func (cosigner *LocalCosigner) DealShares(req CosignerGetEphemeralSecretPartRequest) (HrsMetadata, error) {
 	hrsKey := HRSKey{
 		Height: req.Height,
 		Round:  req.Round,
@@ -249,11 +245,13 @@ func (cosigner *LocalCosigner) DealShares(req CosignerGetEphemeralSecretPartRequ
 	meta, ok := cosigner.hrsMeta[hrsKey]
 
 	if ok {
-		return meta
+		return meta, nil
 	}
 
 	secret := make([]byte, 32)
-	rand.Read(secret)
+	if _, err := rand.Read(secret); err != nil {
+		return HrsMetadata{}, err
+	}
 
 	meta = HrsMetadata{
 		Secret: secret,
@@ -266,18 +264,14 @@ func (cosigner *LocalCosigner) DealShares(req CosignerGetEphemeralSecretPartRequ
 
 	cosigner.hrsMeta[hrsKey] = meta
 
-	return meta
+	return meta, nil
 
 }
 
 // Get the ephemeral secret part for an ephemeral share
 // The ephemeral secret part is encrypted for the receiver
 func (cosigner *LocalCosigner) GetEphemeralSecretPart(req CosignerGetEphemeralSecretPartRequest) (CosignerGetEphemeralSecretPartResponse, error) {
-	res := CosignerGetEphemeralSecretPartResponse{
-		Height: req.Height,
-		Round:  req.Round,
-		Step:   req.Step,
-	}
+	res := CosignerGetEphemeralSecretPartResponse{}
 
 	// protects the meta map
 	cosigner.lastSignStateMutex.Lock()
@@ -292,12 +286,17 @@ func (cosigner *LocalCosigner) GetEphemeralSecretPart(req CosignerGetEphemeralSe
 	meta, ok := cosigner.hrsMeta[hrsKey]
 	// generate metadata placeholder
 	if !ok {
-		meta = cosigner.DealShares(CosignerGetEphemeralSecretPartRequest{
+		newMeta, err := cosigner.DealShares(CosignerGetEphemeralSecretPartRequest{
 			Height: req.Height,
 			Round:  req.Round,
 			Step:   req.Step,
 		})
 
+		if err != nil {
+			return res, err
+		}
+
+		meta = newMeta
 		cosigner.hrsMeta[hrsKey] = meta
 	}
 
@@ -344,6 +343,10 @@ func (cosigner *LocalCosigner) GetEphemeralSecretPart(req CosignerGetEphemeralSe
 		res.SourceSig = signature
 	}
 
+	res.Height = req.Height
+	res.Round = req.Round
+	res.Step = req.Step
+
 	return res, nil
 }
 
@@ -388,25 +391,24 @@ func (cosigner *LocalCosigner) SetEphemeralSecretPart(req CosignerSetEphemeralSe
 		digestMsg.SourceEphemeralSecretPublicKey = req.SourceEphemeralSecretPublicKey
 		digestMsg.EncryptedSharePart = req.EncryptedSharePart
 
-		//digestBytes, err := tmJson.Marshal(digestMsg)
-		_, err := tmJson.Marshal(digestMsg)
+		digestBytes, err := tmJson.Marshal(digestMsg)
 		if err != nil {
 			return err
 		}
 
-		// digest := sha256.Sum256(digestBytes)
-		// peer, ok := cosigner.peers[req.SourceID]
+		digest := sha256.Sum256(digestBytes)
+		peer, ok := cosigner.peers[req.SourceID]
 
-		// if !ok {
-		// 	return fmt.Errorf("Unknown cosigner: %d", req.SourceID)
-		// }
+		if !ok {
+			return fmt.Errorf("Unknown cosigner: %d", req.SourceID)
+		}
 
-		// peerPub := peer.PublicKey
-		// err = rsa.VerifyPSS(&peerPub, crypto.SHA256, digest[:], req.SourceSig, nil)
-		// if err != nil {
-		// 	fmt.Printf("Verify PSS Error: %d %v\n", req.SourceID, err)
-		// 	return err
-		// }
+		peerPub := peer.PublicKey
+		err = rsa.VerifyPSS(&peerPub, crypto.SHA256, digest[:], req.SourceSig, nil)
+		if err != nil {
+			fmt.Printf("Verify PSS Error: %d %v\n", req.SourceID, err)
+			return err
+		}
 	}
 
 	// protects the meta map
@@ -422,12 +424,17 @@ func (cosigner *LocalCosigner) SetEphemeralSecretPart(req CosignerSetEphemeralSe
 	meta, ok := cosigner.hrsMeta[hrsKey]
 	// generate metadata placeholder
 	if !ok {
-		meta = cosigner.DealShares(CosignerGetEphemeralSecretPartRequest{
+		newMeta, err := cosigner.DealShares(CosignerGetEphemeralSecretPartRequest{
 			Height: req.Height,
 			Round:  req.Round,
 			Step:   req.Step,
 		})
 
+		if err != nil {
+			return err
+		}
+
+		meta = newMeta
 		cosigner.hrsMeta[hrsKey] = meta
 	}
 

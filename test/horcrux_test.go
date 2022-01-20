@@ -480,8 +480,7 @@ func TestDownedSigners(t *testing.T) {
 	initialMissed := ourValidator.EnsureNotSlashed()
 
 	// Test taking down each node in the signer cluster for a period of time
-	for i := 0; i < len(signers)*2; i++ {
-		signer := signers[i%len(signers)]
+	for _, signer := range signers {
 		t.Logf("{%s} -> Stopping signer...", signer.Name())
 		require.NoError(t, signer.StopContainer())
 

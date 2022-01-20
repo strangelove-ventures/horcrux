@@ -539,7 +539,7 @@ type CosignerConfig struct {
 
 func (c *Config) CosignerPeers() (out []signer.CosignerConfig) {
 	for _, p := range c.CosignerConfig.Peers {
-		out = append(out, signer.CosignerConfig{ID: p.ShareID, Address: p.P2PAddr})
+		out = append(out, signer.CosignerConfig{ID: p.ShareID, Address: p.P2PAddr, RaftAddress: p.RaftAddr})
 	}
 	return
 }
@@ -588,19 +588,21 @@ func duplicatePeers(peers []CosignerPeer) (duplicates []CosignerPeer) {
 func peersFromFlag(peers string) (out []CosignerPeer, err error) {
 	for _, p := range strings.Split(peers, ",") {
 		ps := strings.Split(p, "|")
-		if len(ps) != 2 {
+		if len(ps) != 3 {
 			fmt.Println(ps)
 			return nil, fmt.Errorf("invalid peer string %s", p)
 		}
-		shareid, err := strconv.ParseInt(ps[1], 10, 64)
+		shareid, err := strconv.ParseInt(ps[2], 10, 64)
 		if err != nil {
 			return nil, err
 		}
-		_, err = url.Parse(ps[0])
+		address, err := url.Parse(ps[0])
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, CosignerPeer{ShareID: int(shareid), P2PAddr: ps[0]})
+		addressSplit := strings.Split(address.Host, ":")
+		raftAddress := fmt.Sprintf("%s:%s", addressSplit[0], ps[1])
+		out = append(out, CosignerPeer{ShareID: int(shareid), P2PAddr: ps[0], RaftAddr: raftAddress})
 	}
 	return
 }

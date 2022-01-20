@@ -35,11 +35,6 @@ type command struct {
 	Value string `json:"value,omitempty"`
 }
 
-type RaftPeer struct {
-	NodeID  string
-	Address string
-}
-
 // Store is a simple key-value store, where all changes are made via Raft consensus.
 type RaftStore struct {
 	service.BaseService
@@ -48,7 +43,7 @@ type RaftStore struct {
 	RaftDir     string
 	RaftBind    string
 	RaftTimeout time.Duration
-	RaftPeers   []RaftPeer
+	Peers       []CosignerConfig
 
 	mu sync.Mutex
 	m  map[string]string // The key-value store for the system.
@@ -61,7 +56,7 @@ type RaftStore struct {
 }
 
 // New returns a new Store.
-func NewRaftStore(nodeID string, directory string, bindAddress string, timeout time.Duration, logger log.Logger, cosigner *LocalCosigner, raftPeers []RaftPeer) *RaftStore {
+func NewRaftStore(nodeID string, directory string, bindAddress string, timeout time.Duration, logger log.Logger, cosigner *LocalCosigner, raftPeers []CosignerConfig) *RaftStore {
 	cosignerRaftStore := &RaftStore{
 		NodeID:      nodeID,
 		RaftDir:     directory,
@@ -70,7 +65,7 @@ func NewRaftStore(nodeID string, directory string, bindAddress string, timeout t
 		m:           make(map[string]string),
 		logger:      logger,
 		cosigner:    cosigner,
-		RaftPeers:   raftPeers,
+		Peers:       raftPeers,
 	}
 
 	cosignerRaftStore.BaseService = *service.NewBaseService(logger, "CosignerRaftStore", cosignerRaftStore)
@@ -81,6 +76,10 @@ func (s *RaftStore) SetThresholdValidator(thresholdValidator *ThresholdValidator
 	s.thresholdValidator = thresholdValidator
 }
 
+func (s *RaftStore) isInitialLeader() bool {
+	return s.NodeID == "1"
+}
+
 // OnStart starts the raft server
 func (s *RaftStore) OnStart() error {
 	go func() {
@@ -89,7 +88,7 @@ func (s *RaftStore) OnStart() error {
 			s.logger.Error("failed to open raft store", err.Error())
 			return
 		}
-		if s.NodeID == "1" {
+		if s.isInitialLeader() {
 			// Wait until bootstrap node is the leader
 			for s.raft.State() != raft.Leader {
 				time.Sleep(1 * time.Second)
@@ -139,7 +138,7 @@ func (s *RaftStore) Open() error {
 	}
 	s.raft = ra
 
-	if s.NodeID == "1" {
+	if s.isInitialLeader() {
 		configuration := raft.Configuration{
 			Servers: []raft.Server{
 				{
@@ -155,11 +154,12 @@ func (s *RaftStore) Open() error {
 }
 
 func (s *RaftStore) JoinCosigners() {
-	for _, peer := range s.RaftPeers {
-		fmt.Printf("Adding node to cluster: %s %s\n", peer.NodeID, peer.Address)
-		err := s.Join(peer.NodeID, peer.Address)
+	for _, peer := range s.Peers {
+		nodeID := fmt.Sprint(peer.ID)
+		fmt.Printf("Adding node to cluster: %s %s\n", nodeID, peer.RaftAddress)
+		err := s.Join(nodeID, peer.RaftAddress)
 		if err != nil {
-			s.logger.Error("Error joining cosigner to Raft cluster", peer.NodeID, err.Error())
+			s.logger.Error("Error joining cosigner to Raft cluster", nodeID, err.Error())
 		}
 	}
 }
@@ -378,7 +378,10 @@ func (f *fsmSnapshot) Persist(sink raft.SnapshotSink) error {
 	}()
 
 	if err != nil {
-		sink.Cancel()
+		err2 := sink.Cancel()
+		if err2 != nil {
+			fmt.Printf("Error cancelling sink: %v\n", err2)
+		}
 	}
 
 	return err
@@ -386,15 +389,33 @@ func (f *fsmSnapshot) Persist(sink raft.SnapshotSink) error {
 
 func (f *fsmSnapshot) Release() {}
 
-func (s *RaftStore) GetLeaderRPCAddress() string {
-	leader := s.GetLeader()
-	leaderSplit := strings.Split(string(leader), ":")
-	leaderAddress := leaderSplit[0]
-	return fmt.Sprintf("tcp://%s:%s", leaderAddress, "2222")
+func (s *RaftStore) GetLeaderRPCAddress() (string, error) {
+	leader := string(s.GetLeader())
+	for _, peer := range s.Peers {
+		peerSplit := strings.Split(peer.RaftAddress, ":")
+		ips, err := net.LookupIP(peerSplit[0])
+		if err == nil {
+			for _, ip := range ips {
+				peerAddress := fmt.Sprintf("%s:%s", ip, peerSplit[1])
+				if peerAddress == leader {
+					return peer.Address, nil
+				}
+			}
+		} else {
+			if peer.Address == leader {
+				return peer.Address, nil
+			}
+		}
+	}
+	return "", errors.New("Unable to find leader address")
 }
 
 func (s *RaftStore) LeaderSignBlock(req RpcRaftSignBlockRequest) (*RpcRaftSignBlockResponse, error) {
-	remoteClient, err := client.New(s.GetLeaderRPCAddress())
+	leaderAddress, err := s.GetLeaderRPCAddress()
+	if err != nil {
+		return nil, err
+	}
+	remoteClient, err := client.New(leaderAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -403,22 +424,6 @@ func (s *RaftStore) LeaderSignBlock(req RpcRaftSignBlockRequest) (*RpcRaftSignBl
 	}
 	result := &RpcRaftSignBlockResponse{}
 	_, err = remoteClient.Call(ctx, "SignBlock", params, result)
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
-}
-
-func (s *RaftStore) LeaderDelete(req RpcRaftRequest) (*RpcRaftResponse, error) {
-	remoteClient, err := client.New(s.GetLeaderRPCAddress())
-	if err != nil {
-		return nil, err
-	}
-	params := map[string]interface{}{
-		"arg": req,
-	}
-	result := &RpcRaftResponse{}
-	_, err = remoteClient.Call(ctx, "Delete", params, result)
 	if err != nil {
 		return nil, err
 	}
@@ -475,7 +480,7 @@ func (s *RaftStore) LeaderEmitSignature(req RpcRaftEmitSignatureRequest) (*RpcRa
 }
 
 func (f *fsm) handleHRSEvent(hrsKey *HRSKey) {
-	for _, peer := range f.cosigner.GetPeers() {
+	for _, peer := range f.Peers {
 		peerID := peer.ID
 		// needed since we are included in peers
 		if peerID == f.cosigner.GetID() {
@@ -491,11 +496,14 @@ func (f *fsm) handleHRSEvent(hrsKey *HRSKey) {
 			fmt.Printf("Eph Scrt Req Error: %v\n", err)
 			continue
 		}
-		(*RaftStore)(f).EmitEphemeralSecretPart(RpcRaftEmitEphemeralSecretRequest{
+		_, err = (*RaftStore)(f).EmitEphemeralSecretPart(RpcRaftEmitEphemeralSecretRequest{
 			SourceID:            f.cosigner.GetID(),
 			DestinationID:       peerID,
 			EphemeralSecretPart: ephScrtRes,
 		})
+		if err != nil {
+			fmt.Printf("EmitEphemeralSecretPart Error: %v\n", err)
+		}
 	}
 }
 
@@ -510,7 +518,7 @@ func (f *fsm) handleSetEvents(key, value string) {
 		f.handleHRSEvent(hrsKey)
 		return
 	}
-	for _, peer := range f.cosigner.GetPeers() {
+	for _, peer := range f.Peers {
 		peerWatchKey := fmt.Sprintf("Eph.%d.%d", f.cosigner.GetID(), peer.ID)
 		if key == peerWatchKey {
 			var ephScrtRes = &CosignerGetEphemeralSecretPartResponse{}
@@ -532,7 +540,7 @@ func (f *fsm) handleSetEvents(key, value string) {
 				fmt.Printf("Eph Scrt Set Error: %v\n", err)
 				continue
 			}
-			(*RaftStore)(f).EmitEphemeralSecretPartReceipt(RpcRaftEmitEphemeralSecretReceiptRequest{
+			_, err = (*RaftStore)(f).EmitEphemeralSecretPartReceipt(RpcRaftEmitEphemeralSecretReceiptRequest{
 				DestinationID: f.cosigner.GetID(),
 				SourceID:      peer.ID,
 				HRS: HRSKey{
@@ -541,6 +549,9 @@ func (f *fsm) handleSetEvents(key, value string) {
 					Step:   ephScrtRes.Step,
 				},
 			})
+			if err != nil {
+				fmt.Printf("EmitEphemeralSecretPartReceipt Error: %v\n", err)
+			}
 			return
 		}
 	}
@@ -554,7 +565,7 @@ func (f *fsm) handleSetEvents(key, value string) {
 			fmt.Printf("Sign Req Error: %v\n", err)
 			return
 		}
-		(*RaftStore)(f).EmitSignature(RpcRaftEmitSignatureRequest{
+		_, err = (*RaftStore)(f).EmitSignature(RpcRaftEmitSignatureRequest{
 			HRS: HRSKey{
 				Height: signRes.Height,
 				Round:  signRes.Round,
@@ -563,12 +574,19 @@ func (f *fsm) handleSetEvents(key, value string) {
 			SourceID:     f.cosigner.GetID(),
 			SignResponse: signRes,
 		})
+		if err != nil {
+			fmt.Printf("EmitSignature Error: %v\n", err)
+		}
 		return
 	}
 }
 
 func (s *RaftStore) callLeaderRPC(method string, req interface{}) (*RpcRaftResponse, error) {
-	remoteClient, err := client.New(s.GetLeaderRPCAddress())
+	leaderAddress, err := s.GetLeaderRPCAddress()
+	if err != nil {
+		return nil, err
+	}
+	remoteClient, err := client.New(leaderAddress)
 	if err != nil {
 		return nil, err
 	}

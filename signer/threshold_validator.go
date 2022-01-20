@@ -246,10 +246,12 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *block) ([]byte, t
 					}
 				}
 
-				// Cleanup keys.
-				// TODO: Does not clean up doneSharingKeys that came in after threshold.
+				// Cleanup keys
 				for _, doneSharingKey := range doneSharingKeys {
-					pv.raftStore.Delete(doneSharingKey)
+					err = pv.raftStore.Delete(doneSharingKey)
+					if err != nil {
+						fmt.Printf("Error deleting raft key: %v\n", err)
+					}
 				}
 
 				// Request signature from this peer since it has enough shares
@@ -273,7 +275,10 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *block) ([]byte, t
 					break
 				}
 
-				pv.raftStore.Delete(peerSignWatchKey)
+				err = pv.raftStore.Delete(peerSignWatchKey)
+				if err != nil {
+					fmt.Printf("Error deleting raft key: %v\n", err)
+				}
 
 				// The signCtx is done if it times out or if the blockCtx done cancels it
 				select {

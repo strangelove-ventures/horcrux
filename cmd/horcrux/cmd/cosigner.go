@@ -5,8 +5,6 @@ import (
 	"log"
 	"os"
 	"path"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -127,26 +125,18 @@ func StartCosignerCmd() *cobra.Command {
 			timeout, _ := time.ParseDuration(config.CosignerConfig.Timeout)
 
 			raftDir := path.Join(config.HomeDir, "raft")
-			os.MkdirAll(raftDir, 0700)
+			if err := os.MkdirAll(raftDir, 0700); err != nil {
+				log.Fatalf("Error creating raft directory: %v\n", err)
+			}
 
 			// RAFT node ID is the cosigner ID
 			nodeID := fmt.Sprint(key.ID)
 
-			var raftPeers []signer.RaftPeer
-
-			for _, cosignerConfig := range cfg.Cosigners {
-				cosignerAddressSplit := strings.Split(cosignerConfig.Address, ":")
-				cosignerPort, err := strconv.Atoi(cosignerAddressSplit[2])
-				if err != nil {
-					log.Printf("failed to parse port for cosigner address %s: %v\n", cosignerConfig.Address, err)
-				}
-				cosignerRaftAddress := fmt.Sprintf("%s:%d", cosignerAddressSplit[1][2:], cosignerPort+1)
-				raftPeers = append(raftPeers, signer.RaftPeer{NodeID: fmt.Sprint(cosignerConfig.ID), Address: cosignerRaftAddress})
-			}
-
 			// Start RAFT store listener
-			raftStore := signer.NewRaftStore(nodeID, raftDir, cfg.RaftListenAddress, timeout, logger, localCosigner, raftPeers)
-			raftStore.Start()
+			raftStore := signer.NewRaftStore(nodeID, raftDir, cfg.RaftListenAddress, timeout, logger, localCosigner, cfg.Cosigners)
+			if err := raftStore.Start(); err != nil {
+				log.Fatalf("Error starting raft store: %v\n", err)
+			}
 			services = append(services, raftStore)
 
 			val = signer.NewThresholdValidator(&signer.ThresholdValidatorOpt{

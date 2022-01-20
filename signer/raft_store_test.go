@@ -1,10 +1,15 @@
 package signer
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
 	"io/ioutil"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
 )
 
 // Test_StoreInMemOpenSingleNode tests that a command can be applied to the log
@@ -13,7 +18,45 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 	tmpDir, _ := ioutil.TempDir("", "store_test")
 	defer os.RemoveAll(tmpDir)
 
-	s := NewRaftStore("1", tmpDir, "127.0.0.1:0", 1*time.Second, nil, nil, []RaftPeer{})
+	dummyPub := tmCryptoEd25519.PubKey{}
+
+	bitSize := 4096
+	rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
+	require.NoError(t, err)
+
+	key := CosignerKey{
+		PubKey:   dummyPub,
+		ShareKey: []byte{},
+		ID:       1,
+	}
+	signState := SignState{
+		Height: 0,
+		Round:  0,
+		Step:   0,
+	}
+
+	config := LocalCosignerConfig{
+		CosignerKey: key,
+		SignState:   &signState,
+		RsaKey:      *rsaKey,
+		Peers: []CosignerPeer{CosignerPeer{
+			ID:        1,
+			PublicKey: rsaKey.PublicKey,
+		}},
+	}
+
+	cosigner := NewLocalCosigner(config)
+
+	s := &RaftStore{
+		NodeID:      "1",
+		RaftDir:     tmpDir,
+		RaftBind:    "127.0.0.1:0",
+		RaftTimeout: 1 * time.Second,
+		m:           make(map[string]string),
+		logger:      nil,
+		cosigner:    cosigner,
+		Peers:       []CosignerConfig{},
+	}
 
 	if s == nil {
 		t.Fatalf("failed to create store")
