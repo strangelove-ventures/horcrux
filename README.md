@@ -2,17 +2,6 @@
 
 Horcrux is a [multi-party-computation](https://en.wikipedia.org/wiki/Secure_multi-party_computation) signing service for Tendermint nodes using threshold Ed25519 signatures. 
 
-## Refactor 
-
-Pylon Validation Services is currently maintaining and refactoring this codebase. The following are goals of the refactor:
-
-- [ ] Refactor existing code into a [`cobra`](https://github.com/spf13/cobra) CLI
-  * [ ] Enable configuration via `ENV`
-  * [ ] Seperate functionality into different commands 
-  * [ ] Document code, security assumptions, and system functionality
-- [ ] Add robust test suite to ensure operation against specific versions of the [`cosmos-sdk`](https://github.com/cosmos/cosmos-sdk) and [`tendermint`](https://github.com/tendermint/tendermint)
-  * [ ] Use `dockertest` framework to spin up 
-
 ## Design
 
 Validator operators for tendermint chains balance operational and risk tradeoffs to avoid penalties via slashing for liveliness faults or double signing blocks.
@@ -21,9 +10,11 @@ Traditional high-availability systems where the keys exist on hot spares risk do
 
 Multi-party computation using threshold signatures is able to provide high-availability while maintaining high security and avoiding double signing via failover detection bugs.
 
+Communication between signer nodes utilizes the Raft protocol [`docs/raft.md`](/docs/raft.md) for leader election and event-based communication.
+
 ## Running Horcrux
 
-See documentation in [`docs/setup.md`](/docs/setup.md)
+See documentation in [`docs/migrating.md`](/docs/migrating.md)
 
 ## Security
 
