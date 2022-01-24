@@ -101,6 +101,14 @@ type LocalCosigner struct {
 	peers   map[int]CosignerPeer
 }
 
+func (cosigner *LocalCosigner) GetErrorIfLessOrEqual(height int64, round int64, step int8) error {
+	return cosigner.lastSignState.GetErrorIfLessOrEqual(height, round, step, &cosigner.lastSignStateMutex)
+}
+
+func (cosigner *LocalCosigner) SaveLastSignedState(signState SignStateConsensus) error {
+	return cosigner.lastSignState.Save(signState, &cosigner.lastSignStateMutex)
+}
+
 func NewLocalCosigner(cfg LocalCosignerConfig) *LocalCosigner {
 	cosigner := &LocalCosigner{
 		key:           cfg.CosignerKey,
@@ -214,13 +222,18 @@ func (cosigner *LocalCosigner) Sign(req CosignerSignRequest) (CosignerSignRespon
 	share := cosigner.key.ShareKey[:]
 	sig := tsed25519.SignWithShare(req.SignBytes, share, ephemeralShare, cosigner.pubKeyBytes, ephemeralPublic)
 
-	cosigner.lastSignState.Height = height
-	cosigner.lastSignState.Round = round
-	cosigner.lastSignState.Step = step
 	cosigner.lastSignState.EphemeralPublic = ephemeralPublic
-	cosigner.lastSignState.Signature = sig
-	cosigner.lastSignState.SignBytes = req.SignBytes
-	cosigner.lastSignState.Save()
+	err = cosigner.lastSignState.Save(SignStateConsensus{
+		Height:    height,
+		Round:     round,
+		Step:      step,
+		Signature: sig,
+		SignBytes: req.SignBytes,
+	}, nil)
+
+	if err != nil {
+		return res, err
+	}
 
 	for existingKey := range cosigner.hrsMeta {
 		// delete any HRS lower than our signed level

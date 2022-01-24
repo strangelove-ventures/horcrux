@@ -303,6 +303,12 @@ func (f *fsm) shouldRetain(key string) bool {
 		return false
 	}
 
+	// Last sign state handled as events only
+	if key == "LSS" {
+		return false
+	}
+
+	// Only other keys we may want to ignore for persistence have length >= 9
 	if len(key) < 9 {
 		return true
 	}
@@ -315,25 +321,20 @@ func (f *fsm) shouldRetain(key string) bool {
 	if key[:8] == "EphDone." {
 		keySplit := strings.Split(key, ".")
 		height, err := strconv.ParseInt(keySplit[1], 10, 64)
-		if err == nil {
-			lastSigned := (*RaftStore)(f).thresholdValidator.GetLastSigned()
-			if height == lastSigned.Height {
-				round, err := strconv.ParseInt(keySplit[2], 10, 64)
-				if err == nil {
-					if round == lastSigned.Round {
-						step, err := strconv.ParseInt(keySplit[3], 10, 8)
-						if err == nil {
-							if int8(step) <= lastSigned.Step {
-								return false
-							}
-						}
-					} else if round < lastSigned.Round {
-						return false
-					}
-				}
-			} else if height < lastSigned.Round {
-				return false
-			}
+		if err != nil {
+			return false
+		}
+		round, err := strconv.ParseInt(keySplit[2], 10, 64)
+		if err != nil {
+			return false
+		}
+		step, err := strconv.ParseInt(keySplit[3], 10, 8)
+		if err != nil {
+			return false
+		}
+		err = (*RaftStore)(f).thresholdValidator.GetErrorIfLessOrEqual(height, round, int8(step))
+		if err != nil {
+			return false
 		}
 	}
 	return true
@@ -481,6 +482,12 @@ func (s *RaftStore) LeaderEmitSignature(req RPCRaftEmitSignatureRequest) (*RPCRa
 }
 
 func (f *fsm) handleHRSEvent(hrsKey *HRSKey) {
+	err := (*RaftStore)(f).thresholdValidator.GetErrorIfLessOrEqual(hrsKey.Height, hrsKey.Round, hrsKey.Step)
+	if err != nil {
+		fmt.Printf("Error with requested HRS: %v\n", err)
+		return
+	}
+
 	for _, peer := range f.Peers {
 		peerID := peer.ID
 		// needed since we are included in peers
@@ -509,6 +516,17 @@ func (f *fsm) handleHRSEvent(hrsKey *HRSKey) {
 }
 
 func (f *fsm) handleSetEvents(key, value string) {
+	if key == "LSS" {
+		lss := &SignStateConsensus{}
+		err := json.Unmarshal([]byte(value), lss)
+		if err != nil {
+			fmt.Printf("LSS Unmarshal Error: %v\n", err)
+			return
+		}
+		_ = (*RaftStore)(f).thresholdValidator.SaveLastSignedState(*lss)
+		_ = (*RaftStore)(f).cosigner.SaveLastSignedState(*lss)
+		return
+	}
 	if key == "HRS" {
 		hrsKey := &HRSKey{}
 		err := json.Unmarshal([]byte(value), hrsKey)
