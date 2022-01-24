@@ -6,6 +6,7 @@ import (
 	"path"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/strangelove-ventures/horcrux/signer"
 	"github.com/stretchr/testify/require"
@@ -56,6 +57,8 @@ func TestStateSetCmd(t *testing.T) {
 			cmd.SetOutput(ioutil.Discard)
 			cmd.SetArgs(tc.args)
 			err = cmd.Execute()
+
+			time.Sleep(1 * time.Second)
 
 			if tc.expectErr {
 				require.Error(t, err)
