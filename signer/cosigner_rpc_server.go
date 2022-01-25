@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/hashicorp/raft"
 	"github.com/tendermint/tendermint/libs/log"
 	tmnet "github.com/tendermint/tendermint/libs/net"
 	"github.com/tendermint/tendermint/libs/service"
@@ -13,35 +12,9 @@ import (
 	rpc_types "github.com/tendermint/tendermint/rpc/jsonrpc/types"
 )
 
-type RPCRaftEmitEphemeralSecretRequest struct {
-	SourceID            int
-	DestinationID       int
-	EphemeralSecretPart CosignerGetEphemeralSecretPartResponse
-}
+type EmptyRPCResponse struct{}
 
-type RPCRaftEmitEphemeralSecretReceiptRequest struct {
-	HRS           HRSKey
-	SourceID      int
-	DestinationID int
-}
-
-type RPCRaftEmitSignatureRequest struct {
-	HRS          HRSKey
-	SourceID     int
-	SignResponse CosignerSignResponse
-}
-
-type RPCJoinRaftRequest struct {
-	NodeID  string
-	Address string
-}
-
-type RPCRaftRequest struct {
-	Key   string
-	Value string
-}
-
-type CosignerRpcServerConfig struct {
+type CosignerRPCServerConfig struct {
 	Logger             log.Logger
 	ListenAddress      string
 	Cosigner           Cosigner
@@ -51,24 +24,8 @@ type CosignerRpcServerConfig struct {
 	ThresholdValidator *ThresholdValidator
 }
 
-type RPCJoinRaftResponse struct{}
-
-type RPCRaftResponse struct {
-	Key   string
-	Value string
-}
-
-type RPCRaftSignBlockRequest struct {
-	ChainID string
-	Block   *block
-}
-
-type RPCRaftSignBlockResponse struct {
-	Signature []byte
-}
-
-// CosignerRpcServer responds to rpc sign requests using a cosigner instance
-type CosignerRpcServer struct {
+// CosignerRPCServer responds to rpc sign requests using a cosigner instance
+type CosignerRPCServer struct {
 	service.BaseService
 
 	logger             log.Logger
@@ -81,9 +38,9 @@ type CosignerRpcServer struct {
 	thresholdValidator *ThresholdValidator
 }
 
-// NewCosignerRpcServer instantiates a local cosigner with the specified key and sign state
-func NewCosignerRpcServer(config *CosignerRpcServerConfig) *CosignerRpcServer {
-	cosignerRpcServer := &CosignerRpcServer{
+// NewCosignerRPCServer instantiates a local cosigner with the specified key and sign state
+func NewCosignerRPCServer(config *CosignerRPCServerConfig) *CosignerRPCServer {
+	cosignerRPCServer := &CosignerRPCServer{
 		cosigner:           config.Cosigner,
 		listenAddress:      config.ListenAddress,
 		peers:              config.Peers,
@@ -93,12 +50,12 @@ func NewCosignerRpcServer(config *CosignerRpcServerConfig) *CosignerRpcServer {
 		thresholdValidator: config.ThresholdValidator,
 	}
 
-	cosignerRpcServer.BaseService = *service.NewBaseService(config.Logger, "CosignerRpcServer", cosignerRpcServer)
-	return cosignerRpcServer
+	cosignerRPCServer.BaseService = *service.NewBaseService(config.Logger, "CosignerRPCServer", cosignerRPCServer)
+	return cosignerRPCServer
 }
 
 // OnStart starts the rpm server to respond to remote CosignerSignRequests
-func (rpcServer *CosignerRpcServer) OnStart() error {
+func (rpcServer *CosignerRPCServer) OnStart() error {
 	proto, address := tmnet.ProtocolAndAddress(rpcServer.listenAddress)
 
 	lis, err := net.Listen(proto, address)
@@ -108,11 +65,10 @@ func (rpcServer *CosignerRpcServer) OnStart() error {
 	rpcServer.listener = lis
 
 	routes := map[string]*server.RPCFunc{
-		"EmitEphemeralSecretPart":        server.NewRPCFunc(rpcServer.rpcRaftEmitEphemeralSecretPartRequest, "arg"),
-		"EmitEphemeralSecretPartReceipt": server.NewRPCFunc(rpcServer.rpcRaftEmitEphemeralSecretPartReceiptRequest, "arg"),
-		"EmitSignature":                  server.NewRPCFunc(rpcServer.rpcRaftEmitSignatureRequest, "arg"),
-		"GetRaftLeader":                  server.NewRPCFunc(rpcServer.rpcRaftGetLeaderRequest, "arg"),
 		"SignBlock":                      server.NewRPCFunc(rpcServer.rpcRaftSignBlockRequest, "arg"),
+		"SetEphemeralSecretPart":         server.NewRPCFunc(rpcServer.rpcRaftSetEphemeralSecretPartRequest, "arg"),
+		"EmitEphemeralSecretPartReceipt": server.NewRPCFunc(rpcServer.rpcRaftEmitEphemeralSecretPartReceiptRequest, "arg"),
+		"Sign":                           server.NewRPCFunc(rpcServer.rpcSignRequest, "arg"),
 	}
 
 	mux := http.NewServeMux()
@@ -124,46 +80,75 @@ func (rpcServer *CosignerRpcServer) OnStart() error {
 
 	go func() {
 		defer lis.Close()
-		server.Serve(lis, mux, tcpLogger, config)
+		err := server.Serve(lis, mux, tcpLogger, config)
+		if err != nil {
+			rpcServer.logger.Error("Error starting RPC server", err.Error())
+		}
 	}()
 
 	return nil
 }
 
-func (rpcServer *CosignerRpcServer) Addr() net.Addr {
+func (rpcServer *CosignerRPCServer) Addr() net.Addr {
 	if rpcServer.listener == nil {
 		return nil
 	}
 	return rpcServer.listener.Addr()
 }
 
-func (rpcServer *CosignerRpcServer) rpcRaftGetLeaderRequest(
-	ctx *rpc_types.Context, req RPCRaftRequest) (raft.ServerAddress, error) {
-	return rpcServer.raftStore.GetLeader(), nil
-}
-
-func (rpcServer *CosignerRpcServer) rpcRaftSignBlockRequest(
-	ctx *rpc_types.Context, req RPCRaftSignBlockRequest) (*RPCRaftSignBlockResponse, error) {
+func (rpcServer *CosignerRPCServer) rpcRaftSignBlockRequest(
+	ctx *rpc_types.Context, req CosignerSignBlockRequest) (*CosignerSignBlockResponse, error) {
 	res, _, err := rpcServer.thresholdValidator.SignBlock(req.ChainID, req.Block)
 	if err != nil {
 		return nil, err
 	}
-	return &RPCRaftSignBlockResponse{
+	return &CosignerSignBlockResponse{
 		Signature: res,
 	}, nil
 }
 
-func (rpcServer *CosignerRpcServer) rpcRaftEmitEphemeralSecretPartRequest(
-	ctx *rpc_types.Context, req RPCRaftEmitEphemeralSecretRequest) (*RPCRaftResponse, error) {
-	return rpcServer.raftStore.LeaderEmitEphemeralSecretPart(req)
+func (rpcServer *CosignerRPCServer) rpcRaftEmitEphemeralSecretPartReceiptRequest(
+	ctx *rpc_types.Context, req CosignerEmitEphemeralSecretReceiptRequest) (*EmptyRPCResponse, error) {
+	err := rpcServer.raftStore.EmitEphemeralSecretPartReceipt(req)
+	if err != nil {
+		return nil, err
+	}
+	return &EmptyRPCResponse{}, nil
 }
 
-func (rpcServer *CosignerRpcServer) rpcRaftEmitEphemeralSecretPartReceiptRequest(
-	ctx *rpc_types.Context, req RPCRaftEmitEphemeralSecretReceiptRequest) (*RPCRaftResponse, error) {
-	return rpcServer.raftStore.LeaderEmitEphemeralSecretPartReceipt(req)
+func (rpcServer *CosignerRPCServer) rpcSignRequest(
+	ctx *rpc_types.Context, req CosignerSignRequest) (*CosignerSignResponse, error) {
+	response := &CosignerSignResponse{}
+
+	resp, err := rpcServer.cosigner.Sign(req)
+	if err != nil {
+		return response, err
+	}
+
+	response.Timestamp = resp.Timestamp
+	response.Signature = resp.Signature
+	return response, nil
 }
 
-func (rpcServer *CosignerRpcServer) rpcRaftEmitSignatureRequest(
-	ctx *rpc_types.Context, req RPCRaftEmitSignatureRequest) (*RPCRaftResponse, error) {
-	return rpcServer.raftStore.LeaderEmitSignature(req)
+func (rpcServer *CosignerRPCServer) rpcRaftSetEphemeralSecretPartRequest(
+	ctx *rpc_types.Context, req CosignerEphemeralSecretPart) (*EmptyRPCResponse, error) {
+	err := rpcServer.cosigner.SetEphemeralSecretPart(req)
+	if err != nil {
+		return nil, err
+	}
+	go func() {
+		err := rpcServer.raftStore.EmitEphemeralSecretPartReceipt(CosignerEmitEphemeralSecretReceiptRequest{
+			DestinationID: rpcServer.cosigner.GetID(),
+			SourceID:      req.SourceID,
+			HRS: HRSKey{
+				Height: req.Height,
+				Round:  req.Round,
+				Step:   req.Step,
+			},
+		})
+		if err != nil {
+			rpcServer.logger.Error("EmitEphemeralSecretPartReceipt Error", err.Error())
+		}
+	}()
+	return &EmptyRPCResponse{}, nil
 }

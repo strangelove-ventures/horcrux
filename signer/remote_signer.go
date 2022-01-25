@@ -156,14 +156,18 @@ func (rs *ReconnRemoteSigner) handleRequest(req tmProtoPrivval.Message) (tmProto
 					},
 				}}
 			} else {
-				msg.Sum = &tmProtoPrivval.Message_PubKeyResponse{PubKeyResponse: &tmProtoPrivval.PubKeyResponse{PubKey: pk, Error: nil}}
+				msg.Sum = &tmProtoPrivval.Message_PubKeyResponse{
+					PubKeyResponse: &tmProtoPrivval.PubKeyResponse{PubKey: pk, Error: nil}}
 			}
 		}
 	case *tmProtoPrivval.Message_SignVoteRequest:
 		vote := typedReq.SignVoteRequest.Vote
 		err = rs.privVal.SignVote(rs.chainID, vote)
 		if err != nil {
-			rs.Logger.Error("Failed to sign vote", "address", rs.address, "error", err, "vote_type", vote.Type, "height", vote.Height, "round", vote.Round, "validator", fmt.Sprintf("%X", vote.ValidatorAddress))
+			if _, ok := err.(*BeyondBlockError); !ok {
+				rs.Logger.Error("Failed to sign vote", "address", rs.address, "error", err, "vote_type", vote.Type,
+					"height", vote.Height, "round", vote.Round, "validator", fmt.Sprintf("%X", vote.ValidatorAddress))
+			}
 			msg.Sum = &tmProtoPrivval.Message_SignedVoteResponse{SignedVoteResponse: &tmProtoPrivval.SignedVoteResponse{
 				Vote: tmProto.Vote{},
 				Error: &tmProtoPrivval.RemoteSignerError{
@@ -173,26 +177,32 @@ func (rs *ReconnRemoteSigner) handleRequest(req tmProtoPrivval.Message) (tmProto
 			}}
 		} else {
 			rs.Logger.Info("Signed vote", "node", rs.address, "height", vote.Height, "round", vote.Round, "type", vote.Type)
-			msg.Sum = &tmProtoPrivval.Message_SignedVoteResponse{SignedVoteResponse: &tmProtoPrivval.SignedVoteResponse{Vote: *vote, Error: nil}}
+			msg.Sum = &tmProtoPrivval.Message_SignedVoteResponse{
+				SignedVoteResponse: &tmProtoPrivval.SignedVoteResponse{Vote: *vote, Error: nil}}
 		}
 	case *tmProtoPrivval.Message_SignProposalRequest:
 		proposal := typedReq.SignProposalRequest.Proposal
 		err = rs.privVal.SignProposal(rs.chainID, typedReq.SignProposalRequest.Proposal)
 		if err != nil {
-			rs.Logger.Error("Failed to sign proposal", "address", rs.address, "error", err, "proposal", proposal)
-			msg.Sum = &tmProtoPrivval.Message_SignedProposalResponse{SignedProposalResponse: &tmProtoPrivval.SignedProposalResponse{
-				Proposal: tmProto.Proposal{},
-				Error: &tmProtoPrivval.RemoteSignerError{
-					Code:        0,
-					Description: err.Error(),
-				},
-			}}
+			if _, ok := err.(*BeyondBlockError); !ok {
+				rs.Logger.Error("Failed to sign proposal", "address", rs.address, "error", err, "proposal", proposal)
+			}
+			msg.Sum = &tmProtoPrivval.Message_SignedProposalResponse{
+				SignedProposalResponse: &tmProtoPrivval.SignedProposalResponse{
+					Proposal: tmProto.Proposal{},
+					Error: &tmProtoPrivval.RemoteSignerError{
+						Code:        0,
+						Description: err.Error(),
+					},
+				}}
 		} else {
-			rs.Logger.Info("Signed proposal", "node", rs.address, "height", proposal.Height, "round", proposal.Round, "type", proposal.Type)
-			msg.Sum = &tmProtoPrivval.Message_SignedProposalResponse{SignedProposalResponse: &tmProtoPrivval.SignedProposalResponse{
-				Proposal: *proposal,
-				Error:    nil,
-			}}
+			rs.Logger.Info("Signed proposal", "node", rs.address,
+				"height", proposal.Height, "round", proposal.Round, "type", proposal.Type)
+			msg.Sum = &tmProtoPrivval.Message_SignedProposalResponse{
+				SignedProposalResponse: &tmProtoPrivval.SignedProposalResponse{
+					Proposal: *proposal,
+					Error:    nil,
+				}}
 		}
 	case *tmProtoPrivval.Message_PingRequest:
 		msg.Sum = &tmProtoPrivval.Message_PingResponse{PingResponse: &tmProtoPrivval.PingResponse{}}
@@ -203,7 +213,8 @@ func (rs *ReconnRemoteSigner) handleRequest(req tmProtoPrivval.Message) (tmProto
 	return msg, err
 }
 
-func StartRemoteSigners(services []tmService.Service, logger tmLog.Logger, chainID string, privVal tm.PrivValidator, nodes []NodeConfig) ([]tmService.Service, error) {
+func StartRemoteSigners(services []tmService.Service, logger tmLog.Logger, chainID string,
+	privVal tm.PrivValidator, nodes []NodeConfig) ([]tmService.Service, error) {
 	var err error
 	for _, node := range nodes {
 		dialer := net.Dialer{Timeout: 30 * time.Second}

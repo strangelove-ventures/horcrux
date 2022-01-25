@@ -62,6 +62,8 @@ type LocalCosignerConfig struct {
 	SignState   *SignState
 	RsaKey      rsa.PrivateKey
 	Peers       []CosignerPeer
+	Address     string
+	RaftAddress string
 	Total       uint8
 	Threshold   uint8
 }
@@ -99,6 +101,9 @@ type LocalCosigner struct {
 	// Height, Round, Step -> metadata
 	hrsMeta map[HRSKey]HrsMetadata
 	peers   map[int]CosignerPeer
+
+	address     string
+	raftAddress string
 }
 
 func (cosigner *LocalCosigner) GetErrorIfLessOrEqual(height int64, round int64, step int8) error {
@@ -118,6 +123,8 @@ func NewLocalCosigner(cfg LocalCosignerConfig) *LocalCosigner {
 		peers:         make(map[int]CosignerPeer),
 		total:         cfg.Total,
 		threshold:     cfg.Threshold,
+		address:       cfg.Address,
+		raftAddress:   cfg.RaftAddress,
 	}
 
 	for _, peer := range cfg.Peers {
@@ -141,6 +148,18 @@ func NewLocalCosigner(cfg LocalCosignerConfig) *LocalCosigner {
 // Implements Cosigner interface
 func (cosigner *LocalCosigner) GetID() int {
 	return cosigner.key.ID
+}
+
+// GetAddress returns the RPC URL of the cosigner
+// Implements Cosigner interface
+func (cosigner *LocalCosigner) GetAddress() string {
+	return cosigner.address
+}
+
+// GetRaftAddress returns the Raft hostname of the cosigner
+// Implements Cosigner interface
+func (cosigner *LocalCosigner) GetRaftAddress() string {
+	return cosigner.raftAddress
 }
 
 // Sign the sign request using the cosigner's share
@@ -178,7 +197,7 @@ func (cosigner *LocalCosigner) Sign(req CosignerSignRequest) (CosignerSignRespon
 			return res, errors.New("Mismatched data")
 		}
 
-		// saame HRS, and only differ by timestamp - ok to sign again
+		// same HRS, and only differ by timestamp - ok to sign again
 	}
 
 	hrsKey := HRSKey{
@@ -248,7 +267,7 @@ func (cosigner *LocalCosigner) Sign(req CosignerSignRequest) (CosignerSignRespon
 	return res, nil
 }
 
-func (cosigner *LocalCosigner) DealShares(req CosignerGetEphemeralSecretPartRequest) (HrsMetadata, error) {
+func (cosigner *LocalCosigner) dealShares(req CosignerGetEphemeralSecretPartRequest) (HrsMetadata, error) {
 	hrsKey := HRSKey{
 		Height: req.Height,
 		Round:  req.Round,
@@ -283,8 +302,9 @@ func (cosigner *LocalCosigner) DealShares(req CosignerGetEphemeralSecretPartRequ
 
 // Get the ephemeral secret part for an ephemeral share
 // The ephemeral secret part is encrypted for the receiver
-func (cosigner *LocalCosigner) GetEphemeralSecretPart(req CosignerGetEphemeralSecretPartRequest) (CosignerGetEphemeralSecretPartResponse, error) {
-	res := CosignerGetEphemeralSecretPartResponse{}
+func (cosigner *LocalCosigner) GetEphemeralSecretPart(
+	req CosignerGetEphemeralSecretPartRequest) (CosignerEphemeralSecretPart, error) {
+	res := CosignerEphemeralSecretPart{}
 
 	// protects the meta map
 	cosigner.lastSignStateMutex.Lock()
@@ -299,7 +319,7 @@ func (cosigner *LocalCosigner) GetEphemeralSecretPart(req CosignerGetEphemeralSe
 	meta, ok := cosigner.hrsMeta[hrsKey]
 	// generate metadata placeholder
 	if !ok {
-		newMeta, err := cosigner.DealShares(CosignerGetEphemeralSecretPartRequest{
+		newMeta, err := cosigner.dealShares(CosignerGetEphemeralSecretPartRequest{
 			Height: req.Height,
 			Round:  req.Round,
 			Step:   req.Step,
@@ -322,7 +342,6 @@ func (cosigner *LocalCosigner) GetEphemeralSecretPart(req CosignerGetEphemeralSe
 	// grab the peer info for the ID being requested
 	peer, ok := cosigner.peers[req.ID]
 	if !ok {
-		fmt.Printf("Error getting peer info for %d\n", req.ID)
 		return res, errors.New("Unknown peer ID")
 	}
 
@@ -391,7 +410,7 @@ func (cosigner *LocalCosigner) HasEphemeralSecretPart(req CosignerHasEphemeralSe
 }
 
 // Store an ephemeral secret share part provided by another cosigner
-func (cosigner *LocalCosigner) SetEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest) error {
+func (cosigner *LocalCosigner) SetEphemeralSecretPart(req CosignerEphemeralSecretPart) error {
 
 	// Verify the source signature
 	{
@@ -399,7 +418,7 @@ func (cosigner *LocalCosigner) SetEphemeralSecretPart(req CosignerSetEphemeralSe
 			return errors.New("SourceSig field is required")
 		}
 
-		digestMsg := CosignerGetEphemeralSecretPartResponse{}
+		digestMsg := CosignerEphemeralSecretPart{}
 		digestMsg.SourceID = req.SourceID
 		digestMsg.SourceEphemeralSecretPublicKey = req.SourceEphemeralSecretPublicKey
 		digestMsg.EncryptedSharePart = req.EncryptedSharePart
@@ -419,7 +438,6 @@ func (cosigner *LocalCosigner) SetEphemeralSecretPart(req CosignerSetEphemeralSe
 		peerPub := peer.PublicKey
 		err = rsa.VerifyPSS(&peerPub, crypto.SHA256, digest[:], req.SourceSig, nil)
 		if err != nil {
-			fmt.Printf("Verify PSS Error: %d %v\n", req.SourceID, err)
 			return err
 		}
 	}
@@ -437,7 +455,7 @@ func (cosigner *LocalCosigner) SetEphemeralSecretPart(req CosignerSetEphemeralSe
 	meta, ok := cosigner.hrsMeta[hrsKey]
 	// generate metadata placeholder
 	if !ok {
-		newMeta, err := cosigner.DealShares(CosignerGetEphemeralSecretPartRequest{
+		newMeta, err := cosigner.dealShares(CosignerGetEphemeralSecretPartRequest{
 			Height: req.Height,
 			Round:  req.Round,
 			Step:   req.Step,
@@ -461,4 +479,12 @@ func (cosigner *LocalCosigner) SetEphemeralSecretPart(req CosignerSetEphemeralSe
 	meta.Peers[req.SourceID-1].Share = sharePart
 	meta.Peers[req.SourceID-1].EphemeralSecretPublicKey = req.SourceEphemeralSecretPublicKey
 	return nil
+}
+
+func (cosigner *LocalCosigner) SignBlock(req CosignerSignBlockRequest) (CosignerSignBlockResponse, error) {
+	return CosignerSignBlockResponse{}, errors.New("not implemented")
+}
+
+func (cosigner *LocalCosigner) EmitEphemeralSecretPartReceipt(req CosignerEmitEphemeralSecretReceiptRequest) error {
+	return errors.New("not implemented")
 }

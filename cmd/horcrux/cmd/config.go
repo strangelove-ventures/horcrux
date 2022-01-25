@@ -589,7 +589,6 @@ func peersFromFlag(peers string) (out []CosignerPeer, err error) {
 	for _, p := range strings.Split(peers, ",") {
 		ps := strings.Split(p, "|")
 		if len(ps) != 3 {
-			fmt.Println(ps)
 			return nil, fmt.Errorf("invalid peer string %s", p)
 		}
 		shareid, err := strconv.ParseInt(ps[2], 10, 64)

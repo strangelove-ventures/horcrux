@@ -95,7 +95,7 @@ func StartCosignerCmd() *cobra.Command {
 			}}
 
 			for _, cosignerConfig := range cfg.Cosigners {
-				cosigner := signer.NewRemoteCosigner(cosignerConfig.ID, cosignerConfig.Address)
+				cosigner := signer.NewRemoteCosigner(cosignerConfig.ID, cosignerConfig.Address, cosignerConfig.RaftAddress)
 				cosigners = append(cosigners, cosigner)
 				remoteCosigners = append(remoteCosigners, *cosigner)
 
@@ -115,6 +115,8 @@ func StartCosignerCmd() *cobra.Command {
 				CosignerKey: key,
 				SignState:   &shareSignState,
 				RsaKey:      key.RSAKey,
+				Address:     cfg.ListenAddress,
+				RaftAddress: cfg.RaftListenAddress,
 				Peers:       peers,
 				Total:       uint8(total),
 				Threshold:   uint8(cfg.CosignerThreshold),
@@ -134,7 +136,7 @@ func StartCosignerCmd() *cobra.Command {
 
 			// Start RAFT store listener
 			raftStore := signer.NewRaftStore(nodeID,
-				raftDir, cfg.RaftListenAddress, timeout, logger, localCosigner, cfg.Cosigners)
+				raftDir, cfg.RaftListenAddress, timeout, logger, localCosigner, cosigners)
 			if err := raftStore.Start(); err != nil {
 				log.Fatalf("Error starting raft store: %v\n", err)
 			}
@@ -147,11 +149,12 @@ func StartCosignerCmd() *cobra.Command {
 				Cosigner:  localCosigner,
 				Peers:     cosigners,
 				RaftStore: raftStore,
+				Logger:    logger,
 			})
 
 			raftStore.SetThresholdValidator(val.(*signer.ThresholdValidator))
 
-			rpcServerConfig := signer.CosignerRpcServerConfig{
+			rpcServerConfig := signer.CosignerRPCServerConfig{
 				Logger:             logger,
 				ListenAddress:      cfg.ListenAddress,
 				Cosigner:           localCosigner,
@@ -161,7 +164,7 @@ func StartCosignerCmd() *cobra.Command {
 				ThresholdValidator: val.(*signer.ThresholdValidator),
 			}
 
-			rpcServer := signer.NewCosignerRpcServer(&rpcServerConfig)
+			rpcServer := signer.NewCosignerRPCServer(&rpcServerConfig)
 			rpcServer.Start()
 			services = append(services, rpcServer)
 
@@ -177,8 +180,6 @@ func StartCosignerCmd() *cobra.Command {
 			if err != nil {
 				panic(err)
 			}
-
-			// TODO: get address from peers how to get address of the cluster?
 
 			signer.WaitAndTerminate(logger, services)
 

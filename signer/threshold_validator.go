@@ -3,7 +3,6 @@ package signer
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -11,7 +10,9 @@ import (
 
 	"github.com/hashicorp/raft"
 	"github.com/tendermint/tendermint/crypto"
+	"github.com/tendermint/tendermint/libs/log"
 	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
+	rpcTypes "github.com/tendermint/tendermint/rpc/jsonrpc/types"
 	tm "github.com/tendermint/tendermint/types"
 	tsed25519 "gitlab.com/polychainlabs/threshold-ed25519/pkg"
 )
@@ -37,7 +38,15 @@ type ThresholdValidator struct {
 	peers []Cosigner
 
 	raftStore *RaftStore
+
+	logger log.Logger
+
+	thresholdPossibilities [][]int
 }
+
+const (
+	peerTimeout = 4 * time.Second
+)
 
 type ThresholdValidatorOpt struct {
 	Pubkey    crypto.PubKey
@@ -46,6 +55,7 @@ type ThresholdValidatorOpt struct {
 	Cosigner  Cosigner
 	Peers     []Cosigner
 	RaftStore *RaftStore
+	Logger    log.Logger
 }
 
 // NewThresholdValidator creates and returns a new ThresholdValidator
@@ -65,6 +75,8 @@ func NewThresholdValidator(opt *ThresholdValidatorOpt) *ThresholdValidator {
 	}
 	validator.lastSignStateInitiatedMutex = sync.Mutex{}
 	validator.raftStore = opt.RaftStore
+	validator.logger = opt.Logger
+	validator.initializeThresholdPossibilities()
 	return validator
 }
 
@@ -84,6 +96,42 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(signState SignStateCo
 // Implements PrivValidator.
 func (pv *ThresholdValidator) GetPubKey() (crypto.PubKey, error) {
 	return pv.pubkey, nil
+}
+
+// Create a list of the possible threshold possibilities that include this node.
+// A threshold possibility is a list of peers that when they have mutually shared
+// their ephemeral secret parts, the threshold signing process can proceed to sign.
+// For example, if the LocalCosigner's peer ID is 3, and the threshold is 3, and
+// there are 5 total signers, possible threshold possibilities are [1,2,3], [1,3,5],
+// etc. This is used in the waitForEphemeralSharing iteration to make sure that mutual
+// sharing has occurred between at least the threshold of signers
+func (pv *ThresholdValidator) recursiveCreateThresholdPossibilities(
+	thresholdPossibilities *[][]int, thresholdPossibility []int, peerID int) {
+	for possiblePeer := peerID; possiblePeer < len(pv.peers)+2; possiblePeer++ {
+		newThresholdPossibility := make([]int, len(thresholdPossibility))
+		_ = copy(newThresholdPossibility, thresholdPossibility)
+		newThresholdPossibility = append(newThresholdPossibility, possiblePeer)
+		if len(newThresholdPossibility) == pv.threshold {
+			for _, peerID := range newThresholdPossibility {
+				if peerID == pv.cosigner.GetID() {
+					// only include threshold possibilities that include the local cosigner
+					(*thresholdPossibilities) = append((*thresholdPossibilities), newThresholdPossibility)
+					break
+				}
+			}
+		} else {
+			pv.recursiveCreateThresholdPossibilities(thresholdPossibilities, newThresholdPossibility, possiblePeer+1)
+		}
+	}
+}
+
+func (pv *ThresholdValidator) initializeThresholdPossibilities() {
+	thresholdFloat := float64(pv.threshold)
+	numThresholdSharingPossibilities := int((0.5 * thresholdFloat * thresholdFloat) - (0.5 * thresholdFloat))
+	pv.thresholdPossibilities = make([][]int, 0, numThresholdSharingPossibilities)
+
+	emptyThresholdPossibility := make([]int, 0, pv.threshold)
+	pv.recursiveCreateThresholdPossibilities(&pv.thresholdPossibilities, emptyThresholdPossibility, 1)
 }
 
 // SignVote signs a canonical representation of the vote, along with the
@@ -136,19 +184,195 @@ type BeyondBlockError struct {
 
 func (e *BeyondBlockError) Error() string { return e.msg }
 
+// These are emitted by signers after the ephemeral secret part is saved
+// during SetEphemeralSecretPart to send a receipt back to the raft leader,
+// done with EmitEphemeralSecretPartReceipt
+func getDoneSharingKey(hrs HRSKey, peerID, otherPeer int) string {
+	return fmt.Sprintf("EphDone.%d.%d.%d.%d.%d", hrs.Height, hrs.Round, hrs.Step, peerID, otherPeer)
+}
+
+// Get the peer IDs in order from least to greatest for comparison against
+// the thresholdPossibilities
+func getOrderedPair(num1, num2 int) (int, int) {
+	if num1 < num2 {
+		return num1, num2
+	}
+	return num2, num1
+}
+
+// Watches for receipts from the signers to indicate the ephemeral secret part sharing is complete
+// Needs to ensure that sharing has occurred mutually between at least threshold peers. For example,
+// if the threshold is 3, and there are 3 cosigners, then cosigner 1 will need to have saved 2 and 3's secret parts,
+// 2 will need 1 and 3's, and 3 will need 1 and 2's, before the SignBlock method can proceed to get signatures.
+func (pv *ThresholdValidator) waitForEphemeralSharing(hrs HRSKey, allSigners []int) ([]int, error) {
+	peerWaitCtx, peerWaitCtxCancel := context.WithTimeout(context.Background(), peerTimeout)
+	defer peerWaitCtxCancel()
+
+	var foundThresholdPeers []int
+
+	for peerWaitCtx.Err() == nil {
+		time.Sleep(100 * time.Millisecond)
+
+		// assemble map of peers to which peers they have saved ephemeral secret parts from
+		doneSharingWith := make(map[int][]int)
+
+		for _, peerID := range allSigners {
+			for _, nestedPeerID := range allSigners {
+				if peerID == nestedPeerID {
+					continue
+				}
+				doneSharingKey := getDoneSharingKey(hrs, peerID, nestedPeerID)
+				doneSharing, _ := pv.raftStore.Get(doneSharingKey)
+				if doneSharing == "true" {
+					doneSharingWith[peerID] = append(doneSharingWith[peerID], nestedPeerID)
+				}
+			}
+		}
+
+		// Assemble the pairs of peers where both peers have shared with each other
+		mutualSharingPairs := make([][2]int, 0, 2*len(allSigners)-1)
+
+		for peerID, doneSharingWithPeers := range doneSharingWith {
+			for _, doneSharingWithPeerID := range doneSharingWithPeers {
+				for _, otherPeersDoneSharingWithPeerID := range doneSharingWith[doneSharingWithPeerID] {
+					if peerID == otherPeersDoneSharingWithPeerID {
+						// there is mutual sharing between peerID and doneSharingWithPeerID
+						found := false
+						firstPeer, secondPeer := getOrderedPair(peerID, doneSharingWithPeerID)
+						for _, mutualSharingPair := range mutualSharingPairs {
+							if mutualSharingPair[0] == firstPeer && mutualSharingPair[1] == secondPeer {
+								found = true
+								break
+							}
+						}
+						if !found {
+							mutualSharingPairs = append(mutualSharingPairs, [2]int{firstPeer, secondPeer})
+						}
+						break
+					}
+				}
+			}
+		}
+
+		// Iterate through the possible threshold peer scenarios and see if we have enough sharing
+		foundThreshold := false
+		for _, thresholdPossibility := range pv.thresholdPossibilities {
+			thresholdPossibilityValid := true
+			for i := 0; i < len(thresholdPossibility)-1; i++ {
+				firstPeer := thresholdPossibility[i]
+				secondPeer := thresholdPossibility[i+1]
+				foundInMutualSharingPairs := false
+				for _, mutualSharingPair := range mutualSharingPairs {
+					firstMutualPeer := mutualSharingPair[0]
+					secondMutualPeer := mutualSharingPair[1]
+					if firstPeer == firstMutualPeer && secondPeer == secondMutualPeer {
+						foundInMutualSharingPairs = true
+						break
+					}
+				}
+				if !foundInMutualSharingPairs {
+					thresholdPossibilityValid = false
+					break
+				}
+			}
+			if thresholdPossibilityValid {
+				foundThresholdPeers = thresholdPossibility
+				foundThreshold = true
+				break
+			}
+		}
+		if foundThreshold {
+			// We have threshold mutual sharing
+			break
+		}
+	}
+
+	if peerWaitCtx.Err() != nil {
+		return nil, errors.New("ephemeral sharing timed out")
+	}
+	pv.logger.Debug(fmt.Sprintf("Ephemeral sharing done, threshold peers: +%v", foundThresholdPeers))
+
+	return foundThresholdPeers, nil
+}
+
+func (pv *ThresholdValidator) peerSign(
+	ourID int,
+	peer Cosigner,
+	hrs HRSKey,
+	allSigners []int,
+	signReq CosignerSignRequest,
+	shareSignatures *[][]byte,
+	ephemeralPublic *[]byte,
+	wg *sync.WaitGroup,
+	shareSignaturesMutex *sync.Mutex,
+	thresholdProgressMutex *sync.Mutex,
+	thresholdProgress *int,
+) {
+	peerID := peer.GetID()
+
+	sigResp, err := peer.Sign(signReq)
+
+	if err != nil {
+		pv.logger.Error("Sign error", err.Error())
+	}
+
+	pv.logger.Debug(fmt.Sprintf("Received signature from %d", peerID))
+
+	shareSignaturesMutex.Lock()
+	defer shareSignaturesMutex.Unlock()
+
+	peerIdx := peerID - 1
+	(*shareSignatures)[peerIdx] = make([]byte, len(sigResp.Signature))
+	copy((*shareSignatures)[peerIdx], sigResp.Signature)
+	if peerID == ourID {
+		*ephemeralPublic = sigResp.EphemeralPublic
+	}
+
+	// need this check so that wg.Done is not called more than (threshold - 1) times, which causes hardlock
+	thresholdProgressMutex.Lock()
+	defer thresholdProgressMutex.Unlock()
+	*thresholdProgress -= 1
+	if *thresholdProgress >= 0 {
+		wg.Done()
+	}
+}
+
+func waitUntilCompleteOrTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
+	c := make(chan struct{})
+	go func() {
+		defer close(c)
+		wg.Wait()
+	}()
+	select {
+	case <-c:
+		return false // completed normally
+	case <-time.After(timeout):
+		return true // timed out
+	}
+}
+
 func (pv *ThresholdValidator) SignBlock(chainID string, block *block) ([]byte, time.Time, error) {
 	height, round, step, stamp := block.Height, block.Round, block.Step, block.Timestamp
 
+	// Only the leader can execute this function. Followers can handle the requests,
+	// but they just need to proxy the request to the raft leader
 	if pv.raftStore.raft.State() != raft.Leader {
-		// fmt.Printf("I am NOT the raft leader. Proxying request to the leader\n")
-		signRes, err := pv.raftStore.LeaderSignBlock(RPCRaftSignBlockRequest{chainID, block})
+		pv.logger.Debug("I am not the raft leader. Proxying request to the leader")
+		signRes, err := pv.raftStore.LeaderSignBlock(CosignerSignBlockRequest{chainID, block})
 		if err != nil {
+			if _, ok := err.(*rpcTypes.RPCError); ok {
+				rpcErrUnwrapped := err.(*rpcTypes.RPCError).Data
+				// Need to return BeyondBlockError after proxy since the error type will be lost over RPC
+				if len(rpcErrUnwrapped) > 33 && rpcErrUnwrapped[:33] == "Progress already started on block" {
+					return nil, stamp, &BeyondBlockError{msg: rpcErrUnwrapped}
+				}
+			}
 			return nil, stamp, err
 		}
 		return signRes.Signature, stamp, nil
 	}
 
-	// fmt.Printf("I am the raft leader. Managing the sign process for this block\n")
+	pv.logger.Debug("I am the raft leader. Managing the sign process for this block")
 
 	// Keep track of the last block that we began the signing process for. Only allow one attempt per block
 	err := pv.SaveLastSignedStateInitiated(SignStateConsensus{
@@ -185,11 +409,8 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *block) ([]byte, t
 		return nil, stamp, errors.New("conflicting data")
 	}
 
-	signReq, err := json.Marshal(&CosignerSignRequest{
+	signReq := CosignerSignRequest{
 		SignBytes: signBytes,
-	})
-	if err != nil {
-		fmt.Printf("ERROR GetEphemeralSecretPart %v\n", err)
 	}
 
 	numPeers := len(pv.peers)
@@ -228,175 +449,52 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *block) ([]byte, t
 		Round:  round,
 		Step:   step,
 	}
-	hrsJSON, err := json.Marshal(hrs)
-	if err != nil {
-		return nil, stamp, err
-	}
 
 	// Send requested HRS to cluster to initiate ephemeral secret sharing amongst cosigners
-	err = pv.raftStore.Set("HRS", string(hrsJSON))
+	err = pv.raftStore.Emit(raftEventHRS, hrs)
 
 	if err != nil {
 		return nil, stamp, err
 	}
 
 	allSigners := []int{ourID}
+	allPeers := []Cosigner{pv.cosigner}
 	for _, peer := range pv.peers {
 		allSigners = append(allSigners, peer.GetID())
+		allPeers = append(allPeers, peer)
 	}
 
-	waitForEphemeralSharing := func(peerId int, loopCondition func() bool) {
-		var doneSharingKeys []string
-		getDoneSharingKey := func(otherPeer int) string {
-			return fmt.Sprintf("EphDone.%d.%d.%d.%d.%d", height, round, step, peerId, otherPeer)
-		}
-		for _, nestedPeerID := range allSigners {
-			if peerId == nestedPeerID {
-				continue
-			}
-			doneSharingKeys = append(doneSharingKeys, getDoneSharingKey(nestedPeerID))
-		}
+	thresholdPeerIDs, err := pv.waitForEphemeralSharing(hrs, allSigners)
 
-		// Wait for (threshold - 1) cosigner ephemeral shares to be saved for this peer
-		for loopCondition() {
-			time.Sleep(100 * time.Millisecond)
-
-			doneSharingWithCount := 0
-
-			for _, doneSharingKey := range doneSharingKeys {
-				doneSharing, _ := pv.raftStore.Get(doneSharingKey)
-				if doneSharing == "true" {
-					doneSharingWithCount += 1
-				}
-			}
-			if doneSharingWithCount >= pv.threshold-1 {
-				// We have reached threshold ephemeral secret sharing for peer. Break out of poll
-				break
-			}
-		}
-
-		// Cleanup keys
-		for _, doneSharingKey := range doneSharingKeys {
-			err = pv.raftStore.Delete(doneSharingKey)
-			if err != nil {
-				fmt.Printf("Error deleting raft key: %v\n", err)
-			}
-		}
-	}
-
-	ourEphShareCtx, ourEphShareCtxCancel := context.WithTimeout(context.Background(), 4*time.Second)
-	go func() {
-		defer ourEphShareCtxCancel()
-		waitForEphemeralSharing(ourID, func() bool {
-			return ourEphShareCtx.Err() == nil
-		})
-		// need this check so that wg.Done is not called more than (threshold) times, which causes hardlock
-		thresholdProgressMutex.Lock()
-		defer thresholdProgressMutex.Unlock()
-		thresholdProgress -= 1
-		if thresholdProgress >= 0 {
-			wg.Done()
-		}
-	}()
-
-	// There are two layers of goroutines for each cosigner.
-	// The outer routine for each cosigner to dispatch signing in parallel. This outer routine
-	// block on the signing request completing.
-	// The inner routine (formed within each request goroutine), dispatches the actual signing call.
-	// This is to support a time out which can happen when using remote signers.
-	for _, peer := range pv.peers {
-		request := func(peer Cosigner) {
-			peerId := peer.GetID()
-			peerIdx := peerId - 1
-
-			// cosigner.Sign makes a blocking RPC request (with no timeout)
-			// to prevent it from hanging our process indefinitely, we use a timeout context
-			// and another goroutine
-			signCtx, signCtxCancel := context.WithTimeout(context.Background(), 4*time.Second)
-
-			go func() {
-				waitForEphemeralSharing(peerId, func() bool {
-					return signCtx.Err() == nil
-				})
-
-				// Request signature from this peer since it has enough shares
-				err = pv.raftStore.Set(fmt.Sprintf("SignReq.%d", peerId), string(signReq))
-
-				var sigResp = &CosignerSignResponse{}
-				peerSignWatchKey := fmt.Sprintf("SignRes.%d.%d.%d.%d", height, round, step, peerId)
-				// Wait for sign response from this peer (or timeout)
-				for signCtx.Err() == nil {
-					time.Sleep(100 * time.Millisecond)
-					value, err := pv.raftStore.Get(peerSignWatchKey)
-					if err != nil || len(value) == 0 {
-						continue
-					}
-					err = json.Unmarshal([]byte(value), sigResp)
-					if err != nil {
-						fmt.Printf("Error during sign response unmarshal %v\n", err)
-						continue
-					}
-					// Got signature from peer, break out of poll
-					break
-				}
-
-				err = pv.raftStore.Delete(peerSignWatchKey)
-				if err != nil {
-					fmt.Printf("Error deleting raft key: %v\n", err)
-				}
-
-				// The signCtx is done if it times out or if the blockCtx done cancels it
-				select {
-				case <-signCtx.Done():
-					return
-				default:
-				}
-
-				defer signCtxCancel()
-
-				shareSignaturesMutex.Lock()
-				defer shareSignaturesMutex.Unlock()
-
-				shareSignatures[peerIdx] = make([]byte, len(sigResp.Signature))
-				copy(shareSignatures[peerIdx], sigResp.Signature)
-			}()
-
-			// the sign context finished or timed out
-			select {
-			case <-signCtx.Done():
-			}
-
-			// need this check so that wg.Done is not called more than (threshold - 1) times, which causes hardlock
-			thresholdProgressMutex.Lock()
-			defer thresholdProgressMutex.Unlock()
-			thresholdProgress -= 1
-			if thresholdProgress >= 0 {
-				wg.Done()
-			}
-		}
-
-		go request(peer)
-	}
-
-	// Wait for threshold cosigners to be complete
-	// A Cosigner will either respond in time, or be cancelled with timeout
-	wg.Wait()
-
-	shareSignaturesMutex.Lock()
-	defer shareSignaturesMutex.Unlock()
-
-	// sign with our share now
-	signResp, err := pv.cosigner.Sign(CosignerSignRequest{
-		SignBytes: signBytes,
-	})
 	if err != nil {
 		return nil, stamp, err
 	}
 
-	ephemeralPublic := signResp.EphemeralPublic
+	thresholdPeers := make([]Cosigner, 0, len(thresholdPeerIDs))
+	for _, peerID := range thresholdPeerIDs {
+		for _, peer := range allPeers {
+			if peerID == peer.GetID() {
+				thresholdPeers = append(thresholdPeers, peer)
+			}
+		}
+	}
 
-	shareSignatures[ourID-1] = make([]byte, len(signResp.Signature))
-	copy(shareSignatures[ourID-1], signResp.Signature)
+	var ephemeralPublic []byte
+
+	for _, peer := range thresholdPeers {
+		// Wait for the peers to sign the request
+		go pv.peerSign(ourID, peer, hrs, allSigners,
+			signReq, &shareSignatures, &ephemeralPublic, &wg,
+			&shareSignaturesMutex, &thresholdProgressMutex, &thresholdProgress)
+	}
+
+	// Wait for threshold cosigners to be complete
+	// A Cosigner will either respond in time, or be cancelled with timeout
+	if waitUntilCompleteOrTimeout(&wg, 4*time.Second) {
+		return nil, stamp, errors.New("timed out waiting for peers to sign")
+	}
+
+	pv.logger.Debug("Done waiting for cosigners, assembling signatures")
 
 	// collect all valid responses into array of ids and signatures for the threshold lib
 	sigIds := make([]int, 0)
@@ -413,17 +511,18 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *block) ([]byte, t
 	}
 
 	if len(sigIds) < pv.threshold {
-		return nil, stamp, errors.New("Not enough co-signers")
+		return nil, stamp, errors.New("not enough co-signers")
 	}
 
 	// assemble into final signature
 	combinedSig := tsed25519.CombineShares(total, sigIds, shareSigs)
 
-	signature := append(ephemeralPublic, combinedSig...)
+	signature := ephemeralPublic
+	signature = append(signature, combinedSig...)
 
 	// verify the combined signature before saving to watermark
 	if !pv.pubkey.VerifySignature(signBytes, signature) {
-		return nil, stamp, errors.New("Combined signature is not valid")
+		return nil, stamp, errors.New("combined signature is not valid")
 	}
 
 	newLss := SignStateConsensus{
@@ -439,13 +538,11 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *block) ([]byte, t
 		return nil, stamp, err
 	}
 
-	newLssJSON, err := json.Marshal(newLss)
-	if err != nil {
-		return nil, stamp, err
-	}
-
 	// Emit last signed state to cluster
-	err = pv.raftStore.Set("LSS", string(newLssJSON))
+	err = pv.raftStore.Emit(raftEventLSS, newLss)
+	if err != nil {
+		pv.logger.Error("Error emitting LSS", err.Error())
+	}
 
 	return signature, stamp, nil
 }

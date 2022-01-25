@@ -1,25 +1,22 @@
 package signer
 
 import (
-	"context"
 	"errors"
-)
-
-var (
-	ctx = context.Background()
 )
 
 // RemoteCosigner uses tendermint rpc to request signing from a remote cosigner
 type RemoteCosigner struct {
-	id      int
-	address string
+	id          int
+	address     string
+	raftAddress string
 }
 
 // NewRemoteCosigner returns a newly initialized RemoteCosigner
-func NewRemoteCosigner(id int, address string) *RemoteCosigner {
+func NewRemoteCosigner(id int, address string, raftAddress string) *RemoteCosigner {
 	cosigner := &RemoteCosigner{
-		id:      id,
-		address: address,
+		id:          id,
+		address:     address,
+		raftAddress: raftAddress,
 	}
 	return cosigner
 }
@@ -30,20 +27,50 @@ func (cosigner *RemoteCosigner) GetID() int {
 	return cosigner.id
 }
 
-func (cosigner *RemoteCosigner) Sign(signReq CosignerSignRequest) (CosignerSignResponse, error) {
-	return CosignerSignResponse{}, errors.New("not Implemented")
+// GetAddress returns the RPC URL of the remote cosigner
+// Implements the cosigner interface
+func (cosigner *RemoteCosigner) GetAddress() string {
+	return cosigner.address
 }
 
+// GetRaftAddress returns the Raft hostname of the remote cosigner
+// Implements the cosigner interface
+func (cosigner *RemoteCosigner) GetRaftAddress() string {
+	return cosigner.raftAddress
+}
+
+// Implements the cosigner interface
+func (cosigner *RemoteCosigner) Sign(req CosignerSignRequest) (CosignerSignResponse, error) {
+	res := &CosignerSignResponse{}
+	err := CallRPC(cosigner.address, "Sign", req, res)
+	return *res, err
+}
+
+// Implements the cosigner interface
 func (cosigner *RemoteCosigner) GetEphemeralSecretPart(
-	req CosignerGetEphemeralSecretPartRequest) (CosignerGetEphemeralSecretPartResponse, error) {
-	return CosignerGetEphemeralSecretPartResponse{}, errors.New("not Implemented")
+	req CosignerGetEphemeralSecretPartRequest) (CosignerEphemeralSecretPart, error) {
+	return CosignerEphemeralSecretPart{}, errors.New("not Implemented")
 }
 
+// Implements the cosigner interface
 func (cosigner *RemoteCosigner) HasEphemeralSecretPart(
 	req CosignerHasEphemeralSecretPartRequest) (CosignerHasEphemeralSecretPartResponse, error) {
 	return CosignerHasEphemeralSecretPartResponse{}, errors.New("not Implemented")
 }
 
-func (cosigner *RemoteCosigner) SetEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest) error {
-	return errors.New("not Implemented")
+// Implements the cosigner interface
+func (cosigner *RemoteCosigner) SetEphemeralSecretPart(req CosignerEphemeralSecretPart) error {
+	return CallRPC(cosigner.address, "SetEphemeralSecretPart", req, &EmptyRPCResponse{})
+}
+
+// Implements the cosigner interface
+func (cosigner *RemoteCosigner) SignBlock(req CosignerSignBlockRequest) (CosignerSignBlockResponse, error) {
+	res := &CosignerSignBlockResponse{}
+	err := CallRPC(cosigner.address, "SignBlock", req, res)
+	return *res, err
+}
+
+// Implements the cosigner interface
+func (cosigner *RemoteCosigner) EmitEphemeralSecretPartReceipt(req CosignerEmitEphemeralSecretReceiptRequest) error {
+	return CallRPC(cosigner.address, "EmitEphemeralSecretPartReceipt", req, &EmptyRPCResponse{})
 }

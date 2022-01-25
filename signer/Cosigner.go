@@ -36,7 +36,7 @@ type CosignerHasEphemeralSecretPartResponse struct {
 	EphemeralSecretPublicKey []byte
 }
 
-type CosignerGetEphemeralSecretPartResponse struct {
+type CosignerEphemeralSecretPart struct {
 	SourceID                       int
 	SourceEphemeralSecretPublicKey []byte
 	EncryptedSharePart             []byte
@@ -46,14 +46,19 @@ type CosignerGetEphemeralSecretPartResponse struct {
 	Step                           int8
 }
 
-type CosignerSetEphemeralSecretPartRequest struct {
-	SourceID                       int
-	SourceEphemeralSecretPublicKey []byte
-	Height                         int64
-	Round                          int64
-	Step                           int8
-	EncryptedSharePart             []byte
-	SourceSig                      []byte
+type CosignerSignBlockRequest struct {
+	ChainID string
+	Block   *block
+}
+
+type CosignerSignBlockResponse struct {
+	Signature []byte
+}
+
+type CosignerEmitEphemeralSecretReceiptRequest struct {
+	HRS           HRSKey
+	SourceID      int
+	DestinationID int
 }
 
 // Cosigner interface is a set of methods for an m-of-n threshold signature.
@@ -63,16 +68,28 @@ type Cosigner interface {
 	// The ID is the shamir index: 1, 2, etc...
 	GetID() int
 
+	// Get the RPC URL
+	GetAddress() string
+
+	// Get the raft host - hostname:port
+	GetRaftAddress() string
+
 	// Get the ephemeral secret part for an ephemeral share
 	// The ephemeral secret part is encrypted for the receiver
-	GetEphemeralSecretPart(req CosignerGetEphemeralSecretPartRequest) (CosignerGetEphemeralSecretPartResponse, error)
+	GetEphemeralSecretPart(req CosignerGetEphemeralSecretPartRequest) (CosignerEphemeralSecretPart, error)
 
 	// Store an ephemeral secret share part provided by another cosigner
-	SetEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest) error
+	SetEphemeralSecretPart(req CosignerEphemeralSecretPart) error
 
 	// Query whether the cosigner has an ehpemeral secret part set
 	HasEphemeralSecretPart(req CosignerHasEphemeralSecretPartRequest) (CosignerHasEphemeralSecretPartResponse, error)
 
+	EmitEphemeralSecretPartReceipt(req CosignerEmitEphemeralSecretReceiptRequest) error
+
 	// Sign the requested bytes
 	Sign(req CosignerSignRequest) (CosignerSignResponse, error)
+
+	// Request that the cosigner manage the threshold signing process for this block
+	// Will throw error if cosigner is not the leader
+	SignBlock(req CosignerSignBlockRequest) (CosignerSignBlockResponse, error)
 }

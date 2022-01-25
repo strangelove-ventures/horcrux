@@ -3,7 +3,6 @@ package signer
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tm "github.com/tendermint/tendermint/types"
 	tsed25519 "gitlab.com/polychainlabs/threshold-ed25519/pkg"
@@ -27,7 +27,7 @@ func getMockRaftStore(cosigner Cosigner, tmpDir string) *RaftStore {
 		m:           make(map[string]string),
 		logger:      nil,
 		cosigner:    cosigner.(*LocalCosigner),
-		Peers:       []CosignerConfig{},
+		Peers:       []Cosigner{},
 	}
 }
 
@@ -124,6 +124,7 @@ func TestThresholdValidator2of2(test *testing.T) {
 		Cosigner:  cosigner1,
 		Peers:     thresholdPeers,
 		RaftStore: raftStore,
+		Logger:    tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
 	}
 
 	validator := NewThresholdValidator(&thresholdValidatorOpt)
@@ -161,7 +162,7 @@ func TestThresholdValidator2of2(test *testing.T) {
 		})
 		require.NoError(test, err)
 
-		err = cosigner2.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
+		err = cosigner2.SetEphemeralSecretPart(CosignerEphemeralSecretPart{
 			SourceSig:                      cosigner1EphSecretPart.SourceSig,
 			SourceID:                       cosigner1EphSecretPart.SourceID,
 			SourceEphemeralSecretPublicKey: cosigner1EphSecretPart.SourceEphemeralSecretPublicKey,
@@ -177,19 +178,27 @@ func TestThresholdValidator2of2(test *testing.T) {
 		require.NoError(test, err)
 		time.Sleep(500 * time.Millisecond) // Wait for raft key to apply
 
-		// Sign from cosigner 2 now that it has all ephemeral parts shared
-
-		signReq := CosignerSignRequest{SignBytes: signBytes}
-
-		signRes2, err := cosigner2.Sign(signReq)
+		cosigner2EphSecretPart1, err := cosigner2.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
+			ID:     1,
+			Height: HRS.Height,
+			Round:  HRS.Round,
+			Step:   HRS.Step,
+		})
 		require.NoError(test, err)
 
-		signKey2 := fmt.Sprintf("SignRes.%d.%d.%d.%d", HRS.Height, HRS.Round, HRS.Step, 2)
-
-		signJSON2, err := json.Marshal(signRes2)
+		err = cosigner1.SetEphemeralSecretPart(CosignerEphemeralSecretPart{
+			SourceSig:                      cosigner2EphSecretPart1.SourceSig,
+			SourceID:                       cosigner2EphSecretPart1.SourceID,
+			SourceEphemeralSecretPublicKey: cosigner2EphSecretPart1.SourceEphemeralSecretPublicKey,
+			EncryptedSharePart:             cosigner2EphSecretPart1.EncryptedSharePart,
+			Height:                         HRS.Height,
+			Round:                          HRS.Round,
+			Step:                           HRS.Step,
+		})
 		require.NoError(test, err)
 
-		err = raftStore.Set(signKey2, string(signJSON2))
+		doneSharingKey1_2 := fmt.Sprintf("EphDone.%d.%d.%d.%d.%d", HRS.Height, HRS.Round, HRS.Step, 1, 2)
+		err = raftStore.Set(doneSharingKey1_2, "true")
 		require.NoError(test, err)
 		time.Sleep(500 * time.Millisecond) // Wait for raft key to apply
 	}
@@ -325,6 +334,7 @@ func TestThresholdValidator3of3(test *testing.T) {
 		Cosigner:  cosigner1,
 		Peers:     thresholdPeers,
 		RaftStore: raftStore,
+		Logger:    tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
 	}
 
 	validator := NewThresholdValidator(&thresholdValidatorOpt)
@@ -363,7 +373,7 @@ func TestThresholdValidator3of3(test *testing.T) {
 		})
 		require.NoError(test, err)
 
-		err = cosigner1.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
+		err = cosigner1.SetEphemeralSecretPart(CosignerEphemeralSecretPart{
 			SourceSig:                      cosigner2EphSecretPart1.SourceSig,
 			SourceID:                       cosigner2EphSecretPart1.SourceID,
 			SourceEphemeralSecretPublicKey: cosigner2EphSecretPart1.SourceEphemeralSecretPublicKey,
@@ -389,7 +399,7 @@ func TestThresholdValidator3of3(test *testing.T) {
 		})
 		require.NoError(test, err)
 
-		err = cosigner1.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
+		err = cosigner1.SetEphemeralSecretPart(CosignerEphemeralSecretPart{
 			SourceSig:                      cosigner3EphSecretPart1.SourceSig,
 			SourceID:                       cosigner3EphSecretPart1.SourceID,
 			SourceEphemeralSecretPublicKey: cosigner3EphSecretPart1.SourceEphemeralSecretPublicKey,
@@ -414,7 +424,7 @@ func TestThresholdValidator3of3(test *testing.T) {
 		})
 		require.NoError(test, err)
 
-		err = cosigner2.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
+		err = cosigner2.SetEphemeralSecretPart(CosignerEphemeralSecretPart{
 			SourceSig:                      cosigner1EphSecretPart2.SourceSig,
 			SourceID:                       cosigner1EphSecretPart2.SourceID,
 			SourceEphemeralSecretPublicKey: cosigner1EphSecretPart2.SourceEphemeralSecretPublicKey,
@@ -440,7 +450,7 @@ func TestThresholdValidator3of3(test *testing.T) {
 		})
 		require.NoError(test, err)
 
-		err = cosigner3.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
+		err = cosigner3.SetEphemeralSecretPart(CosignerEphemeralSecretPart{
 			SourceSig:                      cosigner1EphSecretPart3.SourceSig,
 			SourceID:                       cosigner1EphSecretPart3.SourceID,
 			SourceEphemeralSecretPublicKey: cosigner1EphSecretPart3.SourceEphemeralSecretPublicKey,
@@ -466,7 +476,7 @@ func TestThresholdValidator3of3(test *testing.T) {
 		})
 		require.NoError(test, err)
 
-		err = cosigner3.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
+		err = cosigner3.SetEphemeralSecretPart(CosignerEphemeralSecretPart{
 			SourceSig:                      cosigner2EphSecretPart3.SourceSig,
 			SourceID:                       cosigner2EphSecretPart3.SourceID,
 			SourceEphemeralSecretPublicKey: cosigner2EphSecretPart3.SourceEphemeralSecretPublicKey,
@@ -492,7 +502,7 @@ func TestThresholdValidator3of3(test *testing.T) {
 		})
 		require.NoError(test, err)
 
-		err = cosigner2.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
+		err = cosigner2.SetEphemeralSecretPart(CosignerEphemeralSecretPart{
 			SourceSig:                      cosigner3EphSecretPart2.SourceSig,
 			SourceID:                       cosigner3EphSecretPart2.SourceID,
 			SourceEphemeralSecretPublicKey: cosigner3EphSecretPart2.SourceEphemeralSecretPublicKey,
@@ -505,36 +515,6 @@ func TestThresholdValidator3of3(test *testing.T) {
 
 		doneSharingKey2_3 := fmt.Sprintf("EphDone.%d.%d.%d.%d.%d", HRS.Height, HRS.Round, HRS.Step, 2, 3)
 		err = raftStore.Set(doneSharingKey2_3, "true")
-		require.NoError(test, err)
-		time.Sleep(500 * time.Millisecond) // Wait for raft key to apply
-
-		// Sign from cosigner 2 now that it has all ephemeral parts shared
-
-		signReq := CosignerSignRequest{SignBytes: signBytes}
-
-		signRes2, err := cosigner2.Sign(signReq)
-		require.NoError(test, err)
-
-		signKey2 := fmt.Sprintf("SignRes.%d.%d.%d.%d", HRS.Height, HRS.Round, HRS.Step, 2)
-
-		signJSON2, err := json.Marshal(signRes2)
-		require.NoError(test, err)
-
-		err = raftStore.Set(signKey2, string(signJSON2))
-		require.NoError(test, err)
-		time.Sleep(500 * time.Millisecond) // Wait for raft key to apply
-
-		// Sign from cosigner 3 now that it has all ephemeral parts shared
-
-		signRes3, err := cosigner3.Sign(signReq)
-		require.NoError(test, err)
-
-		signKey3 := fmt.Sprintf("SignRes.%d.%d.%d.%d", HRS.Height, HRS.Round, HRS.Step, 3)
-
-		signJSON3, err := json.Marshal(signRes3)
-		require.NoError(test, err)
-
-		err = raftStore.Set(signKey3, string(signJSON3))
 		require.NoError(test, err)
 		time.Sleep(500 * time.Millisecond) // Wait for raft key to apply
 	}
@@ -673,6 +653,7 @@ func TestThresholdValidator2of3(test *testing.T) {
 		Cosigner:  cosigner1,
 		Peers:     thresholdPeers,
 		RaftStore: raftStore,
+		Logger:    tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
 	}
 
 	validator := NewThresholdValidator(&thresholdValidatorOpt)
@@ -710,7 +691,7 @@ func TestThresholdValidator2of3(test *testing.T) {
 		})
 		require.NoError(test, err)
 
-		err = cosigner3.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
+		err = cosigner3.SetEphemeralSecretPart(CosignerEphemeralSecretPart{
 			SourceSig:                      cosigner1EphSecretPart3.SourceSig,
 			SourceID:                       cosigner1EphSecretPart3.SourceID,
 			SourceEphemeralSecretPublicKey: cosigner1EphSecretPart3.SourceEphemeralSecretPublicKey,
@@ -726,15 +707,27 @@ func TestThresholdValidator2of3(test *testing.T) {
 		require.NoError(test, err)
 		time.Sleep(500 * time.Millisecond) // Wait for raft key to apply
 
-		signRes3, err := cosigner3.Sign(CosignerSignRequest{SignBytes: signBytes})
+		cosigner3EphSecretPart1, err := cosigner3.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
+			ID:     1,
+			Height: HRS.Height,
+			Round:  HRS.Round,
+			Step:   HRS.Step,
+		})
 		require.NoError(test, err)
 
-		signKey3 := fmt.Sprintf("SignRes.%d.%d.%d.%d", HRS.Height, HRS.Round, HRS.Step, 3)
-
-		signJSON3, err := json.Marshal(signRes3)
+		err = cosigner1.SetEphemeralSecretPart(CosignerEphemeralSecretPart{
+			SourceSig:                      cosigner3EphSecretPart1.SourceSig,
+			SourceID:                       cosigner3EphSecretPart1.SourceID,
+			SourceEphemeralSecretPublicKey: cosigner3EphSecretPart1.SourceEphemeralSecretPublicKey,
+			EncryptedSharePart:             cosigner3EphSecretPart1.EncryptedSharePart,
+			Height:                         HRS.Height,
+			Round:                          HRS.Round,
+			Step:                           HRS.Step,
+		})
 		require.NoError(test, err)
 
-		err = raftStore.Set(signKey3, string(signJSON3))
+		doneSharingKey1_3 := fmt.Sprintf("EphDone.%d.%d.%d.%d.%d", HRS.Height, HRS.Round, HRS.Step, 1, 3)
+		err = raftStore.Set(doneSharingKey1_3, "true")
 		require.NoError(test, err)
 		time.Sleep(500 * time.Millisecond) // Wait for raft key to apply
 

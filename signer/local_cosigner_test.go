@@ -139,7 +139,7 @@ func TestLocalCosignerSign2of2(test *testing.T) {
 
 		publicKeys = append(publicKeys, resp.SourceEphemeralSecretPublicKey)
 
-		err = cosigner2.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
+		err = cosigner2.SetEphemeralSecretPart(CosignerEphemeralSecretPart{
 			SourceID:                       resp.SourceID,
 			Height:                         1,
 			Round:                          0,
@@ -163,7 +163,7 @@ func TestLocalCosignerSign2of2(test *testing.T) {
 
 		publicKeys = append(publicKeys, resp.SourceEphemeralSecretPublicKey)
 
-		err = cosigner1.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
+		err = cosigner1.SetEphemeralSecretPart(CosignerEphemeralSecretPart{
 			SourceID:                       resp.SourceID,
 			Height:                         1,
 			Round:                          0,

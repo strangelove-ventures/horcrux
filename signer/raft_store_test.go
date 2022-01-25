@@ -55,7 +55,7 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 		m:           make(map[string]string),
 		logger:      nil,
 		cosigner:    cosigner,
-		Peers:       []CosignerConfig{},
+		Peers:       []Cosigner{},
 	}
 
 	if s == nil {
