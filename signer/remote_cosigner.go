@@ -40,10 +40,8 @@ func (cosigner *RemoteCosigner) GetRaftAddress() string {
 }
 
 // Implements the cosigner interface
-func (cosigner *RemoteCosigner) Sign(req CosignerSignRequest) (CosignerSignResponse, error) {
-	res := &CosignerSignResponse{}
-	err := CallRPC(cosigner.address, "Sign", req, res)
-	return *res, err
+func (cosigner *RemoteCosigner) Sign(req CosignerSignRequest) (res CosignerSignResponse, err error) {
+	return res, CallRPC(cosigner.address, "Sign", req, &res)
 }
 
 // Implements the cosigner interface
@@ -64,10 +62,8 @@ func (cosigner *RemoteCosigner) SetEphemeralSecretPart(req CosignerEphemeralSecr
 }
 
 // Implements the cosigner interface
-func (cosigner *RemoteCosigner) SignBlock(req CosignerSignBlockRequest) (CosignerSignBlockResponse, error) {
-	res := &CosignerSignBlockResponse{}
-	err := CallRPC(cosigner.address, "SignBlock", req, res)
-	return *res, err
+func (cosigner *RemoteCosigner) SignBlock(req CosignerSignBlockRequest) (res CosignerSignBlockResponse, err error) {
+	return res, CallRPC(cosigner.address, "SignBlock", req, &res)
 }
 
 // Implements the cosigner interface
