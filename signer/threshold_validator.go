@@ -41,10 +41,6 @@ type ThresholdValidator struct {
 	logger log.Logger
 }
 
-const (
-	peerTimeout = 4 * time.Second
-)
-
 type ThresholdValidatorOpt struct {
 	Pubkey    crypto.PubKey
 	Threshold int

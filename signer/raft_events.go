@@ -20,11 +20,7 @@ func (f *fsm) getEventHandler(key string) func(string) {
 
 func (f *fsm) shouldRetain(key string) bool {
 	// Last sign state handled as events only
-	if key == raftEventLSS {
-		return false
-	}
-
-	return true
+	return key != raftEventLSS
 }
 
 func (f *fsm) handleLSSEvent(value string) {

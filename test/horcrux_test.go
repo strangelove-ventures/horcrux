@@ -496,7 +496,6 @@ func TestDownedSigners2of3(t *testing.T) {
 }
 
 func TestDownedSigners3of5(t *testing.T) {
-	t.Skip() // Skipping this test in CI suite.
 	t.Parallel()
 	const totalValidators = 4
 	const totalSigners = 5
