@@ -17,7 +17,7 @@ type EmptyRPCResponse struct{}
 type CosignerRPCServerConfig struct {
 	Logger             log.Logger
 	ListenAddress      string
-	Cosigner           Cosigner
+	Cosigner           *LocalCosigner
 	Peers              []RemoteCosigner
 	Timeout            time.Duration
 	RaftStore          *RaftStore
@@ -31,7 +31,7 @@ type CosignerRPCServer struct {
 	logger             log.Logger
 	listenAddress      string
 	listener           net.Listener
-	cosigner           Cosigner
+	cosigner           *LocalCosigner
 	peers              []RemoteCosigner
 	timeout            time.Duration
 	raftStore          *RaftStore
@@ -66,9 +66,8 @@ func (rpcServer *CosignerRPCServer) OnStart() error {
 
 	routes := map[string]*server.RPCFunc{
 		"SignBlock":                      server.NewRPCFunc(rpcServer.rpcRaftSignBlockRequest, "arg"),
-		"SetEphemeralSecretPart":         server.NewRPCFunc(rpcServer.rpcRaftSetEphemeralSecretPartRequest, "arg"),
-		"EmitEphemeralSecretPartReceipt": server.NewRPCFunc(rpcServer.rpcRaftEmitEphemeralSecretPartReceiptRequest, "arg"),
-		"Sign":                           server.NewRPCFunc(rpcServer.rpcSignRequest, "arg"),
+		"SetEphemeralSecretPartsAndSign": server.NewRPCFunc(rpcServer.rpcSetEphemeralSecretPartsAndSignRequest, "arg"),
+		"GetEphemeralSecretParts":        server.NewRPCFunc(rpcServer.rpcGetEphemeralSecretPartsRequest, "arg"),
 	}
 
 	mux := http.NewServeMux()
@@ -107,48 +106,13 @@ func (rpcServer *CosignerRPCServer) rpcRaftSignBlockRequest(
 	}, nil
 }
 
-func (rpcServer *CosignerRPCServer) rpcRaftEmitEphemeralSecretPartReceiptRequest(
-	ctx *rpc_types.Context, req CosignerEmitEphemeralSecretReceiptRequest) (*EmptyRPCResponse, error) {
-	err := rpcServer.raftStore.EmitEphemeralSecretPartReceipt(req)
-	if err != nil {
-		return nil, err
-	}
-	return &EmptyRPCResponse{}, nil
+func (rpcServer *CosignerRPCServer) rpcSetEphemeralSecretPartsAndSignRequest(
+	ctx *rpc_types.Context, req CosignerSetEphemeralSecretPartsAndSignRequest) (*CosignerSignResponse, error) {
+	return rpcServer.cosigner.SetEphemeralSecretPartsAndSign(req)
 }
 
-func (rpcServer *CosignerRPCServer) rpcSignRequest(
-	ctx *rpc_types.Context, req CosignerSignRequest) (*CosignerSignResponse, error) {
-	response := &CosignerSignResponse{}
+func (rpcServer *CosignerRPCServer) rpcGetEphemeralSecretPartsRequest(
+	ctx *rpc_types.Context, req HRSKey) (*CosignerEphemeralSecretPartsResponse, error) {
+	return rpcServer.cosigner.GetEphemeralSecretParts(req)
 
-	resp, err := rpcServer.cosigner.Sign(req)
-	if err != nil {
-		return response, err
-	}
-
-	response.Timestamp = resp.Timestamp
-	response.Signature = resp.Signature
-	return response, nil
-}
-
-func (rpcServer *CosignerRPCServer) rpcRaftSetEphemeralSecretPartRequest(
-	ctx *rpc_types.Context, req CosignerEphemeralSecretPart) (*EmptyRPCResponse, error) {
-	err := rpcServer.cosigner.SetEphemeralSecretPart(req)
-	if err != nil {
-		return nil, err
-	}
-	go func() {
-		err := rpcServer.raftStore.EmitEphemeralSecretPartReceipt(CosignerEmitEphemeralSecretReceiptRequest{
-			DestinationID: rpcServer.cosigner.GetID(),
-			SourceID:      req.SourceID,
-			HRS: HRSKey{
-				Height: req.Height,
-				Round:  req.Round,
-				Step:   req.Step,
-			},
-		})
-		if err != nil {
-			rpcServer.logger.Error("EmitEphemeralSecretPartReceipt Error", err.Error())
-		}
-	}()
-	return &EmptyRPCResponse{}, nil
 }

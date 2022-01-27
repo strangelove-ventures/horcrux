@@ -57,6 +57,13 @@ type CosignerPeer struct {
 	PublicKey rsa.PublicKey
 }
 
+type CosignerGetEphemeralSecretPartRequest struct {
+	ID     int
+	Height int64
+	Round  int64
+	Step   int8
+}
+
 type LocalCosignerConfig struct {
 	CosignerKey CosignerKey
 	SignState   *SignState
@@ -165,7 +172,7 @@ func (cosigner *LocalCosigner) GetRaftAddress() string {
 // Sign the sign request using the cosigner's share
 // Return the signed bytes or an error
 // Implements Cosigner interface
-func (cosigner *LocalCosigner) Sign(req CosignerSignRequest) (CosignerSignResponse, error) {
+func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignResponse, error) {
 	cosigner.lastSignStateMutex.Lock()
 	defer cosigner.lastSignStateMutex.Unlock()
 
@@ -176,10 +183,6 @@ func (cosigner *LocalCosigner) Sign(req CosignerSignRequest) (CosignerSignRespon
 	if err != nil {
 		return res, err
 	}
-
-	res.Height = height
-	res.Round = round
-	res.Step = step
 
 	sameHRS, err := lss.CheckHRS(height, round, step)
 	if err != nil {
@@ -300,9 +303,34 @@ func (cosigner *LocalCosigner) dealShares(req CosignerGetEphemeralSecretPartRequ
 
 }
 
+func (cosigner *LocalCosigner) GetEphemeralSecretParts(
+	req HRSKey) (*CosignerEphemeralSecretPartsResponse, error) {
+	res := &CosignerEphemeralSecretPartsResponse{
+		EncryptedSecrets: make([]CosignerEphemeralSecretPart, 0, len(cosigner.peers)-1),
+	}
+	for _, peer := range cosigner.peers {
+		if peer.ID == cosigner.GetID() {
+			continue
+		}
+		secretPart, err := cosigner.getEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
+			ID:     peer.ID,
+			Height: req.Height,
+			Round:  req.Round,
+			Step:   req.Step,
+		})
+
+		if err != nil {
+			return nil, err
+		}
+
+		res.EncryptedSecrets = append(res.EncryptedSecrets, secretPart)
+	}
+	return res, nil
+}
+
 // Get the ephemeral secret part for an ephemeral share
 // The ephemeral secret part is encrypted for the receiver
-func (cosigner *LocalCosigner) GetEphemeralSecretPart(
+func (cosigner *LocalCosigner) getEphemeralSecretPart(
 	req CosignerGetEphemeralSecretPartRequest) (CosignerEphemeralSecretPart, error) {
 	res := CosignerEphemeralSecretPart{}
 
@@ -375,42 +403,13 @@ func (cosigner *LocalCosigner) GetEphemeralSecretPart(
 		res.SourceSig = signature
 	}
 
-	res.Height = req.Height
-	res.Round = req.Round
-	res.Step = req.Step
-
-	return res, nil
-}
-
-func (cosigner *LocalCosigner) HasEphemeralSecretPart(req CosignerHasEphemeralSecretPartRequest) (CosignerHasEphemeralSecretPartResponse, error) {
-	res := CosignerHasEphemeralSecretPartResponse{
-		Exists: false,
-	}
-
-	// protects the meta map
-	cosigner.lastSignStateMutex.Lock()
-	defer cosigner.lastSignStateMutex.Unlock()
-
-	hrsKey := HRSKey{
-		Height: req.Height,
-		Round:  req.Round,
-		Step:   req.Step,
-	}
-
-	meta, ok := cosigner.hrsMeta[hrsKey]
-	if ok {
-		pub := meta.Peers[req.ID-1].EphemeralSecretPublicKey
-		if len(pub) > 0 {
-			res.Exists = true
-			res.EphemeralSecretPublicKey = pub
-		}
-	}
+	res.DestinationID = req.ID
 
 	return res, nil
 }
 
 // Store an ephemeral secret share part provided by another cosigner
-func (cosigner *LocalCosigner) SetEphemeralSecretPart(req CosignerEphemeralSecretPart) error {
+func (cosigner *LocalCosigner) setEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest) error {
 
 	// Verify the source signature
 	{
@@ -485,6 +484,23 @@ func (cosigner *LocalCosigner) SignBlock(req CosignerSignBlockRequest) (Cosigner
 	return CosignerSignBlockResponse{}, errors.New("not implemented")
 }
 
-func (cosigner *LocalCosigner) EmitEphemeralSecretPartReceipt(req CosignerEmitEphemeralSecretReceiptRequest) error {
-	return errors.New("not implemented")
+func (cosigner *LocalCosigner) SetEphemeralSecretPartsAndSign(
+	req CosignerSetEphemeralSecretPartsAndSignRequest) (*CosignerSignResponse, error) {
+	for _, secretPart := range req.EncryptedSecrets {
+		err := cosigner.setEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
+			SourceID:                       secretPart.SourceID,
+			SourceEphemeralSecretPublicKey: secretPart.SourceEphemeralSecretPublicKey,
+			EncryptedSharePart:             secretPart.EncryptedSharePart,
+			SourceSig:                      secretPart.SourceSig,
+			Height:                         req.HRS.Height,
+			Round:                          req.HRS.Round,
+			Step:                           req.HRS.Step,
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	res, err := cosigner.sign(CosignerSignRequest{req.SignBytes})
+	return &res, err
 }

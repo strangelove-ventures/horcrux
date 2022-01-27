@@ -86,13 +86,14 @@ func (s *RaftStore) OnStart() error {
 			return
 		}
 		if s.isInitialLeader() {
-			// Wait until bootstrap node is the leader
-			for s.raft.State() != raft.Leader {
+			// Wait until bootstrap node is the leader.
+			// Timeout after 10 seconds, which would indicate that
+			// the cluster has a new leader, and this node is rejoining
+			for i := 0; i < 10 && s.raft.State() != raft.Leader; i++ {
 				time.Sleep(1 * time.Second)
 			}
 			s.JoinCosigners()
 		}
-		go s.PeriodicTrim()
 	}()
 
 	return nil

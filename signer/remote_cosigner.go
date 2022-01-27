@@ -1,9 +1,5 @@
 package signer
 
-import (
-	"errors"
-)
-
 // RemoteCosigner uses tendermint rpc to request signing from a remote cosigner
 type RemoteCosigner struct {
 	id          int
@@ -40,25 +36,9 @@ func (cosigner *RemoteCosigner) GetRaftAddress() string {
 }
 
 // Implements the cosigner interface
-func (cosigner *RemoteCosigner) Sign(req CosignerSignRequest) (res CosignerSignResponse, err error) {
-	return res, CallRPC(cosigner.address, "Sign", req, &res)
-}
-
-// Implements the cosigner interface
-func (cosigner *RemoteCosigner) GetEphemeralSecretPart(
-	req CosignerGetEphemeralSecretPartRequest) (CosignerEphemeralSecretPart, error) {
-	return CosignerEphemeralSecretPart{}, errors.New("not Implemented")
-}
-
-// Implements the cosigner interface
-func (cosigner *RemoteCosigner) HasEphemeralSecretPart(
-	req CosignerHasEphemeralSecretPartRequest) (CosignerHasEphemeralSecretPartResponse, error) {
-	return CosignerHasEphemeralSecretPartResponse{}, errors.New("not Implemented")
-}
-
-// Implements the cosigner interface
-func (cosigner *RemoteCosigner) SetEphemeralSecretPart(req CosignerEphemeralSecretPart) error {
-	return CallRPC(cosigner.address, "SetEphemeralSecretPart", req, &EmptyRPCResponse{})
+func (cosigner *RemoteCosigner) GetEphemeralSecretParts(
+	req HRSKey) (res *CosignerEphemeralSecretPartsResponse, err error) {
+	return res, CallRPC(cosigner.address, "GetEphemeralSecretParts", req, &res)
 }
 
 // Implements the cosigner interface
@@ -67,6 +47,7 @@ func (cosigner *RemoteCosigner) SignBlock(req CosignerSignBlockRequest) (res Cos
 }
 
 // Implements the cosigner interface
-func (cosigner *RemoteCosigner) EmitEphemeralSecretPartReceipt(req CosignerEmitEphemeralSecretReceiptRequest) error {
-	return CallRPC(cosigner.address, "EmitEphemeralSecretPartReceipt", req, &EmptyRPCResponse{})
+func (cosigner *RemoteCosigner) SetEphemeralSecretPartsAndSign(
+	req CosignerSetEphemeralSecretPartsAndSignRequest) (res *CosignerSignResponse, err error) {
+	return res, CallRPC(cosigner.address, "SetEphemeralSecretPartsAndSign", req, &res)
 }
