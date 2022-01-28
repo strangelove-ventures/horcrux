@@ -53,7 +53,7 @@ func getGoModuleVersion(pkg string) string {
 
 func getSimdChain() *ChainType {
 	return &ChainType{
-		Repository: "strangelove/simd",
+		Repository: "strangelove-ventures/simd",
 		Version:    getGoModuleVersion("github.com/cosmos/cosmos-sdk"),
 		Bin:        "simd",
 		Ports: map[docker.Port]struct{}{
