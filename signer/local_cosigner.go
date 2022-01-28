@@ -142,8 +142,7 @@ func NewLocalCosigner(cfg LocalCosignerConfig) *LocalCosigner {
 	switch ed25519Key := cosigner.key.PubKey.(type) {
 	case tmCryptoEd25519.PubKey:
 		cosigner.pubKeyBytes = make([]byte, len(ed25519Key))
-		copy(cosigner.pubKeyBytes[:], ed25519Key[:])
-		break
+		copy(cosigner.pubKeyBytes, ed25519Key[:])
 	default:
 		panic("Not an ed25519 public key")
 	}
@@ -179,12 +178,12 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	res := CosignerSignResponse{}
 	lss := cosigner.lastSignState
 
-	height, round, step, err := UnpackHRS(req.SignBytes)
+	hrsKey, err := UnpackHRS(req.SignBytes)
 	if err != nil {
 		return res, err
 	}
 
-	sameHRS, err := lss.CheckHRS(height, round, step)
+	sameHRS, err := lss.CheckHRS(hrsKey)
 	if err != nil {
 		return res, err
 	}
@@ -197,20 +196,15 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 			res.Signature = lss.Signature
 			return res, nil
 		} else if _, ok := lss.OnlyDifferByTimestamp(req.SignBytes); !ok {
-			return res, errors.New("Mismatched data")
+			return res, errors.New("mismatched data")
 		}
 
 		// same HRS, and only differ by timestamp - ok to sign again
 	}
 
-	hrsKey := HRSKey{
-		Height: height,
-		Round:  round,
-		Step:   step,
-	}
 	meta, ok := cosigner.hrsMeta[hrsKey]
 	if !ok {
-		return res, errors.New("No metadata at HRS")
+		return res, errors.New("no metadata at HRS")
 	}
 
 	shareParts := make([]tsed25519.Scalar, 0)
@@ -231,24 +225,24 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	// check bounds for ephemeral share to avoid passing out of bounds valids to SignWithShare
 	{
 		if len(ephemeralShare) != 32 {
-			return res, errors.New("Ephemeral share is out of bounds.")
+			return res, errors.New("ephemeral share is out of bounds")
 		}
 
 		var scalarBytes [32]byte
 		copy(scalarBytes[:], ephemeralShare)
 		if !edwards25519.ScMinimal(&scalarBytes) {
-			return res, errors.New("Ephemeral share is out of bounds.")
+			return res, errors.New("ephemeral share is out of bounds")
 		}
 	}
 
-	share := cosigner.key.ShareKey[:]
-	sig := tsed25519.SignWithShare(req.SignBytes, share, ephemeralShare, cosigner.pubKeyBytes, ephemeralPublic)
+	sig := tsed25519.SignWithShare(
+		req.SignBytes, cosigner.key.ShareKey, ephemeralShare, cosigner.pubKeyBytes, ephemeralPublic)
 
 	cosigner.lastSignState.EphemeralPublic = ephemeralPublic
 	err = cosigner.lastSignState.Save(SignStateConsensus{
-		Height:    height,
-		Round:     round,
-		Step:      step,
+		Height:    hrsKey.Height,
+		Round:     hrsKey.Round,
+		Step:      hrsKey.Step,
 		Signature: sig,
 		SignBytes: req.SignBytes,
 	}, nil)
@@ -370,7 +364,7 @@ func (cosigner *LocalCosigner) getEphemeralSecretPart(
 	// grab the peer info for the ID being requested
 	peer, ok := cosigner.peers[req.ID]
 	if !ok {
-		return res, errors.New("Unknown peer ID")
+		return res, errors.New("unknown peer ID")
 	}
 
 	sharePart := meta.DealtShares[req.ID-1]

@@ -60,7 +60,8 @@ func StartCosignerCmd() *cobra.Command {
 				return err
 			}
 
-			logger.Info("Tendermint Validator", "mode", cfg.Mode, "priv-key", cfg.PrivValKeyFile, "priv-state-dir", cfg.PrivValStateDir)
+			logger.Info("Tendermint Validator", "mode", cfg.Mode,
+				"priv-key", cfg.PrivValKeyFile, "priv-state-dir", cfg.PrivValStateDir)
 
 			var val types.PrivValidator
 
@@ -165,7 +166,9 @@ func StartCosignerCmd() *cobra.Command {
 			}
 
 			rpcServer := signer.NewCosignerRPCServer(&rpcServerConfig)
-			rpcServer.Start()
+			if err := rpcServer.Start(); err != nil {
+				log.Fatalf("Error starting rpc server: %v\n", err)
+			}
 			services = append(services, rpcServer)
 
 			pv = &signer.PvGuard{PrivValidator: val}

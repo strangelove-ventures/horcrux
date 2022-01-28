@@ -140,6 +140,14 @@ type BeyondBlockError struct {
 
 func (e *BeyondBlockError) Error() string { return e.msg }
 
+func (pv *ThresholdValidator) newBeyondBlockError(hrs HRSKey) *BeyondBlockError {
+	return &BeyondBlockError{
+		msg: fmt.Sprintf("Progress already started on block %d.%d.%d, skipping %d.%d.%d",
+			pv.lastSignStateInitiated.Height, pv.lastSignStateInitiated.Round, pv.lastSignStateInitiated.Step,
+			hrs.Height, hrs.Round, hrs.Step),
+	}
+}
+
 func (pv *ThresholdValidator) waitForPeerEphemeralShares(
 	peer Cosigner,
 	hrs HRSKey,
@@ -258,24 +266,21 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *block) ([]byte, t
 	// the block sign state for caching full block signatures
 	lss := pv.lastSignState
 
+	hrs := HRSKey{
+		Height: height,
+		Round:  round,
+		Step:   step,
+	}
+
 	// check watermark
-	sameHRS, err := lss.CheckHRS(height, round, step)
+	sameHRS, err := lss.CheckHRS(hrs)
 	if err != nil {
 		return nil, stamp, err
 	}
 
 	// Keep track of the last block that we began the signing process for. Only allow one attempt per block
-	err = pv.SaveLastSignedStateInitiated(SignStateConsensus{
-		Height: height,
-		Round:  round,
-		Step:   step,
-	})
-	if err != nil {
-		return nil, stamp, &BeyondBlockError{
-			msg: fmt.Sprintf("Progress already started on block %d.%d.%d, skipping %d.%d.%d",
-				pv.lastSignStateInitiated.Height, pv.lastSignStateInitiated.Round, pv.lastSignStateInitiated.Step,
-				height, round, step),
-		}
+	if err := pv.SaveLastSignedStateInitiated(NewSignStateConsensus(height, round, step)); err != nil {
+		return nil, stamp, pv.newBeyondBlockError(hrs)
 	}
 
 	signBytes := block.SignBytes
@@ -299,12 +304,6 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *block) ([]byte, t
 	// Used to track how close we are to threshold
 
 	ourID := pv.cosigner.GetID()
-
-	hrs := HRSKey{
-		Height: height,
-		Round:  round,
-		Step:   step,
-	}
 
 	encryptedEphemeralSharesThresholdMap := make(map[Cosigner][]CosignerEphemeralSecretPart)
 	thresholdPeersMutex := sync.Mutex{}

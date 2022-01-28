@@ -56,7 +56,8 @@ func StartSignerCmd() *cobra.Command {
 				return err
 			}
 
-			logger.Info("Tendermint Validator", "mode", cfg.Mode, "priv-key", cfg.PrivValKeyFile, "priv-state-dir", cfg.PrivValStateDir)
+			logger.Info("Tendermint Validator", "mode", cfg.Mode,
+				"priv-key", cfg.PrivValKeyFile, "priv-state-dir", cfg.PrivValStateDir)
 
 			var val types.PrivValidator
 			stateFile := path.Join(cfg.PrivValStateDir, fmt.Sprintf("%s_priv_validator_state.json", chainID))

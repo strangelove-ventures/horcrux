@@ -34,12 +34,12 @@ clean:
 	rm -rf build
 
 build-simd-docker:
-	docker build -t jackzampolin/simd:$(SDKVERSION) --build-arg VERSION=$(SDKVERSION) -f ./docker/simd/Dockerfile ./docker/simd/
+	docker build -t strangelove/simd:$(SDKVERSION) --build-arg VERSION=$(SDKVERSION) -f ./docker/simd/Dockerfile ./docker/simd/
 
 build-horcrux-docker:
-	docker build -t jackzampolin/horcrux:$(VERSION) -f ./docker/horcrux/Dockerfile .
+	docker build -t strangelove/horcrux:$(VERSION) -f ./docker/horcrux/Dockerfile .
 
 push-simd-docker:
-	docker push jackzampolin/simd:$(SDKVERSION)
+	docker push strangelove/simd:$(SDKVERSION)
 
 .PHONY: all lint test race msan tools clean build

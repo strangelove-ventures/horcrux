@@ -43,8 +43,8 @@ func initCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "init [chain-id] [chain-nodes]",
 		Aliases: []string{"i"},
-		Short:   "initalize configuration file and home directory if one doesn't already exist",
-		Long: "initalize configuration file, use flags for cosigner configuration.\n\n" +
+		Short:   "initialize configuration file and home directory if one doesn't already exist",
+		Long: "initialize configuration file, use flags for cosigner configuration.\n\n" +
 			"[chain-id] is the chain id of the chain to validate\n" +
 			"[chain-nodes] is a comma separated array of chain node addresses i.e.\n" +
 			"tcp://chain-node-1:1234,tcp://chain-node-2:1234",
@@ -122,13 +122,15 @@ func initCmd() *cobra.Command {
 			}
 
 			// initialize state/{chainid}_priv_validator_state.json file
-			if _, err = signer.LoadOrCreateSignState(path.Join(home, "state", fmt.Sprintf("%s_priv_validator_state.json", cid))); err != nil {
+			if _, err = signer.LoadOrCreateSignState(
+				path.Join(home, "state", fmt.Sprintf("%s_priv_validator_state.json", cid))); err != nil {
 				return err
 			}
 
 			// if node is a cosigner initialize state/{chainid}_priv_validator_state.json file
 			if cs {
-				if _, err = signer.LoadOrCreateSignState(path.Join(home, "state", fmt.Sprintf("%s_share_sign_state.json", cid))); err != nil {
+				if _, err = signer.LoadOrCreateSignState(
+					path.Join(home, "state", fmt.Sprintf("%s_share_sign_state.json", cid))); err != nil {
 					return err
 				}
 			}
@@ -147,7 +149,7 @@ func initCmd() *cobra.Command {
 }
 
 func writeConfigFile(path string, cfg *Config) error {
-	return ioutil.WriteFile(path, cfg.MustMarshalYaml(), 0644)
+	return ioutil.WriteFile(path, cfg.MustMarshalYaml(), 0644) //nolint
 }
 
 func validateSingleSignerConfig(cfg *Config) error {
@@ -171,7 +173,8 @@ func validateCosignerConfig(cfg *Config) error {
 		return fmt.Errorf("cosigner config can't be empty")
 	}
 	if len(cfg.CosignerConfig.Peers)+1 < cfg.CosignerConfig.Threshold {
-		return fmt.Errorf("number of peers + 1 (%d) must be greater than threshold (%d)", len(cfg.CosignerConfig.Peers)+1, cfg.CosignerConfig.Threshold)
+		return fmt.Errorf("number of peers + 1 (%d) must be greater than threshold (%d)",
+			len(cfg.CosignerConfig.Peers)+1, cfg.CosignerConfig.Threshold)
 	}
 
 	_, err := time.ParseDuration(cfg.CosignerConfig.Timeout)

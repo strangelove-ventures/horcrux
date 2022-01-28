@@ -25,20 +25,20 @@ func WriteMsg(writer io.Writer, msg tmProtoPrivval.Message) (err error) {
 }
 
 // UnpackHRS deserializes sign bytes and gets the height, round, and step
-func UnpackHRS(signBytes []byte) (height int64, round int64, step int8, err error) {
+func UnpackHRS(signBytes []byte) (hrs HRSKey, err error) {
 	{
 		var proposal tmProto.CanonicalProposal
 		if err := protoio.UnmarshalDelimited(signBytes, &proposal); err == nil {
-			return proposal.Height, proposal.Round, stepPropose, nil
+			return HRSKey{proposal.Height, proposal.Round, stepPropose}, nil
 		}
 	}
 
 	{
 		var vote tmProto.CanonicalVote
 		if err := protoio.UnmarshalDelimited(signBytes, &vote); err == nil {
-			return vote.Height, vote.Round, CanonicalVoteToStep(&vote), nil
+			return HRSKey{vote.Height, vote.Round, CanonicalVoteToStep(&vote)}, nil
 		}
 	}
 
-	return 0, 0, 0, errors.New("Could not UnpackHRS from sign bytes")
+	return HRSKey{0, 0, 0}, errors.New("could not UnpackHRS from sign bytes")
 }

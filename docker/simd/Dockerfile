@@ -1,6 +1,5 @@
-ARG VERSION=v0.42.3
-FROM golang:1.16-alpine AS build-env
-ARG VERSION
+ARG VERSION=v0.45.0
+FROM golang:1.17-alpine AS build-env
 ENV PACKAGES curl make git libc-dev bash gcc linux-headers eudev-dev
 
 RUN apk add --no-cache $PACKAGES
