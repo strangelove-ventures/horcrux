@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"net"
 	"os"
+	"os/exec"
 	"path"
 	"runtime"
 	"strings"
@@ -39,11 +40,21 @@ import (
 
 var (
 	valKey = "validator"
+)
 
-	// ChainType instance for simd
-	simdChain = &ChainType{
+func getGoModuleVersion(pkg string) string {
+	cmd := exec.Command("go", "list", "-m", "-u", "-f", "{{.Version}}", pkg)
+	out, err := cmd.Output()
+	if err != nil {
+		panic(fmt.Sprintf("failed to evaluate Go module version: %v", err))
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func getSimdChain() *ChainType {
+	return &ChainType{
 		Repository: "strangelove/simd",
-		Version:    "v0.42.3",
+		Version:    getGoModuleVersion("github.com/cosmos/cosmos-sdk"),
 		Bin:        "simd",
 		Ports: map[docker.Port]struct{}{
 			"26656/tcp": {},
@@ -53,7 +64,7 @@ var (
 			"1234/tcp":  {},
 		},
 	}
-)
+}
 
 // ChainType represents the type of chain to instantiate
 type ChainType struct {

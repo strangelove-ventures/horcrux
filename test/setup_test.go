@@ -26,7 +26,7 @@ func SetupTestRun(t *testing.T, numNodes int) (context.Context, string, *dockert
 	network, err := CreateTestNetwork(pool, fmt.Sprintf("horcrux-%s", RandLowerCaseLetterString(8)), t)
 	require.NoError(t, err)
 
-	return context.Background(), home, pool, network, MakeTestNodes(numNodes, home, chainid, simdChain, pool, t)
+	return context.Background(), home, pool, network, MakeTestNodes(numNodes, home, chainid, getSimdChain(), pool, t)
 }
 
 // GetHostPort returns a resource's published port with an address.
