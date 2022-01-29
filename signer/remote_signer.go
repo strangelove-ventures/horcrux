@@ -102,22 +102,16 @@ func (rs *ReconnRemoteSigner) loop() {
 			return
 		}
 
-		var (
-			req, res tmProtoPrivval.Message
-			err      error
-		)
-
-		if req, err = ReadMsg(conn); err != nil {
+		req, err := ReadMsg(conn)
+		if err != nil {
 			rs.Logger.Error("readMsg", "err", err)
 			conn.Close()
 			conn = nil
 			continue
 		}
 
-		if res, err = rs.handleRequest(req); err != nil {
-			// only log the error; we reply with an error in handleRequest since the reply needs to be typed based on error
-			rs.Logger.Error("handleRequest", "err", err)
-		}
+		// handleRequest handles request errors. We always send back a response
+		res := rs.handleRequest(req)
 
 		err = WriteMsg(conn, res)
 		if err != nil {
@@ -128,82 +122,102 @@ func (rs *ReconnRemoteSigner) loop() {
 	}
 }
 
-func (rs *ReconnRemoteSigner) handleRequest(req tmProtoPrivval.Message) (tmProtoPrivval.Message, error) {
-	msg := tmProtoPrivval.Message{}
-	var err error
-
+func (rs *ReconnRemoteSigner) handleRequest(req tmProtoPrivval.Message) tmProtoPrivval.Message {
 	switch typedReq := req.Sum.(type) {
-	case *tmProtoPrivval.Message_PubKeyRequest:
-		pubKey, err := rs.privVal.GetPubKey()
-		if err != nil {
-			rs.Logger.Error("Failed to get Pub Key", "address", rs.address, "error", err, "pubKey", typedReq)
-			msg.Sum = &tmProtoPrivval.Message_PubKeyResponse{PubKeyResponse: &tmProtoPrivval.PubKeyResponse{
-				PubKey: tmProtoCrypto.PublicKey{},
-				Error: &tmProtoPrivval.RemoteSignerError{
-					Code:        0,
-					Description: err.Error(),
-				},
-			}}
-		} else {
-			pk, err := tmCryptoEncoding.PubKeyToProto(pubKey)
-			if err != nil {
-				rs.Logger.Error("Failed to get Pub Key", "address", rs.address, "error", err, "pubKey", typedReq)
-				msg.Sum = &tmProtoPrivval.Message_PubKeyResponse{PubKeyResponse: &tmProtoPrivval.PubKeyResponse{
-					PubKey: tmProtoCrypto.PublicKey{},
-					Error: &tmProtoPrivval.RemoteSignerError{
-						Code:        0,
-						Description: err.Error(),
-					},
-				}}
-			} else {
-				msg.Sum = &tmProtoPrivval.Message_PubKeyResponse{PubKeyResponse: &tmProtoPrivval.PubKeyResponse{PubKey: pk, Error: nil}}
-			}
-		}
 	case *tmProtoPrivval.Message_SignVoteRequest:
-		vote := typedReq.SignVoteRequest.Vote
-		err = rs.privVal.SignVote(rs.chainID, vote)
-		if err != nil {
-			rs.Logger.Error("Failed to sign vote", "address", rs.address, "error", err, "vote_type", vote.Type, "height", vote.Height, "round", vote.Round, "validator", fmt.Sprintf("%X", vote.ValidatorAddress))
-			msg.Sum = &tmProtoPrivval.Message_SignedVoteResponse{SignedVoteResponse: &tmProtoPrivval.SignedVoteResponse{
-				Vote: tmProto.Vote{},
-				Error: &tmProtoPrivval.RemoteSignerError{
-					Code:        0,
-					Description: err.Error(),
-				},
-			}}
-		} else {
-			rs.Logger.Info("Signed vote", "node", rs.address, "height", vote.Height, "round", vote.Round, "type", vote.Type)
-			msg.Sum = &tmProtoPrivval.Message_SignedVoteResponse{SignedVoteResponse: &tmProtoPrivval.SignedVoteResponse{Vote: *vote, Error: nil}}
-		}
+		return rs.handleSignVoteRequest(typedReq.SignVoteRequest.Vote)
 	case *tmProtoPrivval.Message_SignProposalRequest:
-		proposal := typedReq.SignProposalRequest.Proposal
-		err = rs.privVal.SignProposal(rs.chainID, typedReq.SignProposalRequest.Proposal)
-		if err != nil {
-			rs.Logger.Error("Failed to sign proposal", "address", rs.address, "error", err, "proposal", proposal)
-			msg.Sum = &tmProtoPrivval.Message_SignedProposalResponse{SignedProposalResponse: &tmProtoPrivval.SignedProposalResponse{
-				Proposal: tmProto.Proposal{},
-				Error: &tmProtoPrivval.RemoteSignerError{
-					Code:        0,
-					Description: err.Error(),
-				},
-			}}
-		} else {
-			rs.Logger.Info("Signed proposal", "node", rs.address, "height", proposal.Height, "round", proposal.Round, "type", proposal.Type)
-			msg.Sum = &tmProtoPrivval.Message_SignedProposalResponse{SignedProposalResponse: &tmProtoPrivval.SignedProposalResponse{
-				Proposal: *proposal,
-				Error:    nil,
-			}}
-		}
+		return rs.handleSignProposalRequest(typedReq.SignProposalRequest.Proposal)
+	case *tmProtoPrivval.Message_PubKeyRequest:
+		return rs.handlePubKeyRequest()
 	case *tmProtoPrivval.Message_PingRequest:
-		msg.Sum = &tmProtoPrivval.Message_PingResponse{PingResponse: &tmProtoPrivval.PingResponse{}}
+		return rs.handlePingRequest()
 	default:
-		err = fmt.Errorf("unknown msg: %v", typedReq)
+		rs.Logger.Error("Unknown request", "err", fmt.Errorf("%v", typedReq))
+		return tmProtoPrivval.Message{}
 	}
-
-	return msg, err
 }
 
-func StartRemoteSigners(services []tmService.Service, logger tmLog.Logger, chainID string, privVal tm.PrivValidator, nodes []NodeConfig) ([]tmService.Service, error) {
+func (rs *ReconnRemoteSigner) handleSignVoteRequest(vote *tmProto.Vote) tmProtoPrivval.Message {
+	msgSum := &tmProtoPrivval.Message_SignedVoteResponse{SignedVoteResponse: &tmProtoPrivval.SignedVoteResponse{
+		Vote:  tmProto.Vote{},
+		Error: nil,
+	}}
+	if err := rs.privVal.SignVote(rs.chainID, vote); err != nil {
+		switch typedErr := err.(type) {
+		case *BeyondBlockError:
+			rs.Logger.Debug("Rejecting sign vote request", "reason", typedErr.msg)
+		default:
+			rs.Logger.Error("Failed to sign vote", "address", rs.address, "error", err, "vote_type", vote.Type,
+				"height", vote.Height, "round", vote.Round, "validator", fmt.Sprintf("%X", vote.ValidatorAddress))
+		}
+		msgSum.SignedVoteResponse.Error = getRemoteSignerError(err)
+		return tmProtoPrivval.Message{Sum: msgSum}
+	}
+	rs.Logger.Info("Signed vote", "node", rs.address, "height", vote.Height, "round", vote.Round, "type", vote.Type)
+	msgSum.SignedVoteResponse.Vote = *vote
+	return tmProtoPrivval.Message{Sum: msgSum}
+}
+
+func (rs *ReconnRemoteSigner) handleSignProposalRequest(proposal *tmProto.Proposal) tmProtoPrivval.Message {
+	msgSum := &tmProtoPrivval.Message_SignedProposalResponse{
+		SignedProposalResponse: &tmProtoPrivval.SignedProposalResponse{
+			Proposal: tmProto.Proposal{},
+			Error:    nil,
+		}}
+	if err := rs.privVal.SignProposal(rs.chainID, proposal); err != nil {
+		switch typedErr := err.(type) {
+		case *BeyondBlockError:
+			rs.Logger.Debug("Rejecting proposal sign request", "reason", typedErr.msg)
+		default:
+			rs.Logger.Error("Failed to sign proposal", "address", rs.address, "error", err, "proposal", proposal)
+		}
+		msgSum.SignedProposalResponse.Error = getRemoteSignerError(err)
+		return tmProtoPrivval.Message{Sum: msgSum}
+	}
+	rs.Logger.Info("Signed proposal", "node", rs.address,
+		"height", proposal.Height, "round", proposal.Round, "type", proposal.Type)
+	msgSum.SignedProposalResponse.Proposal = *proposal
+	return tmProtoPrivval.Message{Sum: msgSum}
+}
+
+func (rs *ReconnRemoteSigner) handlePubKeyRequest() tmProtoPrivval.Message {
+	msgSum := &tmProtoPrivval.Message_PubKeyResponse{PubKeyResponse: &tmProtoPrivval.PubKeyResponse{
+		PubKey: tmProtoCrypto.PublicKey{},
+		Error:  nil,
+	}}
+	pubKey, err := rs.privVal.GetPubKey()
+	if err != nil {
+		rs.Logger.Error("Failed to get Pub Key", "address", rs.address, "error", err)
+		msgSum.PubKeyResponse.Error = getRemoteSignerError(err)
+		return tmProtoPrivval.Message{Sum: msgSum}
+	}
+	pk, err := tmCryptoEncoding.PubKeyToProto(pubKey)
+	if err != nil {
+		rs.Logger.Error("Failed to get Pub Key", "address", rs.address, "error", err)
+		msgSum.PubKeyResponse.Error = getRemoteSignerError(err)
+		return tmProtoPrivval.Message{Sum: msgSum}
+	}
+	msgSum.PubKeyResponse.PubKey = pk
+	return tmProtoPrivval.Message{Sum: msgSum}
+}
+
+func (rs *ReconnRemoteSigner) handlePingRequest() tmProtoPrivval.Message {
+	return tmProtoPrivval.Message{Sum: &tmProtoPrivval.Message_PingResponse{PingResponse: &tmProtoPrivval.PingResponse{}}}
+}
+
+func getRemoteSignerError(err error) *tmProtoPrivval.RemoteSignerError {
+	if err == nil {
+		return nil
+	}
+	return &tmProtoPrivval.RemoteSignerError{
+		Code:        0,
+		Description: err.Error(),
+	}
+}
+
+func StartRemoteSigners(services []tmService.Service, logger tmLog.Logger, chainID string,
+	privVal tm.PrivValidator, nodes []NodeConfig) ([]tmService.Service, error) {
 	var err error
 	for _, node := range nodes {
 		dialer := net.Dialer{Timeout: 30 * time.Second}

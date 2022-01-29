@@ -20,8 +20,8 @@ func TestBuildSignerContainer(t *testing.T) {
 }
 
 // Test3Of7SignerTwoSentries will spin up a chain with four validators and 5 sentry nodes, stop one validator and all
-// the sentry nodes, configure that validator and the sentry nodes to be a relay for the remote signers, spin up a 3/7 threshold
-// signer cluster, restart the validator/sentry nodes and check that no slashing occurs
+// the sentry nodes, configure that validator and the sentry nodes to be a relay for the remote signers, spin up a 3/7
+// threshold signer cluster, restart the validator/sentry nodes and check that no slashing occurs
 func Test3Of7SignerTwoSentries(t *testing.T) {
 	t.Parallel()
 	const totalValidators = 4
@@ -35,7 +35,8 @@ func Test3Of7SignerTwoSentries(t *testing.T) {
 	sentries := validators[totalValidators:]
 	validators = validators[:totalValidators]
 	ourValidator := validators[0]
-	allNodes := append(validators, sentries...)
+	allNodes := validators
+	allNodes = append(allNodes, sentries...)
 
 	// start building the cosigner container first
 	var eg errgroup.Group
@@ -118,8 +119,8 @@ func Test3Of7SignerTwoSentries(t *testing.T) {
 }
 
 // Test2Of3SignerTwoSentries will spin up a chain with four validators and five sentry nodes, stop one validator and all
-// the sentry nodes, configure that validator and the sentry nodes to be a relay for the remote signers, spin up a 2/3 threshold
-// signer cluster, restart the validator/sentry nodes and check that no slashing occurs
+// the sentry nodes, configure that validator and the sentry nodes to be a relay for the remote signers, spin up a 2/3
+// threshold signer cluster, restart the validator/sentry nodes and check that no slashing occurs
 func Test2Of3SignerTwoSentries(t *testing.T) {
 	t.Parallel()
 	const totalValidators = 4
@@ -133,7 +134,8 @@ func Test2Of3SignerTwoSentries(t *testing.T) {
 	sentries := validators[totalValidators:]
 	validators = validators[:totalValidators]
 	ourValidator := validators[0]
-	allNodes := append(validators, sentries...)
+	allNodes := validators
+	allNodes = append(allNodes, sentries...)
 
 	// start building the cosigner container first
 	var eg errgroup.Group
@@ -202,8 +204,8 @@ func Test2Of3SignerTwoSentries(t *testing.T) {
 }
 
 // Test2Of3SignerUniqueSentry will spin up a chain with four validators and two sentry nodes, stop one validator and all
-// sentry nodes, configure that validator and the sentry nodes to be a relay for the remote signers, spin up a 2/3 threshold
-// signer cluster, restart the validator/sentry nodes and check that no slashing occurs
+// sentry nodes, configure that validator and the sentry nodes to be a relay for the remote signers, spin up a 2/3
+// threshold signer cluster, restart the validator/sentry nodes and check that no slashing occurs
 func Test2Of3SignerUniqueSentry(t *testing.T) {
 	t.Parallel()
 	const totalValidators = 4
@@ -217,7 +219,8 @@ func Test2Of3SignerUniqueSentry(t *testing.T) {
 	sentries := validators[totalValidators:]
 	validators = validators[:totalValidators]
 	ourValidator := validators[0]
-	allNodes := append(validators, sentries...)
+	allNodes := validators
+	allNodes = append(allNodes, sentries...)
 
 	// start building the cosigner container first
 	var eg errgroup.Group
@@ -289,8 +292,8 @@ func Test2Of3SignerUniqueSentry(t *testing.T) {
 }
 
 // TestSingleSignerTwoSentries will spin up a chain with four validators & one sentry node, stop one validator & the
-// sentry node, configure those two nodes to be relays for the remote signer, spin up a single remote signer, restart the
-// validator/sentry node and check that no slashing occurs
+// sentry node, configure those two nodes to be relays for the remote signer, spin up a single remote signer, restart
+// the validator/sentry node and check that no slashing occurs
 func TestSingleSignerTwoSentries(t *testing.T) {
 	t.Parallel()
 	const totalValidators = 4
@@ -302,7 +305,8 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 	sentries := validators[totalValidators:]
 	validators = validators[:totalValidators]
 	ourValidator := validators[0]
-	allNodes := append(validators, sentries...)
+	allNodes := validators
+	allNodes = append(allNodes, sentries...)
 
 	// start building the cosigner container first
 	var eg errgroup.Group
@@ -362,8 +366,8 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 }
 
 // TestUpgradeValidatorToHorcrux will spin up a chain with four validators, stop one validator, configure that validator
-// to be a relay for the remote signer cluster, spin up a 2/3 threshold signer cluster, restart the validator and check that no
-// slashing occurs
+// to be a relay for the remote signer cluster, spin up a 2/3 threshold signer cluster, restart the validator and check
+// that no slashing occurs
 func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	t.Parallel()
 	// NOTE: have this test skipped because we are debugging the docker build in CI
@@ -393,7 +397,8 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	require.NoError(t, eg.Wait())
 
 	// start signer cluster
-	StartCosignerContainers(t, signers, ourValidator, TestNodes{ourValidator}, threshold, totalSigners, sentriesPerSigner, network)
+	StartCosignerContainers(t, signers, ourValidator, TestNodes{ourValidator},
+		threshold, totalSigners, sentriesPerSigner, network)
 
 	// Stop one validator node before upgrading to horcrux
 	t.Logf("{%s} -> Stopping Node...", ourValidator.Name())
@@ -450,7 +455,8 @@ func TestDownedSigners2of3(t *testing.T) {
 	require.NoError(t, eg.Wait())
 
 	// start signer cluster
-	StartCosignerContainers(t, signers, ourValidator, TestNodes{ourValidator}, threshold, totalSigners, sentriesPerSigner, network)
+	StartCosignerContainers(t, signers, ourValidator, TestNodes{ourValidator},
+		threshold, totalSigners, sentriesPerSigner, network)
 
 	// Stop our validator node before upgrading to horcrux
 	t.Logf("{%s} -> Stopping Node...", ourValidator.Name())
@@ -496,7 +502,6 @@ func TestDownedSigners2of3(t *testing.T) {
 }
 
 func TestDownedSigners3of5(t *testing.T) {
-	t.Skip() // Skipping this test in CI suite.
 	t.Parallel()
 	const totalValidators = 4
 	const totalSigners = 5

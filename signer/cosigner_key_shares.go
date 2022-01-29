@@ -4,10 +4,11 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
+	"io/ioutil"
+
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/privval"
 	tsed25519 "gitlab.com/polychainlabs/threshold-ed25519/pkg"
-	"io/ioutil"
 )
 
 // CreateCosignerSharesFromFile creates cosigner key objects from a priv_validator_key.json file
@@ -40,7 +41,7 @@ func CreateCosignerShares(pv privval.FilePVKey, threshold, shares int64) (out []
 
 // ReadPrivValidatorFile reads in a privval.FilePVKey from a given file
 func ReadPrivValidatorFile(priv string) (out privval.FilePVKey, err error) {
-	bz := []byte{}
+	var bz []byte
 	if bz, err = ioutil.ReadFile(priv); err != nil {
 		return
 	}
@@ -56,7 +57,7 @@ func WriteCosignerShareFile(cosigner CosignerKey, file string) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(file, jsonBytes, 0644)
+	return ioutil.WriteFile(file, jsonBytes, 0644) //nolint
 }
 
 func makeRSAKeys(num int) (rsaKeys []*rsa.PrivateKey, pubKeys []*rsa.PublicKey, err error) {

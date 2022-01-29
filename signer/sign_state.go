@@ -17,7 +17,6 @@ import (
 )
 
 const (
-	stepNone      int8 = 0 // Used to distinguish the initial state
 	stepPropose   int8 = 1
 	stepPrevote   int8 = 2
 	stepPrecommit int8 = 3
@@ -69,7 +68,15 @@ type SignStateConsensus struct {
 	SignBytes tmBytes.HexBytes
 }
 
-func (lss *SignState) Save(signState SignStateConsensus, lock *sync.Mutex) error {
+func NewSignStateConsensus(height int64, round int64, step int8) SignStateConsensus {
+	return SignStateConsensus{
+		Height: height,
+		Round:  round,
+		Step:   step,
+	}
+}
+
+func (signState *SignState) Save(ssc SignStateConsensus, lock *sync.Mutex) error {
 	// One lock/unlock for less/equal check and mutation.
 	// Setting nil for lock for getErrorIfLessOrEqual to avoid recursive lock
 	if lock != nil {
@@ -77,19 +84,19 @@ func (lss *SignState) Save(signState SignStateConsensus, lock *sync.Mutex) error
 		defer lock.Unlock()
 	}
 
-	err := lss.GetErrorIfLessOrEqual(signState.Height, signState.Round, signState.Step, nil)
+	err := signState.GetErrorIfLessOrEqual(ssc.Height, ssc.Round, ssc.Step, nil)
 	if err != nil {
 		return err
 	}
 	// HRS is greater than existing state, allow
 
-	lss.Height = signState.Height
-	lss.Round = signState.Round
-	lss.Step = signState.Step
-	lss.Signature = signState.Signature
-	lss.SignBytes = signState.SignBytes
+	signState.Height = ssc.Height
+	signState.Round = ssc.Round
+	signState.Step = ssc.Step
+	signState.Signature = ssc.Signature
+	signState.SignBytes = ssc.SignBytes
 	go func() {
-		lss.save()
+		signState.save()
 	}()
 
 	return nil
@@ -120,20 +127,22 @@ func (signState *SignState) save() {
 // Returns true if the HRS matches the arguments and the SignBytes are not empty (indicating
 // we have already signed for this HRS, and can reuse the existing signature).
 // It panics if the HRS matches the arguments, there's a SignBytes, but no Signature.
-func (signState *SignState) CheckHRS(height int64, round int64, step int8) (bool, error) {
-	if signState.Height > height {
-		return false, fmt.Errorf("height regression. Got %v, last height %v", height, signState.Height)
+func (signState *SignState) CheckHRS(hrs HRSKey) (bool, error) {
+	if signState.Height > hrs.Height {
+		return false, fmt.Errorf("height regression. Got %v, last height %v", hrs.Height, signState.Height)
 	}
 
-	if signState.Height == height {
-		if signState.Round > round {
-			return false, fmt.Errorf("round regression at height %v. Got %v, last round %v", height, round, signState.Round)
+	if signState.Height == hrs.Height {
+		if signState.Round > hrs.Round {
+			return false, fmt.Errorf("round regression at height %v. Got %v, last round %v",
+				hrs.Height, hrs.Round, signState.Round)
 		}
 
-		if signState.Round == round {
-			if signState.Step > step {
-				return false, fmt.Errorf("step regression at height %v round %v. Got %v, last step %v", height, round, step, signState.Step)
-			} else if signState.Step == step {
+		if signState.Round == hrs.Round {
+			if signState.Step > hrs.Step {
+				return false, fmt.Errorf("step regression at height %v round %v. Got %v, last step %v",
+					hrs.Height, hrs.Round, hrs.Step, signState.Step)
+			} else if signState.Step == hrs.Step {
 				if signState.SignBytes != nil {
 					if signState.Signature == nil {
 						panic("pv: Signature is nil but SignBytes is not!")
