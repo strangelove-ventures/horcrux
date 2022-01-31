@@ -20,6 +20,20 @@ Multi-party computation using threshold signatures is able to provide high-avail
 
 For more on how the Horcrux MPC signing flow works, see [`docs/signing.md`](/docs/signing.md)
 
+## Raft
+
+Horcrux v2.x introduces [Raft](https://raft.github.io/) For leader election and high watermark consensus.
+
+### Benchmarks
+
+![Screenshot from 2022-01-31 13-50-36](https://user-images.githubusercontent.com/6722152/151871074-32cb5d7a-b9f5-4466-8333-abc00bf7aa68.png)
+
+### Demo
+
+Horcrux signer cluster configured with 5 total nodes, threshold 3.
+
+[![Demo](https://img.youtube.com/vi/O-yy1CYBDsI/0.jpg)](https://www.youtube.com/watch?v=O-yy1CYBDsI)
+
 ## Running Horcrux
 
 See documentation in [`docs/migrating.md`](/docs/migrating.md) to learn how to upgrade your validator infrastructure with Horcrux.

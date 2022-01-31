@@ -11,11 +11,11 @@ Each piece of the key is added to a relative signer node that will run the horcr
 
 A higher threshold _`t`_ equates to more security, since more pieces of the key will be required to assemble a full signature. A higher threshold also means the fault tolerance is lower since you cannot tolerate as many missing participants, or in Horcrux' case, failed nodes. It is important to think about your specific use case to determine what the balance of _`n`_ and _`t`_. 
 
-> IMPORTANT: For security and to ensure that there cannot be a situation in which there are two separate clusters of signer nodes that could combine a full signature, it is required that _t > n/2_
+> IMPORTANT: For security and to ensure that there cannot be a situation in which there are two separate clusters of signer nodes that could combine a full signature, it is required that _`t > n/2`_
 
-The recommended configuration for most validators is _n: 3_ and _t: 2_. This is also the minimum supported _`n`_. This configuration will allow one failed signer node at any given time and will have high performance since only 2 nodes will be required to assemble a full signature for a block. 
+The recommended configuration for most validators is _`n: 3`_ and _`t: 2`_. This is also the minimum supported _`n`_. This configuration will allow one failed signer node at any given time and will have high performance since only 2 nodes will be required to assemble a full signature for a block. 
 
-_n: 5_ and _t: 3_ is also a good configuration to enable higher availability at the expense of slightly longer block sign times since 3 nodes will be required to assemble a full signature. 
+_`n: 5`_ and _`t: 3`_ is also a good configuration to enable higher availability at the expense of slightly longer block sign times since 3 nodes will be required to assemble a full signature. 
 
 Horcrux is designed with performance in mind, so it will sign and return the full block signature as soon as _`t`_ signer nodes have participated in the block signature.
 
