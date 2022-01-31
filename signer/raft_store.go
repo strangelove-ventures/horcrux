@@ -92,7 +92,7 @@ func (s *RaftStore) OnStart() error {
 			for i := 0; i < 10 && s.raft.State() != raft.Leader; i++ {
 				time.Sleep(1 * time.Second)
 			}
-			s.JoinCosigners()
+			s.joinCosigners()
 		}
 	}()
 
@@ -152,7 +152,13 @@ func (s *RaftStore) Open() error {
 	return nil
 }
 
-func (s *RaftStore) JoinCosigners() {
+func (s *RaftStore) joinCosigners() {
+	// If we are not leader, do not want to attempt to join any cosigners.
+	// They are either already followers of the new leader, or will join the new leader
+	// when they come back up if they are currently down.
+	if s.raft.State() != raft.Leader {
+		return
+	}
 	for _, peer := range s.Peers {
 		nodeID := fmt.Sprint(peer.GetID())
 		raftAddress := peer.GetRaftAddress()
