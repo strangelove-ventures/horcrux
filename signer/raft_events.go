@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
-	"strings"
 )
 
 const (
@@ -37,16 +35,12 @@ func (f *fsm) handleLSSEvent(value string) {
 func (s *RaftStore) GetLeaderCosigner() (Cosigner, error) {
 	leader := string(s.GetLeader())
 	for _, peer := range s.Peers {
-		peerSplit := strings.Split(peer.GetRaftAddress(), ":")
-		ips, err := net.LookupIP(peerSplit[0])
-		if err == nil {
-			for _, ip := range ips {
-				peerAddress := fmt.Sprintf("%s:%s", ip, peerSplit[1])
-				if peerAddress == leader {
-					return peer, nil
-				}
-			}
-		} else if peer.GetAddress() == leader {
+		tcpAddress, err := GetTCPAddressForRaftAddress(peer.GetRaftAddress())
+		if err != nil {
+			s.logger.Error("Unable to get TCP address for peer", err)
+			continue
+		}
+		if fmt.Sprint(tcpAddress) == leader {
 			return peer, nil
 		}
 	}

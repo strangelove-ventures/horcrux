@@ -483,7 +483,7 @@ func TestDownedSigners2of3(t *testing.T) {
 	ourValidator.GetHosts().WaitForAllToStart(t, 10)
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
-	initialMissed := ourValidator.EnsureNotSlashed()
+	ourValidator.EnsureNotSlashed()
 
 	// Test taking down each node in the signer cluster for a period of time
 	for _, signer := range signers {
@@ -491,13 +491,16 @@ func TestDownedSigners2of3(t *testing.T) {
 		require.NoError(t, signer.StopContainer())
 
 		t.Logf("{%s} -> Checking that no blocks were missed...", ourValidator.Name())
-		initialMissed = ourValidator.EnsureNoMissedBlocks(initialMissed, 5) // allow up to 5 missed blocks
+
+		time.Sleep(20 * time.Second) // let raft cluster recover from downed node
+
+		ourValidator.EnsureNoMissedBlocks()
 
 		t.Logf("{%s} -> Restarting signer...", signer.Name())
 		require.NoError(t, signer.CreateCosignerContainer(network.ID))
 		require.NoError(t, signer.StartContainer())
 		signer.GetHosts().WaitForAllToStart(t, 10) // Wait to ensure signer is back up
-		time.Sleep(10 * time.Second)               // let container have some runtime before taking down the next one
+		time.Sleep(20 * time.Second)               // let container have some runtime before taking down the next one
 	}
 }
 
@@ -556,7 +559,7 @@ func TestDownedSigners3of5(t *testing.T) {
 	ourValidator.GetHosts().WaitForAllToStart(t, 10)
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
-	initialMissed := ourValidator.EnsureNotSlashed()
+	ourValidator.EnsureNotSlashed()
 
 	// Test taking down 2 nodes at a time in the signer cluster for a period of time
 	for i := 0; i < len(signers); i++ {
@@ -577,8 +580,10 @@ func TestDownedSigners3of5(t *testing.T) {
 			require.NoError(t, signer2.StopContainer())
 		}
 
+		time.Sleep(20 * time.Second) // let raft cluster recover from downed node
+
 		t.Logf("{%s} -> Checking that no blocks were missed...", ourValidator.Name())
-		initialMissed = ourValidator.EnsureNoMissedBlocks(initialMissed, 5) // allow up to 5 missed blocks
+		ourValidator.EnsureNoMissedBlocks() // allow up to 5 missed blocks
 
 		t.Logf("{%s} -> Restarting signer...", signer1.Name())
 		require.NoError(t, signer1.CreateCosignerContainer(network.ID))

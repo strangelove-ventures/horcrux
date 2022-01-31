@@ -361,19 +361,26 @@ func (tn *TestNode) SetPrivValdidatorListen(peers string) {
 	tmconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
 }
 
-func (tn *TestNode) EnsureNotSlashed() int64 {
-	missed := int64(0)
+func (tn *TestNode) getValSigningInfo() *slashingtypes.QuerySigningInfoResponse {
+	slashInfo, err := slashingtypes.NewQueryClient(
+		tn.CliContext()).SigningInfo(context.Background(), &slashingtypes.QuerySigningInfoRequest{
+		ConsAddress: tn.GetConsPub(),
+	})
+	require.NoError(tn.t, err)
+	return slashInfo
+}
+
+func (tn *TestNode) getMissingBlocks() int64 {
+	return tn.getValSigningInfo().ValSigningInfo.MissedBlocksCounter
+}
+
+func (tn *TestNode) EnsureNotSlashed() {
 	for i := 0; i < 50; i++ {
 		time.Sleep(1 * time.Second)
-		slashInfo, err := slashingtypes.NewQueryClient(
-			tn.CliContext()).SigningInfo(context.Background(), &slashingtypes.QuerySigningInfoRequest{
-			ConsAddress: tn.GetConsPub(),
-		})
-		require.NoError(tn.t, err)
+		slashInfo := tn.getValSigningInfo()
 
 		if i == 0 {
-			missed = slashInfo.ValSigningInfo.MissedBlocksCounter
-			tn.t.Log("Initial Missed blocks:", missed)
+			tn.t.Log("Initial Missed blocks:", slashInfo.ValSigningInfo.MissedBlocksCounter)
 			continue
 		}
 		if i%2 == 0 {
@@ -384,18 +391,14 @@ func (tn *TestNode) EnsureNotSlashed() int64 {
 		}
 		require.False(tn.t, slashInfo.ValSigningInfo.Tombstoned)
 	}
-	return missed
 }
 
-func (tn *TestNode) EnsureNoMissedBlocks(initialMissed int64, accepted int64) int64 {
+func (tn *TestNode) EnsureNoMissedBlocks() {
+	initialMissed := tn.getMissingBlocks()
 	missedBlocks := int64(0)
 	for i := 0; i < 50; i++ {
 		time.Sleep(1 * time.Second)
-		slashInfo, err := slashingtypes.NewQueryClient(
-			tn.CliContext()).SigningInfo(context.Background(), &slashingtypes.QuerySigningInfoRequest{
-			ConsAddress: tn.GetConsPub(),
-		})
-		require.NoError(tn.t, err)
+		slashInfo := tn.getValSigningInfo()
 		missedBlocks = slashInfo.ValSigningInfo.MissedBlocksCounter
 		if i == 0 {
 			tn.t.Log("Initial Missed blocks:", missedBlocks)
@@ -405,11 +408,10 @@ func (tn *TestNode) EnsureNoMissedBlocks(initialMissed int64, accepted int64) in
 			// require.Equal(tn.t, missed, slashInfo.ValSigningInfo.MissedBlocksCounter)
 			stat, err := tn.Client.Status(context.Background())
 			require.NoError(tn.t, err)
-			require.LessOrEqual(tn.t, missedBlocks-initialMissed, accepted)
+			require.LessOrEqual(tn.t, missedBlocks-initialMissed, int64(0))
 			tn.t.Log("Missed blocks:", missedBlocks, "block", stat.SyncInfo.LatestBlockHeight)
 		}
 	}
-	return missedBlocks
 }
 
 func stdconfigchanges(cfg *tmconfig.Config, peers string) {
