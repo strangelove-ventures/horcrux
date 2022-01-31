@@ -14,28 +14,9 @@ type CosignerSignResponse struct {
 	Signature       []byte
 }
 
-type CosignerGetEphemeralSecretPartRequest struct {
-	ID           int
-	Height       int64
-	Round        int64
-	Step         int8
-	FindOrCreate bool
-}
-
-type CosignerHasEphemeralSecretPartRequest struct {
-	ID     int
-	Height int64
-	Round  int64
-	Step   int8
-}
-
-type CosignerHasEphemeralSecretPartResponse struct {
-	Exists                   bool
-	EphemeralSecretPublicKey []byte
-}
-
-type CosignerGetEphemeralSecretPartResponse struct {
+type CosignerEphemeralSecretPart struct {
 	SourceID                       int
+	DestinationID                  int
 	SourceEphemeralSecretPublicKey []byte
 	EncryptedSharePart             []byte
 	SourceSig                      []byte
@@ -44,11 +25,36 @@ type CosignerGetEphemeralSecretPartResponse struct {
 type CosignerSetEphemeralSecretPartRequest struct {
 	SourceID                       int
 	SourceEphemeralSecretPublicKey []byte
+	EncryptedSharePart             []byte
+	SourceSig                      []byte
 	Height                         int64
 	Round                          int64
 	Step                           int8
-	EncryptedSharePart             []byte
-	SourceSig                      []byte
+}
+
+type CosignerSignBlockRequest struct {
+	ChainID string
+	Block   *block
+}
+
+type CosignerSignBlockResponse struct {
+	Signature []byte
+}
+
+type CosignerEmitEphemeralSecretReceiptRequest struct {
+	HRS           HRSKey
+	SourceID      int
+	DestinationID int
+}
+
+type CosignerEphemeralSecretPartsResponse struct {
+	EncryptedSecrets []CosignerEphemeralSecretPart
+}
+
+type CosignerSetEphemeralSecretPartsAndSignRequest struct {
+	EncryptedSecrets []CosignerEphemeralSecretPart
+	HRS              HRSKey
+	SignBytes        []byte
 }
 
 // Cosigner interface is a set of methods for an m-of-n threshold signature.
@@ -58,16 +64,19 @@ type Cosigner interface {
 	// The ID is the shamir index: 1, 2, etc...
 	GetID() int
 
-	// Get the ephemeral secret part for an ephemeral share
-	// The ephemeral secret part is encrypted for the receiver
-	GetEphemeralSecretPart(req CosignerGetEphemeralSecretPartRequest) (CosignerGetEphemeralSecretPartResponse, error)
+	// Get the RPC URL
+	GetAddress() string
 
-	// Store an ephemeral secret share part provided by another cosigner
-	SetEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest) error
+	// Get the raft host - hostname:port
+	GetRaftAddress() string
 
-	// Query whether the cosigner has an ehpemeral secret part set
-	HasEphemeralSecretPart(req CosignerHasEphemeralSecretPartRequest) (CosignerHasEphemeralSecretPartResponse, error)
+	// Get ephemeral secret part for all peers
+	GetEphemeralSecretParts(req HRSKey) (*CosignerEphemeralSecretPartsResponse, error)
 
 	// Sign the requested bytes
-	Sign(req CosignerSignRequest) (CosignerSignResponse, error)
+	SetEphemeralSecretPartsAndSign(req CosignerSetEphemeralSecretPartsAndSignRequest) (*CosignerSignResponse, error)
+
+	// Request that the cosigner manage the threshold signing process for this block
+	// Will throw error if cosigner is not the leader
+	SignBlock(req CosignerSignBlockRequest) (CosignerSignBlockResponse, error)
 }

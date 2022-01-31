@@ -20,8 +20,8 @@ func TestBuildSignerContainer(t *testing.T) {
 }
 
 // Test3Of7SignerTwoSentries will spin up a chain with four validators and 5 sentry nodes, stop one validator and all
-// the sentry nodes, configure that validator and the sentry nodes to be a relay for the remote signers, spin up a 3/7 threshold
-// signer cluster, restart the validator/sentry nodes and check that no slashing occurs
+// the sentry nodes, configure that validator and the sentry nodes to be a relay for the remote signers, spin up a 3/7
+// threshold signer cluster, restart the validator/sentry nodes and check that no slashing occurs
 func Test3Of7SignerTwoSentries(t *testing.T) {
 	t.Parallel()
 	const totalValidators = 4
@@ -35,7 +35,8 @@ func Test3Of7SignerTwoSentries(t *testing.T) {
 	sentries := validators[totalValidators:]
 	validators = validators[:totalValidators]
 	ourValidator := validators[0]
-	allNodes := append(validators, sentries...)
+	allNodes := validators
+	allNodes = append(allNodes, sentries...)
 
 	// start building the cosigner container first
 	var eg errgroup.Group
@@ -118,8 +119,8 @@ func Test3Of7SignerTwoSentries(t *testing.T) {
 }
 
 // Test2Of3SignerTwoSentries will spin up a chain with four validators and five sentry nodes, stop one validator and all
-// the sentry nodes, configure that validator and the sentry nodes to be a relay for the remote signers, spin up a 2/3 threshold
-// signer cluster, restart the validator/sentry nodes and check that no slashing occurs
+// the sentry nodes, configure that validator and the sentry nodes to be a relay for the remote signers, spin up a 2/3
+// threshold signer cluster, restart the validator/sentry nodes and check that no slashing occurs
 func Test2Of3SignerTwoSentries(t *testing.T) {
 	t.Parallel()
 	const totalValidators = 4
@@ -133,7 +134,8 @@ func Test2Of3SignerTwoSentries(t *testing.T) {
 	sentries := validators[totalValidators:]
 	validators = validators[:totalValidators]
 	ourValidator := validators[0]
-	allNodes := append(validators, sentries...)
+	allNodes := validators
+	allNodes = append(allNodes, sentries...)
 
 	// start building the cosigner container first
 	var eg errgroup.Group
@@ -202,8 +204,8 @@ func Test2Of3SignerTwoSentries(t *testing.T) {
 }
 
 // Test2Of3SignerUniqueSentry will spin up a chain with four validators and two sentry nodes, stop one validator and all
-// sentry nodes, configure that validator and the sentry nodes to be a relay for the remote signers, spin up a 2/3 threshold
-// signer cluster, restart the validator/sentry nodes and check that no slashing occurs
+// sentry nodes, configure that validator and the sentry nodes to be a relay for the remote signers, spin up a 2/3
+// threshold signer cluster, restart the validator/sentry nodes and check that no slashing occurs
 func Test2Of3SignerUniqueSentry(t *testing.T) {
 	t.Parallel()
 	const totalValidators = 4
@@ -217,7 +219,8 @@ func Test2Of3SignerUniqueSentry(t *testing.T) {
 	sentries := validators[totalValidators:]
 	validators = validators[:totalValidators]
 	ourValidator := validators[0]
-	allNodes := append(validators, sentries...)
+	allNodes := validators
+	allNodes = append(allNodes, sentries...)
 
 	// start building the cosigner container first
 	var eg errgroup.Group
@@ -289,8 +292,8 @@ func Test2Of3SignerUniqueSentry(t *testing.T) {
 }
 
 // TestSingleSignerTwoSentries will spin up a chain with four validators & one sentry node, stop one validator & the
-// sentry node, configure those two nodes to be relays for the remote signer, spin up a single remote signer, restart the
-// validator/sentry node and check that no slashing occurs
+// sentry node, configure those two nodes to be relays for the remote signer, spin up a single remote signer, restart
+// the validator/sentry node and check that no slashing occurs
 func TestSingleSignerTwoSentries(t *testing.T) {
 	t.Parallel()
 	const totalValidators = 4
@@ -302,7 +305,8 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 	sentries := validators[totalValidators:]
 	validators = validators[:totalValidators]
 	ourValidator := validators[0]
-	allNodes := append(validators, sentries...)
+	allNodes := validators
+	allNodes = append(allNodes, sentries...)
 
 	// start building the cosigner container first
 	var eg errgroup.Group
@@ -362,8 +366,8 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 }
 
 // TestUpgradeValidatorToHorcrux will spin up a chain with four validators, stop one validator, configure that validator
-// to be a relay for the remote signer cluster, spin up a 2/3 threshold signer cluster, restart the validator and check that no
-// slashing occurs
+// to be a relay for the remote signer cluster, spin up a 2/3 threshold signer cluster, restart the validator and check
+// that no slashing occurs
 func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	t.Parallel()
 	// NOTE: have this test skipped because we are debugging the docker build in CI
@@ -393,7 +397,8 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	require.NoError(t, eg.Wait())
 
 	// start signer cluster
-	StartCosignerContainers(t, signers, ourValidator, TestNodes{ourValidator}, threshold, totalSigners, sentriesPerSigner, network)
+	StartCosignerContainers(t, signers, ourValidator, TestNodes{ourValidator},
+		threshold, totalSigners, sentriesPerSigner, network)
 
 	// Stop one validator node before upgrading to horcrux
 	t.Logf("{%s} -> Stopping Node...", ourValidator.Name())
@@ -423,8 +428,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	ourValidator.EnsureNotSlashed()
 }
 
-func TestDownedSigners(t *testing.T) {
-	t.Skip()
+func TestDownedSigners2of3(t *testing.T) {
 	t.Parallel()
 	const totalValidators = 4
 	const totalSigners = 3
@@ -451,7 +455,8 @@ func TestDownedSigners(t *testing.T) {
 	require.NoError(t, eg.Wait())
 
 	// start signer cluster
-	StartCosignerContainers(t, signers, ourValidator, TestNodes{ourValidator}, threshold, totalSigners, sentriesPerSigner, network)
+	StartCosignerContainers(t, signers, ourValidator, TestNodes{ourValidator},
+		threshold, totalSigners, sentriesPerSigner, network)
 
 	// Stop our validator node before upgrading to horcrux
 	t.Logf("{%s} -> Stopping Node...", ourValidator.Name())
@@ -486,13 +491,100 @@ func TestDownedSigners(t *testing.T) {
 		require.NoError(t, signer.StopContainer())
 
 		t.Logf("{%s} -> Checking that no blocks were missed...", ourValidator.Name())
-		initialMissed = ourValidator.EnsureNoMissedBlocks(initialMissed, 3)
+		initialMissed = ourValidator.EnsureNoMissedBlocks(initialMissed, 5) // allow up to 5 missed blocks
 
 		t.Logf("{%s} -> Restarting signer...", signer.Name())
-		require.NoError(t, signer.CreateSingleSignerContainer(network.ID))
+		require.NoError(t, signer.CreateCosignerContainer(network.ID))
 		require.NoError(t, signer.StartContainer())
 		signer.GetHosts().WaitForAllToStart(t, 10) // Wait to ensure signer is back up
-		time.Sleep(5 * time.Second)                // let container have some runtime before taking down the next one
+		time.Sleep(10 * time.Second)               // let container have some runtime before taking down the next one
+	}
+}
+
+func TestDownedSigners3of5(t *testing.T) {
+	t.Parallel()
+	const totalValidators = 4
+	const totalSigners = 5
+	const threshold = 3
+	const sentriesPerSigner = 0
+
+	ctx, home, pool, network, validators := SetupTestRun(t, totalValidators)
+	signers := MakeTestSigners(totalSigners, home, pool, t)
+	ourValidator := validators[0]
+
+	// start building the cosigner container first
+	var eg errgroup.Group
+	eg.Go(func() error {
+		return BuildTestSignerImage(pool)
+	})
+
+	// start validators
+	StartNodeContainers(t, ctx, network, validators, []*TestNode{})
+
+	// Wait for all validators to get to given block height
+	validators.WaitForHeight(5)
+
+	// wait for build to finish
+	require.NoError(t, eg.Wait())
+
+	// start signer cluster
+	StartCosignerContainers(t, signers, ourValidator,
+		TestNodes{ourValidator}, threshold, totalSigners, sentriesPerSigner, network)
+
+	// Stop our validator node before upgrading to horcrux
+	t.Logf("{%s} -> Stopping Node...", ourValidator.Name())
+	require.NoError(t, ourValidator.StopContainer())
+
+	time.Sleep(5 * time.Second) // wait for all containers to stop
+
+	// set the test cleanup function
+	t.Cleanup(Cleanup(pool, t.Name(), home))
+
+	// wait until signer containers are reachable on port 2222
+	signers.GetHosts().WaitForAllToStart(t, 10)
+
+	// modify node config to listen for private validator connections
+	ourValidator.SetPrivValdidatorListen(validators.PeerString())
+
+	// restart the validator and ensure that signer cluster is connected by
+	// checking if the node continues to miss blocks or is slashed
+	t.Logf("{%s} -> Restarting Node...", ourValidator.Name())
+	require.NoError(t, ourValidator.CreateNodeContainer(network.ID, true))
+	require.NoError(t, ourValidator.StartContainer(ctx))
+
+	// wait for validator to be reachable
+	ourValidator.GetHosts().WaitForAllToStart(t, 10)
+
+	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
+	initialMissed := ourValidator.EnsureNotSlashed()
+
+	// Test taking down 2 nodes at a time in the signer cluster for a period of time
+	for i := 0; i < len(signers); i++ {
+		signer1 := signers[i]
+		var signer2 *TestSigner
+		if i < len(signers)-1 {
+			signer2 = signers[i+1]
+		} else {
+			signer2 = signers[0]
+		}
+		if i == 0 {
+			t.Logf("{%s} -> Stopping signer...", signer1.Name())
+			require.NoError(t, signer1.StopContainer())
+			t.Logf("{%s} -> Stopping signer...", signer2.Name())
+			require.NoError(t, signer2.StopContainer())
+		} else {
+			t.Logf("{%s} -> Stopping signer...", signer2.Name())
+			require.NoError(t, signer2.StopContainer())
+		}
+
+		t.Logf("{%s} -> Checking that no blocks were missed...", ourValidator.Name())
+		initialMissed = ourValidator.EnsureNoMissedBlocks(initialMissed, 5) // allow up to 5 missed blocks
+
+		t.Logf("{%s} -> Restarting signer...", signer1.Name())
+		require.NoError(t, signer1.CreateCosignerContainer(network.ID))
+		require.NoError(t, signer1.StartContainer())
+		signer1.GetHosts().WaitForAllToStart(t, 10) // Wait to ensure signer is back up
+		time.Sleep(20 * time.Second)                // let container have some runtime before taking down the next one
 	}
 }
 

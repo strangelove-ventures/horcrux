@@ -12,8 +12,9 @@ type NodeConfig struct {
 }
 
 type CosignerConfig struct {
-	ID      int    `toml:"id"`
-	Address string `toml:"remote_address"`
+	ID          int    `toml:"id"`
+	Address     string `toml:"remote_address"`
+	RaftAddress string `toml:"remote_raft_address"`
 }
 
 type Config struct {
@@ -23,6 +24,7 @@ type Config struct {
 	ChainID           string           `toml:"chain_id"`
 	CosignerThreshold int              `toml:"cosigner_threshold"`
 	ListenAddress     string           `toml:"cosigner_listen_address"`
+	RaftListenAddress string           `toml:"cosigner_raft_listen_address"`
 	Nodes             []NodeConfig     `toml:"node"`
 	Cosigners         []CosignerConfig `toml:"cosigner"`
 }

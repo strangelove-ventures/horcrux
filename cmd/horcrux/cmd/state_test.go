@@ -6,6 +6,7 @@ import (
 	"path"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/strangelove-ventures/horcrux/signer"
 	"github.com/stretchr/testify/require"
@@ -27,7 +28,7 @@ func TestStateSetCmd(t *testing.T) {
 		chainid,
 		"tcp://10.168.0.1:1234",
 		"-c",
-		"-p", "tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3",
+		"-p", "tcp://10.168.1.2:2222|2223|2,tcp://10.168.1.3:2222|2223|3",
 		"--timeout", "1500ms",
 	})
 	err = cmd.Execute()
@@ -56,6 +57,8 @@ func TestStateSetCmd(t *testing.T) {
 			cmd.SetOutput(ioutil.Discard)
 			cmd.SetArgs(tc.args)
 			err = cmd.Execute()
+
+			time.Sleep(1 * time.Second)
 
 			if tc.expectErr {
 				require.Error(t, err)

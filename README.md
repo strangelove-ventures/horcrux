@@ -1,17 +1,14 @@
 # Horcrux
 
-Horcrux is a [multi-party-computation](https://en.wikipedia.org/wiki/Secure_multi-party_computation) signing service for Tendermint nodes using threshold Ed25519 signatures. 
+Horcrux is a [multi-party-computation (MPC)](https://en.wikipedia.org/wiki/Secure_multi-party_computation) signing service for Tendermint nodes
 
-## Refactor 
+## Why use Horcrux?
 
-Pylon Validation Services is currently maintaining and refactoring this codebase. The following are goals of the refactor:
+Take your validator infrastructure to the next level of security and availability
 
-- [ ] Refactor existing code into a [`cobra`](https://github.com/spf13/cobra) CLI
-  * [ ] Enable configuration via `ENV`
-  * [ ] Seperate functionality into different commands 
-  * [ ] Document code, security assumptions, and system functionality
-- [ ] Add robust test suite to ensure operation against specific versions of the [`cosmos-sdk`](https://github.com/cosmos/cosmos-sdk) and [`tendermint`](https://github.com/tendermint/tendermint)
-  * [ ] Use `dockertest` framework to spin up 
+- Composed of a cluster of signer nodes in place of the [remote signer](https://docs.tendermint.com/master/nodes/remote-signer.html), enabling High Availability (HA) for block signing through fault tolerance.
+- Secure your validator private key by splitting it across multiple private signer nodes using threshold Ed25519 signatures
+- Add security and availability without sacrificing block sign performance.
 
 ## Design
 
@@ -19,11 +16,27 @@ Validator operators for tendermint chains balance operational and risk tradeoffs
 
 Traditional high-availability systems where the keys exist on hot spares risk double signing if there are failover detection bugs. Low-availability systems, or manual failover, risk downtime if manual intervention cannot respond in a timely manner.
 
-Multi-party computation using threshold signatures is able to provide high-availability while maintaining high security and avoiding double signing via failover detection bugs.
+Multi-party computation using threshold signatures is able to provide high-availability while maintaining high security and avoiding double signing via consensus and failover detection mechanisms.
+
+For more on how the Horcrux MPC signing flow works, see [`docs/signing.md`](/docs/signing.md)
+
+## Raft
+
+Horcrux v2.x introduces [Raft](https://raft.github.io/) For leader election and high watermark consensus.
+
+### Benchmarks
+
+![Screenshot from 2022-01-31 13-50-36](https://user-images.githubusercontent.com/6722152/151871074-32cb5d7a-b9f5-4466-8333-abc00bf7aa68.png)
+
+### Demo
+
+Horcrux signer cluster configured with 5 total nodes, threshold 3.
+
+[![Demo](https://img.youtube.com/vi/O-yy1CYBDsI/0.jpg)](https://www.youtube.com/watch?v=O-yy1CYBDsI)
 
 ## Running Horcrux
 
-See documentation in [`docs/setup.md`](/docs/setup.md)
+See documentation in [`docs/migrating.md`](/docs/migrating.md) to learn how to upgrade your validator infrastructure with Horcrux.
 
 ## Security
 
@@ -44,4 +57,4 @@ software or this license, under any kind of legal claim.
 
 ## Acknowledgement
 
-This codebase (and most especially the underlying cryptographic libraries) was developed by Roman Shtylman (@defunctzombie). The work here primarily adds a nice CLI experience and additional documentation to make operating this software easier and, hopefully, more reliable.
+The initial threshold signing code in this project was developed by Roman Shtylman (@defunctzombie). The work here improves the cluster reliability and performance, adds a nice CLI experience and additional documentation to make operating this software easier and more reliable.

@@ -106,14 +106,16 @@ func setStateCmd() *cobra.Command {
 				return err
 			}
 
-			pv.Height, share.Height = height, height
-			pv.Round, share.Round = 0, 0
-			pv.Step, share.Step = 0, 0
 			pv.EphemeralPublic, share.EphemeralPublic = nil, nil
-			pv.Signature, share.Signature = nil, nil
-			pv.SignBytes, share.SignBytes = nil, nil
-			pv.Save()
-			share.Save()
+			signState := signer.SignStateConsensus{
+				Height:    height,
+				Round:     0,
+				Step:      0,
+				Signature: nil,
+				SignBytes: nil,
+			}
+			_ = pv.Save(signState, nil)
+			_ = share.Save(signState, nil)
 			return nil
 		},
 	}

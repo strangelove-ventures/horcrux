@@ -3,6 +3,7 @@ package signer
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"time"
 
 	"io/ioutil"
 	"os"
@@ -10,10 +11,24 @@ import (
 
 	"github.com/stretchr/testify/require"
 	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tm "github.com/tendermint/tendermint/types"
 	tsed25519 "gitlab.com/polychainlabs/threshold-ed25519/pkg"
 )
+
+func getMockRaftStore(cosigner Cosigner, tmpDir string) *RaftStore {
+	return &RaftStore{
+		NodeID:      "1",
+		RaftDir:     tmpDir,
+		RaftBind:    "127.0.0.1:0",
+		RaftTimeout: 1 * time.Second,
+		m:           make(map[string]string),
+		logger:      nil,
+		cosigner:    cosigner.(*LocalCosigner),
+		Peers:       []Cosigner{},
+	}
+}
 
 func TestThresholdValidator2of2(test *testing.T) {
 
@@ -96,15 +111,29 @@ func TestThresholdValidator2of2(test *testing.T) {
 	thresholdPeers := make([]Cosigner, 0)
 	thresholdPeers = append(thresholdPeers, cosigner2)
 
+	tmpDir, _ := ioutil.TempDir("", "store_test")
+	defer os.RemoveAll(tmpDir)
+
+	raftStore := getMockRaftStore(cosigner1, tmpDir)
+
 	thresholdValidatorOpt := ThresholdValidatorOpt{
 		Pubkey:    privateKey.PubKey(),
-		Threshold: 2,
+		Threshold: int(threshold),
 		SignState: signState1,
 		Cosigner:  cosigner1,
 		Peers:     thresholdPeers,
+		RaftStore: raftStore,
+		Logger:    tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
 	}
 
 	validator := NewThresholdValidator(&thresholdValidatorOpt)
+
+	raftStore.SetThresholdValidator(validator)
+
+	err = raftStore.Open()
+	require.NoError(test, err)
+
+	time.Sleep(3 * time.Second) // Ensure there is a leader
 
 	var proposal tmProto.Proposal
 	proposal.Height = 1
@@ -112,34 +141,6 @@ func TestThresholdValidator2of2(test *testing.T) {
 	proposal.Type = tmProto.ProposalType
 
 	signBytes := tm.ProposalSignBytes("chain-id", &proposal)
-
-	// To perform a sign operation, cosigner 2 will need its ephemeral nonce part from cosigner 1.
-	// During normal operation, cosigner 2 would use an rpc call to cosigner 1 to request its part.
-	// Since we are using local cosigners, cosigner 2 has no path to do so. Instead we manually perform the exchange
-	// for our test.
-	//
-	// An enhancement could be to have Local cosigner logic directly interface their peers.
-	{
-		cosigner1EphSecretPart, err := cosigner1.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-			ID:           2,
-			Height:       proposal.Height,
-			Round:        int64(proposal.Round),
-			Step:         ProposalToStep(&proposal),
-			FindOrCreate: true,
-		})
-		require.NoError(test, err)
-
-		err = cosigner2.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
-			SourceSig:                      cosigner1EphSecretPart.SourceSig,
-			SourceID:                       cosigner1EphSecretPart.SourceID,
-			SourceEphemeralSecretPublicKey: cosigner1EphSecretPart.SourceEphemeralSecretPublicKey,
-			EncryptedSharePart:             cosigner1EphSecretPart.EncryptedSharePart,
-			Height:                         proposal.Height,
-			Round:                          int64(proposal.Round),
-			Step:                           ProposalToStep(&proposal),
-		})
-		require.NoError(test, err)
-	}
 
 	err = validator.SignProposal("chain-id", &proposal)
 	require.NoError(test, err)
@@ -260,15 +261,29 @@ func TestThresholdValidator3of3(test *testing.T) {
 	thresholdPeers := make([]Cosigner, 0)
 	thresholdPeers = append(thresholdPeers, cosigner2, cosigner3)
 
+	tmpDir, _ := ioutil.TempDir("", "store_test")
+	defer os.RemoveAll(tmpDir)
+
+	raftStore := getMockRaftStore(cosigner1, tmpDir)
+
 	thresholdValidatorOpt := ThresholdValidatorOpt{
 		Pubkey:    privateKey.PubKey(),
 		Threshold: int(threshold),
 		SignState: signState1,
 		Cosigner:  cosigner1,
 		Peers:     thresholdPeers,
+		RaftStore: raftStore,
+		Logger:    tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
 	}
 
 	validator := NewThresholdValidator(&thresholdValidatorOpt)
+
+	raftStore.SetThresholdValidator(validator)
+
+	err = raftStore.Open()
+	require.NoError(test, err)
+
+	time.Sleep(3 * time.Second) // Ensure there is a leader
 
 	var proposal tmProto.Proposal
 	proposal.Height = 1
@@ -276,94 +291,6 @@ func TestThresholdValidator3of3(test *testing.T) {
 	proposal.Type = tmProto.ProposalType
 
 	signBytes := tm.ProposalSignBytes("chain-id", &proposal)
-
-	// To perform a sign operation, cosigner 2 will need its ephemeral nonce part from cosigner 1.
-	// During normal operation, cosigner 2 would use an rpc call to cosigner 1 to request its part.
-	// Since we are using local cosigners, cosigner 2 has no path to do so. Instead we manually perform the exchange
-	// for our test.
-	//
-	// An enhancement could be to have Local cosigner logic directly interface their peers.
-	{
-		cosigner1EphSecretPart2, err := cosigner1.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-			ID:           2,
-			Height:       proposal.Height,
-			Round:        int64(proposal.Round),
-			Step:         ProposalToStep(&proposal),
-			FindOrCreate: true,
-		})
-		require.NoError(test, err)
-
-		err = cosigner2.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
-			SourceSig:                      cosigner1EphSecretPart2.SourceSig,
-			SourceID:                       cosigner1EphSecretPart2.SourceID,
-			SourceEphemeralSecretPublicKey: cosigner1EphSecretPart2.SourceEphemeralSecretPublicKey,
-			EncryptedSharePart:             cosigner1EphSecretPart2.EncryptedSharePart,
-			Height:                         proposal.Height,
-			Round:                          int64(proposal.Round),
-			Step:                           ProposalToStep(&proposal),
-		})
-		require.NoError(test, err)
-
-		cosigner1EphSecretPart3, err := cosigner1.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-			ID:           3,
-			Height:       proposal.Height,
-			Round:        int64(proposal.Round),
-			Step:         ProposalToStep(&proposal),
-			FindOrCreate: false,
-		})
-		require.NoError(test, err)
-
-		err = cosigner3.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
-			SourceSig:                      cosigner1EphSecretPart3.SourceSig,
-			SourceID:                       cosigner1EphSecretPart3.SourceID,
-			SourceEphemeralSecretPublicKey: cosigner1EphSecretPart3.SourceEphemeralSecretPublicKey,
-			EncryptedSharePart:             cosigner1EphSecretPart3.EncryptedSharePart,
-			Height:                         proposal.Height,
-			Round:                          int64(proposal.Round),
-			Step:                           ProposalToStep(&proposal),
-		})
-		require.NoError(test, err)
-
-		cosigner2EphSecretPart3, err := cosigner2.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-			ID:           3,
-			Height:       proposal.Height,
-			Round:        int64(proposal.Round),
-			Step:         ProposalToStep(&proposal),
-			FindOrCreate: false,
-		})
-		require.NoError(test, err)
-
-		err = cosigner3.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
-			SourceSig:                      cosigner2EphSecretPart3.SourceSig,
-			SourceID:                       cosigner2EphSecretPart3.SourceID,
-			SourceEphemeralSecretPublicKey: cosigner2EphSecretPart3.SourceEphemeralSecretPublicKey,
-			EncryptedSharePart:             cosigner2EphSecretPart3.EncryptedSharePart,
-			Height:                         proposal.Height,
-			Round:                          int64(proposal.Round),
-			Step:                           ProposalToStep(&proposal),
-		})
-		require.NoError(test, err)
-
-		cosigner3EphSecretPart2, err := cosigner3.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-			ID:           2,
-			Height:       proposal.Height,
-			Round:        int64(proposal.Round),
-			Step:         ProposalToStep(&proposal),
-			FindOrCreate: false,
-		})
-		require.NoError(test, err)
-
-		err = cosigner2.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
-			SourceSig:                      cosigner3EphSecretPart2.SourceSig,
-			SourceID:                       cosigner3EphSecretPart2.SourceID,
-			SourceEphemeralSecretPublicKey: cosigner3EphSecretPart2.SourceEphemeralSecretPublicKey,
-			EncryptedSharePart:             cosigner3EphSecretPart2.EncryptedSharePart,
-			Height:                         proposal.Height,
-			Round:                          int64(proposal.Round),
-			Step:                           ProposalToStep(&proposal),
-		})
-		require.NoError(test, err)
-	}
 
 	err = validator.SignProposal("chain-id", &proposal)
 	if err != nil {
@@ -487,15 +414,29 @@ func TestThresholdValidator2of3(test *testing.T) {
 	thresholdPeers := make([]Cosigner, 0)
 	thresholdPeers = append(thresholdPeers, cosigner2, cosigner3)
 
+	tmpDir, _ := ioutil.TempDir("", "store_test")
+	defer os.RemoveAll(tmpDir)
+
+	raftStore := getMockRaftStore(cosigner1, tmpDir)
+
 	thresholdValidatorOpt := ThresholdValidatorOpt{
 		Pubkey:    privateKey.PubKey(),
 		Threshold: int(threshold),
 		SignState: signState1,
 		Cosigner:  cosigner1,
 		Peers:     thresholdPeers,
+		RaftStore: raftStore,
+		Logger:    tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
 	}
 
 	validator := NewThresholdValidator(&thresholdValidatorOpt)
+
+	raftStore.SetThresholdValidator(validator)
+
+	err = raftStore.Open()
+	require.NoError(test, err)
+
+	time.Sleep(3 * time.Second) // Ensure there is a leader
 
 	var proposal tmProto.Proposal
 	proposal.Height = 1
@@ -503,45 +444,6 @@ func TestThresholdValidator2of3(test *testing.T) {
 	proposal.Type = tmProto.ProposalType
 
 	signBytes := tm.ProposalSignBytes("chain-id", &proposal)
-
-	// To perform a sign operation, cosigner 2 will need its ephemeral nonce part from cosigner 1.
-	// During normal operation, cosigner 2 would use an rpc call to cosigner 1 to request its part.
-	// Since we are using local cosigners, cosigner 2 has no path to do so. Instead we manually perform the exchange
-	// for our test.
-	//
-	// An enhancement could be to have Local cosigner logic directly interface their peers.
-	{
-		_, err := cosigner1.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-			ID:           2,
-			Height:       proposal.Height,
-			Round:        int64(proposal.Round),
-			Step:         ProposalToStep(&proposal),
-			FindOrCreate: true,
-		})
-		require.NoError(test, err)
-
-		cosigner1EphSecretPart3, err := cosigner1.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-			ID:           3,
-			Height:       proposal.Height,
-			Round:        int64(proposal.Round),
-			Step:         ProposalToStep(&proposal),
-			FindOrCreate: false,
-		})
-		require.NoError(test, err)
-
-		err = cosigner3.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
-			SourceSig:                      cosigner1EphSecretPart3.SourceSig,
-			SourceID:                       cosigner1EphSecretPart3.SourceID,
-			SourceEphemeralSecretPublicKey: cosigner1EphSecretPart3.SourceEphemeralSecretPublicKey,
-			EncryptedSharePart:             cosigner1EphSecretPart3.EncryptedSharePart,
-			Height:                         proposal.Height,
-			Round:                          int64(proposal.Round),
-			Step:                           ProposalToStep(&proposal),
-		})
-		require.NoError(test, err)
-
-		// Note: purposefully left out interactions with cosigner2, to test it being "down"
-	}
 
 	err = validator.SignProposal("chain-id", &proposal)
 	if err != nil {

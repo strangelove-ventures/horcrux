@@ -51,6 +51,7 @@ func StartCosignerCmd() *cobra.Command {
 				ChainID:           config.ChainID,
 				CosignerThreshold: config.CosignerConfig.Threshold,
 				ListenAddress:     config.CosignerConfig.P2PListen,
+				RaftListenAddress: config.CosignerConfig.RaftListen,
 				Nodes:             config.Nodes(),
 				Cosigners:         config.CosignerPeers(),
 			}
@@ -59,7 +60,8 @@ func StartCosignerCmd() *cobra.Command {
 				return err
 			}
 
-			logger.Info("Tendermint Validator", "mode", cfg.Mode, "priv-key", cfg.PrivValKeyFile, "priv-state-dir", cfg.PrivValStateDir)
+			logger.Info("Tendermint Validator", "mode", cfg.Mode,
+				"priv-key", cfg.PrivValKeyFile, "priv-state-dir", cfg.PrivValStateDir)
 
 			var val types.PrivValidator
 
@@ -94,7 +96,7 @@ func StartCosignerCmd() *cobra.Command {
 			}}
 
 			for _, cosignerConfig := range cfg.Cosigners {
-				cosigner := signer.NewRemoteCosigner(cosignerConfig.ID, cosignerConfig.Address)
+				cosigner := signer.NewRemoteCosigner(cosignerConfig.ID, cosignerConfig.Address, cosignerConfig.RaftAddress)
 				cosigners = append(cosigners, cosigner)
 				remoteCosigners = append(remoteCosigners, *cosigner)
 
@@ -114,6 +116,8 @@ func StartCosignerCmd() *cobra.Command {
 				CosignerKey: key,
 				SignState:   &shareSignState,
 				RsaKey:      key.RSAKey,
+				Address:     cfg.ListenAddress,
+				RaftAddress: cfg.RaftListenAddress,
 				Peers:       peers,
 				Total:       uint8(total),
 				Threshold:   uint8(cfg.CosignerThreshold),
@@ -121,25 +125,50 @@ func StartCosignerCmd() *cobra.Command {
 
 			localCosigner := signer.NewLocalCosigner(localCosignerConfig)
 
+			timeout, _ := time.ParseDuration(config.CosignerConfig.Timeout)
+
+			raftDir := path.Join(config.HomeDir, "raft")
+			if err := os.MkdirAll(raftDir, 0700); err != nil {
+				log.Fatalf("Error creating raft directory: %v\n", err)
+			}
+
+			// RAFT node ID is the cosigner ID
+			nodeID := fmt.Sprint(key.ID)
+
+			// Start RAFT store listener
+			raftStore := signer.NewRaftStore(nodeID,
+				raftDir, cfg.RaftListenAddress, timeout, logger, localCosigner, cosigners)
+			if err := raftStore.Start(); err != nil {
+				log.Fatalf("Error starting raft store: %v\n", err)
+			}
+			services = append(services, raftStore)
+
 			val = signer.NewThresholdValidator(&signer.ThresholdValidatorOpt{
 				Pubkey:    key.PubKey,
 				Threshold: cfg.CosignerThreshold,
 				SignState: signState,
 				Cosigner:  localCosigner,
 				Peers:     cosigners,
+				RaftStore: raftStore,
+				Logger:    logger,
 			})
 
-			timeout, _ := time.ParseDuration(config.CosignerConfig.Timeout)
-			rpcServerConfig := signer.CosignerRpcServerConfig{
-				Logger:        logger,
-				ListenAddress: cfg.ListenAddress,
-				Cosigner:      localCosigner,
-				Peers:         remoteCosigners,
-				Timeout:       timeout,
+			raftStore.SetThresholdValidator(val.(*signer.ThresholdValidator))
+
+			rpcServerConfig := signer.CosignerRPCServerConfig{
+				Logger:             logger,
+				ListenAddress:      cfg.ListenAddress,
+				Cosigner:           localCosigner,
+				Peers:              remoteCosigners,
+				Timeout:            timeout,
+				RaftStore:          raftStore,
+				ThresholdValidator: val.(*signer.ThresholdValidator),
 			}
 
-			rpcServer := signer.NewCosignerRpcServer(&rpcServerConfig)
-			rpcServer.Start()
+			rpcServer := signer.NewCosignerRPCServer(&rpcServerConfig)
+			if err := rpcServer.Start(); err != nil {
+				log.Fatalf("Error starting rpc server: %v\n", err)
+			}
 			services = append(services, rpcServer)
 
 			pv = &signer.PvGuard{PrivValidator: val}
@@ -154,8 +183,6 @@ func StartCosignerCmd() *cobra.Command {
 			if err != nil {
 				panic(err)
 			}
-
-			// TODO: get address from peers how to get address of the cluster?
 
 			signer.WaitAndTerminate(logger, services)
 

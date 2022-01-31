@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"sync"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
@@ -16,7 +17,6 @@ import (
 )
 
 const (
-	stepNone      int8 = 0 // Used to distinguish the initial state
 	stepPropose   int8 = 1
 	stepPrevote   int8 = 2
 	stepPrecommit int8 = 3
@@ -60,9 +60,54 @@ type SignState struct {
 	filePath string
 }
 
+type SignStateConsensus struct {
+	Height    int64
+	Round     int64
+	Step      int8
+	Signature []byte
+	SignBytes tmBytes.HexBytes
+}
+
+func NewSignStateConsensus(height int64, round int64, step int8) SignStateConsensus {
+	return SignStateConsensus{
+		Height: height,
+		Round:  round,
+		Step:   step,
+	}
+}
+
+func (signState *SignState) Save(ssc SignStateConsensus, lock *sync.Mutex) error {
+	// One lock/unlock for less/equal check and mutation.
+	// Setting nil for lock for getErrorIfLessOrEqual to avoid recursive lock
+	if lock != nil {
+		lock.Lock()
+		defer lock.Unlock()
+	}
+
+	err := signState.GetErrorIfLessOrEqual(ssc.Height, ssc.Round, ssc.Step, nil)
+	if err != nil {
+		return err
+	}
+	// HRS is greater than existing state, allow
+
+	signState.Height = ssc.Height
+	signState.Round = ssc.Round
+	signState.Step = ssc.Step
+	signState.Signature = ssc.Signature
+	signState.SignBytes = ssc.SignBytes
+	go func() {
+		signState.save()
+	}()
+
+	return nil
+}
+
 // Save persists the FilePvLastSignState to its filePath.
-func (signState *SignState) Save() {
+func (signState *SignState) save() {
 	outFile := signState.filePath
+	if outFile == "none" {
+		return
+	}
 	if outFile == "" {
 		panic("cannot save SignState: filePath not set")
 	}
@@ -82,20 +127,22 @@ func (signState *SignState) Save() {
 // Returns true if the HRS matches the arguments and the SignBytes are not empty (indicating
 // we have already signed for this HRS, and can reuse the existing signature).
 // It panics if the HRS matches the arguments, there's a SignBytes, but no Signature.
-func (signState *SignState) CheckHRS(height int64, round int64, step int8) (bool, error) {
-	if signState.Height > height {
-		return false, fmt.Errorf("height regression. Got %v, last height %v", height, signState.Height)
+func (signState *SignState) CheckHRS(hrs HRSKey) (bool, error) {
+	if signState.Height > hrs.Height {
+		return false, fmt.Errorf("height regression. Got %v, last height %v", hrs.Height, signState.Height)
 	}
 
-	if signState.Height == height {
-		if signState.Round > round {
-			return false, fmt.Errorf("round regression at height %v. Got %v, last round %v", height, round, signState.Round)
+	if signState.Height == hrs.Height {
+		if signState.Round > hrs.Round {
+			return false, fmt.Errorf("round regression at height %v. Got %v, last round %v",
+				hrs.Height, hrs.Round, signState.Round)
 		}
 
-		if signState.Round == round {
-			if signState.Step > step {
-				return false, fmt.Errorf("step regression at height %v round %v. Got %v, last step %v", height, round, step, signState.Step)
-			} else if signState.Step == step {
+		if signState.Round == hrs.Round {
+			if signState.Step > hrs.Step {
+				return false, fmt.Errorf("step regression at height %v round %v. Got %v, last step %v",
+					hrs.Height, hrs.Round, hrs.Step, signState.Step)
+			} else if signState.Step == hrs.Step {
 				if signState.SignBytes != nil {
 					if signState.Signature == nil {
 						panic("pv: Signature is nil but SignBytes is not!")
@@ -107,6 +154,41 @@ func (signState *SignState) CheckHRS(height int64, round int64, step int8) (bool
 		}
 	}
 	return false, nil
+}
+
+func (signState *SignState) GetErrorIfLessOrEqual(height int64, round int64, step int8, lock *sync.Mutex) error {
+	if lock != nil {
+		lock.Lock()
+		defer lock.Unlock()
+	}
+	if height < signState.Height {
+		// lower height than current, don't allow state rollback
+		return errors.New("height regression not allowed")
+	}
+	if height > signState.Height {
+		return nil
+	}
+	// Height is equal
+
+	if round < signState.Round {
+		// lower round than current round for same block, don't allow state rollback
+		return errors.New("round regression not allowed")
+	}
+	if round > signState.Round {
+		return nil
+	}
+	// Height and Round are equal
+
+	if step < signState.Step {
+		// lower round than current round for same block, don't allow state rollback
+		return errors.New("step regression not allowed")
+	}
+	if step == signState.Step {
+		// same HRS as current!
+		return errors.New("not allowing double sign of current latest HRS")
+	}
+	// Step is greater, so all good
+	return nil
 }
 
 // LoadSignState loads a sign state from disk.
@@ -138,7 +220,7 @@ func LoadOrCreateSignState(filepath string) (SignState, error) {
 	// Make an empty sign state and save it
 	state := SignState{}
 	state.filePath = filepath
-	state.Save()
+	state.save()
 	return state, nil
 }
 

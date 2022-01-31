@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"net"
 	"os"
+	"os/exec"
 	"path"
 	"runtime"
 	"strings"
@@ -39,11 +40,21 @@ import (
 
 var (
 	valKey = "validator"
+)
 
-	// ChainType instance for simd
-	simdChain = &ChainType{
-		Repository: "jackzampolin/simd",
-		Version:    "v0.42.3",
+func getGoModuleVersion(pkg string) string {
+	cmd := exec.Command("go", "list", "-m", "-u", "-f", "{{.Version}}", pkg)
+	out, err := cmd.Output()
+	if err != nil {
+		panic(fmt.Sprintf("failed to evaluate Go module version: %v", err))
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func getSimdChain() *ChainType {
+	return &ChainType{
+		Repository: "strangelove-ventures/simd",
+		Version:    getGoModuleVersion("github.com/cosmos/cosmos-sdk"),
 		Bin:        "simd",
 		Ports: map[docker.Port]struct{}{
 			"26656/tcp": {},
@@ -53,7 +64,7 @@ var (
 			"1234/tcp":  {},
 		},
 	}
-)
+}
 
 // ChainType represents the type of chain to instantiate
 type ChainType struct {
@@ -91,7 +102,6 @@ func (tn *TestNode) CliContext() client.Context {
 	return client.Context{
 		Client:            tn.Client,
 		ChainID:           tn.ChainID,
-		JSONMarshaler:     tn.ec.Marshaler,
 		InterfaceRegistry: tn.ec.InterfaceRegistry,
 		Input:             os.Stdin,
 		Output:            os.Stdout,
@@ -101,9 +111,11 @@ func (tn *TestNode) CliContext() client.Context {
 }
 
 // MakeTestNodes creates the test node objects required for bootstrapping tests
-func MakeTestNodes(count int, home, chainid string, chainType *ChainType, pool *dockertest.Pool, t *testing.T) (out TestNodes) {
+func MakeTestNodes(count int, home, chainid string, chainType *ChainType,
+	pool *dockertest.Pool, t *testing.T) (out TestNodes) {
 	for i := 0; i < count; i++ {
-		tn := &TestNode{Home: home, Index: i, Chain: chainType, ChainID: chainid, Pool: pool, t: t, ec: simapp.MakeTestEncodingConfig()}
+		tn := &TestNode{Home: home, Index: i, Chain: chainType, ChainID: chainid,
+			Pool: pool, t: t, ec: simapp.MakeTestEncodingConfig()}
 		tn.MkDir()
 		out = append(out, tn)
 	}
@@ -150,10 +162,11 @@ func StartNodeContainers(t *testing.T, ctx context.Context, net *docker.Network,
 	genbz, err := ioutil.ReadFile(validator0.GenesisFilePath())
 	require.NoError(t, err)
 
-	nodes := append(validators, fullnodes...)
+	nodes := validators
+	nodes = append(nodes, fullnodes...)
 
 	for i := 1; i < len(nodes); i++ {
-		require.NoError(t, ioutil.WriteFile(nodes[i].GenesisFilePath(), genbz, 0644))
+		require.NoError(t, ioutil.WriteFile(nodes[i].GenesisFilePath(), genbz, 0644)) //nolint
 	}
 
 	TestNodes(nodes).LogGenesisHashes()
@@ -197,12 +210,12 @@ func (tn *TestNode) NewClient(addr string) error {
 
 }
 
-func (n *TestNode) GetHosts() (out Hosts) {
-	name := n.Name()
-	for k := range n.Chain.Ports {
+func (tn *TestNode) GetHosts() (out Hosts) {
+	name := tn.Name()
+	for k := range tn.Chain.Ports {
 		host := ContainerPort{
 			Name:      name,
-			Container: n.Container,
+			Container: tn.Container,
 			Port:      k,
 		}
 		out = append(out, host)
@@ -352,7 +365,8 @@ func (tn *TestNode) EnsureNotSlashed() int64 {
 	missed := int64(0)
 	for i := 0; i < 50; i++ {
 		time.Sleep(1 * time.Second)
-		slashInfo, err := slashingtypes.NewQueryClient(tn.CliContext()).SigningInfo(context.Background(), &slashingtypes.QuerySigningInfoRequest{
+		slashInfo, err := slashingtypes.NewQueryClient(
+			tn.CliContext()).SigningInfo(context.Background(), &slashingtypes.QuerySigningInfoRequest{
 			ConsAddress: tn.GetConsPub(),
 		})
 		require.NoError(tn.t, err)
@@ -377,7 +391,8 @@ func (tn *TestNode) EnsureNoMissedBlocks(initialMissed int64, accepted int64) in
 	missedBlocks := int64(0)
 	for i := 0; i < 50; i++ {
 		time.Sleep(1 * time.Second)
-		slashInfo, err := slashingtypes.NewQueryClient(tn.CliContext()).SigningInfo(context.Background(), &slashingtypes.QuerySigningInfoRequest{
+		slashInfo, err := slashingtypes.NewQueryClient(
+			tn.CliContext()).SigningInfo(context.Background(), &slashingtypes.QuerySigningInfoRequest{
 			ConsAddress: tn.GetConsPub(),
 		})
 		require.NoError(tn.t, err)
@@ -554,12 +569,13 @@ func (tn *TestNode) StartContainer(ctx context.Context) error {
 	return retry.Do(func() error {
 		stat, err := tn.Client.Status(ctx)
 		if err != nil {
-			//tn.t.Log(err)
+			// tn.t.Log(err)
 			return err
 		}
 		// TODO: reenable this check, having trouble with it for some reason
 		if stat != nil && stat.SyncInfo.CatchingUp {
-			return fmt.Errorf("still catching up: height(%d) catching-up(%t)", stat.SyncInfo.LatestBlockHeight, stat.SyncInfo.CatchingUp)
+			return fmt.Errorf("still catching up: height(%d) catching-up(%t)",
+				stat.SyncInfo.LatestBlockHeight, stat.SyncInfo.CatchingUp)
 		}
 		return nil
 	}, retry.DelayType(retry.BackOffDelay))
@@ -707,11 +723,12 @@ func (tn *TestNode) GetConsPub() string {
 
 	return sdk.ConsAddress(pubkey.Address()).String()
 
-	//return sdk.Bech32ifyPubKey(sdk.Bech32PubKeyTypeValPub, pubkey)
+	// return sdk.Bech32ifyPubKey(sdk.Bech32PubKeyTypeValPub, pubkey)
 }
 
 func (tn *TestNode) CreateKeyShares(threshold, total int64) []signer.CosignerKey {
-	shares, err := signer.CreateCosignerSharesFromFile(path.Join(tn.Dir(), "config", "priv_validator_key.json"), threshold, total)
+	shares, err := signer.CreateCosignerSharesFromFile(
+		path.Join(tn.Dir(), "config", "priv_validator_key.json"), threshold, total)
 	require.NoError(tn.t, err)
 	return shares
 }

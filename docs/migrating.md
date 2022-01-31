@@ -68,20 +68,22 @@ After that is done, initialize the configuration for each node using the `horcru
 ```bash
 # Run this command on the signer-1 VM
 # signer-1 connects to sentry-1
-$ horcrux config init {my_chain_id} "tcp://10.168.0.1:1234" -c -p "tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3" -t 2 --timeout 1500ms
+$ horcrux config init {my_chain_id} "tcp://10.168.0.1:1234" -c -p "tcp://10.168.1.2:2222|2223|2,tcp://10.168.1.3:2222|2223|3" -r "10.168.1.1:2223" -t 2 --timeout 1500ms
 
 # Run this command on the signer-2 VM
 # signer-2 connects to sentry-2
-$ horcrux config init {my_chain_id} "tcp://10.168.0.2:1234" -c -p "tcp://10.168.1.1:2222|1,tcp://10.168.1.3:2222|3" -t 2 --timeout 1500ms
+$ horcrux config init {my_chain_id} "tcp://10.168.0.2:1234" -c -p "tcp://10.168.1.1:2222|2223|1,tcp://10.168.1.3:2222|2223|3" -r "10.168.1.2:2223" -t 2 --timeout 1500ms
 
 # Run this command on the signer-3 VM
 # signer-3 connects to sentry-3
-$ horcrux config init {my_chain_id} "tcp://10.168.0.3:1234" -c -p "tcp://10.168.1.1:2222|1,tcp://10.168.1.2:2222|2" -t 2 --timeout 1500ms
+$ horcrux config init {my_chain_id} "tcp://10.168.0.3:1234" -c -p "tcp://10.168.1.1:2222|2223|1,tcp://10.168.1.2:2222|2223|2" -r "10.168.1.3:2223" -t 2 --timeout 1500ms
 ```
 
-> **NOTE:** The `-p` or `--peers` flag lets you set the addresses of the other signer nodes in the config. Note that each signer also has an index. This index cooresponds to the shard of the private key it will sign with. Keeping the node names and the indexes the same helps avoid errors and allows you to work more quickly
-
 > **NOTE:** The `-c` or `--cosigner` flag here says to configure the signer for cosigner operations. The signer can also be run in single signer configuration, if you want to do that don't pass `-p` or `-t` or `--timeout`.
+
+> **NOTE:** The `-p` or `--peers` flag lets you set the addresses of the other signer nodes in the config. Two ports are required, the P2P port for RCP traffic, and the Raft port for key-value sharing. Note that each signer also has an index. This index corresponds to the shard of the private key it will sign with. Keeping the node names and the indexes the same helps avoid errors and allows you to work more quickly
+
+> **NOTE:** The `-r` or `--raft` flag lets you set the listen address for the Raft protocol. The DNS/IP used for this must be discoverable by the other peers.
 
 > **NOTE:** The `--timeout` value defaults to `1000ms`. If you are running in disconnected data centers (i.e. accross amazon AZs or gcp zones) increasing the timeout slightly helps to avoid missed blocks especially around proposals.
 
@@ -149,7 +151,7 @@ The following logs should be flowing on each signer node:
 
 ```log
 I[2021-09-24|02:10:09.022] Tendermint Validator                         module=validator mode=mpc priv_key=...
-I[2021-09-24|02:10:09.023] Starting CosignerRpcServer service           module=validator impl=CosignerRpcServer
+I[2021-09-24|02:10:09.023] Starting CosignerRPCServer service           module=validator impl=CosignerRPCServer
 I[2021-09-24|02:10:09.025] Signer                                       module=validator pubkey=PubKeyEd25519{9A66109B69C...
 I[2021-09-24|02:10:09.025] Starting RemoteSigner service                module=validator impl=RemoteSigner
 E[2021-09-24|02:10:09.027] Dialing                                      module=validator err="dial tcp 10.180.0.16:1234...

@@ -22,10 +22,10 @@ build-linux:
 	@GOOS=linux GOARCH=amd64 go build --mod readonly $(BUILD_FLAGS) -o ./build/horcrux ./cmd/horcrux
 
 test:
-	@go test -mod readonly -v ./...
+	@go test -timeout 20m -mod readonly -v ./...
 
 test-short:
-	@go test -mod readonly -run TestDownedSigners -v ./... 
+	@go test -mod readonly -run TestDownedSigners2of3 -v ./... 
 
 test-signer-short:
 	@go test -mod readonly -run TestThresholdValidator2of3 -v ./... 
@@ -34,12 +34,12 @@ clean:
 	rm -rf build
 
 build-simd-docker:
-	docker build -t jackzampolin/simd:$(SDKVERSION) --build-arg VERSION=$(SDKVERSION) -f ./docker/simd/Dockerfile ./docker/simd/
+	docker build -t strangelove-ventures/simd:$(SDKVERSION) --build-arg VERSION=$(SDKVERSION) -f ./docker/simd/Dockerfile ./docker/simd/
 
 build-horcrux-docker:
-	docker build -t jackzampolin/horcrux:$(VERSION) -f ./docker/horcrux/Dockerfile .
+	docker build -t strangelove-ventures/horcrux:$(VERSION) -f ./docker/horcrux/Dockerfile .
 
 push-simd-docker:
-	docker push jackzampolin/simd:$(SDKVERSION)
+	docker push strangelove-ventures/simd:$(SDKVERSION)
 
 .PHONY: all lint test race msan tools clean build

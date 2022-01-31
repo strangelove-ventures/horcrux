@@ -37,7 +37,7 @@ func TestLocalCosignerGetID(test *testing.T) {
 		CosignerKey: key,
 		SignState:   &signState,
 		RsaKey:      *rsaKey,
-		Peers: []CosignerPeer{CosignerPeer{
+		Peers: []CosignerPeer{{
 			ID:        1,
 			PublicKey: rsaKey.PublicKey,
 		}},
@@ -60,10 +60,10 @@ func TestLocalCosignerSign2of2(test *testing.T) {
 	rsaKey2, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(test, err)
 
-	peers := []CosignerPeer{CosignerPeer{
+	peers := []CosignerPeer{{
 		ID:        1,
 		PublicKey: rsaKey1.PublicKey,
-	}, CosignerPeer{
+	}, {
 		ID:        2,
 		PublicKey: rsaKey2.PublicKey,
 	}}
@@ -85,6 +85,7 @@ func TestLocalCosignerSign2of2(test *testing.T) {
 	defer os.Remove(stateFile1.Name())
 
 	signState1, err := LoadOrCreateSignState(stateFile1.Name())
+	require.NoError(test, err)
 
 	key2 := CosignerKey{
 		PubKey:   privateKey.PubKey(),
@@ -127,61 +128,28 @@ func TestLocalCosignerSign2of2(test *testing.T) {
 
 	publicKeys := make([]tsed25519.Element, 0)
 
-	// get part 2 from cosigner 1 and give to cosigner 2
-	{
-		resp, err := cosigner1.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-			ID:           2,
-			Height:       1,
-			Round:        0,
-			Step:         2,
-			FindOrCreate: true,
-		})
-		require.NoError(test, err)
-
-		publicKeys = append(publicKeys, resp.SourceEphemeralSecretPublicKey)
-
-		err = cosigner2.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
-			SourceID:                       resp.SourceID,
-			Height:                         1,
-			Round:                          0,
-			Step:                           2,
-			SourceEphemeralSecretPublicKey: resp.SourceEphemeralSecretPublicKey,
-			EncryptedSharePart:             resp.EncryptedSharePart,
-			SourceSig:                      resp.SourceSig,
-		})
-		require.NoError(test, err)
+	hrs := HRSKey{
+		Height: 1,
+		Round:  0,
+		Step:   2,
 	}
 
-	// get part 1 from cosigner 2 and give to cosigner 1
-	{
-		resp, err := cosigner2.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-			ID:           1,
-			Height:       1,
-			Round:        0,
-			Step:         2,
-			FindOrCreate: false,
-		})
-		require.NoError(test, err)
+	ephemeralSharesFor2, err := cosigner1.GetEphemeralSecretParts(hrs)
+	require.NoError(test, err)
 
-		publicKeys = append(publicKeys, resp.SourceEphemeralSecretPublicKey)
+	publicKeys = append(publicKeys, ephemeralSharesFor2.EncryptedSecrets[0].SourceEphemeralSecretPublicKey)
 
-		err = cosigner1.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
-			SourceID:                       resp.SourceID,
-			Height:                         1,
-			Round:                          0,
-			Step:                           2,
-			SourceEphemeralSecretPublicKey: resp.SourceEphemeralSecretPublicKey,
-			EncryptedSharePart:             resp.EncryptedSharePart,
-			SourceSig:                      resp.SourceSig,
-		})
-		require.NoError(test, err)
-	}
+	ephemeralSharesFor1, err := cosigner2.GetEphemeralSecretParts(hrs)
+	require.NoError(test, err)
+
+	fmt.Printf("Shares from 2: %d\n", len(ephemeralSharesFor1.EncryptedSecrets))
+
+	publicKeys = append(publicKeys, ephemeralSharesFor1.EncryptedSecrets[0].SourceEphemeralSecretPublicKey)
 
 	ephemeralPublic := tsed25519.AddElements(publicKeys)
 
 	fmt.Printf("public keys: %x\n", publicKeys)
 	fmt.Printf("eph pub: %x\n", ephemeralPublic)
-
 	// pack a vote into sign bytes
 	var vote tmProto.Vote
 	vote.Height = 1
@@ -190,14 +158,17 @@ func TestLocalCosignerSign2of2(test *testing.T) {
 
 	signBytes := tm.VoteSignBytes("chain-id", &vote)
 
-	// sign with cosigner 1
-	sigRes1, err := cosigner1.Sign(CosignerSignRequest{
-		SignBytes: signBytes,
+	sigRes1, err := cosigner1.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
+		EncryptedSecrets: ephemeralSharesFor1.EncryptedSecrets,
+		HRS:              hrs,
+		SignBytes:        signBytes,
 	})
 	require.NoError(test, err)
 
-	sigRes2, err := cosigner2.Sign(CosignerSignRequest{
-		SignBytes: signBytes,
+	sigRes2, err := cosigner2.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
+		EncryptedSecrets: ephemeralSharesFor2.EncryptedSecrets,
+		HRS:              hrs,
+		SignBytes:        signBytes,
 	})
 	require.NoError(test, err)
 
@@ -207,7 +178,8 @@ func TestLocalCosignerSign2of2(test *testing.T) {
 	fmt.Printf("sig arr: %x\n", sigArr)
 
 	combinedSig := tsed25519.CombineShares(total, sigIds, sigArr)
-	signature := append(ephemeralPublic, combinedSig...)
+	signature := ephemeralPublic
+	signature = append(signature, combinedSig...)
 
 	fmt.Printf("signature: %x\n", signature)
 	require.True(test, privateKey.PubKey().VerifySignature(signBytes, signature))
