@@ -139,19 +139,14 @@ func (s *RaftStore) Open() error {
 		Servers: []raft.Server{
 			{
 				ID:      raft.ServerID(s.NodeID),
-				Address: transport.LocalAddr(),
+				Address: raft.ServerAddress(s.RaftBind),
 			},
 		},
 	}
 	for _, peer := range s.Peers {
-		tcpAddress, err := GetTCPAddressForRaftAddress(peer.GetRaftAddress())
-		if err != nil {
-			s.logger.Error("Error getting TCP address for peer", err)
-			continue
-		}
 		configuration.Servers = append(configuration.Servers, raft.Server{
 			ID:      raft.ServerID(fmt.Sprint(peer.GetID())),
-			Address: raft.ServerAddress(fmt.Sprint(tcpAddress)),
+			Address: raft.ServerAddress(peer.GetRaftAddress()),
 		})
 	}
 	s.raft.BootstrapCluster(configuration)
