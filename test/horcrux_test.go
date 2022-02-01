@@ -492,7 +492,7 @@ func TestDownedSigners2of3(t *testing.T) {
 
 		t.Logf("{%s} -> Checking that no blocks were missed...", ourValidator.Name())
 
-		time.Sleep(20 * time.Second) // let raft cluster recover from downed node
+		time.Sleep(30 * time.Second) // let raft cluster recover from downed node
 
 		ourValidator.EnsureNoMissedBlocks()
 
@@ -580,7 +580,7 @@ func TestDownedSigners3of5(t *testing.T) {
 			require.NoError(t, signer2.StopContainer())
 		}
 
-		time.Sleep(20 * time.Second) // let raft cluster recover from downed node
+		time.Sleep(30 * time.Second) // let raft cluster recover from downed node
 
 		t.Logf("{%s} -> Checking that no blocks were missed...", ourValidator.Name())
 		ourValidator.EnsureNoMissedBlocks() // allow up to 5 missed blocks
