@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/big"
@@ -391,6 +392,62 @@ func (tn *TestNode) EnsureNotSlashed() {
 		}
 		require.False(tn.t, slashInfo.ValSigningInfo.Tombstoned)
 	}
+}
+
+// Wait until we have signed 3 blocks in a row
+func (tn *TestNode) WaitUntilStopMissingBlocks() {
+	initialMissed := tn.getMissingBlocks()
+	stat, err := tn.Client.Status(context.Background())
+	require.NoError(tn.t, err)
+	// timeout after ~1 minute
+	lastBlockChecked := stat.SyncInfo.LatestBlockHeight
+	for i := 0; i < 60; i++ {
+		time.Sleep(1 * time.Second)
+		missedBlocks := tn.getMissingBlocks()
+		deltaMissed := missedBlocks - initialMissed
+		newStat, err := tn.Client.Status(context.Background())
+		require.NoError(tn.t, err)
+		checkingBlock := newStat.SyncInfo.LatestBlockHeight
+		if deltaMissed <= 0 {
+			deltaBlocks := checkingBlock - lastBlockChecked
+			if deltaBlocks >= 3 {
+				tn.t.Log("Time (sec) to recover and start signing consecutive blocks:", i+1)
+				return // done waiting for consecutive signed blocks
+			}
+		} else {
+			// reset initial missed and lastBlockChecked
+			initialMissed = missedBlocks
+			lastBlockChecked = checkingBlock
+		}
+	}
+	require.NoError(tn.t, errors.New("timed out waiting for cluster to recover signing blocks"))
+}
+
+// Wait until we have signed n blocks in a row
+func (tn *TestNode) WaitForConsecutiveBlocks(blocks int64) {
+	initialMissed := tn.getMissingBlocks()
+	stat, err := tn.Client.Status(context.Background())
+	require.NoError(tn.t, err)
+	// timeout after ~1 minute
+	lastBlockChecked := stat.SyncInfo.LatestBlockHeight
+	for i := 0; i < 60; i++ {
+		time.Sleep(1 * time.Second)
+		missedBlocks := tn.getMissingBlocks()
+		deltaMissed := missedBlocks - initialMissed
+		newStat, err := tn.Client.Status(context.Background())
+		require.NoError(tn.t, err)
+		checkingBlock := newStat.SyncInfo.LatestBlockHeight
+		if deltaMissed <= 0 {
+			deltaBlocks := checkingBlock - lastBlockChecked
+			if deltaBlocks >= blocks {
+				tn.t.Log(fmt.Sprintf("Time (sec) to sign %d consecutive blocks:", blocks), i+1)
+				return // done waiting for consecutive signed blocks
+			}
+		} else {
+			require.NoError(tn.t, errors.New("missed blocks while waiting for consecutive blocks"))
+		}
+	}
+	require.NoError(tn.t, errors.New("timed out waiting for cluster to recover signing blocks"))
 }
 
 func (tn *TestNode) EnsureNoMissedBlocks() {
