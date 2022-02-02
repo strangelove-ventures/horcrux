@@ -17,20 +17,18 @@ jobs:
         with:
           go-version: 1.17
 
-      
       # checkout horcrux
       - name: checkout horcrux
         uses: actions/checkout@v2
 
-      # build cache
-      - uses: actions/cache@v1
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+      # cleanup docker environment on self-hosted test runner
+      - name: prepare fresh docker environment
+        run: |
+          docker stop $(docker ps -a -q) || true
+          docker rm -f $(docker ps -a -q) || true
+          docker network prune -f || true
 
-      # todo: pull image from repo
+      # todo: use heighliner image
       - name: build simd image
         run: make build-simd-docker
 

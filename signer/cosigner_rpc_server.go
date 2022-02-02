@@ -114,5 +114,4 @@ func (rpcServer *CosignerRPCServer) rpcSetEphemeralSecretPartsAndSignRequest(
 func (rpcServer *CosignerRPCServer) rpcGetEphemeralSecretPartsRequest(
 	ctx *rpc_types.Context, req HRSKey) (*CosignerEphemeralSecretPartsResponse, error) {
 	return rpcServer.cosigner.GetEphemeralSecretParts(req)
-
 }

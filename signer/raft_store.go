@@ -74,10 +74,6 @@ func (s *RaftStore) SetThresholdValidator(thresholdValidator *ThresholdValidator
 	s.thresholdValidator = thresholdValidator
 }
 
-func (s *RaftStore) isInitialLeader() bool {
-	return s.NodeID == "1"
-}
-
 // OnStart starts the raft server
 func (s *RaftStore) OnStart() error {
 	go func() {
@@ -85,18 +81,17 @@ func (s *RaftStore) OnStart() error {
 			s.logger.Error("failed to open raft store", err.Error())
 			return
 		}
-		if s.isInitialLeader() {
-			// Wait until bootstrap node is the leader.
-			// Timeout after 10 seconds, which would indicate that
-			// the cluster has a new leader, and this node is rejoining
-			for i := 0; i < 10 && s.raft.State() != raft.Leader; i++ {
-				time.Sleep(1 * time.Second)
-			}
-			s.joinCosigners()
-		}
 	}()
 
 	return nil
+}
+
+func GetTCPAddressForRaftAddress(raftAddress string) (*net.TCPAddr, error) {
+	addr, err := net.ResolveTCPAddr("tcp", raftAddress)
+	if err != nil {
+		return nil, err
+	}
+	return addr, nil
 }
 
 // Open opens the store. If enableSingle is set, and there are no existing peers,
@@ -108,12 +103,15 @@ func (s *RaftStore) Open() error {
 	config.LocalID = raft.ServerID(s.NodeID)
 	config.LogLevel = "ERROR"
 
-	// Setup Raft communication.
-	addr, err := net.ResolveTCPAddr("tcp", s.RaftBind)
+	tcpAddress, err := GetTCPAddressForRaftAddress(s.RaftBind)
 	if err != nil {
 		return err
 	}
-	transport, err := raft.NewTCPTransport(s.RaftBind, addr, 3, 10*time.Second, os.Stderr)
+	// Setup Raft communication.
+	transport, err := raft.NewTCPTransport(s.RaftBind, tcpAddress, 3, 10*time.Second, os.Stderr)
+	if err != nil {
+		return err
+	}
 	if err != nil {
 		return err
 	}
@@ -137,37 +135,23 @@ func (s *RaftStore) Open() error {
 	}
 	s.raft = ra
 
-	if s.isInitialLeader() {
-		configuration := raft.Configuration{
-			Servers: []raft.Server{
-				{
-					ID:      config.LocalID,
-					Address: transport.LocalAddr(),
-				},
+	configuration := raft.Configuration{
+		Servers: []raft.Server{
+			{
+				ID:      raft.ServerID(s.NodeID),
+				Address: raft.ServerAddress(s.RaftBind),
 			},
-		}
-		ra.BootstrapCluster(configuration)
-	}
-
-	return nil
-}
-
-func (s *RaftStore) joinCosigners() {
-	// If we are not leader, do not want to attempt to join any cosigners.
-	// They are either already followers of the new leader, or will join the new leader
-	// when they come back up if they are currently down.
-	if s.raft.State() != raft.Leader {
-		return
+		},
 	}
 	for _, peer := range s.Peers {
-		nodeID := fmt.Sprint(peer.GetID())
-		raftAddress := peer.GetRaftAddress()
-		s.logger.Info("Adding node to cluster", nodeID, raftAddress)
-		err := s.Join(nodeID, raftAddress)
-		if err != nil {
-			s.logger.Error("Error joining cosigner to Raft cluster", nodeID, err.Error())
-		}
+		configuration.Servers = append(configuration.Servers, raft.Server{
+			ID:      raft.ServerID(fmt.Sprint(peer.GetID())),
+			Address: raft.ServerAddress(peer.GetRaftAddress()),
+		})
 	}
+	s.raft.BootstrapCluster(configuration)
+
+	return nil
 }
 
 // Get returns the value for the given key.

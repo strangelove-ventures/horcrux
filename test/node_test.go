@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/big"
@@ -361,55 +362,114 @@ func (tn *TestNode) SetPrivValdidatorListen(peers string) {
 	tmconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
 }
 
-func (tn *TestNode) EnsureNotSlashed() int64 {
-	missed := int64(0)
+func (tn *TestNode) getValSigningInfo() *slashingtypes.QuerySigningInfoResponse {
+	slashInfo, err := slashingtypes.NewQueryClient(
+		tn.CliContext()).SigningInfo(context.Background(), &slashingtypes.QuerySigningInfoRequest{
+		ConsAddress: tn.GetConsPub(),
+	})
+	require.NoError(tn.t, err)
+	return slashInfo
+}
+
+func (tn *TestNode) getMissingBlocks() int64 {
+	return tn.getValSigningInfo().ValSigningInfo.MissedBlocksCounter
+}
+
+func (tn *TestNode) EnsureNotSlashed() {
 	for i := 0; i < 50; i++ {
 		time.Sleep(1 * time.Second)
-		slashInfo, err := slashingtypes.NewQueryClient(
-			tn.CliContext()).SigningInfo(context.Background(), &slashingtypes.QuerySigningInfoRequest{
-			ConsAddress: tn.GetConsPub(),
-		})
-		require.NoError(tn.t, err)
+		slashInfo := tn.getValSigningInfo()
 
 		if i == 0 {
-			missed = slashInfo.ValSigningInfo.MissedBlocksCounter
-			tn.t.Log("Initial Missed blocks:", missed)
+			tn.t.Log("{EnsureNotSlashed} Initial Missed blocks:", slashInfo.ValSigningInfo.MissedBlocksCounter)
 			continue
 		}
 		if i%2 == 0 {
 			// require.Equal(tn.t, missed, slashInfo.ValSigningInfo.MissedBlocksCounter)
 			stat, err := tn.Client.Status(context.Background())
 			require.NoError(tn.t, err)
-			tn.t.Log("Missed blocks:", slashInfo.ValSigningInfo.MissedBlocksCounter, "block", stat.SyncInfo.LatestBlockHeight)
+			tn.t.Log("{EnsureNotSlashed} Missed blocks:",
+				slashInfo.ValSigningInfo.MissedBlocksCounter, "block", stat.SyncInfo.LatestBlockHeight)
 		}
 		require.False(tn.t, slashInfo.ValSigningInfo.Tombstoned)
 	}
-	return missed
 }
 
-func (tn *TestNode) EnsureNoMissedBlocks(initialMissed int64, accepted int64) int64 {
+// Wait until we have signed 3 blocks in a row
+func (tn *TestNode) WaitUntilStopMissingBlocks() {
+	initialMissed := tn.getMissingBlocks()
+	tn.t.Log("{WaitUntilStopMissingBlocks} Initial Missed blocks:", initialMissed)
+	stat, err := tn.Client.Status(context.Background())
+	require.NoError(tn.t, err)
+	// timeout after ~1 minute
+	lastBlockChecked := stat.SyncInfo.LatestBlockHeight
+	for i := 0; i < 120; i++ {
+		time.Sleep(1 * time.Second)
+		missedBlocks := tn.getMissingBlocks()
+		deltaMissed := missedBlocks - initialMissed
+		newStat, err := tn.Client.Status(context.Background())
+		require.NoError(tn.t, err)
+		checkingBlock := newStat.SyncInfo.LatestBlockHeight
+		tn.t.Log("{WaitUntilStopMissingBlocks} Missed blocks:", missedBlocks, "block", checkingBlock)
+		if deltaMissed <= 0 {
+			deltaBlocks := checkingBlock - lastBlockChecked
+			if deltaBlocks >= 3 {
+				tn.t.Log("Time (sec) to recover and start signing consecutive blocks:", i+1)
+				return // done waiting for consecutive signed blocks
+			}
+		} else {
+			// reset initial missed and lastBlockChecked
+			initialMissed = missedBlocks
+			lastBlockChecked = checkingBlock
+		}
+	}
+	require.NoError(tn.t, errors.New("timed out waiting for cluster to recover signing blocks"))
+}
+
+// Wait until we have signed n blocks in a row
+func (tn *TestNode) WaitForConsecutiveBlocks(blocks int64) {
+	initialMissed := tn.getMissingBlocks()
+	tn.t.Log("{WaitForConsecutiveBlocks} Initial Missed blocks:", initialMissed)
+	stat, err := tn.Client.Status(context.Background())
+	require.NoError(tn.t, err)
+	// timeout after ~1 minute
+	lastBlockChecked := stat.SyncInfo.LatestBlockHeight
+	for i := 0; i < 60; i++ {
+		time.Sleep(1 * time.Second)
+		missedBlocks := tn.getMissingBlocks()
+		deltaMissed := missedBlocks - initialMissed
+		newStat, err := tn.Client.Status(context.Background())
+		require.NoError(tn.t, err)
+		checkingBlock := newStat.SyncInfo.LatestBlockHeight
+		tn.t.Log("{WaitForConsecutiveBlocks} Missed blocks:", missedBlocks, "block", checkingBlock)
+		if deltaMissed <= 0 {
+			deltaBlocks := checkingBlock - lastBlockChecked
+			if deltaBlocks >= blocks {
+				tn.t.Log(fmt.Sprintf("Time (sec) to sign %d consecutive blocks:", blocks), i+1)
+				return // done waiting for consecutive signed blocks
+			}
+		} else {
+			require.NoError(tn.t, errors.New("missed blocks while waiting for consecutive blocks"))
+		}
+	}
+	require.NoError(tn.t, errors.New("timed out waiting for cluster to recover signing blocks"))
+}
+
+func (tn *TestNode) EnsureNoMissedBlocks() {
+	initialMissed := tn.getMissingBlocks()
+	tn.t.Log("{EnsureNoMissedBlocks} Initial Missed blocks:", initialMissed)
 	missedBlocks := int64(0)
 	for i := 0; i < 50; i++ {
 		time.Sleep(1 * time.Second)
-		slashInfo, err := slashingtypes.NewQueryClient(
-			tn.CliContext()).SigningInfo(context.Background(), &slashingtypes.QuerySigningInfoRequest{
-			ConsAddress: tn.GetConsPub(),
-		})
-		require.NoError(tn.t, err)
+		slashInfo := tn.getValSigningInfo()
 		missedBlocks = slashInfo.ValSigningInfo.MissedBlocksCounter
-		if i == 0 {
-			tn.t.Log("Initial Missed blocks:", missedBlocks)
-			continue
-		}
 		if i%2 == 0 {
-			// require.Equal(tn.t, missed, slashInfo.ValSigningInfo.MissedBlocksCounter)
 			stat, err := tn.Client.Status(context.Background())
 			require.NoError(tn.t, err)
-			require.LessOrEqual(tn.t, missedBlocks-initialMissed, accepted)
-			tn.t.Log("Missed blocks:", missedBlocks, "block", stat.SyncInfo.LatestBlockHeight)
+			require.LessOrEqual(tn.t, missedBlocks-initialMissed, int64(0))
+			tn.t.Log("{EnsureNoMissedBlocks} Missed blocks:", missedBlocks, "block", stat.SyncInfo.LatestBlockHeight)
 		}
 	}
-	return missedBlocks
 }
 
 func stdconfigchanges(cfg *tmconfig.Config, peers string) {
