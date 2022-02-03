@@ -114,6 +114,10 @@ func (tn *TestNode) CliContext() client.Context {
 // MakeTestNodes creates the test node objects required for bootstrapping tests
 func MakeTestNodes(count int, home, chainid string, chainType *ChainType,
 	pool *dockertest.Pool, t *testing.T) (out TestNodes) {
+	err := pool.Client.PullImage(docker.PullImageOptions{Repository: chainType.Repository}, docker.AuthConfiguration{})
+	if err != nil {
+		t.Logf("Error pulling image: %v", err)
+	}
 	for i := 0; i < count; i++ {
 		tn := &TestNode{Home: home, Index: i, Chain: chainType, ChainID: chainid,
 			Pool: pool, t: t, ec: simapp.MakeTestEncodingConfig()}
