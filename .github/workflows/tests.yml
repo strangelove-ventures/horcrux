@@ -28,10 +28,6 @@ jobs:
           docker rm -f $(docker ps -a -q) || true
           docker network prune -f || true
 
-      # todo: use heighliner image
-      - name: build simd image
-        run: make build-simd-docker
-
       # run tests
       - name: run horcrux tests
         run: make test
