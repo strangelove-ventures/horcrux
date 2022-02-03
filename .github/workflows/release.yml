@@ -28,9 +28,6 @@ jobs:
       # TMVERSION := $(shell go list -m -u -f '{{.Version}}' github.com/tendermint/tendermint)
       # Also see .goreleaser.yaml to wire up the environment variables
 
-      # Once this is solved we should also be able to use https://github.com/pmorelli92/github-container-registry-build-push
-      # to build the right simd version and push it to githubs docker repo
-
       - run: echo ":rocket::rocket::rocket:" > ../release_notes.md 
         if: startsWith(github.ref, 'refs/tags/')
 

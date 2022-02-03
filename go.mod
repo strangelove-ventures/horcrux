@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/avast/retry-go v3.0.0+incompatible
-	github.com/cosmos/cosmos-sdk v0.44.0
+	github.com/cosmos/cosmos-sdk v0.44.5
 	github.com/gogo/protobuf v1.3.3
 	github.com/hashicorp/raft v1.3.3
 	github.com/mitchellh/go-homedir v1.1.0
@@ -38,6 +38,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.1 // indirect
 	github.com/confio/ics23/go v0.6.6 // indirect
 	github.com/containerd/continuity v0.0.0-20201208142359-180525291bb7 // indirect
+	github.com/cosmos/btcutil v1.0.4 // indirect
 	github.com/cosmos/go-bip39 v1.0.0 // indirect
 	github.com/cosmos/iavl v0.17.3 // indirect
 	github.com/cosmos/ledger-cosmos-go v0.11.1 // indirect
@@ -51,7 +52,6 @@ require (
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/dvsekhvalnov/jose2go v0.0.0-20200901110807-248326c1351b // indirect
-	github.com/enigmampc/btcutil v1.0.3-0.20200723161021-e2fb6adb2a25 // indirect
 	github.com/felixge/httpsnoop v1.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/go-kit/kit v0.10.0 // indirect
