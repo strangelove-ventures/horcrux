@@ -518,7 +518,7 @@ func setChainIDCmd() *cobra.Command {
 
 type Config struct {
 	HomeDir        string          `json:"home-dir" yaml:"home-dir"`
-	PrivValKeyFile string          `json:"key_file" yaml:"key_file"`
+	PrivValKeyFile string          `json:"key-file,omitempty" yaml:"key-file,omitempty"`
 	ChainID        string          `json:"chain-id" yaml:"chain-id"`
 	CosignerConfig *CosignerConfig `json:"cosigner,omitempty" yaml:"cosigner,omitempty"`
 	ChainNodes     []ChainNode     `json:"chain-nodes,omitempty" yaml:"chain-nodes,omitempty"`
