@@ -3,7 +3,6 @@ module github.com/strangelove-ventures/horcrux
 go 1.17
 
 require (
-	github.com/BurntSushi/toml v0.3.1
 	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/cosmos/cosmos-sdk v0.44.5
 	github.com/gogo/protobuf v1.3.3
