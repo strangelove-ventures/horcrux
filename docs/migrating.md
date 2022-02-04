@@ -85,6 +85,8 @@ $ horcrux config init {my_chain_id} "tcp://10.168.0.3:1234" -c -p "tcp://10.168.
 
 > **NOTE:** The `-r` or `--raft` flag lets you set the listen address for the Raft protocol. The DNS/IP used for this must be discoverable by the other peers.
 
+> **NOTE:** The `-k` or `--keyfile` flag lets you set the file path for the private key share file if you would like to use a different path than `~/.horcrux/share.json`.
+
 > **NOTE:** The `--timeout` value defaults to `1000ms`. If you are running in disconnected data centers (i.e. accross amazon AZs or gcp zones) increasing the timeout slightly helps to avoid missed blocks especially around proposals.
 
 ### 3. Split `priv_validator_key.json` and distribute key material
