@@ -44,9 +44,16 @@ func StartSignerCmd() *cobra.Command {
 				cfg      signer.Config
 			)
 
+			var privValKeyFile string
+			if config.PrivValKeyFile == "" {
+				privValKeyFile = path.Join(config.HomeDir, "priv_validator_key.json")
+			} else {
+				privValKeyFile = config.PrivValKeyFile
+			}
+
 			cfg = signer.Config{
 				Mode:            "single",
-				PrivValKeyFile:  path.Join(config.HomeDir, "priv_validator_key.json"),
+				PrivValKeyFile:  privValKeyFile,
 				PrivValStateDir: path.Join(config.HomeDir, "state"),
 				ChainID:         config.ChainID,
 				Nodes:           config.Nodes(),

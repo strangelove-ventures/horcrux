@@ -71,21 +71,25 @@ func initCmd() *cobra.Command {
 			}
 
 			var cfg *Config
-			cs, _ := cmd.Flags().GetBool("cosigner")
+
+			cmdFlags := cmd.Flags()
+			cs, _ := cmdFlags.GetBool("cosigner")
+			keyFile, _ := cmdFlags.GetString("keyfile")
 			if cs {
-				p, _ := cmd.Flags().GetString("peers")
-				threshold, _ := cmd.Flags().GetInt("threshold")
+				p, _ := cmdFlags.GetString("peers")
+				threshold, _ := cmdFlags.GetInt("threshold")
 				peers, err := peersFromFlag(p)
-				listen, _ := cmd.Flags().GetString("listen")
-				raft, _ := cmd.Flags().GetString("raft")
-				timeout, _ := cmd.Flags().GetString("timeout")
+				listen, _ := cmdFlags.GetString("listen")
+				raft, _ := cmdFlags.GetString("raft")
+				timeout, _ := cmdFlags.GetString("timeout")
 
 				if err != nil {
 					return err
 				}
 				cfg = &Config{
-					HomeDir: home,
-					ChainID: cid,
+					HomeDir:        home,
+					PrivValKeyFile: keyFile,
+					ChainID:        cid,
 					CosignerConfig: &CosignerConfig{
 						Threshold:  threshold,
 						Shares:     len(peers) + 1,
@@ -104,9 +108,10 @@ func initCmd() *cobra.Command {
 					return fmt.Errorf("must input at least one node")
 				}
 				cfg = &Config{
-					HomeDir:    home,
-					ChainID:    cid,
-					ChainNodes: cn,
+					HomeDir:        home,
+					PrivValKeyFile: keyFile,
+					ChainID:        cid,
+					ChainNodes:     cn,
 				}
 				if err = validateSingleSignerConfig(cfg); err != nil {
 					return err
@@ -143,6 +148,8 @@ func initCmd() *cobra.Command {
 	cmd.Flags().IntP("threshold", "t", 0, "indicate number of signatures required for threshold signature")
 	cmd.Flags().StringP("listen", "l", "tcp://0.0.0.0:2222", "listen address of the signer")
 	cmd.Flags().StringP("raft", "r", "", "raft listen address of the signer")
+	cmd.Flags().StringP("keyfile", "k", "",
+		"priv val key file path (full key for single signer, or key share for cosigner)")
 	cmd.Flags().String("timeout", "1500ms", "configure cosigner rpc server timeout value, \n"+
 		"accepts valid duration strings for Go's time.ParseDuration() e.g. 1s, 1000ms, 1.5m")
 	return cmd
@@ -511,6 +518,7 @@ func setChainIDCmd() *cobra.Command {
 
 type Config struct {
 	HomeDir        string          `json:"home-dir" yaml:"home-dir"`
+	PrivValKeyFile string          `json:"key-file,omitempty" yaml:"key-file,omitempty"`
 	ChainID        string          `json:"chain-id" yaml:"chain-id"`
 	CosignerConfig *CosignerConfig `json:"cosigner,omitempty" yaml:"cosigner,omitempty"`
 	ChainNodes     []ChainNode     `json:"chain-nodes,omitempty" yaml:"chain-nodes,omitempty"`

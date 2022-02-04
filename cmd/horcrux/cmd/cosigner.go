@@ -44,9 +44,16 @@ func StartCosignerCmd() *cobra.Command {
 				cfg      signer.Config
 			)
 
+			var privValKeyFile string
+			if config.PrivValKeyFile == "" {
+				privValKeyFile = path.Join(config.HomeDir, "share.json")
+			} else {
+				privValKeyFile = config.PrivValKeyFile
+			}
+
 			cfg = signer.Config{
 				Mode:              "mpc",
-				PrivValKeyFile:    path.Join(config.HomeDir, "share.json"),
+				PrivValKeyFile:    privValKeyFile,
 				PrivValStateDir:   path.Join(config.HomeDir, "state"),
 				ChainID:           config.ChainID,
 				CosignerThreshold: config.CosignerConfig.Threshold,
