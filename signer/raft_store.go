@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/raft"
+	"github.com/strangelove-ventures/raft"
 	"github.com/tendermint/tendermint/libs/log"
 	"github.com/tendermint/tendermint/libs/service"
 )
@@ -243,8 +243,8 @@ func (s *RaftStore) Join(nodeID, addr string) error {
 	return nil
 }
 
-func (s *RaftStore) GetLeader() raft.ServerAddress {
-	return s.raft.Leader()
+func (s *RaftStore) GetLeader() raft.Server {
+	return s.raft.GetLeader()
 }
 
 type fsm RaftStore

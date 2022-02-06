@@ -2,6 +2,7 @@ package signer
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 )
 
@@ -32,20 +33,16 @@ func (f *fsm) handleLSSEvent(value string) {
 }
 
 func (s *RaftStore) GetLeaderCosigner() (Cosigner, error) {
-	leader := string(s.GetLeader())
+	leaderID := s.GetLeader().ID
+	if leaderID == "" {
+		return nil, errors.New("no current raft leader")
+	}
 	for _, peer := range s.Peers {
-		if peer.GetRaftAddress() == leader {
-			return peer, nil
-		}
-		tcpAddress, err := GetTCPAddressForRaftAddress(peer.GetRaftAddress())
-		if err != nil {
-			continue
-		}
-		if fmt.Sprint(tcpAddress) == leader {
+		if fmt.Sprint(peer.GetID()) == string(leaderID) {
 			return peer, nil
 		}
 	}
-	return nil, fmt.Errorf("unable to find leader cosigner from address %s", leader)
+	return nil, fmt.Errorf("unable to find leader cosigner from ID %s", leaderID)
 }
 
 func (s *RaftStore) LeaderSignBlock(req CosignerSignBlockRequest) (*CosignerSignBlockResponse, error) {
