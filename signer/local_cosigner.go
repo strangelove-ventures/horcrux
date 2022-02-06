@@ -474,10 +474,6 @@ func (cosigner *LocalCosigner) setEphemeralSecretPart(req CosignerSetEphemeralSe
 	return nil
 }
 
-func (cosigner *LocalCosigner) SignBlock(req CosignerSignBlockRequest) (CosignerSignBlockResponse, error) {
-	return CosignerSignBlockResponse{}, errors.New("not implemented")
-}
-
 func (cosigner *LocalCosigner) SetEphemeralSecretPartsAndSign(
 	req CosignerSetEphemeralSecretPartsAndSignRequest) (*CosignerSignResponse, error) {
 	for _, secretPart := range req.EncryptedSecrets {

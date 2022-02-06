@@ -75,8 +75,4 @@ type Cosigner interface {
 
 	// Sign the requested bytes
 	SetEphemeralSecretPartsAndSign(req CosignerSetEphemeralSecretPartsAndSignRequest) (*CosignerSignResponse, error)
-
-	// Request that the cosigner manage the threshold signing process for this block
-	// Will throw error if cosigner is not the leader
-	SignBlock(req CosignerSignBlockRequest) (CosignerSignBlockResponse, error)
 }

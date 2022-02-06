@@ -13,6 +13,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -49,6 +50,22 @@ type RaftStore struct {
 	logger             log.Logger
 	cosigner           *LocalCosigner
 	thresholdValidator *ThresholdValidator
+	commonRPCPort      string
+}
+
+// OnStart starts the raft server
+func getCommonRPCPort(peers []Cosigner) string {
+	var rpcPort string
+	for i, peer := range peers {
+		if i == 0 {
+			rpcPort = strings.Split(peer.GetAddress(), ":")[2]
+			continue
+		}
+		if strings.Split(peer.GetAddress(), ":")[2] != rpcPort {
+			return ""
+		}
+	}
+	return rpcPort
 }
 
 // New returns a new Store.
@@ -56,14 +73,15 @@ func NewRaftStore(
 	nodeID string, directory string, bindAddress string, timeout time.Duration,
 	logger log.Logger, cosigner *LocalCosigner, raftPeers []Cosigner) *RaftStore {
 	cosignerRaftStore := &RaftStore{
-		NodeID:      nodeID,
-		RaftDir:     directory,
-		RaftBind:    bindAddress,
-		RaftTimeout: timeout,
-		m:           make(map[string]string),
-		logger:      logger,
-		cosigner:    cosigner,
-		Peers:       raftPeers,
+		NodeID:        nodeID,
+		RaftDir:       directory,
+		RaftBind:      bindAddress,
+		RaftTimeout:   timeout,
+		m:             make(map[string]string),
+		logger:        logger,
+		cosigner:      cosigner,
+		Peers:         raftPeers,
+		commonRPCPort: getCommonRPCPort(raftPeers),
 	}
 
 	cosignerRaftStore.BaseService = *service.NewBaseService(logger, "CosignerRaftStore", cosignerRaftStore)
