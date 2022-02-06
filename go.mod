@@ -10,7 +10,7 @@ require (
 	github.com/ory/dockertest v3.3.5+incompatible
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/viper v1.8.1
-	github.com/strangelove-ventures/raft v1.3.4
+	github.com/strangelove-ventures/raft v1.3.5
 	github.com/stretchr/testify v1.7.0
 	github.com/tendermint/go-amino v0.16.0
 	github.com/tendermint/tendermint v0.34.14
