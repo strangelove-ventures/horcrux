@@ -65,6 +65,7 @@ func NewThresholdValidator(opt *ThresholdValidatorOpt) *ThresholdValidator {
 		Round:    opt.SignState.Round,
 		Step:     opt.SignState.Step,
 		filePath: "none",
+		cache:    make(map[HRSKey]SignStateConsensus),
 	}
 	validator.lastSignStateInitiatedMutex = sync.Mutex{}
 	validator.raftStore = opt.RaftStore
@@ -263,36 +264,39 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *block) ([]byte, t
 
 	pv.logger.Debug("I am the raft leader. Managing the sign process for this block")
 
-	// the block sign state for caching full block signatures
-	lss := pv.lastSignState
-
 	hrs := HRSKey{
 		Height: height,
 		Round:  round,
 		Step:   step,
 	}
 
-	// check watermark
-	sameHRS, err := lss.CheckHRS(hrs)
-	if err != nil {
-		return nil, stamp, err
-	}
+	signBytes := block.SignBytes
 
 	// Keep track of the last block that we began the signing process for. Only allow one attempt per block
 	if err := pv.SaveLastSignedStateInitiated(NewSignStateConsensus(height, round, step)); err != nil {
-		return nil, stamp, pv.newBeyondBlockError(hrs)
-	}
-
-	signBytes := block.SignBytes
-
-	if sameHRS {
-		if bytes.Equal(signBytes, lss.SignBytes) {
-			return lss.Signature, block.Timestamp, nil
-		} else if timestamp, ok := lss.OnlyDifferByTimestamp(signBytes); ok {
-			return lss.Signature, timestamp, nil
+		switch err.(type) {
+		case *SameHRSError:
+			// Wait for last sign state signature to be the same block
+			for i := 0; i < 100; i++ {
+				time.Sleep(10 * time.Millisecond)
+				latestBlock, existingSignature := pv.lastSignState.GetFromCache(hrs, &pv.lastSignStateMutex)
+				if existingSignature != nil {
+					if bytes.Equal(signBytes, existingSignature.SignBytes) {
+						return existingSignature.Signature, block.Timestamp, nil
+					} else if timestamp, ok := existingSignature.OnlyDifferByTimestamp(signBytes); ok {
+						return existingSignature.Signature, timestamp, nil
+					}
+					return nil, stamp, errors.New("conflicting data")
+				} else if latestBlock.Height > height ||
+					(latestBlock.Height == height && latestBlock.Round > round) ||
+					(latestBlock.Height == height && latestBlock.Round == round && latestBlock.Step > step) {
+					return nil, stamp, pv.newBeyondBlockError(hrs)
+				}
+			}
+			return nil, stamp, errors.New("timed out waiting for block signature from cluster")
+		default:
+			return nil, stamp, pv.newBeyondBlockError(hrs)
 		}
-
-		return nil, stamp, errors.New("conflicting data")
 	}
 
 	numPeers := len(pv.peers)
