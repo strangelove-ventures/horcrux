@@ -42,11 +42,6 @@ func (cosigner *RemoteCosigner) GetEphemeralSecretParts(
 }
 
 // Implements the cosigner interface
-func (cosigner *RemoteCosigner) SignBlock(req CosignerSignBlockRequest) (res CosignerSignBlockResponse, err error) {
-	return res, CallRPC(cosigner.address, "SignBlock", req, &res)
-}
-
-// Implements the cosigner interface
 func (cosigner *RemoteCosigner) SetEphemeralSecretPartsAndSign(
 	req CosignerSetEphemeralSecretPartsAndSignRequest) (res *CosignerSignResponse, err error) {
 	return res, CallRPC(cosigner.address, "SetEphemeralSecretPartsAndSign", req, &res)

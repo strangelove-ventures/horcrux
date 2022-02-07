@@ -20,6 +20,7 @@ const (
 	stepPropose   int8 = 1
 	stepPrevote   int8 = 2
 	stepPrecommit int8 = 3
+	blocksToCache      = 3
 )
 
 func CanonicalVoteToStep(vote *tmProto.CanonicalVote) int8 {
@@ -56,6 +57,7 @@ type SignState struct {
 	EphemeralPublic []byte           `json:"ephemeral_public"`
 	Signature       []byte           `json:"signature,omitempty"`
 	SignBytes       tmBytes.HexBytes `json:"signbytes,omitempty"`
+	cache           map[HRSKey]SignStateConsensus
 
 	filePath string
 }
@@ -76,6 +78,22 @@ func NewSignStateConsensus(height int64, round int64, step int8) SignStateConsen
 	}
 }
 
+func (signState *SignState) GetFromCache(hrs HRSKey, lock *sync.Mutex) (HRSKey, *SignStateConsensus) {
+	if lock != nil {
+		lock.Lock()
+		defer lock.Unlock()
+	}
+	latestBlock := HRSKey{
+		Height: signState.Height,
+		Round:  signState.Round,
+		Step:   signState.Step,
+	}
+	if ssc, ok := signState.cache[hrs]; ok {
+		return latestBlock, &ssc
+	}
+	return latestBlock, nil
+}
+
 func (signState *SignState) Save(ssc SignStateConsensus, lock *sync.Mutex) error {
 	// One lock/unlock for less/equal check and mutation.
 	// Setting nil for lock for getErrorIfLessOrEqual to avoid recursive lock
@@ -89,6 +107,13 @@ func (signState *SignState) Save(ssc SignStateConsensus, lock *sync.Mutex) error
 		return err
 	}
 	// HRS is greater than existing state, allow
+
+	signState.cache[HRSKey{Height: ssc.Height, Round: ssc.Round, Step: ssc.Step}] = ssc
+	for hrs := range signState.cache {
+		if hrs.Height < ssc.Height-blocksToCache {
+			delete(signState.cache, hrs)
+		}
+	}
 
 	signState.Height = ssc.Height
 	signState.Round = ssc.Round
@@ -156,6 +181,18 @@ func (signState *SignState) CheckHRS(hrs HRSKey) (bool, error) {
 	return false, nil
 }
 
+type SameHRSError struct {
+	msg string
+}
+
+func (e *SameHRSError) Error() string { return e.msg }
+
+func newSameHRSError(hrs HRSKey) *SameHRSError {
+	return &SameHRSError{
+		msg: fmt.Sprintf("HRS is the same as current: %d:%d:%d", hrs.Height, hrs.Round, hrs.Step),
+	}
+}
+
 func (signState *SignState) GetErrorIfLessOrEqual(height int64, round int64, step int8, lock *sync.Mutex) error {
 	if lock != nil {
 		lock.Lock()
@@ -184,8 +221,8 @@ func (signState *SignState) GetErrorIfLessOrEqual(height int64, round int64, ste
 		return errors.New("step regression not allowed")
 	}
 	if step == signState.Step {
-		// same HRS as current!
-		return errors.New("not allowing double sign of current latest HRS")
+		// same HRS as current
+		return newSameHRSError(HRSKey{Height: height, Round: round, Step: step})
 	}
 	// Step is greater, so all good
 	return nil
@@ -202,6 +239,14 @@ func LoadSignState(filepath string) (SignState, error) {
 	err = tmJson.Unmarshal(stateJSONBytes, &state)
 	if err != nil {
 		return state, err
+	}
+	state.cache = make(map[HRSKey]SignStateConsensus)
+	state.cache[HRSKey{Height: state.Height, Round: state.Round, Step: state.Step}] = SignStateConsensus{
+		Height:    state.Height,
+		Round:     state.Round,
+		Step:      state.Step,
+		Signature: state.Signature,
+		SignBytes: state.SignBytes,
 	}
 	state.filePath = filepath
 	return state, nil
@@ -220,6 +265,7 @@ func LoadOrCreateSignState(filepath string) (SignState, error) {
 	// Make an empty sign state and save it
 	state := SignState{}
 	state.filePath = filepath
+	state.cache = make(map[HRSKey]SignStateConsensus)
 	state.save()
 	return state, nil
 }
@@ -227,6 +273,16 @@ func LoadOrCreateSignState(filepath string) (SignState, error) {
 // OnlyDifferByTimestamp returns true if the sign bytes of the sign state
 // are the same as the new sign bytes excluding the timestamp.
 func (signState *SignState) OnlyDifferByTimestamp(signBytes []byte) (time.Time, bool) {
+	if signState.Step == stepPropose {
+		return checkProposalOnlyDifferByTimestamp(signState.SignBytes, signBytes)
+	} else if signState.Step == stepPrevote || signState.Step == stepPrecommit {
+		return checkVoteOnlyDifferByTimestamp(signState.SignBytes, signBytes)
+	}
+
+	return time.Time{}, false
+}
+
+func (signState *SignStateConsensus) OnlyDifferByTimestamp(signBytes []byte) (time.Time, bool) {
 	if signState.Step == stepPropose {
 		return checkProposalOnlyDifferByTimestamp(signState.SignBytes, signBytes)
 	} else if signState.Step == stepPrevote || signState.Step == stepPrecommit {
