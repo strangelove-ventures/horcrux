@@ -19,15 +19,15 @@ func TestBuildSignerContainer(t *testing.T) {
 	require.NoError(t, BuildTestSignerImage(pool))
 }
 
-// Test3Of7SignerTwoSentries will spin up a chain with four validators and 5 sentry nodes, stop one validator and all
+// Test4Of7SignerTwoSentries will spin up a chain with four validators and 5 sentry nodes, stop one validator and all
 // the sentry nodes, configure that validator and the sentry nodes to be a relay for the remote signers, spin up a 3/7
 // threshold signer cluster, restart the validator/sentry nodes and check that no slashing occurs
-func Test3Of7SignerTwoSentries(t *testing.T) {
+func Test4Of7SignerTwoSentries(t *testing.T) {
 	t.Parallel()
 	const totalValidators = 4
 	const totalSentries = 4
 	const totalSigners = 7
-	const threshold = 3
+	const threshold = 4
 	const sentriesPerSigner = 2
 
 	ctx, home, pool, network, validators := SetupTestRun(t, totalValidators+totalSentries)
@@ -201,6 +201,8 @@ func Test2Of3SignerTwoSentries(t *testing.T) {
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
 	ourValidator.EnsureNotSlashed()
+
+	ourValidator.WaitForConsecutiveBlocks(30)
 }
 
 // Test2Of3SignerUniqueSentry will spin up a chain with four validators and two sentry nodes, stop one validator and all

@@ -16,12 +16,6 @@ import (
 	tsed25519 "gitlab.com/polychainlabs/threshold-ed25519/pkg"
 )
 
-type HRSKey struct {
-	Height int64
-	Round  int64
-	Step   int8
-}
-
 // return true if we are less than the other key
 func (hrsKey *HRSKey) Less(other HRSKey) bool {
 	if hrsKey.Height < other.Height {
@@ -109,8 +103,7 @@ type LocalCosigner struct {
 	hrsMeta map[HRSKey]HrsMetadata
 	peers   map[int]CosignerPeer
 
-	address     string
-	raftAddress string
+	address string
 }
 
 func (cosigner *LocalCosigner) GetErrorIfLessOrEqual(height int64, round int64, step int8) error {
@@ -131,7 +124,6 @@ func NewLocalCosigner(cfg LocalCosignerConfig) *LocalCosigner {
 		total:         cfg.Total,
 		threshold:     cfg.Threshold,
 		address:       cfg.Address,
-		raftAddress:   cfg.RaftAddress,
 	}
 
 	for _, peer := range cfg.Peers {
@@ -160,12 +152,6 @@ func (cosigner *LocalCosigner) GetID() int {
 // Implements Cosigner interface
 func (cosigner *LocalCosigner) GetAddress() string {
 	return cosigner.address
-}
-
-// GetRaftAddress returns the Raft hostname of the cosigner
-// Implements Cosigner interface
-func (cosigner *LocalCosigner) GetRaftAddress() string {
-	return cosigner.raftAddress
 }
 
 // Sign the sign request using the cosigner's share

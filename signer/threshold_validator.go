@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/raft"
+	proto "github.com/strangelove-ventures/horcrux/signer/proto"
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/libs/log"
 	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
@@ -94,7 +95,7 @@ func (pv *ThresholdValidator) GetPubKey() (crypto.PubKey, error) {
 // SignVote signs a canonical representation of the vote, along with the
 // chainID. Implements PrivValidator.
 func (pv *ThresholdValidator) SignVote(chainID string, vote *tmProto.Vote) error {
-	block := &block{
+	block := &Block{
 		Height:    vote.Height,
 		Round:     int64(vote.Round),
 		Step:      VoteToStep(vote),
@@ -112,7 +113,7 @@ func (pv *ThresholdValidator) SignVote(chainID string, vote *tmProto.Vote) error
 // SignProposal signs a canonical representation of the proposal, along with
 // the chainID. Implements PrivValidator.
 func (pv *ThresholdValidator) SignProposal(chainID string, proposal *tmProto.Proposal) error {
-	block := &block{
+	block := &Block{
 		Height:    proposal.Height,
 		Round:     int64(proposal.Round),
 		Step:      ProposalToStep(proposal),
@@ -127,12 +128,22 @@ func (pv *ThresholdValidator) SignProposal(chainID string, proposal *tmProto.Pro
 	return err
 }
 
-type block struct {
+type Block struct {
 	Height    int64
 	Round     int64
 	Step      int8
 	SignBytes []byte
 	Timestamp time.Time
+}
+
+func (block Block) toProto() *proto.Block {
+	return &proto.Block{
+		Height:    block.Height,
+		Round:     block.Round,
+		Step:      int32(block.Step),
+		SignBytes: block.SignBytes,
+		Timestamp: block.Timestamp.UnixNano(),
+	}
 }
 
 type BeyondBlockError struct {
@@ -241,7 +252,7 @@ func waitUntilCompleteOrTimeout(wg *sync.WaitGroup, timeout time.Duration) bool 
 	}
 }
 
-func (pv *ThresholdValidator) SignBlock(chainID string, block *block) ([]byte, time.Time, error) {
+func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, time.Time, error) {
 	height, round, step, stamp := block.Height, block.Round, block.Step, block.Timestamp
 
 	// Only the leader can execute this function. Followers can handle the requests,
