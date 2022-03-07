@@ -20,7 +20,6 @@ import (
 
 var (
 	signerPort  = "2222"
-	raftPort    = "2223"
 	signerImage = "horcrux-test"
 )
 
@@ -227,7 +226,7 @@ func (ts TestSigners) PeerString(skip int) string {
 	for _, s := range ts {
 		// Skip over the calling signer so its peer list does not include itself
 		if s.Index != skip {
-			out.WriteString(fmt.Sprintf("tcp://%s:%s|%s|%d,", s.Name(), signerPort, raftPort, s.Index))
+			out.WriteString(fmt.Sprintf("tcp://%s:%s|%d,", s.Name(), signerPort, s.Index))
 		}
 	}
 	return strings.TrimSuffix(out.String(), ",")
@@ -346,7 +345,6 @@ func (ts *TestSigner) InitCosignerConfig(
 		chainid, "config", "init",
 		chainid, listenNodes.ListenAddrs(),
 		"--cosigner",
-		fmt.Sprintf("--raft=%s:%s", ts.Name(), raftPort),
 		fmt.Sprintf("--peers=%s", peers.PeerString(skip)),
 		fmt.Sprintf("--threshold=%d", threshold),
 		fmt.Sprintf("--home=%s", ts.Dir()),
@@ -359,7 +357,6 @@ func (ts *TestSigner) InitCosignerConfig(
 			Hostname: container,
 			ExposedPorts: map[docker.Port]struct{}{
 				docker.Port(fmt.Sprintf("%s/tcp", signerPort)): {},
-				docker.Port(fmt.Sprintf("%s/tcp", raftPort)):   {},
 			},
 			Image:  signerImage,
 			Cmd:    cmd,
@@ -472,7 +469,6 @@ func (ts *TestSigner) CreateCosignerContainer(networkID string) error {
 			Hostname: ts.Name(),
 			ExposedPorts: map[docker.Port]struct{}{
 				docker.Port(fmt.Sprintf("%s/tcp", signerPort)): {},
-				docker.Port(fmt.Sprintf("%s/tcp", raftPort)):   {},
 			},
 			DNS:    []string{},
 			Image:  signerImage,
