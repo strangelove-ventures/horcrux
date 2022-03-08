@@ -182,7 +182,8 @@ func (e *ConflictingDataError) Error() string { return e.msg }
 
 func newConflictingDataError(existingSignBytes, newSignBytes []byte) *ConflictingDataError {
 	return &ConflictingDataError{
-		msg: fmt.Sprintf("Conflicting data. existing: %s - new: %s", hex.EncodeToString(existingSignBytes), hex.EncodeToString(newSignBytes)),
+		msg: fmt.Sprintf("Conflicting data. existing: %s - new: %s",
+			hex.EncodeToString(existingSignBytes), hex.EncodeToString(newSignBytes)),
 	}
 }
 
