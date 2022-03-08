@@ -386,16 +386,11 @@ func (tn *TestNode) GetMostRecentConsecutiveSignedBlocks(max int64) (count int64
 	pv, err := tn.GetPrivVal()
 	require.NoError(tn.t, err)
 
-	pubkey, err := cryptocodec.FromTmPubKeyInterface(pv.PubKey)
-	require.NoError(tn.t, err)
-
-	hexAddress := pubkey.Address()
-
 	for i := latestHeight; i > latestHeight-max && i > 0; i-- {
 		block, err := tn.Client.Block(context.Background(), &i)
 		require.NoError(tn.t, err)
 		for _, voter := range block.Block.LastCommit.Signatures {
-			if reflect.DeepEqual(voter.ValidatorAddress, hexAddress) {
+			if reflect.DeepEqual(voter.ValidatorAddress, pv.Address) {
 				count++
 				break
 			}
