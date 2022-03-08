@@ -102,6 +102,7 @@ func (s *RaftStore) init() error {
 	proto.RegisterCosignerGRPCServer(grpcServer, &GRPCServer{
 		cosigner:           s.cosigner,
 		thresholdValidator: s.thresholdValidator,
+		raftStore:          s,
 	})
 	transportManager.Register(grpcServer)
 	leaderhealth.Setup(s.raft, grpcServer, []string{"Leader"})

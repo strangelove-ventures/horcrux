@@ -2,6 +2,7 @@ package signer
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"sync"
@@ -166,10 +167,22 @@ type StillWaitingForBlockError struct {
 
 func (e *StillWaitingForBlockError) Error() string { return e.msg }
 
-func (pv *ThresholdValidator) newStillWaitingForBlockError(hrs HRSKey) *StillWaitingForBlockError {
+func newStillWaitingForBlockError(hrs HRSKey) *StillWaitingForBlockError {
 	return &StillWaitingForBlockError{
 		msg: fmt.Sprintf("Still waiting for block %d.%d.%d",
 			hrs.Height, hrs.Round, hrs.Step),
+	}
+}
+
+type ConflictingDataError struct {
+	msg string
+}
+
+func (e *ConflictingDataError) Error() string { return e.msg }
+
+func newConflictingDataError(existingSignBytes, newSignBytes []byte) *ConflictingDataError {
+	return &ConflictingDataError{
+		msg: fmt.Sprintf("Conflicting data. existing: %s - new: %s", hex.EncodeToString(existingSignBytes), hex.EncodeToString(newSignBytes)),
 	}
 }
 
@@ -279,13 +292,13 @@ func (pv *ThresholdValidator) getExistingBlockSignature(block *Block) ([]byte, t
 		} else if timestamp, ok := existingSignature.OnlyDifferByTimestamp(signBytes); ok {
 			return existingSignature.Signature, timestamp, nil
 		}
-		return nil, stamp, errors.New("conflicting data")
+		return nil, stamp, newConflictingDataError(existingSignature.SignBytes, signBytes)
 	} else if latestBlock.Height > height ||
 		(latestBlock.Height == height && latestBlock.Round > round) ||
 		(latestBlock.Height == height && latestBlock.Round == round && latestBlock.Step > step) {
 		return nil, stamp, pv.newBeyondBlockError(hrs)
 	}
-	return nil, stamp, pv.newStillWaitingForBlockError(hrs)
+	return nil, stamp, newStillWaitingForBlockError(hrs)
 }
 
 func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, time.Time, error) {
