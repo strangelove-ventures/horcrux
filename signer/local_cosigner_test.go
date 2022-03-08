@@ -3,7 +3,6 @@ package signer
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -142,14 +141,14 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	ephemeralSharesFor1, err := cosigner2.GetEphemeralSecretParts(hrs)
 	require.NoError(t, err)
 
-	fmt.Printf("Shares from 2: %d\n", len(ephemeralSharesFor1.EncryptedSecrets))
+	t.Logf("Shares from 2: %d", len(ephemeralSharesFor1.EncryptedSecrets))
 
 	publicKeys = append(publicKeys, ephemeralSharesFor1.EncryptedSecrets[0].SourceEphemeralSecretPublicKey)
 
 	ephemeralPublic := tsed25519.AddElements(publicKeys)
 
-	fmt.Printf("public keys: %x\n", publicKeys)
-	fmt.Printf("eph pub: %x\n", ephemeralPublic)
+	t.Logf("public keys: %x", publicKeys)
+	t.Logf("eph pub: %x", ephemeralPublic)
 	// pack a vote into sign bytes
 	var vote tmProto.Vote
 	vote.Height = 1
@@ -175,13 +174,13 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	sigIds := []int{1, 2}
 	sigArr := [][]byte{sigRes1.Signature, sigRes2.Signature}
 
-	fmt.Printf("sig arr: %x\n", sigArr)
+	t.Logf("sig arr: %x", sigArr)
 
 	combinedSig := tsed25519.CombineShares(total, sigIds, sigArr)
 	signature := ephemeralPublic
 	signature = append(signature, combinedSig...)
 
-	fmt.Printf("signature: %x\n", signature)
+	t.Logf("signature: %x", signature)
 	require.True(t, privateKey.PubKey().VerifySignature(signBytes, signature))
 }
 
