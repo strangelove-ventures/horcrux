@@ -530,16 +530,12 @@ func TestDownedSigners2of3(t *testing.T) {
 		require.NoError(t, signer.StopContainer())
 
 		t.Logf("{%s} -> Waiting until cluster recovers from taking down signer {%s}", ourValidator.Name(), signer.Name())
-		ourValidator.WaitUntilStopMissingBlocks()
-
-		t.Logf("{%s} -> Checking that no blocks were missed...", ourValidator.Name())
-		ourValidator.EnsureNoMissedBlocks()
+		ourValidator.WaitForConsecutiveBlocks(10)
 
 		t.Logf("{%s} -> Restarting signer...", signer.Name())
 		require.NoError(t, signer.CreateCosignerContainer(network.ID))
 		require.NoError(t, signer.StartContainer())
 		signer.GetHosts().WaitForAllToStart(t, 10) // Wait to ensure signer is back up
-		ourValidator.WaitUntilStopMissingBlocks()
 		ourValidator.WaitForConsecutiveBlocks(10)
 	}
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
@@ -662,16 +658,12 @@ func TestDownedSigners3of5(t *testing.T) {
 		}
 
 		t.Logf("{%s} -> Waiting until cluster recovers from taking down signer {%s}", ourValidator.Name(), signer2.Name())
-		ourValidator.WaitUntilStopMissingBlocks()
-
-		t.Logf("{%s} -> Checking that no blocks were missed...", ourValidator.Name())
-		ourValidator.EnsureNoMissedBlocks()
+		ourValidator.WaitForConsecutiveBlocks(10)
 
 		t.Logf("{%s} -> Restarting signer...", signer1.Name())
 		require.NoError(t, signer1.CreateCosignerContainer(network.ID))
 		require.NoError(t, signer1.StartContainer())
 		signer1.GetHosts().WaitForAllToStart(t, 10) // Wait to ensure signer is back up
-		ourValidator.WaitUntilStopMissingBlocks()
 		ourValidator.WaitForConsecutiveBlocks(10)
 	}
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
