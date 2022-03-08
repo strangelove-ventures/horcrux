@@ -201,8 +201,6 @@ func Test2Of3SignerTwoSentries(t *testing.T) {
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
 	ourValidator.EnsureNotSlashed()
-
-	ourValidator.WaitForConsecutiveBlocks(30)
 }
 
 // Test2Of3SignerUniqueSentry will spin up a chain with four validators and two sentry nodes, stop one validator and all
