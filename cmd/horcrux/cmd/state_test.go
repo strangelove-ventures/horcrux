@@ -29,6 +29,7 @@ func TestStateSetCmd(t *testing.T) {
 		"tcp://10.168.0.1:1234",
 		"-c",
 		"-p", "tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3",
+		"-l", "tcp://10.168.1.1:2222",
 		"--timeout", "1500ms",
 	})
 	err = cmd.Execute()
