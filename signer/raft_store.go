@@ -99,7 +99,7 @@ func (s *RaftStore) init() error {
 		return err
 	}
 	grpcServer := grpc.NewServer()
-	proto.RegisterCosignerGRPCServer(grpcServer, &GRPCServer{
+	proto.RegisterCosignerGRPCServer(grpcServer, &CosignerGRPCServer{
 		cosigner:           s.cosigner,
 		thresholdValidator: s.thresholdValidator,
 	})
