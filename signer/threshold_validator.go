@@ -160,6 +160,19 @@ func (pv *ThresholdValidator) newBeyondBlockError(hrs HRSKey) *BeyondBlockError 
 	}
 }
 
+type StillWaitingForBlockError struct {
+	msg string
+}
+
+func (e *StillWaitingForBlockError) Error() string { return e.msg }
+
+func (pv *ThresholdValidator) newStillWaitingForBlockError(hrs HRSKey) *StillWaitingForBlockError {
+	return &StillWaitingForBlockError{
+		msg: fmt.Sprintf("Still waiting for block %d.%d.%d",
+			hrs.Height, hrs.Round, hrs.Step),
+	}
+}
+
 func (pv *ThresholdValidator) waitForPeerEphemeralShares(
 	peer Cosigner,
 	hrs HRSKey,
@@ -252,8 +265,31 @@ func waitUntilCompleteOrTimeout(wg *sync.WaitGroup, timeout time.Duration) bool 
 	}
 }
 
+func (pv *ThresholdValidator) getExistingBlockSignature(block *Block) ([]byte, time.Time, error) {
+	height, round, step, stamp, signBytes := block.Height, block.Round, block.Step, block.Timestamp, block.SignBytes
+	hrs := HRSKey{
+		height,
+		round,
+		step,
+	}
+	latestBlock, existingSignature := pv.lastSignState.GetFromCache(hrs, &pv.lastSignStateMutex)
+	if existingSignature != nil {
+		if bytes.Equal(signBytes, existingSignature.SignBytes) {
+			return existingSignature.Signature, block.Timestamp, nil
+		} else if timestamp, ok := existingSignature.OnlyDifferByTimestamp(signBytes); ok {
+			return existingSignature.Signature, timestamp, nil
+		}
+		return nil, stamp, errors.New("conflicting data")
+	} else if latestBlock.Height > height ||
+		(latestBlock.Height == height && latestBlock.Round > round) ||
+		(latestBlock.Height == height && latestBlock.Round == round && latestBlock.Step > step) {
+		return nil, stamp, pv.newBeyondBlockError(hrs)
+	}
+	return nil, stamp, pv.newStillWaitingForBlockError(hrs)
+}
+
 func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, time.Time, error) {
-	height, round, step, stamp := block.Height, block.Round, block.Step, block.Timestamp
+	height, round, step, stamp, signBytes := block.Height, block.Round, block.Step, block.Timestamp, block.SignBytes
 
 	// Only the leader can execute this function. Followers can handle the requests,
 	// but they just need to proxy the request to the raft leader
@@ -281,8 +317,6 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 		Step:   step,
 	}
 
-	signBytes := block.SignBytes
-
 	// Keep track of the last block that we began the signing process for. Only allow one attempt per block
 	if err := pv.SaveLastSignedStateInitiated(NewSignStateConsensus(height, round, step)); err != nil {
 		switch err.(type) {
@@ -290,23 +324,24 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 			// Wait for last sign state signature to be the same block
 			for i := 0; i < 100; i++ {
 				time.Sleep(10 * time.Millisecond)
-				latestBlock, existingSignature := pv.lastSignState.GetFromCache(hrs, &pv.lastSignStateMutex)
-				if existingSignature != nil {
-					if bytes.Equal(signBytes, existingSignature.SignBytes) {
-						return existingSignature.Signature, block.Timestamp, nil
-					} else if timestamp, ok := existingSignature.OnlyDifferByTimestamp(signBytes); ok {
-						return existingSignature.Signature, timestamp, nil
-					}
-					return nil, stamp, errors.New("conflicting data")
-				} else if latestBlock.Height > height ||
-					(latestBlock.Height == height && latestBlock.Round > round) ||
-					(latestBlock.Height == height && latestBlock.Round == round && latestBlock.Step > step) {
-					return nil, stamp, pv.newBeyondBlockError(hrs)
+				existingSignature, existingTimestamp, sameBlockErr := pv.getExistingBlockSignature(block)
+				if sameBlockErr == nil {
+					return existingSignature, existingTimestamp, nil
+				}
+				switch sameBlockErr.(type) {
+				case *StillWaitingForBlockError:
+					continue
+				default:
+					return nil, existingTimestamp, sameBlockErr
 				}
 			}
 			return nil, stamp, errors.New("timed out waiting for block signature from cluster")
 		default:
-			return nil, stamp, pv.newBeyondBlockError(hrs)
+			existingSignature, existingTimestamp, sameBlockErr := pv.getExistingBlockSignature(block)
+			if sameBlockErr == nil {
+				return existingSignature, stamp, nil
+			}
+			return nil, existingTimestamp, pv.newBeyondBlockError(hrs)
 		}
 	}
 

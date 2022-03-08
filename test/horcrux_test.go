@@ -552,7 +552,7 @@ func TestDownedSigners3of5(t *testing.T) {
 	const totalSigners = 5
 	const totalSentries = 4
 	const threshold = 3
-	const sentriesPerSigner = 2
+	const sentriesPerSigner = 5
 
 	ctx, home, pool, network, validators := SetupTestRun(t, totalValidators+totalSentries)
 	signers := MakeTestSigners(totalSigners, home, pool, t)
