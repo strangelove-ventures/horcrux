@@ -26,6 +26,7 @@ require (
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/ChainSafe/go-schnorrkel v0.0.0-20200405005733-88cbf1b4c40d // indirect
 	github.com/DataDog/zstd v1.4.5 // indirect
+	github.com/Jille/grpc-multi-resolver v1.1.0 // indirect
 	github.com/Jille/raft-grpc-leader-rpc v1.1.0 // indirect
 	github.com/Jille/raft-grpc-transport v1.2.0 // indirect
 	github.com/Jille/raftadmin v1.2.0 // indirect

@@ -3,7 +3,6 @@ package signer
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 
 	proto "github.com/strangelove-ventures/horcrux/signer/proto"
 	"google.golang.org/grpc"
@@ -41,8 +40,7 @@ func (s *RaftStore) getLeaderGRPCClient() (proto.CosignerGRPCClient, error) {
 	if leader == "" {
 		return nil, errors.New("no current raft leader")
 	}
-	leaderAddress := fmt.Sprintf("tcp://%s", leader)
-	conn, err := grpc.Dial(leaderAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.Dial(leader, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
 	}

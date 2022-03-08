@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"net/url"
-	"os"
+	"strings"
 	"time"
 
+	_ "github.com/Jille/grpc-multi-resolver"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 
 	grpc_retry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
@@ -28,10 +30,6 @@ To choose a specific leader, pass that leader's ID as an argument.
 `,
 	Args: cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
-		if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
-			return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
-		}
-
 		if config == nil {
 			return fmt.Errorf("no configuration file exists")
 		}
@@ -49,16 +47,33 @@ To choose a specific leader, pass that leader's ID as an argument.
 			grpc_retry.WithBackoff(grpc_retry.BackoffExponential(100 * time.Millisecond)),
 			grpc_retry.WithMax(5),
 		}
-		grpcAddress := "multi:///"
+
+		var grpcAddresses []string
+		url, err := url.Parse(config.CosignerConfig.P2PListen)
+		if err != nil {
+			fmt.Printf("Error parsing peer URL: %v", err)
+		} else {
+			host, port, err := net.SplitHostPort(url.Host)
+			if err == nil {
+				grpcAddresses = append(grpcAddresses, fmt.Sprintf("%s:%s", host, port))
+			}
+		}
 
 		for _, peer := range config.CosignerConfig.Peers {
 			url, err := url.Parse(peer.P2PAddr)
 			if err != nil {
-				grpcAddress += peer.P2PAddr
+				fmt.Printf("Error parsing peer URL: %v", err)
 			} else {
-				grpcAddress += url.Host
+				host, port, err := net.SplitHostPort(url.Host)
+				if err == nil {
+					grpcAddresses = append(grpcAddresses, fmt.Sprintf("%s:%s", host, port))
+				}
 			}
 		}
+
+		grpcAddress := fmt.Sprintf("multi:///%s", strings.Join(grpcAddresses, ","))
+
+		fmt.Println(grpcAddress)
 		conn, err := grpc.Dial(grpcAddress,
 			grpc.WithDefaultServiceConfig(serviceConfig), grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
@@ -74,9 +89,12 @@ To choose a specific leader, pass that leader's ID as an argument.
 			leaderID = args[0]
 		}
 
+		context, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancelFunc()
+
 		grpcClient := proto.NewCosignerGRPCClient(conn)
 		_, err = grpcClient.TransferLeadership(
-			context.Background(),
+			context,
 			&proto.CosignerGRPCTransferLeadershipRequest{LeaderID: leaderID},
 		)
 		if err != nil {

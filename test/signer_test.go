@@ -348,6 +348,7 @@ func (ts *TestSigner) InitCosignerConfig(
 		fmt.Sprintf("--peers=%s", peers.PeerString(skip)),
 		fmt.Sprintf("--threshold=%d", threshold),
 		fmt.Sprintf("--home=%s", ts.Dir()),
+		fmt.Sprintf("--listen=tcp://%s:%s", ts.Name(), signerPort),
 	}
 	ts.t.Logf("{%s}[%s] -> '%s'", ts.Name(), container, strings.Join(cmd, " "))
 	cont, err := ts.Pool.Client.CreateContainer(docker.CreateContainerOptions{

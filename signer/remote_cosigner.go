@@ -2,6 +2,7 @@ package signer
 
 import (
 	"context"
+	"net/url"
 	"time"
 
 	proto "github.com/strangelove-ventures/horcrux/signer/proto"
@@ -46,7 +47,14 @@ func (cosigner *RemoteCosigner) GetAddress() string {
 }
 
 func (cosigner *RemoteCosigner) getGRPCClient() (proto.CosignerGRPCClient, error) {
-	conn, err := grpc.Dial(cosigner.address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	var grpcAddress string
+	url, err := url.Parse(cosigner.address)
+	if err != nil {
+		grpcAddress = cosigner.address
+	} else {
+		grpcAddress = url.Host
+	}
+	conn, err := grpc.Dial(grpcAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
 	}

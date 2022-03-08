@@ -69,6 +69,8 @@ github.com/DataDog/datadog-go v3.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3
 github.com/DataDog/zstd v1.4.1/go.mod h1:1jcaCB/ufaK+sKp1NBhlGmpz41jOoPQ35bpF36t7BBo=
 github.com/DataDog/zstd v1.4.5 h1:EndNeuB0l9syBZhut0wns3gV1hL8zX8LIu6ZiVHWLIQ=
 github.com/DataDog/zstd v1.4.5/go.mod h1:1jcaCB/ufaK+sKp1NBhlGmpz41jOoPQ35bpF36t7BBo=
+github.com/Jille/grpc-multi-resolver v1.1.0 h1:+SfnPGnoMjJVkURNfzpR8D+0Oy4w7IGAZ1azX1AQScY=
+github.com/Jille/grpc-multi-resolver v1.1.0/go.mod h1:mvSEHOdOT1ju0ySQXhWMNCI4QsAGhuUqy6+wHGVJS+8=
 github.com/Jille/raft-grpc-leader-rpc v1.1.0 h1:u36rmA4tjp+4FSdZ17jg/1sfSCYNQIe5bzzwvW0iVTM=
 github.com/Jille/raft-grpc-leader-rpc v1.1.0/go.mod h1:l+pK+uPuqpFDFcPmyUPSng4257UXrST0Vc3Lo4XwVB0=
 github.com/Jille/raft-grpc-transport v1.2.0 h1:W/YSPz8IsirEyomjKmDog5Xk71o9+l4KhyMEX2TsgSs=

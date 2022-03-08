@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/url"
 	"os"
 	"path"
@@ -78,13 +79,28 @@ func initCmd() *cobra.Command {
 			if cs {
 				p, _ := cmdFlags.GetString("peers")
 				threshold, _ := cmdFlags.GetInt("threshold")
-				peers, err := peersFromFlag(p)
-				listen, _ := cmdFlags.GetString("listen")
 				timeout, _ := cmdFlags.GetString("timeout")
-
+				peers, err := peersFromFlag(p)
 				if err != nil {
 					return err
 				}
+
+				listen, _ := cmdFlags.GetString("listen")
+				if listen == "" {
+					return errors.New("must input at least one node")
+				}
+				url, err := url.Parse(listen)
+				if err != nil {
+					return fmt.Errorf("error parsing listen address: %s, %v", listen, err)
+				}
+				host, _, err := net.SplitHostPort(url.Host)
+				if err != nil {
+					return err
+				}
+				if host == "0.0.0.0" {
+					return errors.New("host cannot be 0.0.0.0, must be reachable from other peers")
+				}
+
 				cfg = &Config{
 					HomeDir:        home,
 					PrivValKeyFile: keyFile,
@@ -144,7 +160,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringP("peers", "p", "", "cosigner peer addresses in format tcp://{addr}:{port}|{share-id} \n"+
 		"(i.e. \"tcp://node-1:2222|2,tcp://node-2:2222|3\")")
 	cmd.Flags().IntP("threshold", "t", 0, "indicate number of signatures required for threshold signature")
-	cmd.Flags().StringP("listen", "l", "tcp://0.0.0.0:2222", "listen address of the signer")
+	cmd.Flags().StringP("listen", "l", "", "listen address of the signer")
 	cmd.Flags().StringP("keyfile", "k", "",
 		"priv val key file path (full key for single signer, or key share for cosigner)")
 	cmd.Flags().String("timeout", "1500ms", "configure cosigner rpc server timeout value, \n"+
