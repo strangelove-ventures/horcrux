@@ -293,6 +293,9 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 
 	// Only the leader can execute this function. Followers can handle the requests,
 	// but they just need to proxy the request to the raft leader
+	if pv.raftStore.raft == nil {
+		return nil, stamp, errors.New("raft not yet initialized")
+	}
 	if pv.raftStore.raft.State() != raft.Leader {
 		pv.logger.Debug("I am not the raft leader. Proxying request to the leader")
 		signRes, err := pv.raftStore.LeaderSignBlock(CosignerSignBlockRequest{chainID, block})
