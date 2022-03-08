@@ -6,11 +6,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLoadCosignerKey(test *testing.T) {
+func TestLoadCosignerKey(t *testing.T) {
 	key, err := LoadCosignerKey("./fixtures/cosigner-key.json")
-	require.NoError(test, err)
-	require.Equal(test, key.ID, 3)
+	require.NoError(t, err)
+	require.Equal(t, key.ID, 3)
 
 	// public key from cosigner pubs array should match public key from our private key
-	require.Equal(test, &key.RSAKey.PublicKey, key.CosignerKeys[key.ID-1])
+	require.Equal(t, &key.RSAKey.PublicKey, key.CosignerKeys[key.ID-1])
 }

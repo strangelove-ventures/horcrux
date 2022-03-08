@@ -8,7 +8,7 @@ import (
 	tm "github.com/tendermint/tendermint/types"
 )
 
-func TestUnpackHRSPrevote(test *testing.T) {
+func TestUnpackHRSPrevote(t *testing.T) {
 	vote := tmproto.Vote{
 		Height: 1,
 		Round:  2,
@@ -18,13 +18,13 @@ func TestUnpackHRSPrevote(test *testing.T) {
 	signBytes := tm.VoteSignBytes("chain-id", &vote)
 
 	hrs, err := UnpackHRS(signBytes)
-	require.NoError(test, err)
-	require.Equal(test, int64(1), hrs.Height)
-	require.Equal(test, int64(2), hrs.Round)
-	require.Equal(test, int8(2), hrs.Step)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), hrs.Height)
+	require.Equal(t, int64(2), hrs.Round)
+	require.Equal(t, int8(2), hrs.Step)
 }
 
-func TestUnpackHRSPrecommit(test *testing.T) {
+func TestUnpackHRSPrecommit(t *testing.T) {
 	vote := tmproto.Vote{
 		Height: 3,
 		Round:  2,
@@ -34,13 +34,13 @@ func TestUnpackHRSPrecommit(test *testing.T) {
 	signBytes := tm.VoteSignBytes("chain-id", &vote)
 
 	hrs, err := UnpackHRS(signBytes)
-	require.NoError(test, err)
-	require.Equal(test, int64(3), hrs.Height)
-	require.Equal(test, int64(2), hrs.Round)
-	require.Equal(test, int8(3), hrs.Step)
+	require.NoError(t, err)
+	require.Equal(t, int64(3), hrs.Height)
+	require.Equal(t, int64(2), hrs.Round)
+	require.Equal(t, int8(3), hrs.Step)
 }
 
-func TestUnpackHRSProposal(test *testing.T) {
+func TestUnpackHRSProposal(t *testing.T) {
 	proposal := tmproto.Proposal{
 		Height: 1,
 		Round:  2,
@@ -50,8 +50,8 @@ func TestUnpackHRSProposal(test *testing.T) {
 	signBytes := tm.ProposalSignBytes("chain-id", &proposal)
 
 	hrs, err := UnpackHRS(signBytes)
-	require.NoError(test, err)
-	require.Equal(test, int64(1), hrs.Height)
-	require.Equal(test, int64(2), hrs.Round)
-	require.Equal(test, int8(1), hrs.Step)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), hrs.Height)
+	require.Equal(t, int64(2), hrs.Round)
+	require.Equal(t, int8(1), hrs.Step)
 }

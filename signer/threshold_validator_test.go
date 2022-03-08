@@ -30,17 +30,16 @@ func getMockRaftStore(cosigner Cosigner, tmpDir string) *RaftStore {
 	}
 }
 
-func TestThresholdValidator2of2(test *testing.T) {
-
+func TestThresholdValidator2of2(t *testing.T) {
 	total := uint8(2)
 	threshold := uint8(2)
 
 	bitSize := 4096
 	rsaKey1, err := rsa.GenerateKey(rand.Reader, bitSize)
-	require.NoError(test, err)
+	require.NoError(t, err)
 
 	rsaKey2, err := rsa.GenerateKey(rand.Reader, bitSize)
-	require.NoError(test, err)
+	require.NoError(t, err)
 
 	peers := []CosignerPeer{{
 		ID:        1,
@@ -63,11 +62,11 @@ func TestThresholdValidator2of2(test *testing.T) {
 	}
 
 	stateFile1, err := ioutil.TempFile("", "state1.json")
-	require.NoError(test, err)
+	require.NoError(t, err)
 	defer os.Remove(stateFile1.Name())
 
 	signState1, err := LoadOrCreateSignState(stateFile1.Name())
-	require.NoError(test, err)
+	require.NoError(t, err)
 
 	key2 := CosignerKey{
 		PubKey:   privateKey.PubKey(),
@@ -76,10 +75,10 @@ func TestThresholdValidator2of2(test *testing.T) {
 	}
 
 	stateFile2, err := ioutil.TempFile("", "state2.json")
-	require.NoError(test, err)
+	require.NoError(t, err)
 	defer os.Remove(stateFile2.Name())
 	signState2, err := LoadOrCreateSignState(stateFile2.Name())
-	require.NoError(test, err)
+	require.NoError(t, err)
 
 	config1 := LocalCosignerConfig{
 		CosignerKey: key1,
@@ -105,8 +104,8 @@ func TestThresholdValidator2of2(test *testing.T) {
 	cosigner1 = NewLocalCosigner(config1)
 	cosigner2 = NewLocalCosigner(config2)
 
-	require.Equal(test, cosigner1.GetID(), 1)
-	require.Equal(test, cosigner2.GetID(), 2)
+	require.Equal(t, cosigner1.GetID(), 1)
+	require.Equal(t, cosigner2.GetID(), 2)
 
 	thresholdPeers := make([]Cosigner, 0)
 	thresholdPeers = append(thresholdPeers, cosigner2)
@@ -131,7 +130,7 @@ func TestThresholdValidator2of2(test *testing.T) {
 	raftStore.SetThresholdValidator(validator)
 
 	err = raftStore.Open()
-	require.NoError(test, err)
+	require.NoError(t, err)
 
 	time.Sleep(3 * time.Second) // Ensure there is a leader
 
@@ -143,25 +142,24 @@ func TestThresholdValidator2of2(test *testing.T) {
 	signBytes := tm.ProposalSignBytes("chain-id", &proposal)
 
 	err = validator.SignProposal("chain-id", &proposal)
-	require.NoError(test, err)
+	require.NoError(t, err)
 
-	require.True(test, privateKey.PubKey().VerifySignature(signBytes, proposal.Signature))
-
+	require.True(t, privateKey.PubKey().VerifySignature(signBytes, proposal.Signature))
 }
 
-func TestThresholdValidator3of3(test *testing.T) {
+func TestThresholdValidator3of3(t *testing.T) {
 	total := uint8(3)
 	threshold := uint8(3)
 
 	bitSize := 4096
 	rsaKey1, err := rsa.GenerateKey(rand.Reader, bitSize)
-	require.NoError(test, err)
+	require.NoError(t, err)
 
 	rsaKey2, err := rsa.GenerateKey(rand.Reader, bitSize)
-	require.NoError(test, err)
+	require.NoError(t, err)
 
 	rsaKey3, err := rsa.GenerateKey(rand.Reader, bitSize)
-	require.NoError(test, err)
+	require.NoError(t, err)
 
 	peers := []CosignerPeer{{
 		ID:        1,
@@ -187,11 +185,11 @@ func TestThresholdValidator3of3(test *testing.T) {
 	}
 
 	stateFile1, err := ioutil.TempFile("", "state1.json")
-	require.NoError(test, err)
+	require.NoError(t, err)
 	defer os.Remove(stateFile1.Name())
 
 	signState1, err := LoadOrCreateSignState(stateFile1.Name())
-	require.NoError(test, err)
+	require.NoError(t, err)
 
 	key2 := CosignerKey{
 		PubKey:   privateKey.PubKey(),
@@ -200,11 +198,11 @@ func TestThresholdValidator3of3(test *testing.T) {
 	}
 
 	stateFile2, err := ioutil.TempFile("", "state2.json")
-	require.NoError(test, err)
+	require.NoError(t, err)
 	defer os.Remove(stateFile2.Name())
 
 	signState2, err := LoadOrCreateSignState(stateFile2.Name())
-	require.NoError(test, err)
+	require.NoError(t, err)
 
 	key3 := CosignerKey{
 		PubKey:   privateKey.PubKey(),
@@ -213,11 +211,11 @@ func TestThresholdValidator3of3(test *testing.T) {
 	}
 
 	stateFile3, err := ioutil.TempFile("", "state3.json")
-	require.NoError(test, err)
+	require.NoError(t, err)
 	defer os.Remove(stateFile3.Name())
 
 	signState3, err := LoadOrCreateSignState(stateFile3.Name())
-	require.NoError(test, err)
+	require.NoError(t, err)
 
 	config1 := LocalCosignerConfig{
 		CosignerKey: key1,
@@ -254,9 +252,9 @@ func TestThresholdValidator3of3(test *testing.T) {
 	cosigner2 = NewLocalCosigner(config2)
 	cosigner3 = NewLocalCosigner(config3)
 
-	require.Equal(test, cosigner1.GetID(), 1)
-	require.Equal(test, cosigner2.GetID(), 2)
-	require.Equal(test, cosigner3.GetID(), 3)
+	require.Equal(t, cosigner1.GetID(), 1)
+	require.Equal(t, cosigner2.GetID(), 2)
+	require.Equal(t, cosigner3.GetID(), 3)
 
 	thresholdPeers := make([]Cosigner, 0)
 	thresholdPeers = append(thresholdPeers, cosigner2, cosigner3)
@@ -281,7 +279,7 @@ func TestThresholdValidator3of3(test *testing.T) {
 	raftStore.SetThresholdValidator(validator)
 
 	err = raftStore.Open()
-	require.NoError(test, err)
+	require.NoError(t, err)
 
 	time.Sleep(3 * time.Second) // Ensure there is a leader
 
@@ -294,27 +292,26 @@ func TestThresholdValidator3of3(test *testing.T) {
 
 	err = validator.SignProposal("chain-id", &proposal)
 	if err != nil {
-		test.Logf("%v", err)
+		t.Logf("%v", err)
 	}
-	require.NoError(test, err)
+	require.NoError(t, err)
 
-	require.True(test, privateKey.PubKey().VerifySignature(signBytes, proposal.Signature))
-
+	require.True(t, privateKey.PubKey().VerifySignature(signBytes, proposal.Signature))
 }
 
-func TestThresholdValidator2of3(test *testing.T) {
+func TestThresholdValidator2of3(t *testing.T) {
 	total := uint8(3)
 	threshold := uint8(2)
 
 	bitSize := 4096
 	rsaKey1, err := rsa.GenerateKey(rand.Reader, bitSize)
-	require.NoError(test, err)
+	require.NoError(t, err)
 
 	rsaKey2, err := rsa.GenerateKey(rand.Reader, bitSize)
-	require.NoError(test, err)
+	require.NoError(t, err)
 
 	rsaKey3, err := rsa.GenerateKey(rand.Reader, bitSize)
-	require.NoError(test, err)
+	require.NoError(t, err)
 
 	peers := []CosignerPeer{{
 		ID:        1,
@@ -340,11 +337,11 @@ func TestThresholdValidator2of3(test *testing.T) {
 	}
 
 	stateFile1, err := ioutil.TempFile("", "state1.json")
-	require.NoError(test, err)
+	require.NoError(t, err)
 	defer os.Remove(stateFile1.Name())
 
 	signState1, err := LoadOrCreateSignState(stateFile1.Name())
-	require.NoError(test, err)
+	require.NoError(t, err)
 
 	key2 := CosignerKey{
 		PubKey:   privateKey.PubKey(),
@@ -353,11 +350,11 @@ func TestThresholdValidator2of3(test *testing.T) {
 	}
 
 	stateFile2, err := ioutil.TempFile("", "state2.json")
-	require.NoError(test, err)
+	require.NoError(t, err)
 	defer os.Remove(stateFile2.Name())
 
 	signState2, err := LoadOrCreateSignState(stateFile2.Name())
-	require.NoError(test, err)
+	require.NoError(t, err)
 
 	key3 := CosignerKey{
 		PubKey:   privateKey.PubKey(),
@@ -366,11 +363,11 @@ func TestThresholdValidator2of3(test *testing.T) {
 	}
 
 	stateFile3, err := ioutil.TempFile("", "state3.json")
-	require.NoError(test, err)
+	require.NoError(t, err)
 	defer os.Remove(stateFile3.Name())
 
 	signState3, err := LoadOrCreateSignState(stateFile3.Name())
-	require.NoError(test, err)
+	require.NoError(t, err)
 
 	config1 := LocalCosignerConfig{
 		CosignerKey: key1,
@@ -407,9 +404,9 @@ func TestThresholdValidator2of3(test *testing.T) {
 	cosigner2 = NewLocalCosigner(config2)
 	cosigner3 = NewLocalCosigner(config3)
 
-	require.Equal(test, cosigner1.GetID(), 1)
-	require.Equal(test, cosigner2.GetID(), 2)
-	require.Equal(test, cosigner3.GetID(), 3)
+	require.Equal(t, cosigner1.GetID(), 1)
+	require.Equal(t, cosigner2.GetID(), 2)
+	require.Equal(t, cosigner3.GetID(), 3)
 
 	thresholdPeers := make([]Cosigner, 0)
 	thresholdPeers = append(thresholdPeers, cosigner2, cosigner3)
@@ -434,7 +431,7 @@ func TestThresholdValidator2of3(test *testing.T) {
 	raftStore.SetThresholdValidator(validator)
 
 	err = raftStore.Open()
-	require.NoError(test, err)
+	require.NoError(t, err)
 
 	time.Sleep(3 * time.Second) // Ensure there is a leader
 
@@ -447,10 +444,9 @@ func TestThresholdValidator2of3(test *testing.T) {
 
 	err = validator.SignProposal("chain-id", &proposal)
 	if err != nil {
-		test.Logf("%v", err)
+		t.Logf("%v", err)
 	}
-	require.NoError(test, err)
+	require.NoError(t, err)
 
-	require.True(test, privateKey.PubKey().VerifySignature(signBytes, proposal.Signature))
-
+	require.True(t, privateKey.PubKey().VerifySignature(signBytes, proposal.Signature))
 }
