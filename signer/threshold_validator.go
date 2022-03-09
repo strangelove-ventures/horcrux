@@ -201,11 +201,11 @@ func (pv *ThresholdValidator) waitForPeerEphemeralShares(
 	}
 	// Check so that getEphemeralWaitGroup.Done is not called more than (threshold - 1) times which causes hardlock
 	thresholdPeersMutex.Lock()
-	defer thresholdPeersMutex.Unlock()
 	if len(*encryptedEphemeralSharesThresholdMap) < pv.threshold-1 {
 		(*encryptedEphemeralSharesThresholdMap)[peer] = ephemeralSecretParts.EncryptedSecrets
-		wg.Done()
+		defer wg.Done()
 	}
+	thresholdPeersMutex.Unlock()
 }
 
 func (pv *ThresholdValidator) waitForPeerSetEphemeralSharesAndSign(
@@ -219,6 +219,7 @@ func (pv *ThresholdValidator) waitForPeerSetEphemeralSharesAndSign(
 	ephemeralPublic *[]byte,
 	wg *sync.WaitGroup,
 ) {
+	defer wg.Done()
 	peerEphemeralSecretParts := make([]CosignerEphemeralSecretPart, 0, pv.threshold-1)
 	for _, EncryptedSecrets := range *encryptedEphemeralSharesThresholdMap {
 		for _, ephemeralSecretPart := range EncryptedSecrets {
@@ -247,6 +248,7 @@ func (pv *ThresholdValidator) waitForPeerSetEphemeralSharesAndSign(
 
 	if err != nil {
 		pv.logger.Error("Sign error", err.Error())
+		return
 	}
 
 	pv.logger.Debug(fmt.Sprintf("Received signature from %d", peerID))
@@ -260,9 +262,6 @@ func (pv *ThresholdValidator) waitForPeerSetEphemeralSharesAndSign(
 	if peerID == ourID {
 		*ephemeralPublic = sigRes.EphemeralPublic
 	}
-
-	wg.Done()
-
 }
 
 func waitUntilCompleteOrTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
