@@ -308,7 +308,27 @@ func checkVoteOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) (time.Ti
 	lastVote.Timestamp = now
 	newVote.Timestamp = now
 
-	return lastTime, proto.Equal(&newVote, &lastVote)
+	isEqual := proto.Equal(&newVote, &lastVote)
+
+	if !isEqual {
+		fmt.Printf(`Votes are not equal
+Last Vote - BlockID: %s, ChainID: %s, Height: %d, Round: %d, Type: %s
+New Vote  - BlockID: %s, ChainID: %s, Height: %d, Round: %d, Type: %s
+`,
+			lastVote.GetBlockID().String(),
+			lastVote.GetChainID(),
+			lastVote.GetHeight(),
+			lastVote.GetRound(),
+			lastVote.GetType().String(),
+			newVote.GetBlockID().String(),
+			newVote.GetChainID(),
+			newVote.GetHeight(),
+			newVote.GetRound(),
+			newVote.GetType().String(),
+		)
+	}
+
+	return lastTime, isEqual
 }
 
 func checkProposalOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) (time.Time, bool) {
@@ -326,5 +346,27 @@ func checkProposalOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) (tim
 	lastProposal.Timestamp = now
 	newProposal.Timestamp = now
 
-	return lastTime, proto.Equal(&newProposal, &lastProposal)
+	isEqual := proto.Equal(&newProposal, &lastProposal)
+
+	if !isEqual {
+		fmt.Printf(`Proposals are not equal
+Last Proposal - BlockID: %s, ChainID: %s, Height: %d, Round: %d, Type: %s, POL Round: %d
+New Proposal  - BlockID: %s, ChainID: %s, Height: %d, Round: %d, Type: %s, POL Round: %d
+`,
+			lastProposal.GetBlockID().String(),
+			lastProposal.GetChainID(),
+			lastProposal.GetHeight(),
+			lastProposal.GetRound(),
+			lastProposal.GetType().String(),
+			lastProposal.GetPOLRound(),
+			newProposal.GetBlockID().String(),
+			newProposal.GetChainID(),
+			newProposal.GetHeight(),
+			newProposal.GetRound(),
+			newProposal.GetType().String(),
+			newProposal.GetPOLRound(),
+		)
+	}
+
+	return lastTime, isEqual
 }
