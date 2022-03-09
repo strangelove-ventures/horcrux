@@ -181,8 +181,8 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 			res.EphemeralPublic = lss.EphemeralPublic
 			res.Signature = lss.Signature
 			return res, nil
-		} else if _, ok := lss.OnlyDifferByTimestamp(req.SignBytes); !ok {
-			return res, errors.New("mismatched data")
+		} else if err := lss.OnlyDifferByTimestamp(req.SignBytes); err != nil {
+			return res, err
 		}
 
 		// same HRS, and only differ by timestamp - ok to sign again

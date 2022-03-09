@@ -2,7 +2,6 @@ package signer
 
 import (
 	"bytes"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"sync"
@@ -174,19 +173,6 @@ func newStillWaitingForBlockError(hrs HRSKey) *StillWaitingForBlockError {
 	}
 }
 
-type ConflictingDataError struct {
-	msg string
-}
-
-func (e *ConflictingDataError) Error() string { return e.msg }
-
-func newConflictingDataError(existingSignBytes, newSignBytes []byte) *ConflictingDataError {
-	return &ConflictingDataError{
-		msg: fmt.Sprintf("Conflicting data. existing: %s - new: %s",
-			hex.EncodeToString(existingSignBytes), hex.EncodeToString(newSignBytes)),
-	}
-}
-
 func (pv *ThresholdValidator) waitForPeerEphemeralShares(
 	peer Cosigner,
 	hrs HRSKey,
@@ -289,10 +275,12 @@ func (pv *ThresholdValidator) getExistingBlockSignature(block *Block) ([]byte, t
 	if existingSignature != nil {
 		if bytes.Equal(signBytes, existingSignature.SignBytes) {
 			return existingSignature.Signature, block.Timestamp, nil
-		} else if timestamp, ok := existingSignature.OnlyDifferByTimestamp(signBytes); ok {
-			return existingSignature.Signature, timestamp, nil
 		}
-		return nil, stamp, newConflictingDataError(existingSignature.SignBytes, signBytes)
+		if err := existingSignature.OnlyDifferByTimestamp(signBytes); err != nil {
+			return nil, stamp, err
+		}
+
+		// only differ by timestamp, okay to sign again
 	} else if latestBlock.Height > height ||
 		(latestBlock.Height == height && latestBlock.Round > round) ||
 		(latestBlock.Height == height && latestBlock.Round == round && latestBlock.Step > step) {

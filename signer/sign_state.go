@@ -1,11 +1,12 @@
 package signer
 
 import (
+	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"sync"
-	"time"
 
 	"github.com/gogo/protobuf/proto"
 	tmBytes "github.com/tendermint/tendermint/libs/bytes"
@@ -13,7 +14,6 @@ import (
 	"github.com/tendermint/tendermint/libs/protoio"
 	"github.com/tendermint/tendermint/libs/tempfile"
 	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
-	tmtime "github.com/tendermint/tendermint/types/time"
 )
 
 const (
@@ -75,6 +75,19 @@ func NewSignStateConsensus(height int64, round int64, step int8) SignStateConsen
 		Height: height,
 		Round:  round,
 		Step:   step,
+	}
+}
+
+type ConflictingDataError struct {
+	msg string
+}
+
+func (e *ConflictingDataError) Error() string { return e.msg }
+
+func newConflictingDataError(existingSignBytes, newSignBytes []byte) *ConflictingDataError {
+	return &ConflictingDataError{
+		msg: fmt.Sprintf("conflicting data. existing: %s - new: %s",
+			hex.EncodeToString(existingSignBytes), hex.EncodeToString(newSignBytes)),
 	}
 }
 
@@ -272,101 +285,74 @@ func LoadOrCreateSignState(filepath string) (SignState, error) {
 
 // OnlyDifferByTimestamp returns true if the sign bytes of the sign state
 // are the same as the new sign bytes excluding the timestamp.
-func (signState *SignState) OnlyDifferByTimestamp(signBytes []byte) (time.Time, bool) {
-	if signState.Step == stepPropose {
-		return checkProposalOnlyDifferByTimestamp(signState.SignBytes, signBytes)
-	} else if signState.Step == stepPrevote || signState.Step == stepPrecommit {
-		return checkVoteOnlyDifferByTimestamp(signState.SignBytes, signBytes)
-	}
-
-	return time.Time{}, false
+func (signState *SignState) OnlyDifferByTimestamp(signBytes []byte) error {
+	return onlyDifferByTimestamp(signState.Step, signState.SignBytes, signBytes)
 }
 
-func (signState *SignStateConsensus) OnlyDifferByTimestamp(signBytes []byte) (time.Time, bool) {
-	if signState.Step == stepPropose {
-		return checkProposalOnlyDifferByTimestamp(signState.SignBytes, signBytes)
-	} else if signState.Step == stepPrevote || signState.Step == stepPrecommit {
-		return checkVoteOnlyDifferByTimestamp(signState.SignBytes, signBytes)
-	}
-
-	return time.Time{}, false
+func (signState *SignStateConsensus) OnlyDifferByTimestamp(signBytes []byte) error {
+	return onlyDifferByTimestamp(signState.Step, signState.SignBytes, signBytes)
 }
 
-func checkVoteOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) (time.Time, bool) {
+func onlyDifferByTimestamp(step int8, signStateSignBytes, signBytes []byte) error {
+	if step == stepPropose {
+		return checkProposalOnlyDifferByTimestamp(signStateSignBytes, signBytes)
+	} else if step == stepPrevote || step == stepPrecommit {
+		return checkVoteOnlyDifferByTimestamp(signStateSignBytes, signBytes)
+	}
+
+	return fmt.Errorf("unexpected sign step: %d", step)
+}
+
+func checkVoteOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) error {
 	var lastVote, newVote tmProto.CanonicalVote
 	if err := protoio.UnmarshalDelimited(lastSignBytes, &lastVote); err != nil {
-		panic(fmt.Sprintf("LastSignBytes cannot be unmarshalled into vote: %v", err))
+		return fmt.Errorf("lastSignBytes cannot be unmarshalled into vote: %v", err)
 	}
 	if err := protoio.UnmarshalDelimited(newSignBytes, &newVote); err != nil {
-		panic(fmt.Sprintf("signBytes cannot be unmarshalled into vote: %v", err))
+		return fmt.Errorf("signBytes cannot be unmarshalled into vote: %v", err)
 	}
 
-	lastTime := lastVote.Timestamp
-
 	// set the times to the same value and check equality
-	now := tmtime.Now()
-	lastVote.Timestamp = now
-	newVote.Timestamp = now
+	newVote.Timestamp = lastVote.Timestamp
 
 	isEqual := proto.Equal(&newVote, &lastVote)
 
 	if !isEqual {
-		fmt.Printf(`Votes are not equal
-Last Vote - BlockID: %s, ChainID: %s, Height: %d, Round: %d, Type: %s
-New Vote  - BlockID: %s, ChainID: %s, Height: %d, Round: %d, Type: %s
-`,
-			lastVote.GetBlockID().String(),
-			lastVote.GetChainID(),
-			lastVote.GetHeight(),
-			lastVote.GetRound(),
-			lastVote.GetType().String(),
-			newVote.GetBlockID().String(),
-			newVote.GetChainID(),
-			newVote.GetHeight(),
-			newVote.GetRound(),
-			newVote.GetType().String(),
-		)
+		lastVoteBlockID := lastVote.GetBlockID()
+		newVoteBlockID := newVote.GetBlockID()
+		if newVoteBlockID == nil && lastVoteBlockID != nil {
+			return errors.New("already signed vote with non-nil BlockID. refusing to sign vote on nil BlockID")
+		}
+		if newVoteBlockID != nil && lastVoteBlockID == nil {
+			return errors.New("already signed vote with nil BlockID. refusing to sign vote on non-nil BlockID")
+		}
+		if !bytes.Equal(lastVoteBlockID.GetHash(), newVoteBlockID.GetHash()) {
+			return fmt.Errorf("differing block IDs - last Vote: %s, new Vote: %s",
+				lastVoteBlockID.GetHash(), newVoteBlockID.GetHash())
+		}
+		return newConflictingDataError(lastSignBytes, newSignBytes)
 	}
 
-	return lastTime, isEqual
+	return nil
 }
 
-func checkProposalOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) (time.Time, bool) {
+func checkProposalOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) error {
 	var lastProposal, newProposal tmProto.CanonicalProposal
 	if err := protoio.UnmarshalDelimited(lastSignBytes, &lastProposal); err != nil {
-		panic(fmt.Sprintf("LastSignBytes cannot be unmarshalled into proposal: %v", err))
+		return fmt.Errorf("lastSignBytes cannot be unmarshalled into proposal: %v", err)
 	}
 	if err := protoio.UnmarshalDelimited(newSignBytes, &newProposal); err != nil {
-		panic(fmt.Sprintf("signBytes cannot be unmarshalled into proposal: %v", err))
+		return fmt.Errorf("signBytes cannot be unmarshalled into proposal: %v", err)
 	}
 
-	lastTime := lastProposal.Timestamp
 	// set the times to the same value and check equality
-	now := tmtime.Now()
-	lastProposal.Timestamp = now
-	newProposal.Timestamp = now
+	newProposal.Timestamp = lastProposal.Timestamp
 
 	isEqual := proto.Equal(&newProposal, &lastProposal)
 
 	if !isEqual {
-		fmt.Printf(`Proposals are not equal
-Last Proposal - BlockID: %s, ChainID: %s, Height: %d, Round: %d, Type: %s, POL Round: %d
-New Proposal  - BlockID: %s, ChainID: %s, Height: %d, Round: %d, Type: %s, POL Round: %d
-`,
-			lastProposal.GetBlockID().String(),
-			lastProposal.GetChainID(),
-			lastProposal.GetHeight(),
-			lastProposal.GetRound(),
-			lastProposal.GetType().String(),
-			lastProposal.GetPOLRound(),
-			newProposal.GetBlockID().String(),
-			newProposal.GetChainID(),
-			newProposal.GetHeight(),
-			newProposal.GetRound(),
-			newProposal.GetType().String(),
-			newProposal.GetPOLRound(),
-		)
+		return newConflictingDataError(lastSignBytes, newSignBytes)
 	}
 
-	return lastTime, isEqual
+	return nil
 }
