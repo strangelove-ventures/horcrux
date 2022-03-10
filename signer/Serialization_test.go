@@ -17,7 +17,7 @@ func TestUnpackHRSPrevote(t *testing.T) {
 
 	signBytes := tm.VoteSignBytes("chain-id", &vote)
 
-	hrs, err := UnpackHRS(signBytes)
+	hrs, err := UnpackHRST(signBytes)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), hrs.Height)
 	require.Equal(t, int64(2), hrs.Round)
@@ -33,7 +33,7 @@ func TestUnpackHRSPrecommit(t *testing.T) {
 
 	signBytes := tm.VoteSignBytes("chain-id", &vote)
 
-	hrs, err := UnpackHRS(signBytes)
+	hrs, err := UnpackHRST(signBytes)
 	require.NoError(t, err)
 	require.Equal(t, int64(3), hrs.Height)
 	require.Equal(t, int64(2), hrs.Round)
@@ -49,7 +49,7 @@ func TestUnpackHRSProposal(t *testing.T) {
 
 	signBytes := tm.ProposalSignBytes("chain-id", &proposal)
 
-	hrs, err := UnpackHRS(signBytes)
+	hrs, err := UnpackHRST(signBytes)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), hrs.Height)
 	require.Equal(t, int64(2), hrs.Round)
