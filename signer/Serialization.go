@@ -3,7 +3,6 @@ package signer
 import (
 	"errors"
 	"io"
-	"time"
 
 	"github.com/tendermint/tendermint/libs/protoio"
 	tmProtoPrivval "github.com/tendermint/tendermint/proto/tendermint/privval"
@@ -30,16 +29,16 @@ func UnpackHRS(signBytes []byte) (HRSTKey, error) {
 	{
 		var proposal tmProto.CanonicalProposal
 		if err := protoio.UnmarshalDelimited(signBytes, &proposal); err == nil {
-			return HRSTKey{proposal.Height, proposal.Round, stepPropose, proposal.Timestamp}, nil
+			return HRSTKey{proposal.Height, proposal.Round, stepPropose, proposal.Timestamp.UnixNano()}, nil
 		}
 	}
 
 	{
 		var vote tmProto.CanonicalVote
 		if err := protoio.UnmarshalDelimited(signBytes, &vote); err == nil {
-			return HRSTKey{vote.Height, vote.Round, CanonicalVoteToStep(&vote), vote.Timestamp}, nil
+			return HRSTKey{vote.Height, vote.Round, CanonicalVoteToStep(&vote), vote.Timestamp.UnixNano()}, nil
 		}
 	}
 
-	return HRSTKey{0, 0, 0, time.Time{}}, errors.New("could not UnpackHRS from sign bytes")
+	return HRSTKey{0, 0, 0, 0}, errors.New("could not UnpackHRS from sign bytes")
 }

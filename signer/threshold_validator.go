@@ -327,7 +327,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 		Height:    height,
 		Round:     round,
 		Step:      step,
-		Timestamp: stamp,
+		Timestamp: stamp.UnixNano(),
 	}
 
 	// Keep track of the last block that we began the signing process for. Only allow one attempt per block

@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
@@ -133,7 +132,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		Height:    1,
 		Round:     0,
 		Step:      2,
-		Timestamp: time.Now(),
+		Timestamp: 0,
 	}
 
 	ephemeralSharesFor2, err := cosigner1.GetEphemeralSecretParts(hrst)

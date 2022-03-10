@@ -253,7 +253,7 @@ func (cosigner *LocalCosigner) dealShares(req CosignerGetEphemeralSecretPartRequ
 		Height:    req.Height,
 		Round:     req.Round,
 		Step:      req.Step,
-		Timestamp: req.Timestamp,
+		Timestamp: req.Timestamp.UnixNano(),
 	}
 
 	meta, ok := cosigner.hrsMeta[hrsKey]
@@ -317,14 +317,14 @@ func (cosigner *LocalCosigner) getEphemeralSecretPart(
 	cosigner.lastSignStateMutex.Lock()
 	defer cosigner.lastSignStateMutex.Unlock()
 
-	hrsKey := HRSTKey{
+	hrst := HRSTKey{
 		Height:    req.Height,
 		Round:     req.Round,
 		Step:      req.Step,
-		Timestamp: req.Timestamp,
+		Timestamp: req.Timestamp.UnixNano(),
 	}
 
-	meta, ok := cosigner.hrsMeta[hrsKey]
+	meta, ok := cosigner.hrsMeta[hrst]
 	// generate metadata placeholder
 	if !ok {
 		newMeta, err := cosigner.dealShares(CosignerGetEphemeralSecretPartRequest{
@@ -338,7 +338,7 @@ func (cosigner *LocalCosigner) getEphemeralSecretPart(
 		}
 
 		meta = newMeta
-		cosigner.hrsMeta[hrsKey] = meta
+		cosigner.hrsMeta[hrst] = meta
 	}
 
 	ourEphPublicKey := tsed25519.ScalarMultiplyBase(meta.Secret)
@@ -425,14 +425,14 @@ func (cosigner *LocalCosigner) setEphemeralSecretPart(req CosignerSetEphemeralSe
 	cosigner.lastSignStateMutex.Lock()
 	defer cosigner.lastSignStateMutex.Unlock()
 
-	hrsKey := HRSTKey{
+	hrst := HRSTKey{
 		Height:    req.Height,
 		Round:     req.Round,
 		Step:      req.Step,
-		Timestamp: req.Timestamp,
+		Timestamp: req.Timestamp.UnixNano(),
 	}
 
-	meta, ok := cosigner.hrsMeta[hrsKey]
+	meta, ok := cosigner.hrsMeta[hrst]
 	// generate metadata placeholder
 	if !ok {
 		newMeta, err := cosigner.dealShares(CosignerGetEphemeralSecretPartRequest{
@@ -446,7 +446,7 @@ func (cosigner *LocalCosigner) setEphemeralSecretPart(req CosignerSetEphemeralSe
 		}
 
 		meta = newMeta
-		cosigner.hrsMeta[hrsKey] = meta
+		cosigner.hrsMeta[hrst] = meta
 	}
 
 	// decrypt share
@@ -472,7 +472,7 @@ func (cosigner *LocalCosigner) SetEphemeralSecretPartsAndSign(
 			Height:                         req.HRST.Height,
 			Round:                          req.HRST.Round,
 			Step:                           req.HRST.Step,
-			Timestamp:                      req.HRST.Timestamp,
+			Timestamp:                      time.Unix(0, req.HRST.Timestamp),
 		})
 		if err != nil {
 			return nil, err

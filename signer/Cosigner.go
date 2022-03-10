@@ -16,7 +16,7 @@ type HRSTKey struct {
 	Height    int64
 	Round     int64
 	Step      int8
-	Timestamp time.Time
+	Timestamp int64
 }
 
 func HRSTKeyFromProto(hrs *proto.HRST) HRSTKey {
@@ -24,7 +24,7 @@ func HRSTKeyFromProto(hrs *proto.HRST) HRSTKey {
 		Height:    hrs.GetHeight(),
 		Round:     hrs.GetRound(),
 		Step:      int8(hrs.GetStep()),
-		Timestamp: time.Unix(0, hrs.GetTimestamp()),
+		Timestamp: hrs.GetTimestamp(),
 	}
 }
 
@@ -33,7 +33,7 @@ func (hrst HRSTKey) toProto() *proto.HRST {
 		Height:    hrst.Height,
 		Round:     hrst.Round,
 		Step:      int32(hrst.Step),
-		Timestamp: hrst.Timestamp.UnixNano(),
+		Timestamp: hrst.Timestamp,
 	}
 }
 
