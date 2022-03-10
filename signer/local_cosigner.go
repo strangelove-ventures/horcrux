@@ -232,7 +232,9 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	}, nil)
 
 	if err != nil {
-		return res, err
+		if _, isSameHRSError := err.(*SameHRSError); !isSameHRSError {
+			return res, err
+		}
 	}
 
 	for existingKey := range cosigner.hrsMeta {
