@@ -3,6 +3,7 @@ package signer
 import (
 	"encoding/json"
 	"errors"
+	"time"
 
 	proto "github.com/strangelove-ventures/horcrux/signer/proto"
 	"google.golang.org/grpc"
@@ -36,9 +37,16 @@ func (f *fsm) handleLSSEvent(value string) {
 }
 
 func (s *RaftStore) getLeaderGRPCClient() (proto.CosignerGRPCClient, error) {
-	leader := string(s.GetLeader())
+	var leader string
+	for i := 0; i < 30; i++ {
+		leader = string(s.GetLeader())
+		if leader != "" {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 	if leader == "" {
-		return nil, errors.New("no current raft leader")
+		return nil, errors.New("timed out waiting for leader election to complete")
 	}
 	conn, err := grpc.Dial(leader, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {

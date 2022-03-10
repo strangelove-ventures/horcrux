@@ -294,10 +294,11 @@ func (cosigner *LocalCosigner) GetEphemeralSecretParts(
 			continue
 		}
 		secretPart, err := cosigner.getEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-			ID:     peer.ID,
-			Height: hrst.Height,
-			Round:  hrst.Round,
-			Step:   hrst.Step,
+			ID:        peer.ID,
+			Height:    hrst.Height,
+			Round:     hrst.Round,
+			Step:      hrst.Step,
+			Timestamp: time.Unix(0, hrst.Timestamp),
 		})
 
 		if err != nil {
@@ -330,9 +331,10 @@ func (cosigner *LocalCosigner) getEphemeralSecretPart(
 	// generate metadata placeholder
 	if !ok {
 		newMeta, err := cosigner.dealShares(CosignerGetEphemeralSecretPartRequest{
-			Height: req.Height,
-			Round:  req.Round,
-			Step:   req.Step,
+			Height:    req.Height,
+			Round:     req.Round,
+			Step:      req.Step,
+			Timestamp: req.Timestamp,
 		})
 
 		if err != nil {
