@@ -270,15 +270,16 @@ func (pv *ThresholdValidator) getExistingBlockSignature(block *Block) ([]byte, t
 	}
 	latestBlock, existingSignature := pv.lastSignState.GetFromCache(hrs, &pv.lastSignStateMutex)
 	if existingSignature != nil {
-		if bytes.Equal(signBytes, existingSignature.SignBytes) {
+		// If a proposal has already been signed for this HRS, return that
+		if block.Step == stepPropose || bytes.Equal(signBytes, existingSignature.SignBytes) {
 			return existingSignature.Signature, block.Timestamp, nil
 		}
 		if err := existingSignature.OnlyDifferByTimestamp(signBytes); err != nil {
 			return nil, stamp, err
 		}
 
-		return nil, stamp, nil
 		// only differ by timestamp, okay to sign again
+		return nil, stamp, nil
 	} else if latestBlock.Height > height ||
 		(latestBlock.Height == height && latestBlock.Round > round) ||
 		(latestBlock.Height == height && latestBlock.Round == round && latestBlock.Step > step) {
