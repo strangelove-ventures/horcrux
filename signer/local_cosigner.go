@@ -162,12 +162,12 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	res := CosignerSignResponse{}
 	lss := cosigner.lastSignState
 
-	hrsKey, err := UnpackHRS(req.SignBytes)
+	hrst, err := UnpackHRST(req.SignBytes)
 	if err != nil {
 		return res, err
 	}
 
-	sameHRS, err := lss.CheckHRS(hrsKey)
+	sameHRS, err := lss.CheckHRS(hrst)
 	if err != nil {
 		return res, err
 	}
@@ -186,7 +186,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		// same HRS, and only differ by timestamp - ok to sign again
 	}
 
-	meta, ok := cosigner.hrsMeta[hrsKey]
+	meta, ok := cosigner.hrsMeta[hrst]
 	if !ok {
 		return res, errors.New("no metadata at HRS")
 	}

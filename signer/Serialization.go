@@ -25,7 +25,7 @@ func WriteMsg(writer io.Writer, msg tmProtoPrivval.Message) (err error) {
 }
 
 // UnpackHRS deserializes sign bytes and gets the height, round, and step
-func UnpackHRS(signBytes []byte) (HRSTKey, error) {
+func UnpackHRST(signBytes []byte) (HRSTKey, error) {
 	{
 		var proposal tmProto.CanonicalProposal
 		if err := protoio.UnmarshalDelimited(signBytes, &proposal); err == nil {

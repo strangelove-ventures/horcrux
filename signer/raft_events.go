@@ -36,7 +36,7 @@ func (f *fsm) handleLSSEvent(value string) {
 	_ = f.cosigner.SaveLastSignedState(*lss)
 }
 
-func (s *RaftStore) getLeaderGRPCClient() (proto.CosignerGRPCClient, error) {
+func (s *RaftStore) getLeaderGRPCClient() (proto.CosignerGRPCClient, *grpc.ClientConn, error) {
 	var leader string
 	for i := 0; i < 30; i++ {
 		leader = string(s.GetLeader())
@@ -46,20 +46,21 @@ func (s *RaftStore) getLeaderGRPCClient() (proto.CosignerGRPCClient, error) {
 		time.Sleep(100 * time.Millisecond)
 	}
 	if leader == "" {
-		return nil, errors.New("timed out waiting for leader election to complete")
+		return nil, nil, errors.New("timed out waiting for leader election to complete")
 	}
 	conn, err := grpc.Dial(leader, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return proto.NewCosignerGRPCClient(conn), nil
+	return proto.NewCosignerGRPCClient(conn), conn, nil
 }
 
 func (s *RaftStore) LeaderSignBlock(req CosignerSignBlockRequest) (*CosignerSignBlockResponse, error) {
-	client, err := s.getLeaderGRPCClient()
+	client, conn, err := s.getLeaderGRPCClient()
 	if err != nil {
 		return nil, err
 	}
+	defer conn.Close()
 	context, cancelFunc := getContext()
 	defer cancelFunc()
 	res, err := client.SignBlock(context, &proto.CosignerGRPCSignBlockRequest{
