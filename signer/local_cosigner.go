@@ -224,9 +224,9 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 
 	cosigner.lastSignState.EphemeralPublic = ephemeralPublic
 	err = cosigner.lastSignState.Save(SignStateConsensus{
-		Height:    hrsKey.Height,
-		Round:     hrsKey.Round,
-		Step:      hrsKey.Step,
+		Height:    hrst.Height,
+		Round:     hrst.Round,
+		Step:      hrst.Step,
 		Signature: sig,
 		SignBytes: req.SignBytes,
 	}, nil)
@@ -240,7 +240,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	for existingKey := range cosigner.hrsMeta {
 		// delete any HRS lower than our signed level
 		// we will not be providing parts for any lower HRS
-		if existingKey.Less(hrsKey) {
+		if existingKey.Less(hrst) {
 			delete(cosigner.hrsMeta, existingKey)
 		}
 	}
