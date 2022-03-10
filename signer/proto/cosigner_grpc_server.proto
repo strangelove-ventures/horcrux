@@ -36,15 +36,16 @@ message EphemeralSecretPart {
 	bytes sourceSig = 5;
 }
 
-message HRS {
+message HRST {
 	int64 height = 1;
 	int64 round = 2;
-	int32 step = 3;
+  int32 step = 3;
+  int64 timestamp = 4;
 }
 
 message CosignerGRPCSetEphemeralSecretPartsAndSignRequest {
 	repeated EphemeralSecretPart encryptedSecrets = 1;
-	HRS hrs = 2;
+	HRST hrst = 2;
 	bytes signBytes = 3;
 }
 
@@ -55,7 +56,7 @@ message CosignerGRPCSetEphemeralSecretPartsAndSignResponse {
 }
 
 message CosignerGRPCGetEphemeralSecretPartsRequest {
-	HRS hrs = 1;
+	HRST hrst = 1;
 }
 
 message CosignerGRPCGetEphemeralSecretPartsResponse {

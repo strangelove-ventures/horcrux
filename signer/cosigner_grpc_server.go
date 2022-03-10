@@ -9,14 +9,14 @@ import (
 	proto "github.com/strangelove-ventures/horcrux/signer/proto"
 )
 
-type GRPCServer struct {
+type CosignerGRPCServer struct {
 	cosigner           *LocalCosigner
 	thresholdValidator *ThresholdValidator
 	raftStore          *RaftStore
 	proto.UnimplementedCosignerGRPCServer
 }
 
-func (rpc *GRPCServer) SignBlock(
+func (rpc *CosignerGRPCServer) SignBlock(
 	ctx context.Context, req *proto.CosignerGRPCSignBlockRequest) (*proto.CosignerGRPCSignBlockResponse, error) {
 	block := &Block{
 		Height:    req.Block.GetHeight(),
@@ -34,7 +34,7 @@ func (rpc *GRPCServer) SignBlock(
 	}, nil
 }
 
-func (rpc *GRPCServer) SetEphemeralSecretPartsAndSign(
+func (rpc *CosignerGRPCServer) SetEphemeralSecretPartsAndSign(
 	ctx context.Context,
 	req *proto.CosignerGRPCSetEphemeralSecretPartsAndSignRequest,
 ) (*proto.CosignerGRPCSetEphemeralSecretPartsAndSignResponse, error) {
@@ -53,7 +53,7 @@ func (rpc *GRPCServer) SetEphemeralSecretPartsAndSign(
 	}, nil
 }
 
-func (rpc *GRPCServer) GetEphemeralSecretParts(
+func (rpc *CosignerGRPCServer) GetEphemeralSecretParts(
 	ctx context.Context,
 	req *proto.CosignerGRPCGetEphemeralSecretPartsRequest,
 ) (*proto.CosignerGRPCGetEphemeralSecretPartsResponse, error) {
@@ -66,7 +66,7 @@ func (rpc *GRPCServer) GetEphemeralSecretParts(
 	}, nil
 }
 
-func (rpc *GRPCServer) TransferLeadership(
+func (rpc *CosignerGRPCServer) TransferLeadership(
 	ctx context.Context,
 	req *proto.CosignerGRPCTransferLeadershipRequest,
 ) (*proto.CosignerGRPCTransferLeadershipResponse, error) {

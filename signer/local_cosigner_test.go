@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
@@ -128,18 +129,19 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 
 	publicKeys := make([]tsed25519.Element, 0)
 
-	hrs := HRSKey{
-		Height: 1,
-		Round:  0,
-		Step:   2,
+	hrst := HRSTKey{
+		Height:    1,
+		Round:     0,
+		Step:      2,
+		Timestamp: time.Now(),
 	}
 
-	ephemeralSharesFor2, err := cosigner1.GetEphemeralSecretParts(hrs)
+	ephemeralSharesFor2, err := cosigner1.GetEphemeralSecretParts(hrst)
 	require.NoError(t, err)
 
 	publicKeys = append(publicKeys, ephemeralSharesFor2.EncryptedSecrets[0].SourceEphemeralSecretPublicKey)
 
-	ephemeralSharesFor1, err := cosigner2.GetEphemeralSecretParts(hrs)
+	ephemeralSharesFor1, err := cosigner2.GetEphemeralSecretParts(hrst)
 	require.NoError(t, err)
 
 	fmt.Printf("Shares from 2: %d\n", len(ephemeralSharesFor1.EncryptedSecrets))
@@ -160,14 +162,14 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 
 	sigRes1, err := cosigner1.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
 		EncryptedSecrets: ephemeralSharesFor1.EncryptedSecrets,
-		HRS:              hrs,
+		HRST:             hrst,
 		SignBytes:        signBytes,
 	})
 	require.NoError(t, err)
 
 	sigRes2, err := cosigner2.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
 		EncryptedSecrets: ephemeralSharesFor2.EncryptedSecrets,
-		HRS:              hrs,
+		HRST:             hrst,
 		SignBytes:        signBytes,
 	})
 	require.NoError(t, err)

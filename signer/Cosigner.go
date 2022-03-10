@@ -12,19 +12,28 @@ type HRSKey struct {
 	Step   int8
 }
 
-func HRSKeyFromProto(hrs *proto.HRS) HRSKey {
-	return HRSKey{
-		Height: hrs.GetHeight(),
-		Round:  hrs.GetRound(),
-		Step:   int8(hrs.GetStep()),
+type HRSTKey struct {
+	Height    int64
+	Round     int64
+	Step      int8
+	Timestamp time.Time
+}
+
+func HRSTKeyFromProto(hrs *proto.HRST) HRSTKey {
+	return HRSTKey{
+		Height:    hrs.GetHeight(),
+		Round:     hrs.GetRound(),
+		Step:      int8(hrs.GetStep()),
+		Timestamp: time.Unix(0, hrs.GetTimestamp()),
 	}
 }
 
-func (hrsKey HRSKey) toProto() *proto.HRS {
-	return &proto.HRS{
-		Height: hrsKey.Height,
-		Round:  hrsKey.Round,
-		Step:   int32(hrsKey.Step),
+func (hrst HRSTKey) toProto() *proto.HRST {
+	return &proto.HRST{
+		Height:    hrst.Height,
+		Round:     hrst.Round,
+		Step:      int32(hrst.Step),
+		Timestamp: hrst.Timestamp.UnixNano(),
 	}
 }
 
@@ -93,6 +102,7 @@ type CosignerSetEphemeralSecretPartRequest struct {
 	Height                         int64
 	Round                          int64
 	Step                           int8
+	Timestamp                      time.Time
 }
 
 type CosignerSignBlockRequest struct {
@@ -110,7 +120,7 @@ type CosignerEphemeralSecretPartsResponse struct {
 
 type CosignerSetEphemeralSecretPartsAndSignRequest struct {
 	EncryptedSecrets []CosignerEphemeralSecretPart
-	HRS              HRSKey
+	HRST             HRSTKey
 	SignBytes        []byte
 }
 
@@ -125,7 +135,7 @@ type Cosigner interface {
 	GetAddress() string
 
 	// Get ephemeral secret part for all peers
-	GetEphemeralSecretParts(req HRSKey) (*CosignerEphemeralSecretPartsResponse, error)
+	GetEphemeralSecretParts(hrst HRSTKey) (*CosignerEphemeralSecretPartsResponse, error)
 
 	// Sign the requested bytes
 	SetEphemeralSecretPartsAndSign(req CosignerSetEphemeralSecretPartsAndSignRequest) (*CosignerSignResponse, error)

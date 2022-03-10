@@ -165,22 +165,22 @@ func (signState *SignState) save() {
 // Returns true if the HRS matches the arguments and the SignBytes are not empty (indicating
 // we have already signed for this HRS, and can reuse the existing signature).
 // It panics if the HRS matches the arguments, there's a SignBytes, but no Signature.
-func (signState *SignState) CheckHRS(hrs HRSKey) (bool, error) {
-	if signState.Height > hrs.Height {
-		return false, fmt.Errorf("height regression. Got %v, last height %v", hrs.Height, signState.Height)
+func (signState *SignState) CheckHRS(hrst HRSTKey) (bool, error) {
+	if signState.Height > hrst.Height {
+		return false, fmt.Errorf("height regression. Got %v, last height %v", hrst.Height, signState.Height)
 	}
 
-	if signState.Height == hrs.Height {
-		if signState.Round > hrs.Round {
+	if signState.Height == hrst.Height {
+		if signState.Round > hrst.Round {
 			return false, fmt.Errorf("round regression at height %v. Got %v, last round %v",
-				hrs.Height, hrs.Round, signState.Round)
+				hrst.Height, hrst.Round, signState.Round)
 		}
 
-		if signState.Round == hrs.Round {
-			if signState.Step > hrs.Step {
+		if signState.Round == hrst.Round {
+			if signState.Step > hrst.Step {
 				return false, fmt.Errorf("step regression at height %v round %v. Got %v, last step %v",
-					hrs.Height, hrs.Round, hrs.Step, signState.Step)
-			} else if signState.Step == hrs.Step {
+					hrst.Height, hrst.Round, hrst.Step, signState.Step)
+			} else if signState.Step == hrst.Step {
 				if signState.SignBytes != nil {
 					if signState.Signature == nil {
 						panic("pv: Signature is nil but SignBytes is not!")
