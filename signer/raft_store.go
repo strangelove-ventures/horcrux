@@ -12,14 +12,23 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 	"os"
-	"strings"
+	"path/filepath"
 	"sync"
 	"time"
 
+	"github.com/Jille/raft-grpc-leader-rpc/leaderhealth"
+	gRPCTransport "github.com/Jille/raft-grpc-transport"
+	"github.com/Jille/raftadmin"
 	"github.com/hashicorp/raft"
+	boltdb "github.com/hashicorp/raft-boltdb"
+	proto "github.com/strangelove-ventures/horcrux/signer/proto"
 	"github.com/tendermint/tendermint/libs/log"
 	"github.com/tendermint/tendermint/libs/service"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/reflection"
 )
 
 const (
@@ -50,22 +59,6 @@ type RaftStore struct {
 	logger             log.Logger
 	cosigner           *LocalCosigner
 	thresholdValidator *ThresholdValidator
-	commonRPCPort      string
-}
-
-// OnStart starts the raft server
-func getCommonRPCPort(peers []Cosigner) string {
-	var rpcPort string
-	for i, peer := range peers {
-		if i == 0 {
-			rpcPort = strings.Split(peer.GetAddress(), ":")[2]
-			continue
-		}
-		if strings.Split(peer.GetAddress(), ":")[2] != rpcPort {
-			return ""
-		}
-	}
-	return rpcPort
 }
 
 // New returns a new Store.
@@ -73,15 +66,14 @@ func NewRaftStore(
 	nodeID string, directory string, bindAddress string, timeout time.Duration,
 	logger log.Logger, cosigner *LocalCosigner, raftPeers []Cosigner) *RaftStore {
 	cosignerRaftStore := &RaftStore{
-		NodeID:        nodeID,
-		RaftDir:       directory,
-		RaftBind:      bindAddress,
-		RaftTimeout:   timeout,
-		m:             make(map[string]string),
-		logger:        logger,
-		cosigner:      cosigner,
-		Peers:         raftPeers,
-		commonRPCPort: getCommonRPCPort(raftPeers),
+		NodeID:      nodeID,
+		RaftDir:     directory,
+		RaftBind:    bindAddress,
+		RaftTimeout: timeout,
+		m:           make(map[string]string),
+		logger:      logger,
+		cosigner:    cosigner,
+		Peers:       raftPeers,
 	}
 
 	cosignerRaftStore.BaseService = *service.NewBaseService(logger, "CosignerRaftStore", cosignerRaftStore)
@@ -92,64 +84,95 @@ func (s *RaftStore) SetThresholdValidator(thresholdValidator *ThresholdValidator
 	s.thresholdValidator = thresholdValidator
 }
 
+func (s *RaftStore) init() error {
+	host := p2pURLToRaftAddress(s.RaftBind)
+	_, port, err := net.SplitHostPort(host)
+	if err != nil {
+		return fmt.Errorf("failed to parse local address: %s, %v", host, err)
+	}
+	sock, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
+	if err != nil {
+		return err
+	}
+	transportManager, err := s.Open()
+	if err != nil {
+		return err
+	}
+	grpcServer := grpc.NewServer()
+	proto.RegisterCosignerGRPCServer(grpcServer, &GRPCServer{
+		cosigner:           s.cosigner,
+		thresholdValidator: s.thresholdValidator,
+		raftStore:          s,
+	})
+	transportManager.Register(grpcServer)
+	leaderhealth.Setup(s.raft, grpcServer, []string{"Leader"})
+	raftadmin.Register(grpcServer, s.raft)
+	reflection.Register(grpcServer)
+	if err := grpcServer.Serve(sock); err != nil {
+		return err
+	}
+	return nil
+}
+
 // OnStart starts the raft server
 func (s *RaftStore) OnStart() error {
 	go func() {
-		if err := s.Open(); err != nil {
-			s.logger.Error("failed to open raft store", err.Error())
-			return
+		err := s.init()
+		if err != nil {
+			panic(err)
 		}
 	}()
 
 	return nil
 }
 
-func GetTCPAddressForRaftAddress(raftAddress string) (*net.TCPAddr, error) {
-	addr, err := net.ResolveTCPAddr("tcp", raftAddress)
+func p2pURLToRaftAddress(p2pURL string) string {
+	url, err := url.Parse(p2pURL)
 	if err != nil {
-		return nil, err
+		return p2pURL
 	}
-	return addr, nil
+	return url.Host
 }
 
 // Open opens the store. If enableSingle is set, and there are no existing peers,
 // then this node becomes the first node, and therefore leader, of the cluster.
 // localID should be the server identifier for this node.
-func (s *RaftStore) Open() error {
+func (s *RaftStore) Open() (*gRPCTransport.Manager, error) {
 	// Setup Raft configuration.
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(s.NodeID)
 	config.LogLevel = "ERROR"
 
-	tcpAddress, err := GetTCPAddressForRaftAddress(s.RaftBind)
-	if err != nil {
-		return err
-	}
-	// Setup Raft communication.
-	transport, err := raft.NewTCPTransport(s.RaftBind, tcpAddress, 3, 10*time.Second, os.Stderr)
-	if err != nil {
-		return err
-	}
-	if err != nil {
-		return err
-	}
-
 	// Create the snapshot store. This allows the Raft to truncate the log.
 	snapshots, err := raft.NewFileSnapshotStore(s.RaftDir, retainSnapshotCount, os.Stderr)
 	if err != nil {
-		return fmt.Errorf("file snapshot store: %s", err)
+		return nil, fmt.Errorf("file snapshot store: %s", err)
 	}
 
 	// Create the log store and stable store.
-	var logStore raft.LogStore
-	var stableStore raft.StableStore
-	logStore = raft.NewInmemStore()
-	stableStore = raft.NewInmemStore()
+	logStoreFile := filepath.Join(s.RaftDir, "logs.dat")
+	logStore, err := boltdb.NewBoltStore(logStoreFile)
+	if err != nil {
+		return nil, fmt.Errorf(`boltdb.NewBoltStore(%q): %v`, logStoreFile, err)
+	}
+
+	stableStoreFile := filepath.Join(s.RaftDir, "stable.dat")
+	stableStore, err := boltdb.NewBoltStore(stableStoreFile)
+	if err != nil {
+		return nil, fmt.Errorf(`boltdb.NewBoltStore(%q): %v`, stableStoreFile, err)
+	}
+
+	raftAddress := raft.ServerAddress(p2pURLToRaftAddress(s.RaftBind))
+
+	// Setup Raft communication.
+	transportManager := gRPCTransport.New(raftAddress, []grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	})
 
 	// Instantiate the Raft systems.
-	ra, err := raft.NewRaft(config, (*fsm)(s), logStore, stableStore, snapshots, transport)
+	ra, err := raft.NewRaft(config, (*fsm)(s), logStore, stableStore, snapshots, transportManager.Transport())
 	if err != nil {
-		return fmt.Errorf("new raft: %s", err)
+		return nil, fmt.Errorf("new raft: %s", err)
 	}
 	s.raft = ra
 
@@ -157,19 +180,19 @@ func (s *RaftStore) Open() error {
 		Servers: []raft.Server{
 			{
 				ID:      raft.ServerID(s.NodeID),
-				Address: raft.ServerAddress(s.RaftBind),
+				Address: raftAddress,
 			},
 		},
 	}
 	for _, peer := range s.Peers {
 		configuration.Servers = append(configuration.Servers, raft.Server{
 			ID:      raft.ServerID(fmt.Sprint(peer.GetID())),
-			Address: raft.ServerAddress(peer.GetRaftAddress()),
+			Address: raft.ServerAddress(p2pURLToRaftAddress(peer.GetAddress())),
 		})
 	}
 	s.raft.BootstrapCluster(configuration)
 
-	return nil
+	return transportManager, nil
 }
 
 // Get returns the value for the given key.

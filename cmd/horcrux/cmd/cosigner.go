@@ -58,7 +58,6 @@ func StartCosignerCmd() *cobra.Command {
 				ChainID:           config.ChainID,
 				CosignerThreshold: config.CosignerConfig.Threshold,
 				ListenAddress:     config.CosignerConfig.P2PListen,
-				RaftListenAddress: config.CosignerConfig.RaftListen,
 				Nodes:             config.Nodes(),
 				Cosigners:         config.CosignerPeers(),
 			}
@@ -94,7 +93,6 @@ func StartCosignerCmd() *cobra.Command {
 			}
 
 			cosigners := []signer.Cosigner{}
-			remoteCosigners := []signer.RemoteCosigner{}
 
 			// add ourselves as a peer so localcosigner can handle GetEphSecPart requests
 			peers := []signer.CosignerPeer{{
@@ -103,9 +101,8 @@ func StartCosignerCmd() *cobra.Command {
 			}}
 
 			for _, cosignerConfig := range cfg.Cosigners {
-				cosigner := signer.NewRemoteCosigner(cosignerConfig.ID, cosignerConfig.Address, cosignerConfig.RaftAddress)
+				cosigner := signer.NewRemoteCosigner(cosignerConfig.ID, cosignerConfig.Address)
 				cosigners = append(cosigners, cosigner)
-				remoteCosigners = append(remoteCosigners, *cosigner)
 
 				if cosignerConfig.ID < 1 || cosignerConfig.ID > len(key.CosignerKeys) {
 					log.Fatalf("Unexpected cosigner ID %d", cosignerConfig.ID)
@@ -124,7 +121,6 @@ func StartCosignerCmd() *cobra.Command {
 				SignState:   &shareSignState,
 				RsaKey:      key.RSAKey,
 				Address:     cfg.ListenAddress,
-				RaftAddress: cfg.RaftListenAddress,
 				Peers:       peers,
 				Total:       uint8(total),
 				Threshold:   uint8(cfg.CosignerThreshold),
@@ -144,7 +140,7 @@ func StartCosignerCmd() *cobra.Command {
 
 			// Start RAFT store listener
 			raftStore := signer.NewRaftStore(nodeID,
-				raftDir, cfg.RaftListenAddress, timeout, logger, localCosigner, cosigners)
+				raftDir, cfg.ListenAddress, timeout, logger, localCosigner, cosigners)
 			if err := raftStore.Start(); err != nil {
 				log.Fatalf("Error starting raft store: %v\n", err)
 			}
@@ -161,22 +157,6 @@ func StartCosignerCmd() *cobra.Command {
 			})
 
 			raftStore.SetThresholdValidator(val.(*signer.ThresholdValidator))
-
-			rpcServerConfig := signer.CosignerRPCServerConfig{
-				Logger:             logger,
-				ListenAddress:      cfg.ListenAddress,
-				Cosigner:           localCosigner,
-				Peers:              remoteCosigners,
-				Timeout:            timeout,
-				RaftStore:          raftStore,
-				ThresholdValidator: val.(*signer.ThresholdValidator),
-			}
-
-			rpcServer := signer.NewCosignerRPCServer(&rpcServerConfig)
-			if err := rpcServer.Start(); err != nil {
-				log.Fatalf("Error starting rpc server: %v\n", err)
-			}
-			services = append(services, rpcServer)
 
 			pv = &signer.PvGuard{PrivValidator: val}
 

@@ -62,7 +62,7 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 		t.Fatalf("failed to create store")
 	}
 
-	if err := s.Open(); err != nil {
+	if _, err := s.Open(); err != nil {
 		t.Fatalf("failed to open store: %s", err)
 	}
 

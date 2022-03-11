@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	tmJson "github.com/tendermint/tendermint/libs/json"
@@ -16,39 +17,33 @@ import (
 	tsed25519 "gitlab.com/polychainlabs/threshold-ed25519/pkg"
 )
 
-type HRSKey struct {
-	Height int64
-	Round  int64
-	Step   int8
-}
-
 // return true if we are less than the other key
-func (hrsKey *HRSKey) Less(other HRSKey) bool {
-	if hrsKey.Height < other.Height {
+func (hrst *HRSTKey) Less(other HRSTKey) bool {
+	if hrst.Height < other.Height {
 		return true
 	}
 
-	if hrsKey.Height > other.Height {
+	if hrst.Height > other.Height {
 		return false
 	}
 
 	// height is equal, check round
 
-	if hrsKey.Round < other.Round {
+	if hrst.Round < other.Round {
 		return true
 	}
 
-	if hrsKey.Round > other.Round {
+	if hrst.Round > other.Round {
 		return false
 	}
 
 	// round is equal, check step
 
-	if hrsKey.Step < other.Step {
+	if hrst.Step < other.Step {
 		return true
 	}
 
-	// everything is equal
+	// HRS is greater or equal
 	return false
 }
 
@@ -58,10 +53,11 @@ type CosignerPeer struct {
 }
 
 type CosignerGetEphemeralSecretPartRequest struct {
-	ID     int
-	Height int64
-	Round  int64
-	Step   int8
+	ID        int
+	Height    int64
+	Round     int64
+	Step      int8
+	Timestamp time.Time
 }
 
 type LocalCosignerConfig struct {
@@ -106,15 +102,10 @@ type LocalCosigner struct {
 	lastSignStateMutex sync.Mutex
 
 	// Height, Round, Step -> metadata
-	hrsMeta map[HRSKey]HrsMetadata
+	hrsMeta map[HRSTKey]HrsMetadata
 	peers   map[int]CosignerPeer
 
-	address     string
-	raftAddress string
-}
-
-func (cosigner *LocalCosigner) GetErrorIfLessOrEqual(height int64, round int64, step int8) error {
-	return cosigner.lastSignState.GetErrorIfLessOrEqual(height, round, step, &cosigner.lastSignStateMutex)
+	address string
 }
 
 func (cosigner *LocalCosigner) SaveLastSignedState(signState SignStateConsensus) error {
@@ -126,12 +117,11 @@ func NewLocalCosigner(cfg LocalCosignerConfig) *LocalCosigner {
 		key:           cfg.CosignerKey,
 		lastSignState: cfg.SignState,
 		rsaKey:        cfg.RsaKey,
-		hrsMeta:       make(map[HRSKey]HrsMetadata),
+		hrsMeta:       make(map[HRSTKey]HrsMetadata),
 		peers:         make(map[int]CosignerPeer),
 		total:         cfg.Total,
 		threshold:     cfg.Threshold,
 		address:       cfg.Address,
-		raftAddress:   cfg.RaftAddress,
 	}
 
 	for _, peer := range cfg.Peers {
@@ -162,12 +152,6 @@ func (cosigner *LocalCosigner) GetAddress() string {
 	return cosigner.address
 }
 
-// GetRaftAddress returns the Raft hostname of the cosigner
-// Implements Cosigner interface
-func (cosigner *LocalCosigner) GetRaftAddress() string {
-	return cosigner.raftAddress
-}
-
 // Sign the sign request using the cosigner's share
 // Return the signed bytes or an error
 // Implements Cosigner interface
@@ -178,12 +162,12 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	res := CosignerSignResponse{}
 	lss := cosigner.lastSignState
 
-	hrsKey, err := UnpackHRS(req.SignBytes)
+	hrst, err := UnpackHRST(req.SignBytes)
 	if err != nil {
 		return res, err
 	}
 
-	sameHRS, err := lss.CheckHRS(hrsKey)
+	sameHRS, err := lss.CheckHRS(hrst)
 	if err != nil {
 		return res, err
 	}
@@ -195,14 +179,14 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 			res.EphemeralPublic = lss.EphemeralPublic
 			res.Signature = lss.Signature
 			return res, nil
-		} else if _, ok := lss.OnlyDifferByTimestamp(req.SignBytes); !ok {
-			return res, errors.New("mismatched data")
+		} else if err := lss.OnlyDifferByTimestamp(req.SignBytes); err != nil {
+			return res, err
 		}
 
 		// same HRS, and only differ by timestamp - ok to sign again
 	}
 
-	meta, ok := cosigner.hrsMeta[hrsKey]
+	meta, ok := cosigner.hrsMeta[hrst]
 	if !ok {
 		return res, errors.New("no metadata at HRS")
 	}
@@ -240,21 +224,23 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 
 	cosigner.lastSignState.EphemeralPublic = ephemeralPublic
 	err = cosigner.lastSignState.Save(SignStateConsensus{
-		Height:    hrsKey.Height,
-		Round:     hrsKey.Round,
-		Step:      hrsKey.Step,
+		Height:    hrst.Height,
+		Round:     hrst.Round,
+		Step:      hrst.Step,
 		Signature: sig,
 		SignBytes: req.SignBytes,
 	}, nil)
 
 	if err != nil {
-		return res, err
+		if _, isSameHRSError := err.(*SameHRSError); !isSameHRSError {
+			return res, err
+		}
 	}
 
 	for existingKey := range cosigner.hrsMeta {
 		// delete any HRS lower than our signed level
 		// we will not be providing parts for any lower HRS
-		if existingKey.Less(hrsKey) {
+		if existingKey.Less(hrst) {
 			delete(cosigner.hrsMeta, existingKey)
 		}
 	}
@@ -265,10 +251,11 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 }
 
 func (cosigner *LocalCosigner) dealShares(req CosignerGetEphemeralSecretPartRequest) (HrsMetadata, error) {
-	hrsKey := HRSKey{
-		Height: req.Height,
-		Round:  req.Round,
-		Step:   req.Step,
+	hrsKey := HRSTKey{
+		Height:    req.Height,
+		Round:     req.Round,
+		Step:      req.Step,
+		Timestamp: req.Timestamp.UnixNano(),
 	}
 
 	meta, ok := cosigner.hrsMeta[hrsKey]
@@ -298,7 +285,7 @@ func (cosigner *LocalCosigner) dealShares(req CosignerGetEphemeralSecretPartRequ
 }
 
 func (cosigner *LocalCosigner) GetEphemeralSecretParts(
-	req HRSKey) (*CosignerEphemeralSecretPartsResponse, error) {
+	hrst HRSTKey) (*CosignerEphemeralSecretPartsResponse, error) {
 	res := &CosignerEphemeralSecretPartsResponse{
 		EncryptedSecrets: make([]CosignerEphemeralSecretPart, 0, len(cosigner.peers)-1),
 	}
@@ -307,10 +294,11 @@ func (cosigner *LocalCosigner) GetEphemeralSecretParts(
 			continue
 		}
 		secretPart, err := cosigner.getEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-			ID:     peer.ID,
-			Height: req.Height,
-			Round:  req.Round,
-			Step:   req.Step,
+			ID:        peer.ID,
+			Height:    hrst.Height,
+			Round:     hrst.Round,
+			Step:      hrst.Step,
+			Timestamp: time.Unix(0, hrst.Timestamp),
 		})
 
 		if err != nil {
@@ -332,19 +320,21 @@ func (cosigner *LocalCosigner) getEphemeralSecretPart(
 	cosigner.lastSignStateMutex.Lock()
 	defer cosigner.lastSignStateMutex.Unlock()
 
-	hrsKey := HRSKey{
-		Height: req.Height,
-		Round:  req.Round,
-		Step:   req.Step,
+	hrst := HRSTKey{
+		Height:    req.Height,
+		Round:     req.Round,
+		Step:      req.Step,
+		Timestamp: req.Timestamp.UnixNano(),
 	}
 
-	meta, ok := cosigner.hrsMeta[hrsKey]
+	meta, ok := cosigner.hrsMeta[hrst]
 	// generate metadata placeholder
 	if !ok {
 		newMeta, err := cosigner.dealShares(CosignerGetEphemeralSecretPartRequest{
-			Height: req.Height,
-			Round:  req.Round,
-			Step:   req.Step,
+			Height:    req.Height,
+			Round:     req.Round,
+			Step:      req.Step,
+			Timestamp: req.Timestamp,
 		})
 
 		if err != nil {
@@ -352,7 +342,7 @@ func (cosigner *LocalCosigner) getEphemeralSecretPart(
 		}
 
 		meta = newMeta
-		cosigner.hrsMeta[hrsKey] = meta
+		cosigner.hrsMeta[hrst] = meta
 	}
 
 	ourEphPublicKey := tsed25519.ScalarMultiplyBase(meta.Secret)
@@ -439,13 +429,14 @@ func (cosigner *LocalCosigner) setEphemeralSecretPart(req CosignerSetEphemeralSe
 	cosigner.lastSignStateMutex.Lock()
 	defer cosigner.lastSignStateMutex.Unlock()
 
-	hrsKey := HRSKey{
-		Height: req.Height,
-		Round:  req.Round,
-		Step:   req.Step,
+	hrst := HRSTKey{
+		Height:    req.Height,
+		Round:     req.Round,
+		Step:      req.Step,
+		Timestamp: req.Timestamp.UnixNano(),
 	}
 
-	meta, ok := cosigner.hrsMeta[hrsKey]
+	meta, ok := cosigner.hrsMeta[hrst]
 	// generate metadata placeholder
 	if !ok {
 		newMeta, err := cosigner.dealShares(CosignerGetEphemeralSecretPartRequest{
@@ -459,7 +450,7 @@ func (cosigner *LocalCosigner) setEphemeralSecretPart(req CosignerSetEphemeralSe
 		}
 
 		meta = newMeta
-		cosigner.hrsMeta[hrsKey] = meta
+		cosigner.hrsMeta[hrst] = meta
 	}
 
 	// decrypt share
@@ -482,9 +473,10 @@ func (cosigner *LocalCosigner) SetEphemeralSecretPartsAndSign(
 			SourceEphemeralSecretPublicKey: secretPart.SourceEphemeralSecretPublicKey,
 			EncryptedSharePart:             secretPart.EncryptedSharePart,
 			SourceSig:                      secretPart.SourceSig,
-			Height:                         req.HRS.Height,
-			Round:                          req.HRS.Round,
-			Step:                           req.HRS.Step,
+			Height:                         req.HRST.Height,
+			Round:                          req.HRST.Round,
+			Step:                           req.HRST.Step,
+			Timestamp:                      time.Unix(0, req.HRST.Timestamp),
 		})
 		if err != nil {
 			return nil, err

@@ -5,6 +5,12 @@ on:
   push:
     branches:
       - main
+    paths:
+      - '**.go'
+      - '**.mod'
+      - '**.sum'
+      - '**.proto'
+      - 'Makefile'
 
 jobs:
   test:
@@ -27,6 +33,10 @@ jobs:
           docker stop $(docker ps -a -q) || true
           docker rm -f $(docker ps -a -q) || true
           docker network prune -f || true
+
+      # make sure proto files are up to date
+      - name: generate fresh signer proto .go files
+        run: make signer-proto
 
       # run tests
       - name: run horcrux tests

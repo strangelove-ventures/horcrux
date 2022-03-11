@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/url"
 	"os"
 	"path"
@@ -78,25 +79,38 @@ func initCmd() *cobra.Command {
 			if cs {
 				p, _ := cmdFlags.GetString("peers")
 				threshold, _ := cmdFlags.GetInt("threshold")
-				peers, err := peersFromFlag(p)
-				listen, _ := cmdFlags.GetString("listen")
-				raft, _ := cmdFlags.GetString("raft")
 				timeout, _ := cmdFlags.GetString("timeout")
-
+				peers, err := peersFromFlag(p)
 				if err != nil {
 					return err
 				}
+
+				listen, _ := cmdFlags.GetString("listen")
+				if listen == "" {
+					return errors.New("must input at least one node")
+				}
+				url, err := url.Parse(listen)
+				if err != nil {
+					return fmt.Errorf("error parsing listen address: %s, %v", listen, err)
+				}
+				host, _, err := net.SplitHostPort(url.Host)
+				if err != nil {
+					return err
+				}
+				if host == "0.0.0.0" {
+					return errors.New("host cannot be 0.0.0.0, must be reachable from other peers")
+				}
+
 				cfg = &Config{
 					HomeDir:        home,
 					PrivValKeyFile: keyFile,
 					ChainID:        cid,
 					CosignerConfig: &CosignerConfig{
-						Threshold:  threshold,
-						Shares:     len(peers) + 1,
-						P2PListen:  listen,
-						RaftListen: raft,
-						Peers:      peers,
-						Timeout:    timeout,
+						Threshold: threshold,
+						Shares:    len(peers) + 1,
+						P2PListen: listen,
+						Peers:     peers,
+						Timeout:   timeout,
 					},
 					ChainNodes: cn,
 				}
@@ -144,10 +158,9 @@ func initCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolP("cosigner", "c", false, "set to initialize a cosigner node, requires --peers and --threshold")
 	cmd.Flags().StringP("peers", "p", "", "cosigner peer addresses in format tcp://{addr}:{port}|{share-id} \n"+
-		"(i.e. \"tcp://node-1:2222|2223|2,tcp://node-2:2222|2223|3\")")
+		"(i.e. \"tcp://node-1:2222|2,tcp://node-2:2222|3\")")
 	cmd.Flags().IntP("threshold", "t", 0, "indicate number of signatures required for threshold signature")
-	cmd.Flags().StringP("listen", "l", "tcp://0.0.0.0:2222", "listen address of the signer")
-	cmd.Flags().StringP("raft", "r", "", "raft listen address of the signer")
+	cmd.Flags().StringP("listen", "l", "", "listen address of the signer")
 	cmd.Flags().StringP("keyfile", "k", "",
 		"priv val key file path (full key for single signer, or key share for cosigner)")
 	cmd.Flags().String("timeout", "1500ms", "configure cosigner rpc server timeout value, \n"+
@@ -190,9 +203,6 @@ func validateCosignerConfig(cfg *Config) error {
 	}
 	if _, err := url.Parse(cfg.CosignerConfig.P2PListen); err != nil {
 		return fmt.Errorf("failed to parse p2p listen address")
-	}
-	if _, err := url.Parse(fmt.Sprintf("tcp://%s", cfg.CosignerConfig.RaftListen)); err != nil {
-		return fmt.Errorf("failed to parse raft listen address")
 	}
 	if err := validateCosignerPeers(cfg.CosignerConfig.Peers, cfg.CosignerConfig.Shares); err != nil {
 		return err
@@ -540,25 +550,23 @@ func (c *Config) MustMarshalYaml() []byte {
 }
 
 type CosignerConfig struct {
-	Threshold  int            `json:"threshold"   yaml:"threshold"`
-	Shares     int            `json:"shares" yaml:"shares"`
-	P2PListen  string         `json:"p2p-listen"  yaml:"p2p-listen"`
-	RaftListen string         `json:"raft-listen"  yaml:"raft-listen"`
-	Peers      []CosignerPeer `json:"peers"       yaml:"peers"`
-	Timeout    string         `json:"rpc-timeout" yaml:"rpc-timeout"`
+	Threshold int            `json:"threshold"   yaml:"threshold"`
+	Shares    int            `json:"shares" yaml:"shares"`
+	P2PListen string         `json:"p2p-listen"  yaml:"p2p-listen"`
+	Peers     []CosignerPeer `json:"peers"       yaml:"peers"`
+	Timeout   string         `json:"rpc-timeout" yaml:"rpc-timeout"`
 }
 
 func (c *Config) CosignerPeers() (out []signer.CosignerConfig) {
 	for _, p := range c.CosignerConfig.Peers {
-		out = append(out, signer.CosignerConfig{ID: p.ShareID, Address: p.P2PAddr, RaftAddress: p.RaftAddr})
+		out = append(out, signer.CosignerConfig{ID: p.ShareID, Address: p.P2PAddr})
 	}
 	return
 }
 
 type CosignerPeer struct {
-	ShareID  int    `json:"share-id" yaml:"share-id"`
-	P2PAddr  string `json:"p2p-addr" yaml:"p2p-addr"`
-	RaftAddr string `json:"raft-addr" yaml:"raft-addr"`
+	ShareID int    `json:"share-id" yaml:"share-id"`
+	P2PAddr string `json:"p2p-addr" yaml:"p2p-addr"`
 }
 
 func validateCosignerPeers(peers []CosignerPeer, shares int) error {
@@ -590,7 +598,7 @@ func duplicatePeers(peers []CosignerPeer) (duplicates []CosignerPeer) {
 		if _, found := encountered[peer.ShareID]; !found {
 			encountered[peer.ShareID] = peer.P2PAddr
 		} else {
-			duplicates = append(duplicates, CosignerPeer{peer.ShareID, peer.P2PAddr, peer.RaftAddr})
+			duplicates = append(duplicates, CosignerPeer{peer.ShareID, peer.P2PAddr})
 		}
 	}
 	return
@@ -599,20 +607,14 @@ func duplicatePeers(peers []CosignerPeer) (duplicates []CosignerPeer) {
 func peersFromFlag(peers string) (out []CosignerPeer, err error) {
 	for _, p := range strings.Split(peers, ",") {
 		ps := strings.Split(p, "|")
-		if len(ps) != 3 {
+		if len(ps) != 2 {
 			return nil, fmt.Errorf("invalid peer string %s", p)
 		}
-		shareid, err := strconv.ParseInt(ps[2], 10, 64)
+		shareid, err := strconv.ParseInt(ps[1], 10, 64)
 		if err != nil {
 			return nil, err
 		}
-		address, err := url.Parse(ps[0])
-		if err != nil {
-			return nil, err
-		}
-		addressSplit := strings.Split(address.Host, ":")
-		raftAddress := fmt.Sprintf("%s:%s", addressSplit[0], ps[1])
-		out = append(out, CosignerPeer{ShareID: int(shareid), P2PAddr: ps[0], RaftAddr: raftAddress})
+		out = append(out, CosignerPeer{ShareID: int(shareid), P2PAddr: ps[0]})
 	}
 	return
 }

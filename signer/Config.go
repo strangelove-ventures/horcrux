@@ -10,9 +10,8 @@ type NodeConfig struct {
 }
 
 type CosignerConfig struct {
-	ID          int
-	Address     string
-	RaftAddress string
+	ID      int
+	Address string
 }
 
 type Config struct {
@@ -22,7 +21,6 @@ type Config struct {
 	ChainID           string
 	CosignerThreshold int
 	ListenAddress     string
-	RaftListenAddress string
 	Nodes             []NodeConfig
 	Cosigners         []CosignerConfig
 }

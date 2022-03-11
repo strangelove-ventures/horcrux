@@ -36,4 +36,21 @@ clean:
 build-horcrux-docker:
 	docker build -t strangelove-ventures/horcrux:$(VERSION) -f ./docker/horcrux/Dockerfile .
 
+mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
+mkfile_dir := $(dir $(mkfile_path))
+
+signer-proto:
+	docker run \
+	  --rm \
+	  -u $(shell id -u ${USER}):$(shell id -g ${USER}) \
+		--mount type=bind,source=$(mkfile_dir)/signer/proto,target=/horcrux/signer/proto \
+		--entrypoint protoc \
+		namely/protoc-all \
+		--go_out=/horcrux \
+		--go_opt=paths=source_relative \
+		--go-grpc_out=/horcrux \
+		--go-grpc_opt=paths=source_relative \
+		--proto_path /horcrux \
+		$(shell find $(mkfile_dir) -name *.proto -printf "%P\n")
+
 .PHONY: all lint test race msan tools clean build

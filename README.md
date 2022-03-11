@@ -20,6 +20,9 @@ Multi-party computation using threshold signatures is able to provide high-avail
 
 For more on how the Horcrux MPC signing flow works, see [`docs/signing.md`](/docs/signing.md)
 
+![Screenshot from 2022-03-07 18-09-49](https://user-images.githubusercontent.com/6722152/157145772-8557b4b5-a0cc-4073-8834-86afda1900fc.png)
+
+
 ## Raft
 
 Horcrux v2.x introduces [Raft](https://raft.github.io/) For leader election and high watermark consensus.

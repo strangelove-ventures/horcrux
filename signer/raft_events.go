@@ -3,8 +3,11 @@ package signer
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
-	"strings"
+	"time"
+
+	proto "github.com/strangelove-ventures/horcrux/signer/proto"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 const (
@@ -33,39 +36,41 @@ func (f *fsm) handleLSSEvent(value string) {
 	_ = f.cosigner.SaveLastSignedState(*lss)
 }
 
-func (s *RaftStore) getLeaderRPCAddress() (string, error) {
-	leader := string(s.GetLeader())
+func (s *RaftStore) getLeaderGRPCClient() (proto.CosignerGRPCClient, *grpc.ClientConn, error) {
+	var leader string
+	for i := 0; i < 30; i++ {
+		leader = string(s.GetLeader())
+		if leader != "" {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 	if leader == "" {
-		return "", errors.New("no current raft leader")
+		return nil, nil, errors.New("timed out waiting for leader election to complete")
 	}
-	// If the same RPC port is used for all peers, we can just use the leader address on that port
-	if s.commonRPCPort != "" {
-		leaderSplit := strings.Split(leader, ":")
-		if len(leaderSplit) == 2 {
-			return fmt.Sprintf("tcp://%s:%s", leaderSplit[0], s.commonRPCPort), nil
-		}
+	conn, err := grpc.Dial(leader, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, nil, err
 	}
-	for _, peer := range s.Peers {
-		if peer.GetRaftAddress() == leader {
-			return peer.GetAddress(), nil
-		}
-		tcpAddress, err := GetTCPAddressForRaftAddress(peer.GetRaftAddress())
-		if err != nil {
-			continue
-		}
-		if fmt.Sprint(tcpAddress) == leader {
-			return peer.GetAddress(), nil
-		}
-	}
-
-	return "", fmt.Errorf("unable to find leader cosigner from address %s", leader)
+	return proto.NewCosignerGRPCClient(conn), conn, nil
 }
 
-func (s *RaftStore) LeaderSignBlock(req CosignerSignBlockRequest) (res *CosignerSignBlockResponse, err error) {
-	leaderCosigner, err := s.getLeaderRPCAddress()
+func (s *RaftStore) LeaderSignBlock(req CosignerSignBlockRequest) (*CosignerSignBlockResponse, error) {
+	client, conn, err := s.getLeaderGRPCClient()
 	if err != nil {
 		return nil, err
 	}
-
-	return res, CallRPC(leaderCosigner, "SignBlock", req, &res)
+	defer conn.Close()
+	context, cancelFunc := getContext()
+	defer cancelFunc()
+	res, err := client.SignBlock(context, &proto.CosignerGRPCSignBlockRequest{
+		ChainID: req.ChainID,
+		Block:   req.Block.toProto(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &CosignerSignBlockResponse{
+		Signature: res.GetSignature(),
+	}, nil
 }

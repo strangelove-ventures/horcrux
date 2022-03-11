@@ -68,15 +68,15 @@ After that is done, initialize the configuration for each node using the `horcru
 ```bash
 # Run this command on the signer-1 VM
 # signer-1 connects to sentry-1
-$ horcrux config init {my_chain_id} "tcp://10.168.0.1:1234" -c -p "tcp://10.168.1.2:2222|2223|2,tcp://10.168.1.3:2222|2223|3" -r "10.168.1.1:2223" -t 2 --timeout 1500ms
+$ horcrux config init {my_chain_id} "tcp://10.168.0.1:1234" -c -p "tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3" -l "tcp://10.168.1.1:2222" -t 2 --timeout 1500ms
 
 # Run this command on the signer-2 VM
 # signer-2 connects to sentry-2
-$ horcrux config init {my_chain_id} "tcp://10.168.0.2:1234" -c -p "tcp://10.168.1.1:2222|2223|1,tcp://10.168.1.3:2222|2223|3" -r "10.168.1.2:2223" -t 2 --timeout 1500ms
+$ horcrux config init {my_chain_id} "tcp://10.168.0.2:1234" -c -p "tcp://10.168.1.1:2222|1,tcp://10.168.1.3:2222|3" -l "tcp://10.168.1.2:2222" -t 2 --timeout 1500ms
 
 # Run this command on the signer-3 VM
 # signer-3 connects to sentry-3
-$ horcrux config init {my_chain_id} "tcp://10.168.0.3:1234" -c -p "tcp://10.168.1.1:2222|2223|1,tcp://10.168.1.2:2222|2223|2" -r "10.168.1.3:2223" -t 2 --timeout 1500ms
+$ horcrux config init {my_chain_id} "tcp://10.168.0.3:1234" -c -p "tcp://10.168.1.1:2222|1,tcp://10.168.1.2:2222|2" -l "tcp://10.168.1.3:2222" -t 2 --timeout 1500ms
 ```
 
 > **NOTE:** Note the node address (e.g. "tcp://10.168.0.1:1234") of each command. In this example, each horcrux node is communicating with a corresponding sentry. It is also possible to include a comma separated list of node addresses (e.g. "tcp://chain-node-1:1234,tcp://chain-node-2:1234", etc), allowing all horcrux nodes to communicate with all sentries.
@@ -85,7 +85,7 @@ $ horcrux config init {my_chain_id} "tcp://10.168.0.3:1234" -c -p "tcp://10.168.
 
 > **NOTE:** The `-p` or `--peers` flag lets you set the addresses of the other signer nodes in the config. Two ports are required, the P2P port for RCP traffic, and the Raft port for key-value sharing. Note that each signer also has an index. This index corresponds to the shard of the private key it will sign with. Keeping the node names and the indexes the same helps avoid errors and allows you to work more quickly
 
-> **NOTE:** The `-r` or `--raft` flag lets you set the listen address for the Raft protocol. The DNS/IP used for this must be discoverable by the other peers.
+> **NOTE:** The `-l` or `--listen` flag lets you set the listen address for the cosigner, which is used for communication between cosigners, Raft and GRPC. The DNS/IP used for this must be reachable by the other peers, i.e. do not use 0.0.0.0 for the hostname.
 
 > **NOTE:** The `-k` or `--keyfile` flag lets you set the file path for the private key share file if you would like to use a different path than `~/.horcrux/share.json`.
 

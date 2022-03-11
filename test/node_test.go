@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"reflect"
 	"runtime"
 	"strings"
 	"sync"
@@ -39,8 +40,9 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var (
-	valKey = "validator"
+const (
+	valKey    = "validator"
+	blockTime = 3 // seconds
 )
 
 func getGoModuleVersion(pkg string) string {
@@ -375,6 +377,28 @@ func (tn *TestNode) getValSigningInfo() *slashingtypes.QuerySigningInfoResponse 
 	return slashInfo
 }
 
+func (tn *TestNode) GetMostRecentConsecutiveSignedBlocks(max int64) (count int64, latestHeight int64) {
+	status, err := tn.Client.Status(context.Background())
+	require.NoError(tn.t, err)
+
+	latestHeight = status.SyncInfo.LatestBlockHeight
+
+	pv, err := tn.GetPrivVal()
+	require.NoError(tn.t, err)
+
+	for i := latestHeight; i > latestHeight-max && i > 0; i-- {
+		block, err := tn.Client.Block(context.Background(), &i)
+		require.NoError(tn.t, err)
+		for _, voter := range block.Block.LastCommit.Signatures {
+			if reflect.DeepEqual(voter.ValidatorAddress, pv.Address) {
+				count++
+				break
+			}
+		}
+	}
+	return
+}
+
 func (tn *TestNode) getMissingBlocks() int64 {
 	return tn.getValSigningInfo().ValSigningInfo.MissedBlocksCounter
 }
@@ -399,87 +423,36 @@ func (tn *TestNode) EnsureNotSlashed() {
 	}
 }
 
-// Wait until we have signed 3 blocks in a row
-func (tn *TestNode) WaitUntilStopMissingBlocks() {
-	initialMissed := tn.getMissingBlocks()
-	tn.t.Log("{WaitUntilStopMissingBlocks} Initial Missed blocks:", initialMissed)
-	stat, err := tn.Client.Status(context.Background())
-	require.NoError(tn.t, err)
-	// timeout after ~1 minute
-	lastBlockChecked := stat.SyncInfo.LatestBlockHeight
-	for i := 0; i < 120; i++ {
-		time.Sleep(1 * time.Second)
-		missedBlocks := tn.getMissingBlocks()
-		deltaMissed := missedBlocks - initialMissed
-		newStat, err := tn.Client.Status(context.Background())
-		require.NoError(tn.t, err)
-		checkingBlock := newStat.SyncInfo.LatestBlockHeight
-		tn.t.Log("{WaitUntilStopMissingBlocks} Missed blocks:", missedBlocks, "block", checkingBlock)
-		if deltaMissed <= 0 {
-			deltaBlocks := checkingBlock - lastBlockChecked
-			if deltaBlocks >= 3 {
-				tn.t.Log("Time (sec) to recover and start signing consecutive blocks:", i+1)
-				return // done waiting for consecutive signed blocks
-			}
-		} else {
-			// reset initial missed and lastBlockChecked
-			initialMissed = missedBlocks
-			lastBlockChecked = checkingBlock
-		}
-	}
-	require.NoError(tn.t, errors.New("timed out waiting for cluster to recover signing blocks"))
-}
-
 // Wait until we have signed n blocks in a row
 func (tn *TestNode) WaitForConsecutiveBlocks(blocks int64) {
 	initialMissed := tn.getMissingBlocks()
 	tn.t.Log("{WaitForConsecutiveBlocks} Initial Missed blocks:", initialMissed)
 	stat, err := tn.Client.Status(context.Background())
 	require.NoError(tn.t, err)
-	// timeout after ~1 minute
-	lastBlockChecked := stat.SyncInfo.LatestBlockHeight
-	for i := 0; i < 60; i++ {
+
+	startingBlock := stat.SyncInfo.LatestBlockHeight
+	// timeout after ~1 minute plus block time
+	timeoutSeconds := blocks*int64(blockTime) + int64(60)
+	for i := int64(0); i < timeoutSeconds; i++ {
 		time.Sleep(1 * time.Second)
-		missedBlocks := tn.getMissingBlocks()
-		deltaMissed := missedBlocks - initialMissed
-		newStat, err := tn.Client.Status(context.Background())
-		require.NoError(tn.t, err)
-		checkingBlock := newStat.SyncInfo.LatestBlockHeight
-		tn.t.Log("{WaitForConsecutiveBlocks} Missed blocks:", missedBlocks, "block", checkingBlock)
-		if deltaMissed <= 0 {
-			deltaBlocks := checkingBlock - lastBlockChecked
-			if deltaBlocks >= blocks {
-				tn.t.Log(fmt.Sprintf("Time (sec) to sign %d consecutive blocks:", blocks), i+1)
-				return // done waiting for consecutive signed blocks
-			}
-		} else {
-			require.NoError(tn.t, errors.New("missed blocks while waiting for consecutive blocks"))
+
+		recentSignedBlocksCount, checkingBlock := tn.GetMostRecentConsecutiveSignedBlocks(blocks)
+		deltaMissed := blocks - recentSignedBlocksCount
+		deltaBlocks := checkingBlock - startingBlock
+
+		tn.t.Log("{WaitForConsecutiveBlocks} Missed blocks:", deltaMissed, "block", checkingBlock)
+		if deltaMissed == 0 && deltaBlocks >= blocks {
+			tn.t.Log(fmt.Sprintf("Time (sec) to sign %d consecutive blocks:", blocks), i+1)
+			return // done waiting for consecutive signed blocks
 		}
 	}
 	require.NoError(tn.t, errors.New("timed out waiting for cluster to recover signing blocks"))
 }
 
-func (tn *TestNode) EnsureNoMissedBlocks() {
-	initialMissed := tn.getMissingBlocks()
-	tn.t.Log("{EnsureNoMissedBlocks} Initial Missed blocks:", initialMissed)
-	missedBlocks := int64(0)
-	for i := 0; i < 50; i++ {
-		time.Sleep(1 * time.Second)
-		slashInfo := tn.getValSigningInfo()
-		missedBlocks = slashInfo.ValSigningInfo.MissedBlocksCounter
-		if i%2 == 0 {
-			stat, err := tn.Client.Status(context.Background())
-			require.NoError(tn.t, err)
-			require.LessOrEqual(tn.t, missedBlocks-initialMissed, int64(0))
-			tn.t.Log("{EnsureNoMissedBlocks} Missed blocks:", missedBlocks, "block", stat.SyncInfo.LatestBlockHeight)
-		}
-	}
-}
-
 func stdconfigchanges(cfg *tmconfig.Config, peers string) {
 	// turn down blocktimes to make the chain faster
-	cfg.Consensus.TimeoutCommit = 3 * time.Second
-	cfg.Consensus.TimeoutPropose = 3 * time.Second
+	cfg.Consensus.TimeoutCommit = blockTime * time.Second
+	cfg.Consensus.TimeoutPropose = blockTime * time.Second
 
 	// Open up rpc address
 	cfg.RPC.ListenAddress = "tcp://0.0.0.0:26657"
