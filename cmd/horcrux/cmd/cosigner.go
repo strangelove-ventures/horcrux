@@ -31,13 +31,13 @@ var cosignerCmd = &cobra.Command{
 
 type AddressCmdOutput struct {
 	HexAddress     string
-	ConsValAddress string
+	ValConsAddress string
 }
 
 func AddressCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "address",
-		Short: "Get public key hex address and consval address",
+		Short: "Get public key hex address and valcons address",
 		Args:  cobra.RangeArgs(0, 1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			err = validateCosignerConfig(config)
@@ -64,11 +64,11 @@ func AddressCmd() *cobra.Command {
 			}
 
 			if len(args) == 1 {
-				bech32ConsValAddress, err := bech32.ConvertAndEncode(args[0], pubKey)
+				bech32ValConsAddress, err := bech32.ConvertAndEncode(args[0], pubKey)
 				if err != nil {
 					return err
 				}
-				output.ConsValAddress = bech32ConsValAddress
+				output.ValConsAddress = bech32ValConsAddress
 			}
 
 			jsonOut, err := json.Marshal(output)
