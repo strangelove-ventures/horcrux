@@ -200,3 +200,9 @@ Common failure modes:
 ### 7. CONGRATS!
 
 You now can sleep much better at night because you are much less likely to have a down validator wake you up in the middle of the night. You have also completed a stressful migration on a production system. Go run around outside screaming, pet your dog, eat a nice meal, hug your kids/significant other, etc... and enjoy the rest of your day!
+
+### 8. Administration Commands
+
+`horcrux elect` - Elect a new cluster leader. Pass an optional argument with the intended leader ID to elect that cosigner as the new leader, e.g. `horcrux elect 3` to elect cosigner with `ID: 3` as leader
+
+`horcrux cosigner address` - Get the public key address as both hex and optionally the validator consensus bech32 address. To retrieve the valcons bech32 address, pass an optional argument with the chain's bech32 valcons prefix, e.g. `horcrux cosigner address cosmosvalcons`
