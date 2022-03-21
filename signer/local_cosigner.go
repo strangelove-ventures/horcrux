@@ -61,14 +61,15 @@ type CosignerGetEphemeralSecretPartRequest struct {
 }
 
 type LocalCosignerConfig struct {
-	CosignerKey CosignerKey
-	SignState   *SignState
-	RsaKey      rsa.PrivateKey
-	Peers       []CosignerPeer
-	Address     string
-	RaftAddress string
-	Total       uint8
-	Threshold   uint8
+	CosignerKey               CosignerKey
+	SignState                 *SignState
+	RsaKey                    rsa.PrivateKey
+	Peers                     []CosignerPeer
+	Address                   string
+	RaftAddress               string
+	Total                     uint8
+	Threshold                 uint8
+	ThresholdEd25519Signature ThresholdEd25519Signature
 }
 
 type PeerMetadata struct {
@@ -85,8 +86,8 @@ type HrsMetadata struct {
 
 // LocalCosigner responds to sign requests using their share key
 // The cosigner maintains a watermark to avoid double-signing
-//
-// LocalCosigner signing is thread saafe
+// TODO: Clarify what you mean with cosinger here.
+// LocalCosigner signing is thread safe
 type LocalCosigner struct {
 	pubKeyBytes []byte
 	key         CosignerKey
@@ -106,6 +107,8 @@ type LocalCosigner struct {
 	peers   map[int]CosignerPeer
 
 	address string
+
+	thresholdEd25519SignatureImplementation ThresholdEd25519Signature
 }
 
 func (cosigner *LocalCosigner) SaveLastSignedState(signState SignStateConsensus) error {
@@ -114,14 +117,15 @@ func (cosigner *LocalCosigner) SaveLastSignedState(signState SignStateConsensus)
 
 func NewLocalCosigner(cfg LocalCosignerConfig) *LocalCosigner {
 	cosigner := &LocalCosigner{
-		key:           cfg.CosignerKey,
-		lastSignState: cfg.SignState,
-		rsaKey:        cfg.RsaKey,
-		hrsMeta:       make(map[HRSTKey]HrsMetadata),
-		peers:         make(map[int]CosignerPeer),
-		total:         cfg.Total,
-		threshold:     cfg.Threshold,
-		address:       cfg.Address,
+		key:                                     cfg.CosignerKey,
+		lastSignState:                           cfg.SignState,
+		rsaKey:                                  cfg.RsaKey,
+		hrsMeta:                                 make(map[HRSTKey]HrsMetadata),
+		peers:                                   make(map[int]CosignerPeer),
+		total:                                   cfg.Total,
+		threshold:                               cfg.Threshold,
+		address:                                 cfg.Address,
+		thresholdEd25519SignatureImplementation: cfg.ThresholdEd25519Signature,
 	}
 
 	for _, peer := range cfg.Peers {
@@ -146,15 +150,67 @@ func (cosigner *LocalCosigner) GetID() int {
 	return cosigner.key.ID
 }
 
-// GetAddress returns the RPC URL of the cosigner
+// GetAddress returns the GRPC URL of the cosigner
 // Implements Cosigner interface
 func (cosigner *LocalCosigner) GetAddress() string {
 	return cosigner.address
 }
 
-// Sign the sign request using the cosigner's share
-// Return the signed bytes or an error
+// GetEphemeralSecretParts
 // Implements Cosigner interface
+func (cosigner *LocalCosigner) GetEphemeralSecretParts(
+	hrst HRSTKey) (*CosignerEphemeralSecretPartsResponse, error) {
+	res := &CosignerEphemeralSecretPartsResponse{
+		EncryptedSecrets: make([]CosignerEphemeralSecretPart, 0, len(cosigner.peers)-1),
+	}
+	for _, peer := range cosigner.peers {
+		if peer.ID == cosigner.GetID() {
+			continue
+		}
+		secretPart, err := cosigner.getEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
+			ID:        peer.ID,
+			Height:    hrst.Height,
+			Round:     hrst.Round,
+			Step:      hrst.Step,
+			Timestamp: time.Unix(0, hrst.Timestamp),
+		})
+
+		if err != nil {
+			return nil, err
+		}
+
+		res.EncryptedSecrets = append(res.EncryptedSecrets, secretPart)
+	}
+	return res, nil
+}
+
+// SetEphemeralSecretPartsAndSign
+// Implements Cosigner interface
+func (cosigner *LocalCosigner) SetEphemeralSecretPartsAndSign(
+	req CosignerSetEphemeralSecretPartsAndSignRequest) (*CosignerSignResponse, error) {
+	for _, secretPart := range req.EncryptedSecrets {
+		err := cosigner.setEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
+			SourceID:                       secretPart.SourceID,
+			SourceEphemeralSecretPublicKey: secretPart.SourceEphemeralSecretPublicKey,
+			EncryptedSharePart:             secretPart.EncryptedSharePart,
+			SourceSig:                      secretPart.SourceSig,
+			Height:                         req.HRST.Height,
+			Round:                          req.HRST.Round,
+			Step:                           req.HRST.Step,
+			Timestamp:                      time.Unix(0, req.HRST.Timestamp),
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	res, err := cosigner.sign(CosignerSignRequest{req.SignBytes})
+	return &res, err
+}
+
+// sign the sign request using the cosigner's share
+// Return the signed bytes or an error
+// Implements Cosigner interface # Comment is this really true? Doesnt it implement ThresholdEd25519Signature
 func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignResponse, error) {
 	cosigner.lastSignStateMutex.Lock()
 	defer cosigner.lastSignStateMutex.Unlock()
@@ -250,6 +306,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	return res, nil
 }
 
+// Implements ThresholdEd25519Signature interface
 func (cosigner *LocalCosigner) dealShares(req CosignerGetEphemeralSecretPartRequest) (HrsMetadata, error) {
 	hrsKey := HRSTKey{
 		Height:    req.Height,
@@ -284,34 +341,9 @@ func (cosigner *LocalCosigner) dealShares(req CosignerGetEphemeralSecretPartRequ
 
 }
 
-func (cosigner *LocalCosigner) GetEphemeralSecretParts(
-	hrst HRSTKey) (*CosignerEphemeralSecretPartsResponse, error) {
-	res := &CosignerEphemeralSecretPartsResponse{
-		EncryptedSecrets: make([]CosignerEphemeralSecretPart, 0, len(cosigner.peers)-1),
-	}
-	for _, peer := range cosigner.peers {
-		if peer.ID == cosigner.GetID() {
-			continue
-		}
-		secretPart, err := cosigner.getEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-			ID:        peer.ID,
-			Height:    hrst.Height,
-			Round:     hrst.Round,
-			Step:      hrst.Step,
-			Timestamp: time.Unix(0, hrst.Timestamp),
-		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		res.EncryptedSecrets = append(res.EncryptedSecrets, secretPart)
-	}
-	return res, nil
-}
-
 // Get the ephemeral secret part for an ephemeral share
 // The ephemeral secret part is encrypted for the receiver
+// Implements ThresholdEd25519Signature interface
 func (cosigner *LocalCosigner) getEphemeralSecretPart(
 	req CosignerGetEphemeralSecretPartRequest) (CosignerEphemeralSecretPart, error) {
 	res := CosignerEphemeralSecretPart{}
@@ -393,6 +425,7 @@ func (cosigner *LocalCosigner) getEphemeralSecretPart(
 }
 
 // Store an ephemeral secret share part provided by another cosigner
+// Implements ThresholdEd25519Signature interface
 func (cosigner *LocalCosigner) setEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest) error {
 
 	// Verify the source signature
@@ -463,26 +496,4 @@ func (cosigner *LocalCosigner) setEphemeralSecretPart(req CosignerSetEphemeralSe
 	meta.Peers[req.SourceID-1].Share = sharePart
 	meta.Peers[req.SourceID-1].EphemeralSecretPublicKey = req.SourceEphemeralSecretPublicKey
 	return nil
-}
-
-func (cosigner *LocalCosigner) SetEphemeralSecretPartsAndSign(
-	req CosignerSetEphemeralSecretPartsAndSignRequest) (*CosignerSignResponse, error) {
-	for _, secretPart := range req.EncryptedSecrets {
-		err := cosigner.setEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
-			SourceID:                       secretPart.SourceID,
-			SourceEphemeralSecretPublicKey: secretPart.SourceEphemeralSecretPublicKey,
-			EncryptedSharePart:             secretPart.EncryptedSharePart,
-			SourceSig:                      secretPart.SourceSig,
-			Height:                         req.HRST.Height,
-			Round:                          req.HRST.Round,
-			Step:                           req.HRST.Step,
-			Timestamp:                      time.Unix(0, req.HRST.Timestamp),
-		})
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	res, err := cosigner.sign(CosignerSignRequest{req.SignBytes})
-	return &res, err
 }
