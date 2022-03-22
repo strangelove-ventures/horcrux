@@ -1,12 +1,16 @@
 package cmd
 
 import (
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"path"
+	"strings"
 	"time"
 
+	"github.com/cosmos/cosmos-sdk/types/bech32"
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/signer"
 	tmlog "github.com/tendermint/tendermint/libs/log"
@@ -16,12 +20,69 @@ import (
 
 func init() {
 	cosignerCmd.AddCommand(StartCosignerCmd())
+	cosignerCmd.AddCommand(AddressCmd())
 	rootCmd.AddCommand(cosignerCmd)
 }
 
 var cosignerCmd = &cobra.Command{
 	Use:   "cosigner",
 	Short: "Threshold mpc signer for TM based nodes",
+}
+
+type AddressCmdOutput struct {
+	HexAddress     string
+	ValConsAddress string
+}
+
+func AddressCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "address",
+		Short: "Get public key hex address and valcons address",
+		Args:  cobra.RangeArgs(0, 1),
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
+			err = validateCosignerConfig(config)
+			if err != nil {
+				return
+			}
+
+			var privValKeyFile string
+			if config.PrivValKeyFile == "" {
+				privValKeyFile = path.Join(config.HomeDir, "share.json")
+			} else {
+				privValKeyFile = config.PrivValKeyFile
+			}
+
+			key, err := signer.LoadCosignerKey(privValKeyFile)
+			if err != nil {
+				return fmt.Errorf("error reading cosigner key: %s", err)
+			}
+
+			pubKey := key.PubKey.Address()
+
+			output := AddressCmdOutput{
+				HexAddress: strings.ToUpper(hex.EncodeToString(pubKey)),
+			}
+
+			if len(args) == 1 {
+				bech32ValConsAddress, err := bech32.ConvertAndEncode(args[0], pubKey)
+				if err != nil {
+					return err
+				}
+				output.ValConsAddress = bech32ValConsAddress
+			}
+
+			jsonOut, err := json.Marshal(output)
+			if err != nil {
+				return err
+			}
+
+			fmt.Println(string(jsonOut))
+
+			return nil
+		},
+	}
+
+	return cmd
 }
 
 func StartCosignerCmd() *cobra.Command {
