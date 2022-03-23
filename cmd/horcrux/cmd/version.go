@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"runtime"
+	dbg "runtime/debug"
 
 	"github.com/spf13/cobra"
 )
@@ -48,12 +49,20 @@ type Info struct {
 }
 
 func NewInfo() Info {
+	bi, _ := dbg.ReadBuildInfo()
+
+	dependencyVersions := map[string]string{}
+
+	for _, dep := range bi.Deps {
+		dependencyVersions[dep.Path] = dep.Version
+	}
+
 	return Info{
 		Version:           Version,
 		GitCommit:         Commit,
 		GoVersion:         fmt.Sprintf("%s %s/%s", runtime.Version(), runtime.GOOS, runtime.GOARCH),
-		CosmosSdkVersion:  SDKVersion,
-		TendermintVersion: TMVersion,
+		CosmosSdkVersion:  dependencyVersions["github.com/cosmos/cosmos-sdk"],
+		TendermintVersion: dependencyVersions["github.com/tendermint/tendermint"],
 	}
 }
 
