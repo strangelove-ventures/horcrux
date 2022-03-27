@@ -3,6 +3,7 @@ package signer
 import (
 	"encoding/json"
 	"errors"
+	"github.com/strangelove-ventures/horcrux/signer/localthreshold"
 	"time"
 
 	proto "github.com/strangelove-ventures/horcrux/signer/proto"
@@ -26,7 +27,7 @@ func (f *fsm) shouldRetain(key string) bool {
 }
 
 func (f *fsm) handleLSSEvent(value string) {
-	lss := &SignStateConsensus{}
+	lss := &localthreshold.SignStateConsensus{}
 	err := json.Unmarshal([]byte(value), lss)
 	if err != nil {
 		f.logger.Error("LSS Unmarshal Error", err.Error())
@@ -55,7 +56,7 @@ func (s *RaftStore) getLeaderGRPCClient() (proto.CosignerGRPCClient, *grpc.Clien
 	return proto.NewCosignerGRPCClient(conn), conn, nil
 }
 
-func (s *RaftStore) LeaderSignBlock(req CosignerSignBlockRequest) (*CosignerSignBlockResponse, error) {
+func (s *RaftStore) LeaderSignBlock(req localthreshold.CosignerSignBlockRequest) (*localthreshold.CosignerSignBlockResponse, error) {
 	client, conn, err := s.getLeaderGRPCClient()
 	if err != nil {
 		return nil, err
@@ -70,7 +71,7 @@ func (s *RaftStore) LeaderSignBlock(req CosignerSignBlockRequest) (*CosignerSign
 	if err != nil {
 		return nil, err
 	}
-	return &CosignerSignBlockResponse{
+	return &localthreshold.CosignerSignBlockResponse{
 		Signature: res.GetSignature(),
 	}, nil
 }

@@ -117,7 +117,7 @@ func NewLocalCosigner(cfg LocalCosignerConfig) *LocalCosigner {
 		total:                                   cfg.Total,
 		threshold:                               cfg.Threshold,
 		address:                                 cfg.Address,
-		thresholdEd25519SignatureImplementation: localThresholdSignatureImplementation //cfg.ThresholdEd25519Signature,
+		thresholdEd25519SignatureImplementation: cfg.ThresholdEd25519Signature, //localThresholdSignatureImplementation
 	}
 
 	for _, peer := range cfg.Peers {

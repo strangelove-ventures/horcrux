@@ -3,6 +3,7 @@ package signer
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"github.com/strangelove-ventures/horcrux/signer/localthreshold"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -24,28 +25,28 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 	rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(t, err)
 
-	key := CosignerKey{
+	key := localthreshold.CosignerKey{
 		PubKey:   dummyPub,
 		ShareKey: []byte{},
 		ID:       1,
 	}
-	signState := SignState{
+	signState := localthreshold.SignState{
 		Height: 0,
 		Round:  0,
 		Step:   0,
 	}
 
-	config := LocalCosignerConfig{
+	config := localthreshold.LocalCosignerConfig{
 		CosignerKey: key,
 		SignState:   &signState,
 		RsaKey:      *rsaKey,
-		Peers: []CosignerPeer{{
+		Peers: []localthreshold.CosignerPeer{{
 			ID:        1,
 			PublicKey: rsaKey.PublicKey,
 		}},
 	}
 
-	cosigner := NewLocalCosigner(config)
+	cosigner := localthreshold.NewLocalCosigner(config)
 
 	s := &RaftStore{
 		NodeID:      "1",
@@ -55,7 +56,7 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 		m:           make(map[string]string),
 		logger:      nil,
 		cosigner:    cosigner,
-		Peers:       []Cosigner{},
+		Peers:       []localthreshold.Cosigner{},
 	}
 
 	if s == nil {

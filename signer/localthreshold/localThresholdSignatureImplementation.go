@@ -14,6 +14,10 @@ import (
 	tsed25519 "gitlab.com/polychainlabs/threshold-ed25519/pkg"
 )
 
+type localThresholdSignatureImplementation struct {
+	LocalCosigner
+}
+
 // Creating the LocalThresholdSignatureImplementation (or similar) in a new file
 // and moving the ThresholdEd25519Signature interface method implementations there
 // will help cleanup the LocalCosigner file so that it will be more generic in application
@@ -22,11 +26,7 @@ import (
 
 // sign the sign request using the cosigner's share
 // Return the signed bytes or an error
-
-type localThresholdSignatureImplementation struct {
-}
-
-// Implements ThresholdEd25519Signature interface
+// Implements Cosigner interface # Comment is this really true? Doesnt it implement ThresholdEd25519Signature
 func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignResponse, error) {
 	cosigner.lastSignStateMutex.Lock()
 	defer cosigner.lastSignStateMutex.Unlock()
