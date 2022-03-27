@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/rcommodum/horcrux/signer/localthreshold"
+	"github.com/stranger-love/horcrux/signer/localthreshold"
 
 	"github.com/spf13/cobra"
 	"github.com/tendermint/tendermint/libs/os"

@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rcommodum/horcrux/signer/localthreshold"
+	"github.com/stranger-love/horcrux/signer/localthreshold"
 
 	"github.com/mitchellh/go-homedir"
-	"github.com/rcommodum/horcrux/signer"
+	"github.com/stranger-love/horcrux/signer"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 )

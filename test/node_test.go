@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rcommodum/horcrux/signer/localthreshold"
+	"github.com/stranger-love/horcrux/signer/localthreshold"
 
 	"github.com/avast/retry-go"
 	"github.com/cosmos/cosmos-sdk/client"

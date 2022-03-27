@@ -9,7 +9,7 @@ import (
 	"path"
 	"strconv"
 
-	"github.com/rcommodum/horcrux/signer/localthreshold"
+	"github.com/stranger-love/horcrux/signer/localthreshold"
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"

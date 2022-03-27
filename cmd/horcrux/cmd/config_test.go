@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/rcommodum/horcrux/signer/localthreshold"
+	"github.com/stranger-love/horcrux/signer/localthreshold"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"

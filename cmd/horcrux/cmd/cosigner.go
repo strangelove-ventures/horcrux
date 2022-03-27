@@ -7,11 +7,11 @@ import (
 	"path"
 	"time"
 
-	"github.com/rcommodum/horcrux/signer/localthreshold"
-	"github.com/rcommodum/horcrux/signer/raft"
+	"github.com/stranger-love/horcrux/signer/localthreshold"
+	"github.com/stranger-love/horcrux/signer/raft"
 
-	"github.com/rcommodum/horcrux/signer"
 	"github.com/spf13/cobra"
+	"github.com/stranger-love/horcrux/signer"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmService "github.com/tendermint/tendermint/libs/service"
 	"github.com/tendermint/tendermint/types"

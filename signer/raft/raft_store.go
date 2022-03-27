@@ -18,15 +18,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rcommodum/horcrux/signer"
-	"github.com/rcommodum/horcrux/signer/localthreshold"
+	"github.com/stranger-love/horcrux/signer"
+	"github.com/stranger-love/horcrux/signer/localthreshold"
 
 	"github.com/Jille/raft-grpc-leader-rpc/leaderhealth"
 	gRPCTransport "github.com/Jille/raft-grpc-transport"
 	"github.com/Jille/raftadmin"
 	"github.com/hashicorp/raft"
 	boltdb "github.com/hashicorp/raft-boltdb"
-	proto "github.com/rcommodum/horcrux/signer/proto"
+	proto "github.com/stranger-love/horcrux/signer/proto"
 	"github.com/tendermint/tendermint/libs/log"
 	"github.com/tendermint/tendermint/libs/service"
 	"google.golang.org/grpc"

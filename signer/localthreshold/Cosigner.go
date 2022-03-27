@@ -3,9 +3,9 @@ package localthreshold
 import (
 	"time"
 
-	"github.com/rcommodum/horcrux/signer"
+	"github.com/strangelove-ventures/horcrux/signer"
 
-	proto "github.com/rcommodum/horcrux/signer/proto"
+	proto "github.com/strangelove-ventures/horcrux/signer/proto"
 )
 
 type HRSKey struct {

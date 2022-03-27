@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rcommodum/horcrux/signer/localthreshold"
+	"github.com/stranger-love/horcrux/signer/localthreshold"
 
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"

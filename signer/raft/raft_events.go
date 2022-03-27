@@ -5,10 +5,10 @@ import (
 	"errors"
 	"time"
 
-	"github.com/rcommodum/horcrux/signer"
-	"github.com/rcommodum/horcrux/signer/localthreshold"
+	"github.com/stranger-love/horcrux/signer"
+	"github.com/stranger-love/horcrux/signer/localthreshold"
 
-	proto "github.com/rcommodum/horcrux/signer/proto"
+	proto "github.com/stranger-love/horcrux/signer/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )

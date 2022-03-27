@@ -1,4 +1,4 @@
-module github.com/rcommodum/horcrux
+module github.com/stranger-love/horcrux
 
 go 1.17
 

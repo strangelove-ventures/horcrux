@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rcommodum/horcrux/signer/localthreshold"
-	raft2 "github.com/rcommodum/horcrux/signer/raft"
+	"github.com/stranger-love/horcrux/signer/localthreshold"
+	raft2 "github.com/stranger-love/horcrux/signer/raft"
 
 	"github.com/hashicorp/raft"
-	proto "github.com/rcommodum/horcrux/signer/proto"
+	proto "github.com/stranger-love/horcrux/signer/proto"
 )
 
 type CosignerGRPCServer struct {
