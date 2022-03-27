@@ -12,9 +12,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rcommodum/horcrux/signer/localthreshold"
+
 	"github.com/mitchellh/go-homedir"
+	"github.com/rcommodum/horcrux/signer"
 	"github.com/spf13/cobra"
-	"github.com/strangelove-ventures/horcrux/signer"
 	"gopkg.in/yaml.v2"
 )
 
@@ -141,14 +143,14 @@ func initCmd() *cobra.Command {
 			}
 
 			// initialize state/{chainid}_priv_validator_state.json file
-			if _, err = signer.LoadOrCreateSignState(
+			if _, err = localthreshold.LoadOrCreateSignState(
 				path.Join(home, "state", fmt.Sprintf("%s_priv_validator_state.json", cid))); err != nil {
 				return err
 			}
 
 			// if node is a cosigner initialize state/{chainid}_priv_validator_state.json file
 			if cs {
-				if _, err = signer.LoadOrCreateSignState(
+				if _, err = localthreshold.LoadOrCreateSignState(
 					path.Join(home, "state", fmt.Sprintf("%s_share_sign_state.json", cid))); err != nil {
 					return err
 				}

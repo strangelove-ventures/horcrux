@@ -1,18 +1,17 @@
-package signer
+package localthreshold
 
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"io/ioutil"
-	"os"
-	"testing"
-	"time"
-
 	"github.com/stretchr/testify/require"
 	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tm "github.com/tendermint/tendermint/types"
 	tsed25519 "gitlab.com/polychainlabs/threshold-ed25519/pkg"
+	"io/ioutil"
+	"os"
+	"testing"
+	"time"
 )
 
 func TestLocalCosignerGetID(t *testing.T) {

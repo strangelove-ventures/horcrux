@@ -9,9 +9,10 @@ import (
 	"path"
 	"strconv"
 
+	"github.com/rcommodum/horcrux/signer/localthreshold"
+
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
-	"github.com/strangelove-ventures/horcrux/signer"
 )
 
 func init() {
@@ -45,13 +46,13 @@ func showStateCmd() *cobra.Command {
 			}
 
 			filepath := path.Join(stateDir, config.ChainID+"_priv_validator_state.json")
-			pv, err := signer.LoadSignState(filepath)
+			pv, err := localthreshold.LoadSignState(filepath)
 			if err != nil {
 				return err
 			}
 
 			filepath = path.Join(stateDir, config.ChainID+"_share_sign_state.json")
-			share, err := signer.LoadSignState(filepath)
+			share, err := localthreshold.LoadSignState(filepath)
 			if err != nil {
 				return err
 			}
@@ -90,13 +91,13 @@ func setStateCmd() *cobra.Command {
 			}
 
 			filepath := path.Join(stateDir, config.ChainID+"_priv_validator_state.json")
-			pv, err := signer.LoadSignState(filepath)
+			pv, err := localthreshold.LoadSignState(filepath)
 			if err != nil {
 				return err
 			}
 
 			filepath = path.Join(stateDir, config.ChainID+"_share_sign_state.json")
-			share, err := signer.LoadSignState(filepath)
+			share, err := localthreshold.LoadSignState(filepath)
 			if err != nil {
 				return err
 			}
@@ -107,7 +108,7 @@ func setStateCmd() *cobra.Command {
 			}
 
 			pv.EphemeralPublic, share.EphemeralPublic = nil, nil
-			signState := signer.SignStateConsensus{
+			signState := localthreshold.SignStateConsensus{
 				Height:    height,
 				Round:     0,
 				Step:      0,
@@ -127,7 +128,7 @@ func isRunning() bool {
 	return len(bz) != 0
 }
 
-func printSignState(ss signer.SignState) {
+func printSignState(ss localthreshold.SignState) {
 	fmt.Printf("  Height:    %v\n"+
 		"  Round:     %v\n"+
 		"  Step:      %v\n",

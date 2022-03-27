@@ -5,14 +5,17 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/rcommodum/horcrux/signer/localthreshold"
+	raft2 "github.com/rcommodum/horcrux/signer/raft"
+
 	"github.com/hashicorp/raft"
-	proto "github.com/strangelove-ventures/horcrux/signer/proto"
+	proto "github.com/rcommodum/horcrux/signer/proto"
 )
 
 type GRPCServer struct {
-	cosigner           *LocalCosigner
+	cosigner           *localthreshold.LocalCosigner
 	thresholdValidator *ThresholdValidator
-	raftStore          *RaftStore
+	raftStore          *raft2.RaftStore
 	proto.UnimplementedCosignerGRPCServer
 }
 
@@ -38,9 +41,9 @@ func (rpc *GRPCServer) SetEphemeralSecretPartsAndSign(
 	ctx context.Context,
 	req *proto.CosignerGRPCSetEphemeralSecretPartsAndSignRequest,
 ) (*proto.CosignerGRPCSetEphemeralSecretPartsAndSignResponse, error) {
-	res, err := rpc.cosigner.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
-		EncryptedSecrets: CosignerEphemeralSecretPartsFromProto(req.GetEncryptedSecrets()),
-		HRST:             HRSTKeyFromProto(req.GetHrst()),
+	res, err := rpc.cosigner.SetEphemeralSecretPartsAndSign(localthreshold.CosignerSetEphemeralSecretPartsAndSignRequest{
+		EncryptedSecrets: localthreshold.CosignerEphemeralSecretPartsFromProto(req.GetEncryptedSecrets()),
+		HRST:             localthreshold.HRSTKeyFromProto(req.GetHrst()),
 		SignBytes:        req.GetSignBytes(),
 	})
 	if err != nil {
@@ -57,12 +60,12 @@ func (rpc *GRPCServer) GetEphemeralSecretParts(
 	ctx context.Context,
 	req *proto.CosignerGRPCGetEphemeralSecretPartsRequest,
 ) (*proto.CosignerGRPCGetEphemeralSecretPartsResponse, error) {
-	res, err := rpc.cosigner.GetEphemeralSecretParts(HRSTKeyFromProto(req.GetHrst()))
+	res, err := rpc.cosigner.GetEphemeralSecretParts(localthreshold.HRSTKeyFromProto(req.GetHrst()))
 	if err != nil {
 		return nil, err
 	}
 	return &proto.CosignerGRPCGetEphemeralSecretPartsResponse{
-		EncryptedSecrets: CosignerEphemeralSecretParts(res.EncryptedSecrets).toProto(),
+		EncryptedSecrets: localthreshold.CosignerEphemeralSecretParts(res.EncryptedSecrets).ToProto(),
 	}, nil
 }
 
@@ -75,14 +78,14 @@ func (rpc *GRPCServer) TransferLeadership(
 		for _, peer := range rpc.raftStore.Peers {
 			thisPeerID := fmt.Sprint(peer.GetID())
 			if thisPeerID == leaderID {
-				peerRaftAddress := p2pURLToRaftAddress(peer.GetAddress())
+				peerRaftAddress := raft2.P2pURLToRaftAddress(peer.GetAddress())
 				fmt.Printf("Transferring leadership to ID: %s - Address: %s\n", thisPeerID, peerRaftAddress)
-				rpc.raftStore.raft.LeadershipTransferToServer(raft.ServerID(thisPeerID), raft.ServerAddress(peerRaftAddress))
+				rpc.raftStore.Raft.LeadershipTransferToServer(raft.ServerID(thisPeerID), raft.ServerAddress(peerRaftAddress))
 				return &proto.CosignerGRPCTransferLeadershipResponse{LeaderID: thisPeerID, LeaderAddress: peerRaftAddress}, nil
 			}
 		}
 	}
 	fmt.Printf("Transferring leadership to next candidate\n")
-	rpc.raftStore.raft.LeadershipTransfer()
+	rpc.raftStore.Raft.LeadershipTransfer()
 	return &proto.CosignerGRPCTransferLeadershipResponse{}, nil
 }

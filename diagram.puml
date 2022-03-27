@@ -1,0 +1,762 @@
+@startuml
+legend
+<u><b>Legend</b></u>
+Render Aggregations: true
+Render Fields: true
+Render Methods: true
+Pritave Aggregations: false
+end legend
+namespace cmd {
+    class ChainNode << (S,Aquamarine) >> {
+        + PrivValAddr string
+
+    }
+    class Config << (S,Aquamarine) >> {
+        + HomeDir string
+        + PrivValKeyFile string
+        + ChainID string
+        + CosignerConfig *CosignerConfig
+        + ChainNodes []ChainNode
+
+        + Nodes() []signer.NodeConfig
+        + MustMarshalYaml() []byte
+        + CosignerPeers() []signer.CosignerConfig
+
+    }
+    class CosignerConfig << (S,Aquamarine) >> {
+        + Threshold int
+        + Shares int
+        + P2PListen string
+        + Peers []CosignerPeer
+        + Timeout string
+
+    }
+    class CosignerPeer << (S,Aquamarine) >> {
+        + ShareID int
+        + P2PAddr string
+
+    }
+    class Info << (S,Aquamarine) >> {
+        + Version string
+        + GitCommit string
+        + GoVersion string
+        + CosmosSdkVersion string
+        + TendermintVersion string
+
+    }
+}
+
+
+"cmd.Config""uses" o-- "cmd.ChainNode"
+"cmd.Config""uses" o-- "cmd.CosignerConfig"
+"cmd.CosignerConfig""uses" o-- "cmd.CosignerPeer"
+
+namespace localthreshold {
+    class ConflictingDataError << (S,Aquamarine) >> {
+        - msg string
+
+        + Error() string
+
+    }
+    interface Cosigner  {
+        + GetID() int
+        + GetAddress() string
+        + GetEphemeralSecretParts(hrst HRSTKey) (*CosignerEphemeralSecretPartsResponse, error)
+        + SetEphemeralSecretPartsAndSign(req CosignerSetEphemeralSecretPartsAndSignRequest) (*CosignerSignResponse, error)
+
+    }
+    class CosignerEphemeralSecretPart << (S,Aquamarine) >> {
+        + SourceID int
+        + DestinationID int
+        + SourceEphemeralSecretPublicKey []byte
+        + EncryptedSharePart []byte
+        + SourceSig []byte
+
+        - toProto() *proto.EphemeralSecretPart
+
+    }
+    class CosignerEphemeralSecretParts << (S,Aquamarine) >> {
+        + ToProto() []*proto.EphemeralSecretPart
+
+    }
+    class CosignerEphemeralSecretPartsResponse << (S,Aquamarine) >> {
+        + EncryptedSecrets []CosignerEphemeralSecretPart
+
+    }
+    class CosignerGetEphemeralSecretPartRequest << (S,Aquamarine) >> {
+        + ID int
+        + Height int64
+        + Round int64
+        + Step int8
+        + Timestamp time.Time
+
+    }
+    class CosignerKey << (S,Aquamarine) >> {
+        + PubKey crypto.PubKey
+        + ShareKey []byte
+        + RSAKey rsa.PrivateKey
+        + ID int
+        + CosignerKeys []*rsa.PublicKey
+
+        + MarshalJSON() ([]byte, error)
+        + UnmarshalJSON(data []byte) error
+
+    }
+    class CosignerPeer << (S,Aquamarine) >> {
+        + ID int
+        + PublicKey rsa.PublicKey
+
+    }
+    class CosignerSetEphemeralSecretPartRequest << (S,Aquamarine) >> {
+        + SourceID int
+        + SourceEphemeralSecretPublicKey []byte
+        + EncryptedSharePart []byte
+        + SourceSig []byte
+        + Height int64
+        + Round int64
+        + Step int8
+        + Timestamp time.Time
+
+    }
+    class CosignerSetEphemeralSecretPartsAndSignRequest << (S,Aquamarine) >> {
+        + EncryptedSecrets []CosignerEphemeralSecretPart
+        + HRST HRSTKey
+        + SignBytes []byte
+
+    }
+    class CosignerSignBlockRequest << (S,Aquamarine) >> {
+        + ChainID string
+        + Block *signer.Block
+
+    }
+    class CosignerSignBlockResponse << (S,Aquamarine) >> {
+        + Signature []byte
+
+    }
+    class CosignerSignRequest << (S,Aquamarine) >> {
+        + SignBytes []byte
+
+    }
+    class CosignerSignResponse << (S,Aquamarine) >> {
+        + EphemeralPublic []byte
+        + Timestamp time.Time
+        + Signature []byte
+
+    }
+    class HRSKey << (S,Aquamarine) >> {
+        + Height int64
+        + Round int64
+        + Step int8
+
+    }
+    class HRSTKey << (S,Aquamarine) >> {
+        + Height int64
+        + Round int64
+        + Step int8
+        + Timestamp int64
+
+        + ToProto() *proto.HRST
+        + Less(other HRSTKey) bool
+
+    }
+    class HrsMetadata << (S,Aquamarine) >> {
+        + Secret []byte
+        + DealtShares []pkg.Scalar
+        + Peers []PeerMetadata
+
+    }
+    class LocalCosigner << (S,Aquamarine) >> {
+        - pubKeyBytes []byte
+        - key CosignerKey
+        - rsaKey rsa.PrivateKey
+        - total uint8
+        - threshold uint8
+        - lastSignState *SignState
+        - lastSignStateMutex sync.Mutex
+        - hrsMeta <font color=blue>map</font>[HRSTKey]HrsMetadata
+        - peers <font color=blue>map</font>[int]CosignerPeer
+        - address string
+        - thresholdEd25519SignatureImplementation ThresholdEd25519Signature
+
+        - sign(req CosignerSignRequest) (CosignerSignResponse, error)
+        - dealShares(req CosignerGetEphemeralSecretPartRequest) (HrsMetadata, error)
+        - getEphemeralSecretPart(req CosignerGetEphemeralSecretPartRequest) (CosignerEphemeralSecretPart, error)
+        - setEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest) error
+
+        + SaveLastSignedState(signState SignStateConsensus) error
+        + GetID() int
+        + GetAddress() string
+        + GetEphemeralSecretParts(hrst HRSTKey) (*CosignerEphemeralSecretPartsResponse, error)
+        + SetEphemeralSecretPartsAndSign(req CosignerSetEphemeralSecretPartsAndSignRequest) (*CosignerSignResponse, error)
+
+    }
+    class LocalCosignerConfig << (S,Aquamarine) >> {
+        + CosignerKey CosignerKey
+        + SignState *SignState
+        + RsaKey rsa.PrivateKey
+        + Peers []CosignerPeer
+        + Address string
+        + RaftAddress string
+        + Total uint8
+        + Threshold uint8
+        + ThresholdEd25519Signature ThresholdEd25519Signature
+
+    }
+    class PeerMetadata << (S,Aquamarine) >> {
+        + Share []byte
+        + EphemeralSecretPublicKey []byte
+
+    }
+    class SameHRSError << (S,Aquamarine) >> {
+        - msg string
+
+        + Error() string
+
+    }
+    class SignState << (S,Aquamarine) >> {
+        - cache <font color=blue>map</font>[HRSKey]SignStateConsensus
+        - filePath string
+
+        + Height int64
+        + Round int64
+        + Step int8
+        + EphemeralPublic []byte
+        + Signature []byte
+        + SignBytes bytes.HexBytes
+
+        - save() 
+
+        + GetFromCache(hrs HRSKey, lock *sync.Mutex) (HRSKey, *SignStateConsensus)
+        + Save(ssc SignStateConsensus, lock *sync.Mutex) error
+        + CheckHRS(hrst HRSTKey) (bool, error)
+        + GetErrorIfLessOrEqual(height int64, round int64, step int8, lock *sync.Mutex) error
+        + OnlyDifferByTimestamp(signBytes []byte) error
+
+    }
+    class SignStateConsensus << (S,Aquamarine) >> {
+        + Height int64
+        + Round int64
+        + Step int8
+        + Signature []byte
+        + SignBytes bytes.HexBytes
+
+        + OnlyDifferByTimestamp(signBytes []byte) error
+
+    }
+    interface ThresholdEd25519Signature  {
+        - dealShares(req CosignerGetEphemeralSecretPartRequest) (HrsMetadata, error)
+        - getEphemeralSecretPart(req CosignerGetEphemeralSecretPartRequest) (CosignerEphemeralSecretPart, error)
+        - setEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest) error
+        - sign(req CosignerSignRequest) (CosignerSignResponse, error)
+
+    }
+    class localThresholdSignatureImplementation << (S,Aquamarine) >> {
+    }
+    class localthreshold.CosignerEphemeralSecretParts << (T, #FF7700) >>  {
+    }
+}
+"localthreshold.LocalCosigner" *-- "extends""localthreshold.localThresholdSignatureImplementation"
+
+"localthreshold.Cosigner" <|-- "implements""localthreshold.LocalCosigner"
+"localthreshold.ThresholdEd25519Signature" <|-- "implements""localthreshold.LocalCosigner"
+
+"localthreshold.CosignerEphemeralSecretPartsResponse""uses" o-- "localthreshold.CosignerEphemeralSecretPart"
+"localthreshold.CosignerGetEphemeralSecretPartRequest""uses" o-- "time.Time"
+"localthreshold.CosignerKey""uses" o-- "crypto.PubKey"
+"localthreshold.CosignerKey""uses" o-- "rsa.PrivateKey"
+"localthreshold.CosignerKey""uses" o-- "rsa.PublicKey"
+"localthreshold.CosignerPeer""uses" o-- "rsa.PublicKey"
+"localthreshold.CosignerSetEphemeralSecretPartRequest""uses" o-- "time.Time"
+"localthreshold.CosignerSetEphemeralSecretPartsAndSignRequest""uses" o-- "localthreshold.CosignerEphemeralSecretPart"
+"localthreshold.CosignerSetEphemeralSecretPartsAndSignRequest""uses" o-- "localthreshold.HRSTKey"
+"localthreshold.CosignerSignBlockRequest""uses" o-- "signer.Block"
+"localthreshold.CosignerSignResponse""uses" o-- "time.Time"
+"localthreshold.HrsMetadata""uses" o-- "localthreshold.PeerMetadata"
+"localthreshold.HrsMetadata""uses" o-- "pkg.Scalar"
+"localthreshold.LocalCosignerConfig""uses" o-- "localthreshold.CosignerKey"
+"localthreshold.LocalCosignerConfig""uses" o-- "localthreshold.CosignerPeer"
+"localthreshold.LocalCosignerConfig""uses" o-- "localthreshold.SignState"
+"localthreshold.LocalCosignerConfig""uses" o-- "localthreshold.ThresholdEd25519Signature"
+"localthreshold.LocalCosignerConfig""uses" o-- "rsa.PrivateKey"
+"localthreshold.SignState""uses" o-- "bytes.HexBytes"
+"localthreshold.SignStateConsensus""uses" o-- "bytes.HexBytes"
+
+namespace proto {
+    class Block << (S,Aquamarine) >> {
+        - state protoimpl.MessageState
+        - sizeCache protoimpl.SizeCache
+        - unknownFields protoimpl.UnknownFields
+
+        + Height int64
+        + Round int64
+        + Step int32
+        + SignBytes []byte
+        + Timestamp int64
+
+        + Reset() 
+        + String() string
+        + ProtoMessage() 
+        + ProtoReflect() protoreflect.Message
+        + Descriptor() ([]byte, []int)
+        + GetHeight() int64
+        + GetRound() int64
+        + GetStep() int32
+        + GetSignBytes() []byte
+        + GetTimestamp() int64
+
+    }
+    interface CosignerGRPCClient  {
+        + SignBlock(ctx "context.Context, in *CosignerGRPCSignBlockRequest, opts ...grpc.CallOption) (*CosignerGRPCSignBlockResponse, error)
+        + SetEphemeralSecretPartsAndSign(ctx "context.Context, in *CosignerGRPCSetEphemeralSecretPartsAndSignRequest, opts ...grpc.CallOption) (*CosignerGRPCSetEphemeralSecretPartsAndSignResponse, error)
+        + GetEphemeralSecretParts(ctx "context.Context, in *CosignerGRPCGetEphemeralSecretPartsRequest, opts ...grpc.CallOption) (*CosignerGRPCGetEphemeralSecretPartsResponse, error)
+        + TransferLeadership(ctx "context.Context, in *CosignerGRPCTransferLeadershipRequest, opts ...grpc.CallOption) (*CosignerGRPCTransferLeadershipResponse, error)
+
+    }
+    class CosignerGRPCGetEphemeralSecretPartsRequest << (S,Aquamarine) >> {
+        - state protoimpl.MessageState
+        - sizeCache protoimpl.SizeCache
+        - unknownFields protoimpl.UnknownFields
+
+        + Hrst *HRST
+
+        + Reset() 
+        + String() string
+        + ProtoMessage() 
+        + ProtoReflect() protoreflect.Message
+        + Descriptor() ([]byte, []int)
+        + GetHrst() *HRST
+
+    }
+    class CosignerGRPCGetEphemeralSecretPartsResponse << (S,Aquamarine) >> {
+        - state protoimpl.MessageState
+        - sizeCache protoimpl.SizeCache
+        - unknownFields protoimpl.UnknownFields
+
+        + EncryptedSecrets []*EphemeralSecretPart
+
+        + Reset() 
+        + String() string
+        + ProtoMessage() 
+        + ProtoReflect() protoreflect.Message
+        + Descriptor() ([]byte, []int)
+        + GetEncryptedSecrets() []*EphemeralSecretPart
+
+    }
+    interface CosignerGRPCServer  {
+        - mustEmbedUnimplementedCosignerGRPCServer() 
+
+        + SignBlock( "context.Context,  *CosignerGRPCSignBlockRequest) (*CosignerGRPCSignBlockResponse, error)
+        + SetEphemeralSecretPartsAndSign( "context.Context,  *CosignerGRPCSetEphemeralSecretPartsAndSignRequest) (*CosignerGRPCSetEphemeralSecretPartsAndSignResponse, error)
+        + GetEphemeralSecretParts( "context.Context,  *CosignerGRPCGetEphemeralSecretPartsRequest) (*CosignerGRPCGetEphemeralSecretPartsResponse, error)
+        + TransferLeadership( "context.Context,  *CosignerGRPCTransferLeadershipRequest) (*CosignerGRPCTransferLeadershipResponse, error)
+
+    }
+    class CosignerGRPCSetEphemeralSecretPartsAndSignRequest << (S,Aquamarine) >> {
+        - state protoimpl.MessageState
+        - sizeCache protoimpl.SizeCache
+        - unknownFields protoimpl.UnknownFields
+
+        + EncryptedSecrets []*EphemeralSecretPart
+        + Hrst *HRST
+        + SignBytes []byte
+
+        + Reset() 
+        + String() string
+        + ProtoMessage() 
+        + ProtoReflect() protoreflect.Message
+        + Descriptor() ([]byte, []int)
+        + GetEncryptedSecrets() []*EphemeralSecretPart
+        + GetHrst() *HRST
+        + GetSignBytes() []byte
+
+    }
+    class CosignerGRPCSetEphemeralSecretPartsAndSignResponse << (S,Aquamarine) >> {
+        - state protoimpl.MessageState
+        - sizeCache protoimpl.SizeCache
+        - unknownFields protoimpl.UnknownFields
+
+        + EphemeralPublic []byte
+        + Timestamp int64
+        + Signature []byte
+
+        + Reset() 
+        + String() string
+        + ProtoMessage() 
+        + ProtoReflect() protoreflect.Message
+        + Descriptor() ([]byte, []int)
+        + GetEphemeralPublic() []byte
+        + GetTimestamp() int64
+        + GetSignature() []byte
+
+    }
+    class CosignerGRPCSignBlockRequest << (S,Aquamarine) >> {
+        - state protoimpl.MessageState
+        - sizeCache protoimpl.SizeCache
+        - unknownFields protoimpl.UnknownFields
+
+        + ChainID string
+        + Block *Block
+
+        + Reset() 
+        + String() string
+        + ProtoMessage() 
+        + ProtoReflect() protoreflect.Message
+        + Descriptor() ([]byte, []int)
+        + GetChainID() string
+        + GetBlock() *Block
+
+    }
+    class CosignerGRPCSignBlockResponse << (S,Aquamarine) >> {
+        - state protoimpl.MessageState
+        - sizeCache protoimpl.SizeCache
+        - unknownFields protoimpl.UnknownFields
+
+        + Signature []byte
+
+        + Reset() 
+        + String() string
+        + ProtoMessage() 
+        + ProtoReflect() protoreflect.Message
+        + Descriptor() ([]byte, []int)
+        + GetSignature() []byte
+
+    }
+    class CosignerGRPCTransferLeadershipRequest << (S,Aquamarine) >> {
+        - state protoimpl.MessageState
+        - sizeCache protoimpl.SizeCache
+        - unknownFields protoimpl.UnknownFields
+
+        + LeaderID string
+
+        + Reset() 
+        + String() string
+        + ProtoMessage() 
+        + ProtoReflect() protoreflect.Message
+        + Descriptor() ([]byte, []int)
+        + GetLeaderID() string
+
+    }
+    class CosignerGRPCTransferLeadershipResponse << (S,Aquamarine) >> {
+        - state protoimpl.MessageState
+        - sizeCache protoimpl.SizeCache
+        - unknownFields protoimpl.UnknownFields
+
+        + LeaderID string
+        + LeaderAddress string
+
+        + Reset() 
+        + String() string
+        + ProtoMessage() 
+        + ProtoReflect() protoreflect.Message
+        + Descriptor() ([]byte, []int)
+        + GetLeaderID() string
+        + GetLeaderAddress() string
+
+    }
+    class EphemeralSecretPart << (S,Aquamarine) >> {
+        - state protoimpl.MessageState
+        - sizeCache protoimpl.SizeCache
+        - unknownFields protoimpl.UnknownFields
+
+        + SourceID int32
+        + DestinationID int32
+        + SourceEphemeralSecretPublicKey []byte
+        + EncryptedSharePart []byte
+        + SourceSig []byte
+
+        + Reset() 
+        + String() string
+        + ProtoMessage() 
+        + ProtoReflect() protoreflect.Message
+        + Descriptor() ([]byte, []int)
+        + GetSourceID() int32
+        + GetDestinationID() int32
+        + GetSourceEphemeralSecretPublicKey() []byte
+        + GetEncryptedSharePart() []byte
+        + GetSourceSig() []byte
+
+    }
+    class HRST << (S,Aquamarine) >> {
+        - state protoimpl.MessageState
+        - sizeCache protoimpl.SizeCache
+        - unknownFields protoimpl.UnknownFields
+
+        + Height int64
+        + Round int64
+        + Step int32
+        + Timestamp int64
+
+        + Reset() 
+        + String() string
+        + ProtoMessage() 
+        + ProtoReflect() protoreflect.Message
+        + Descriptor() ([]byte, []int)
+        + GetHeight() int64
+        + GetRound() int64
+        + GetStep() int32
+        + GetTimestamp() int64
+
+    }
+    class UnimplementedCosignerGRPCServer << (S,Aquamarine) >> {
+        - mustEmbedUnimplementedCosignerGRPCServer() 
+
+        + SignBlock( "context.Context,  *CosignerGRPCSignBlockRequest) (*CosignerGRPCSignBlockResponse, error)
+        + SetEphemeralSecretPartsAndSign( "context.Context,  *CosignerGRPCSetEphemeralSecretPartsAndSignRequest) (*CosignerGRPCSetEphemeralSecretPartsAndSignResponse, error)
+        + GetEphemeralSecretParts( "context.Context,  *CosignerGRPCGetEphemeralSecretPartsRequest) (*CosignerGRPCGetEphemeralSecretPartsResponse, error)
+        + TransferLeadership( "context.Context,  *CosignerGRPCTransferLeadershipRequest) (*CosignerGRPCTransferLeadershipResponse, error)
+
+    }
+    interface UnsafeCosignerGRPCServer  {
+        - mustEmbedUnimplementedCosignerGRPCServer() 
+
+    }
+    class cosignerGRPCClient << (S,Aquamarine) >> {
+        - cc grpc.ClientConnInterface
+
+        + SignBlock(ctx "context.Context, in *CosignerGRPCSignBlockRequest, opts ...grpc.CallOption) (*CosignerGRPCSignBlockResponse, error)
+        + SetEphemeralSecretPartsAndSign(ctx "context.Context, in *CosignerGRPCSetEphemeralSecretPartsAndSignRequest, opts ...grpc.CallOption) (*CosignerGRPCSetEphemeralSecretPartsAndSignResponse, error)
+        + GetEphemeralSecretParts(ctx "context.Context, in *CosignerGRPCGetEphemeralSecretPartsRequest, opts ...grpc.CallOption) (*CosignerGRPCGetEphemeralSecretPartsResponse, error)
+        + TransferLeadership(ctx "context.Context, in *CosignerGRPCTransferLeadershipRequest, opts ...grpc.CallOption) (*CosignerGRPCTransferLeadershipResponse, error)
+
+    }
+}
+
+"proto.CosignerGRPCServer" <|-- "implements""proto.UnimplementedCosignerGRPCServer"
+"proto.UnsafeCosignerGRPCServer" <|-- "implements""proto.UnimplementedCosignerGRPCServer"
+"proto.CosignerGRPCClient" <|-- "implements""proto.cosignerGRPCClient"
+
+"proto.CosignerGRPCGetEphemeralSecretPartsRequest""uses" o-- "proto.HRST"
+"proto.CosignerGRPCGetEphemeralSecretPartsResponse""uses" o-- "proto.EphemeralSecretPart"
+"proto.CosignerGRPCSetEphemeralSecretPartsAndSignRequest""uses" o-- "proto.EphemeralSecretPart"
+"proto.CosignerGRPCSetEphemeralSecretPartsAndSignRequest""uses" o-- "proto.HRST"
+"proto.CosignerGRPCSignBlockRequest""uses" o-- "proto.Block"
+
+namespace raft {
+    class RaftStore << (S,Aquamarine) >> {
+        - mu "sync.Mutex
+        - thresholdValidator *signer.ThresholdValidator
+
+        + NodeID string
+        + RaftDir string
+        + RaftBind string
+        + RaftTimeout time.Duration
+        + Peers []localthreshold.Cosigner
+        + M <font color=blue>map</font>[string]string
+        + Raft *raft.Raft
+        + Logger log.Logger
+        + Cosigner *localthreshold.LocalCosigner
+
+        - getLeaderGRPCClient() (proto.CosignerGRPCClient, *grpc.ClientConn, error)
+        - init() error
+
+        + LeaderSignBlock(req localthreshold.CosignerSignBlockRequest) (*localthreshold.CosignerSignBlockResponse, error)
+        + SetThresholdValidator(thresholdValidator *signer.ThresholdValidator) 
+        + OnStart() error
+        + Open() (*raft-grpc-transport.Manager, error)
+        + Get(key string) (string, error)
+        + Emit(key string, value <font color=blue>interface</font>{}) error
+        + Set(key string, value string) error
+        + Delete(key string) error
+        + Join(nodeID string, addr string) error
+        + GetLeader() raft.ServerAddress
+
+    }
+    class command << (S,Aquamarine) >> {
+        + Op string
+        + Key string
+        + Value string
+
+    }
+    class fsm << (S,Aquamarine) >> {
+        - getEventHandler(key string) <font color=blue>func</font>(string) 
+        - shouldRetain(key string) bool
+        - handleLSSEvent(value string) 
+        - applySet(key string, value string) <font color=blue>interface</font>{}
+        - applyDelete(key string) <font color=blue>interface</font>{}
+
+        + Apply(l *raft.Log) <font color=blue>interface</font>{}
+        + Snapshot() (raft.FSMSnapshot, error)
+        + Restore(rc io.ReadCloser) error
+
+    }
+    class fsmSnapshot << (S,Aquamarine) >> {
+        - store <font color=blue>map</font>[string]string
+        - logger log.Logger
+
+        + Persist(sink raft.SnapshotSink) error
+        + Release() 
+
+    }
+    class raft.fsm << (T, #FF7700) >>  {
+    }
+}
+"service.BaseService" *-- "extends""raft.RaftStore"
+
+
+"raft.RaftStore""uses" o-- "localthreshold.Cosigner"
+"raft.RaftStore""uses" o-- "localthreshold.LocalCosigner"
+"raft.RaftStore""uses" o-- "log.Logger"
+"raft.RaftStore""uses" o-- "raft.Raft"
+"raft.RaftStore""uses" o-- "time.Duration"
+
+namespace signer {
+    class BeyondBlockError << (S,Aquamarine) >> {
+        - msg string
+
+        + Error() string
+
+    }
+    class Block << (S,Aquamarine) >> {
+        + Height int64
+        + Round int64
+        + Step int8
+        + SignBytes []byte
+        + Timestamp time.Time
+
+        + ToProto() *proto.Block
+
+    }
+    class Config << (S,Aquamarine) >> {
+        + Mode string
+        + PrivValKeyFile string
+        + PrivValStateDir string
+        + ChainID string
+        + CosignerThreshold int
+        + ListenAddress string
+        + Nodes []NodeConfig
+        + Cosigners []CosignerConfig
+
+        + KeyFileExists() error
+
+    }
+    class CosignerConfig << (S,Aquamarine) >> {
+        + ID int
+        + Address string
+
+    }
+    class CosignerGRPCServer << (S,Aquamarine) >> {
+        - cosigner *localthreshold.LocalCosigner
+        - thresholdValidator *ThresholdValidator
+        - raftStore *raft.RaftStore
+
+        + SignBlock(ctx context.Context, req *proto.CosignerGRPCSignBlockRequest) (*proto.CosignerGRPCSignBlockResponse, error)
+        + SetEphemeralSecretPartsAndSign(ctx context.Context, req *proto.CosignerGRPCSetEphemeralSecretPartsAndSignRequest) (*proto.CosignerGRPCSetEphemeralSecretPartsAndSignResponse, error)
+        + GetEphemeralSecretParts(ctx context.Context, req *proto.CosignerGRPCGetEphemeralSecretPartsRequest) (*proto.CosignerGRPCGetEphemeralSecretPartsResponse, error)
+        + TransferLeadership(ctx context.Context, req *proto.CosignerGRPCTransferLeadershipRequest) (*proto.CosignerGRPCTransferLeadershipResponse, error)
+
+    }
+    class GRPCServer << (S,Aquamarine) >> {
+        - cosigner *localthreshold.LocalCosigner
+        - thresholdValidator *ThresholdValidator
+        - raftStore *raft.RaftStore
+
+        + SignBlock(ctx context.Context, req *proto.CosignerGRPCSignBlockRequest) (*proto.CosignerGRPCSignBlockResponse, error)
+        + SetEphemeralSecretPartsAndSign(ctx context.Context, req *proto.CosignerGRPCSetEphemeralSecretPartsAndSignRequest) (*proto.CosignerGRPCSetEphemeralSecretPartsAndSignResponse, error)
+        + GetEphemeralSecretParts(ctx context.Context, req *proto.CosignerGRPCGetEphemeralSecretPartsRequest) (*proto.CosignerGRPCGetEphemeralSecretPartsResponse, error)
+        + TransferLeadership(ctx context.Context, req *proto.CosignerGRPCTransferLeadershipRequest) (*proto.CosignerGRPCTransferLeadershipResponse, error)
+
+    }
+    class NodeConfig << (S,Aquamarine) >> {
+        + Address string
+
+    }
+    class PvGuard << (S,Aquamarine) >> {
+        - pvMutex sync.Mutex
+
+        + PrivValidator types.PrivValidator
+
+        + GetPubKey() (crypto.PubKey, error)
+        + SignVote(chainID string, vote *types.Vote) error
+        + SignProposal(chainID string, proposal *types.Proposal) error
+
+    }
+    class ReconnRemoteSigner << (S,Aquamarine) >> {
+        - address string
+        - chainID string
+        - privKey ed25519.PrivKey
+        - privVal types.PrivValidator
+        - dialer net.Dialer
+
+        - loop() 
+        - handleRequest(req privval.Message) privval.Message
+        - handleSignVoteRequest(vote *types.Vote) privval.Message
+        - handleSignProposalRequest(proposal *types.Proposal) privval.Message
+        - handlePubKeyRequest() privval.Message
+        - handlePingRequest() privval.Message
+
+        + OnStart() error
+
+    }
+    class RemoteCosigner << (S,Aquamarine) >> {
+        - id int
+        - address string
+
+        - getGRPCClient() (proto.CosignerGRPCClient, *grpc.ClientConn, error)
+
+        + GetID() int
+        + GetAddress() string
+        + GetEphemeralSecretParts(req localthreshold.HRSTKey) (*localthreshold.CosignerEphemeralSecretPartsResponse, error)
+        + SetEphemeralSecretPartsAndSign(req localthreshold.CosignerSetEphemeralSecretPartsAndSignRequest) (*localthreshold.CosignerSignResponse, error)
+
+    }
+    class StillWaitingForBlockError << (S,Aquamarine) >> {
+        - msg string
+
+        + Error() string
+
+    }
+    class ThresholdValidator << (S,Aquamarine) >> {
+        - threshold int
+        - pubkey crypto.PubKey
+        - lastSignState localthreshold.SignState
+        - lastSignStateMutex sync.Mutex
+        - lastSignStateInitiated localthreshold.SignState
+        - lastSignStateInitiatedMutex sync.Mutex
+        - cosigner localthreshold.Cosigner
+        - peers []localthreshold.Cosigner
+        - raftStore *raft.RaftStore
+        - logger log.Logger
+
+        - newBeyondBlockError(hrs localthreshold.HRSKey) *BeyondBlockError
+        - waitForPeerEphemeralShares(peer localthreshold.Cosigner, hrst localthreshold.HRSTKey, wg *sync.WaitGroup, encryptedEphemeralSharesThresholdMap *<font color=blue>map</font>[localthreshold.Cosigner][]localthreshold.CosignerEphemeralSecretPart, thresholdPeersMutex *sync.Mutex) 
+        - waitForPeerSetEphemeralSharesAndSign(ourID int, peer localthreshold.Cosigner, hrst localthreshold.HRSTKey, encryptedEphemeralSharesThresholdMap *<font color=blue>map</font>[localthreshold.Cosigner][]localthreshold.CosignerEphemeralSecretPart, signBytes []byte, shareSignatures *[][]byte, shareSignaturesMutex *sync.Mutex, ephemeralPublic *[]byte, wg *sync.WaitGroup) 
+        - getExistingBlockSignature(block *Block) ([]byte, time.Time, error)
+
+        + SaveLastSignedState(signState localthreshold.SignStateConsensus) error
+        + SaveLastSignedStateInitiated(signState localthreshold.SignStateConsensus) error
+        + GetPubKey() (crypto.PubKey, error)
+        + SignVote(chainID string, vote *types.Vote) error
+        + SignProposal(chainID string, proposal *types.Proposal) error
+        + SignBlock(chainID string, block *Block) ([]byte, time.Time, error)
+
+    }
+    class ThresholdValidatorOpt << (S,Aquamarine) >> {
+        + Pubkey crypto.PubKey
+        + Threshold int
+        + SignState localthreshold.SignState
+        + Cosigner localthreshold.Cosigner
+        + Peers []localthreshold.Cosigner
+        + RaftStore *raft.RaftStore
+        + Logger log.Logger
+
+    }
+}
+"proto.UnimplementedCosignerGRPCServer" *-- "extends""signer.CosignerGRPCServer"
+"proto.UnimplementedCosignerGRPCServer" *-- "extends""signer.GRPCServer"
+"service.BaseService" *-- "extends""signer.ReconnRemoteSigner"
+
+"localthreshold.Cosigner" <|-- "implements""signer.RemoteCosigner"
+
+"signer.Block""uses" o-- "time.Time"
+"signer.Config""uses" o-- "signer.CosignerConfig"
+"signer.Config""uses" o-- "signer.NodeConfig"
+"signer.PvGuard""uses" o-- "types.PrivValidator"
+"signer.ThresholdValidatorOpt""uses" o-- "crypto.PubKey"
+"signer.ThresholdValidatorOpt""uses" o-- "localthreshold.Cosigner"
+"signer.ThresholdValidatorOpt""uses" o-- "localthreshold.SignState"
+"signer.ThresholdValidatorOpt""uses" o-- "log.Logger"
+"signer.ThresholdValidatorOpt""uses" o-- "raft.RaftStore"
+
+"localthreshold.[]CosignerEphemeralSecretPart" #.. "alias of""localthreshold.CosignerEphemeralSecretParts"
+"raft.RaftStore" #.. "alias of""raft.fsm"
+@enduml

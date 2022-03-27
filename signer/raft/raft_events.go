@@ -1,12 +1,14 @@
-package signer
+package raft
 
 import (
 	"encoding/json"
 	"errors"
-	"github.com/strangelove-ventures/horcrux/signer/localthreshold"
 	"time"
 
-	proto "github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/rcommodum/horcrux/signer"
+	"github.com/rcommodum/horcrux/signer/localthreshold"
+
+	proto "github.com/rcommodum/horcrux/signer/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -30,11 +32,11 @@ func (f *fsm) handleLSSEvent(value string) {
 	lss := &localthreshold.SignStateConsensus{}
 	err := json.Unmarshal([]byte(value), lss)
 	if err != nil {
-		f.logger.Error("LSS Unmarshal Error", err.Error())
+		f.Logger.Error("LSS Unmarshal Error", err.Error())
 		return
 	}
 	_ = f.thresholdValidator.SaveLastSignedState(*lss)
-	_ = f.cosigner.SaveLastSignedState(*lss)
+	_ = f.Cosigner.SaveLastSignedState(*lss)
 }
 
 func (s *RaftStore) getLeaderGRPCClient() (proto.CosignerGRPCClient, *grpc.ClientConn, error) {
@@ -62,11 +64,11 @@ func (s *RaftStore) LeaderSignBlock(req localthreshold.CosignerSignBlockRequest)
 		return nil, err
 	}
 	defer conn.Close()
-	context, cancelFunc := getContext()
+	context, cancelFunc := signer.GetContext()
 	defer cancelFunc()
 	res, err := client.SignBlock(context, &proto.CosignerGRPCSignBlockRequest{
 		ChainID: req.ChainID,
-		Block:   req.Block.toProto(),
+		Block:   req.Block.ToProto(),
 	})
 	if err != nil {
 		return nil, err

@@ -1,9 +1,11 @@
-package signer
+package localthreshold
 
 import (
 	"time"
 
-	proto "github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/rcommodum/horcrux/signer"
+
+	proto "github.com/rcommodum/horcrux/signer/proto"
 )
 
 type HRSKey struct {
@@ -28,7 +30,7 @@ func HRSTKeyFromProto(hrs *proto.HRST) HRSTKey {
 	}
 }
 
-func (hrst HRSTKey) toProto() *proto.HRST {
+func (hrst HRSTKey) ToProto() *proto.HRST {
 	return &proto.HRST{
 		Height:    hrst.Height,
 		Round:     hrst.Round,
@@ -69,7 +71,7 @@ func (secretPart *CosignerEphemeralSecretPart) toProto() *proto.EphemeralSecretP
 
 type CosignerEphemeralSecretParts []CosignerEphemeralSecretPart
 
-func (secretParts CosignerEphemeralSecretParts) toProto() (out []*proto.EphemeralSecretPart) {
+func (secretParts CosignerEphemeralSecretParts) ToProto() (out []*proto.EphemeralSecretPart) {
 	for _, secretPart := range secretParts {
 		out = append(out, secretPart.toProto())
 	}
@@ -107,7 +109,7 @@ type CosignerSetEphemeralSecretPartRequest struct {
 
 type CosignerSignBlockRequest struct {
 	ChainID string
-	Block   *Block
+	Block   *signer.Block
 }
 
 type CosignerSignBlockResponse struct {

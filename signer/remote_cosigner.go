@@ -5,7 +5,9 @@ import (
 	"net/url"
 	"time"
 
-	proto "github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/rcommodum/horcrux/signer/localthreshold"
+
+	proto "github.com/rcommodum/horcrux/signer/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -30,7 +32,7 @@ const (
 	rpcTimeout = 4 * time.Second
 )
 
-func getContext() (context.Context, context.CancelFunc) {
+func GetContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), rpcTimeout)
 }
 
@@ -63,44 +65,44 @@ func (cosigner *RemoteCosigner) getGRPCClient() (proto.CosignerGRPCClient, *grpc
 
 // GetEphemeralSecretParts implements the Cosigner interface
 func (cosigner *RemoteCosigner) GetEphemeralSecretParts(
-	req HRSTKey) (*CosignerEphemeralSecretPartsResponse, error) {
+	req localthreshold.HRSTKey) (*localthreshold.CosignerEphemeralSecretPartsResponse, error) {
 	client, conn, err := cosigner.getGRPCClient()
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
-	context, cancelFunc := getContext()
+	context, cancelFunc := GetContext()
 	defer cancelFunc()
 	res, err := client.GetEphemeralSecretParts(context, &proto.CosignerGRPCGetEphemeralSecretPartsRequest{
-		Hrst: req.toProto(),
+		Hrst: req.ToProto(),
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &CosignerEphemeralSecretPartsResponse{
-		EncryptedSecrets: CosignerEphemeralSecretPartsFromProto(res.GetEncryptedSecrets()),
+	return &localthreshold.CosignerEphemeralSecretPartsResponse{
+		EncryptedSecrets: localthreshold.CosignerEphemeralSecretPartsFromProto(res.GetEncryptedSecrets()),
 	}, nil
 }
 
 // SetEphemeralSecretPartsAndSign implements the Cosigner interface
 func (cosigner *RemoteCosigner) SetEphemeralSecretPartsAndSign(
-	req CosignerSetEphemeralSecretPartsAndSignRequest) (*CosignerSignResponse, error) {
+	req localthreshold.CosignerSetEphemeralSecretPartsAndSignRequest) (*localthreshold.CosignerSignResponse, error) {
 	client, conn, err := cosigner.getGRPCClient()
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
-	context, cancelFunc := getContext()
+	context, cancelFunc := GetContext()
 	defer cancelFunc()
 	res, err := client.SetEphemeralSecretPartsAndSign(context, &proto.CosignerGRPCSetEphemeralSecretPartsAndSignRequest{
-		EncryptedSecrets: CosignerEphemeralSecretParts(req.EncryptedSecrets).toProto(),
-		Hrst:             req.HRST.toProto(),
+		EncryptedSecrets: localthreshold.CosignerEphemeralSecretParts(req.EncryptedSecrets).ToProto(),
+		Hrst:             req.HRST.ToProto(),
 		SignBytes:        req.SignBytes,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &CosignerSignResponse{
+	return &localthreshold.CosignerSignResponse{
 		EphemeralPublic: res.GetEphemeralPublic(),
 		Timestamp:       time.Unix(0, res.GetTimestamp()),
 		Signature:       res.GetSignature(),

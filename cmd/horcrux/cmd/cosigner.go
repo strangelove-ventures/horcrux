@@ -7,8 +7,11 @@ import (
 	"path"
 	"time"
 
+	"github.com/rcommodum/horcrux/signer/localthreshold"
+	"github.com/rcommodum/horcrux/signer/raft"
+
+	"github.com/rcommodum/horcrux/signer"
 	"github.com/spf13/cobra"
-	"github.com/strangelove-ventures/horcrux/signer"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmService "github.com/tendermint/tendermint/libs/service"
 	"github.com/tendermint/tendermint/types"
@@ -71,7 +74,7 @@ func StartCosignerCmd() *cobra.Command {
 
 			var val types.PrivValidator
 
-			key, err := signer.LoadCosignerKey(cfg.PrivValKeyFile)
+			key, err := localthreshold.LoadCosignerKey(cfg.PrivValKeyFile)
 			if err != nil {
 				return fmt.Errorf("error reading cosigner key: %s", err)
 			}
@@ -79,7 +82,7 @@ func StartCosignerCmd() *cobra.Command {
 			// ok to auto initialize on disk since the cosigner share is the one that actually
 			// protects against double sign - this exists as a cache for the final signature
 			stateFile := path.Join(cfg.PrivValStateDir, fmt.Sprintf("%s_priv_validator_state.json", chainID))
-			signState, err := signer.LoadOrCreateSignState(stateFile)
+			signState, err := localthreshold.LoadOrCreateSignState(stateFile)
 			if err != nil {
 				panic(err)
 			}
@@ -87,15 +90,15 @@ func StartCosignerCmd() *cobra.Command {
 			// state for our cosigner share
 			// Not automatically initialized on disk to avoid double sign risk
 			shareStateFile := path.Join(cfg.PrivValStateDir, fmt.Sprintf("%s_share_sign_state.json", chainID))
-			shareSignState, err := signer.LoadSignState(shareStateFile)
+			shareSignState, err := localthreshold.LoadSignState(shareStateFile)
 			if err != nil {
 				panic(err)
 			}
 
-			cosigners := []signer.Cosigner{}
+			cosigners := []localthreshold.Cosigner{}
 
 			// add ourselves as a peer so localcosigner can handle GetEphSecPart requests
-			peers := []signer.CosignerPeer{{
+			peers := []localthreshold.CosignerPeer{{
 				ID:        key.ID,
 				PublicKey: key.RSAKey.PublicKey,
 			}}
@@ -109,14 +112,14 @@ func StartCosignerCmd() *cobra.Command {
 				}
 
 				pubKey := key.CosignerKeys[cosignerConfig.ID-1]
-				peers = append(peers, signer.CosignerPeer{
+				peers = append(peers, localthreshold.CosignerPeer{
 					ID:        cosigner.GetID(),
 					PublicKey: *pubKey,
 				})
 			}
 
 			total := len(cfg.Cosigners) + 1
-			localCosignerConfig := signer.LocalCosignerConfig{
+			localCosignerConfig := localthreshold.LocalCosignerConfig{
 				CosignerKey: key,
 				SignState:   &shareSignState,
 				RsaKey:      key.RSAKey,
@@ -126,7 +129,7 @@ func StartCosignerCmd() *cobra.Command {
 				Threshold:   uint8(cfg.CosignerThreshold),
 			}
 
-			localCosigner := signer.NewLocalCosigner(localCosignerConfig)
+			localCosigner := localthreshold.NewLocalCosigner(localCosignerConfig)
 
 			timeout, _ := time.ParseDuration(config.CosignerConfig.Timeout)
 
@@ -139,7 +142,7 @@ func StartCosignerCmd() *cobra.Command {
 			nodeID := fmt.Sprint(key.ID)
 
 			// Start RAFT store listener
-			raftStore := signer.NewRaftStore(nodeID,
+			raftStore := raft.NewRaftStore(nodeID,
 				raftDir, cfg.ListenAddress, timeout, logger, localCosigner, cosigners)
 			if err := raftStore.Start(); err != nil {
 				log.Fatalf("Error starting raft store: %v\n", err)

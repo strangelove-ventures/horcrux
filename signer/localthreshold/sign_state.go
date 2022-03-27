@@ -1,4 +1,4 @@
-package signer
+package localthreshold
 
 import (
 	"bytes"
@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	stepPropose   int8 = 1
+	StepPropose   int8 = 1
 	stepPrevote   int8 = 2
 	stepPrecommit int8 = 3
 	blocksToCache      = 3
@@ -46,7 +46,7 @@ func VoteToStep(vote *tmProto.Vote) int8 {
 }
 
 func ProposalToStep(_ *tmProto.Proposal) int8 {
-	return stepPropose
+	return StepPropose
 }
 
 // SignState stores signing information for high level watermark management.
@@ -294,7 +294,7 @@ func (signState *SignStateConsensus) OnlyDifferByTimestamp(signBytes []byte) err
 }
 
 func onlyDifferByTimestamp(step int8, signStateSignBytes, signBytes []byte) error {
-	if step == stepPropose {
+	if step == StepPropose {
 		return checkProposalOnlyDifferByTimestamp(signStateSignBytes, signBytes)
 	} else if step == stepPrevote || step == stepPrecommit {
 		return checkVoteOnlyDifferByTimestamp(signStateSignBytes, signBytes)

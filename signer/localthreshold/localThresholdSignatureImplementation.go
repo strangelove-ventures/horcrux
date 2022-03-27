@@ -1,4 +1,4 @@
-package signer
+package localthreshold
 
 import (
 	"bytes"
@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/strangelove-ventures/horcrux/signer"
 	tmJson "github.com/tendermint/tendermint/libs/json"
 	"gitlab.com/polychainlabs/edwards25519"
 	tsed25519 "gitlab.com/polychainlabs/threshold-ed25519/pkg"
@@ -34,7 +35,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	res := CosignerSignResponse{}
 	lss := cosigner.lastSignState
 
-	hrst, err := UnpackHRST(req.SignBytes)
+	hrst, err := signer.UnpackHRST(req.SignBytes)
 	if err != nil {
 		return res, err
 	}

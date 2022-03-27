@@ -10,7 +10,7 @@ import (
 	"time"
 
 	_ "github.com/Jille/grpc-multi-resolver"
-	"github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/rcommodum/horcrux/signer/proto"
 
 	grpc_retry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"github.com/spf13/cobra"

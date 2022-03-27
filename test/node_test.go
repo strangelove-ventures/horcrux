@@ -19,6 +19,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rcommodum/horcrux/signer/localthreshold"
+
 	"github.com/avast/retry-go"
 	"github.com/cosmos/cosmos-sdk/client"
 	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
@@ -29,7 +31,6 @@ import (
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
-	"github.com/strangelove-ventures/horcrux/signer"
 	"github.com/stretchr/testify/require"
 	tmconfig "github.com/tendermint/tendermint/config"
 	"github.com/tendermint/tendermint/p2p"
@@ -748,7 +749,7 @@ func (tn TestNodes) WaitForHeight(height int64) {
 }
 
 func (tn *TestNode) GetPrivVal() (privval.FilePVKey, error) {
-	return signer.ReadPrivValidatorFile(path.Join(tn.Dir(), "config", "priv_validator_key.json"))
+	return localthreshold.ReadPrivValidatorFile(path.Join(tn.Dir(), "config", "priv_validator_key.json"))
 }
 
 func (tn *TestNode) GetConsPub() string {
@@ -763,8 +764,8 @@ func (tn *TestNode) GetConsPub() string {
 	// return sdk.Bech32ifyPubKey(sdk.Bech32PubKeyTypeValPub, pubkey)
 }
 
-func (tn *TestNode) CreateKeyShares(threshold, total int64) []signer.CosignerKey {
-	shares, err := signer.CreateCosignerSharesFromFile(
+func (tn *TestNode) CreateKeyShares(threshold, total int64) []localthreshold.CosignerKey {
+	shares, err := localthreshold.CreateCosignerSharesFromFile(
 		path.Join(tn.Dir(), "config", "priv_validator_key.json"), threshold, total)
 	require.NoError(tn.t, err)
 	return shares

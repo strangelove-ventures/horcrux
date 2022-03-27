@@ -6,8 +6,8 @@ import (
 	"os"
 	"path"
 
+	"github.com/rcommodum/horcrux/signer"
 	"github.com/spf13/cobra"
-	"github.com/strangelove-ventures/horcrux/signer"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmService "github.com/tendermint/tendermint/libs/service"
 	"github.com/tendermint/tendermint/privval"

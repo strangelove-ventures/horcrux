@@ -10,9 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rcommodum/horcrux/signer/localthreshold"
+
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
-	"github.com/strangelove-ventures/horcrux/signer"
 	"github.com/stretchr/testify/require"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	"golang.org/x/sync/errgroup"
@@ -29,7 +30,7 @@ type TestSigner struct {
 	Index     int
 	Pool      *dockertest.Pool
 	Container *docker.Container
-	Key       signer.CosignerKey
+	Key       localthreshold.CosignerKey
 	t         *testing.T
 }
 
@@ -197,7 +198,7 @@ func StartCosignerContainers(
 		s := s
 		s.t.Logf("{%s} -> Writing Key Share To File... ", s.Name())
 		privateFilename := path.Join(s.Dir(), "share.json")
-		require.NoError(t, signer.WriteCosignerShareFile(s.Key, privateFilename))
+		require.NoError(t, localthreshold.WriteCosignerShareFile(s.Key, privateFilename))
 	}
 
 	// create containers & start signer nodes
@@ -240,7 +241,7 @@ func MakeTestSigners(count int, home string, pool *dockertest.Pool, t *testing.T
 			Index:     i + 1, // +1 is to ensure all Cosigner IDs end up being >0 as required in cosigner.go
 			Pool:      pool,
 			Container: nil,
-			Key:       signer.CosignerKey{},
+			Key:       localthreshold.CosignerKey{},
 			t:         t,
 		}
 		out = append(out, ts)

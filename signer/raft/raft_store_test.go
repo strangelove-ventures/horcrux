@@ -1,4 +1,4 @@
-package signer
+package raft
 
 import (
 	"crypto/rand"
@@ -53,9 +53,9 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 		RaftDir:     tmpDir,
 		RaftBind:    "127.0.0.1:0",
 		RaftTimeout: 1 * time.Second,
-		m:           make(map[string]string),
-		logger:      nil,
-		cosigner:    cosigner,
+		M:           make(map[string]string),
+		Logger:      nil,
+		Cosigner:    cosigner,
 		Peers:       []localthreshold.Cosigner{},
 	}
 

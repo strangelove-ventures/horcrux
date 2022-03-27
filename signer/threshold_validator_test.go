@@ -3,6 +3,8 @@ package signer
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"github.com/strangelove-ventures/horcrux/signer/localthreshold"
+	"github.com/strangelove-ventures/horcrux/signer/raft"
 	"time"
 
 	"io/ioutil"
@@ -17,16 +19,16 @@ import (
 	tsed25519 "gitlab.com/polychainlabs/threshold-ed25519/pkg"
 )
 
-func getMockRaftStore(cosigner Cosigner, tmpDir string) *RaftStore {
-	return &RaftStore{
+func getMockRaftStore(cosigner localthreshold.Cosigner, tmpDir string) *raft.RaftStore {
+	return &raft.RaftStore{
 		NodeID:      "1",
 		RaftDir:     tmpDir,
 		RaftBind:    "127.0.0.1:0",
 		RaftTimeout: 1 * time.Second,
-		m:           make(map[string]string),
-		logger:      nil,
-		cosigner:    cosigner.(*LocalCosigner),
-		Peers:       []Cosigner{},
+		M:           make(map[string]string),
+		Logger:      nil,
+		Cosigner:    cosigner.(*localthreshold.LocalCosigner),
+		Peers:       []localthreshold.Cosigner{},
 	}
 }
 
@@ -41,7 +43,7 @@ func TestThresholdValidator2of2(t *testing.T) {
 	rsaKey2, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(t, err)
 
-	peers := []CosignerPeer{{
+	peers := []localthreshold.CosignerPeer{{
 		ID:        1,
 		PublicKey: rsaKey1.PublicKey,
 	}, {
@@ -55,7 +57,7 @@ func TestThresholdValidator2of2(t *testing.T) {
 	copy(privKeyBytes[:], privateKey[:])
 	secretShares := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
 
-	key1 := CosignerKey{
+	key1 := localthreshold.CosignerKey{
 		PubKey:   privateKey.PubKey(),
 		ShareKey: secretShares[0],
 		ID:       1,
@@ -65,10 +67,10 @@ func TestThresholdValidator2of2(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(stateFile1.Name())
 
-	signState1, err := LoadOrCreateSignState(stateFile1.Name())
+	signState1, err := localthreshold.LoadOrCreateSignState(stateFile1.Name())
 	require.NoError(t, err)
 
-	key2 := CosignerKey{
+	key2 := localthreshold.CosignerKey{
 		PubKey:   privateKey.PubKey(),
 		ShareKey: secretShares[1],
 		ID:       2,
@@ -77,10 +79,10 @@ func TestThresholdValidator2of2(t *testing.T) {
 	stateFile2, err := ioutil.TempFile("", "state2.json")
 	require.NoError(t, err)
 	defer os.Remove(stateFile2.Name())
-	signState2, err := LoadOrCreateSignState(stateFile2.Name())
+	signState2, err := localthreshold.LoadOrCreateSignState(stateFile2.Name())
 	require.NoError(t, err)
 
-	config1 := LocalCosignerConfig{
+	config1 := localthreshold.LocalCosignerConfig{
 		CosignerKey: key1,
 		SignState:   &signState1,
 		RsaKey:      *rsaKey1,
@@ -89,7 +91,7 @@ func TestThresholdValidator2of2(t *testing.T) {
 		Threshold:   threshold,
 	}
 
-	config2 := LocalCosignerConfig{
+	config2 := localthreshold.LocalCosignerConfig{
 		CosignerKey: key2,
 		SignState:   &signState2,
 		RsaKey:      *rsaKey2,
@@ -98,16 +100,16 @@ func TestThresholdValidator2of2(t *testing.T) {
 		Threshold:   threshold,
 	}
 
-	var cosigner1 Cosigner
-	var cosigner2 Cosigner
+	var cosigner1 localthreshold.Cosigner
+	var cosigner2 localthreshold.Cosigner
 
-	cosigner1 = NewLocalCosigner(config1)
-	cosigner2 = NewLocalCosigner(config2)
+	cosigner1 = localthreshold.NewLocalCosigner(config1)
+	cosigner2 = localthreshold.NewLocalCosigner(config2)
 
 	require.Equal(t, cosigner1.GetID(), 1)
 	require.Equal(t, cosigner2.GetID(), 2)
 
-	thresholdPeers := make([]Cosigner, 0)
+	thresholdPeers := make([]localthreshold.Cosigner, 0)
 	thresholdPeers = append(thresholdPeers, cosigner2)
 
 	tmpDir, _ := ioutil.TempDir("", "store_test")
@@ -161,7 +163,7 @@ func TestThresholdValidator3of3(t *testing.T) {
 	rsaKey3, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(t, err)
 
-	peers := []CosignerPeer{{
+	peers := []localthreshold.CosignerPeer{{
 		ID:        1,
 		PublicKey: rsaKey1.PublicKey,
 	}, {
@@ -178,7 +180,7 @@ func TestThresholdValidator3of3(t *testing.T) {
 	copy(privKeyBytes[:], privateKey[:])
 	secretShares := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
 
-	key1 := CosignerKey{
+	key1 := localthreshold.CosignerKey{
 		PubKey:   privateKey.PubKey(),
 		ShareKey: secretShares[0],
 		ID:       1,
@@ -188,10 +190,10 @@ func TestThresholdValidator3of3(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(stateFile1.Name())
 
-	signState1, err := LoadOrCreateSignState(stateFile1.Name())
+	signState1, err := localthreshold.LoadOrCreateSignState(stateFile1.Name())
 	require.NoError(t, err)
 
-	key2 := CosignerKey{
+	key2 := localthreshold.CosignerKey{
 		PubKey:   privateKey.PubKey(),
 		ShareKey: secretShares[1],
 		ID:       2,
@@ -201,10 +203,10 @@ func TestThresholdValidator3of3(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(stateFile2.Name())
 
-	signState2, err := LoadOrCreateSignState(stateFile2.Name())
+	signState2, err := localthreshold.LoadOrCreateSignState(stateFile2.Name())
 	require.NoError(t, err)
 
-	key3 := CosignerKey{
+	key3 := localthreshold.CosignerKey{
 		PubKey:   privateKey.PubKey(),
 		ShareKey: secretShares[2],
 		ID:       3,
@@ -214,10 +216,10 @@ func TestThresholdValidator3of3(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(stateFile3.Name())
 
-	signState3, err := LoadOrCreateSignState(stateFile3.Name())
+	signState3, err := localthreshold.LoadOrCreateSignState(stateFile3.Name())
 	require.NoError(t, err)
 
-	config1 := LocalCosignerConfig{
+	config1 := localthreshold.LocalCosignerConfig{
 		CosignerKey: key1,
 		SignState:   &signState1,
 		RsaKey:      *rsaKey1,
@@ -226,7 +228,7 @@ func TestThresholdValidator3of3(t *testing.T) {
 		Threshold:   threshold,
 	}
 
-	config2 := LocalCosignerConfig{
+	config2 := localthreshold.LocalCosignerConfig{
 		CosignerKey: key2,
 		SignState:   &signState2,
 		RsaKey:      *rsaKey2,
@@ -235,7 +237,7 @@ func TestThresholdValidator3of3(t *testing.T) {
 		Threshold:   threshold,
 	}
 
-	config3 := LocalCosignerConfig{
+	config3 := localthreshold.LocalCosignerConfig{
 		CosignerKey: key3,
 		SignState:   &signState3,
 		RsaKey:      *rsaKey3,
@@ -244,19 +246,19 @@ func TestThresholdValidator3of3(t *testing.T) {
 		Threshold:   threshold,
 	}
 
-	var cosigner1 Cosigner
-	var cosigner2 Cosigner
-	var cosigner3 Cosigner
+	var cosigner1 localthreshold.Cosigner
+	var cosigner2 localthreshold.Cosigner
+	var cosigner3 localthreshold.Cosigner
 
-	cosigner1 = NewLocalCosigner(config1)
-	cosigner2 = NewLocalCosigner(config2)
-	cosigner3 = NewLocalCosigner(config3)
+	cosigner1 = localthreshold.NewLocalCosigner(config1)
+	cosigner2 = localthreshold.NewLocalCosigner(config2)
+	cosigner3 = localthreshold.NewLocalCosigner(config3)
 
 	require.Equal(t, cosigner1.GetID(), 1)
 	require.Equal(t, cosigner2.GetID(), 2)
 	require.Equal(t, cosigner3.GetID(), 3)
 
-	thresholdPeers := make([]Cosigner, 0)
+	thresholdPeers := make([]localthreshold.Cosigner, 0)
 	thresholdPeers = append(thresholdPeers, cosigner2, cosigner3)
 
 	tmpDir, _ := ioutil.TempDir("", "store_test")
@@ -313,7 +315,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 	rsaKey3, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(t, err)
 
-	peers := []CosignerPeer{{
+	peers := []localthreshold.CosignerPeer{{
 		ID:        1,
 		PublicKey: rsaKey1.PublicKey,
 	}, {
@@ -330,7 +332,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 	copy(privKeyBytes[:], privateKey[:])
 	secretShares := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
 
-	key1 := CosignerKey{
+	key1 := localthreshold.CosignerKey{
 		PubKey:   privateKey.PubKey(),
 		ShareKey: secretShares[0],
 		ID:       1,
@@ -340,10 +342,10 @@ func TestThresholdValidator2of3(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(stateFile1.Name())
 
-	signState1, err := LoadOrCreateSignState(stateFile1.Name())
+	signState1, err := localthreshold.LoadOrCreateSignState(stateFile1.Name())
 	require.NoError(t, err)
 
-	key2 := CosignerKey{
+	key2 := localthreshold.CosignerKey{
 		PubKey:   privateKey.PubKey(),
 		ShareKey: secretShares[1],
 		ID:       2,
@@ -353,10 +355,10 @@ func TestThresholdValidator2of3(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(stateFile2.Name())
 
-	signState2, err := LoadOrCreateSignState(stateFile2.Name())
+	signState2, err := localthreshold.LoadOrCreateSignState(stateFile2.Name())
 	require.NoError(t, err)
 
-	key3 := CosignerKey{
+	key3 := localthreshold.CosignerKey{
 		PubKey:   privateKey.PubKey(),
 		ShareKey: secretShares[2],
 		ID:       3,
@@ -366,10 +368,10 @@ func TestThresholdValidator2of3(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(stateFile3.Name())
 
-	signState3, err := LoadOrCreateSignState(stateFile3.Name())
+	signState3, err := localthreshold.LoadOrCreateSignState(stateFile3.Name())
 	require.NoError(t, err)
 
-	config1 := LocalCosignerConfig{
+	config1 := localthreshold.LocalCosignerConfig{
 		CosignerKey: key1,
 		SignState:   &signState1,
 		RsaKey:      *rsaKey1,
@@ -378,7 +380,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 		Threshold:   threshold,
 	}
 
-	config2 := LocalCosignerConfig{
+	config2 := localthreshold.LocalCosignerConfig{
 		CosignerKey: key2,
 		SignState:   &signState2,
 		RsaKey:      *rsaKey2,
@@ -387,7 +389,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 		Threshold:   threshold,
 	}
 
-	config3 := LocalCosignerConfig{
+	config3 := localthreshold.LocalCosignerConfig{
 		CosignerKey: key3,
 		SignState:   &signState3,
 		RsaKey:      *rsaKey3,
@@ -396,19 +398,19 @@ func TestThresholdValidator2of3(t *testing.T) {
 		Threshold:   threshold,
 	}
 
-	var cosigner1 Cosigner
-	var cosigner2 Cosigner
-	var cosigner3 Cosigner
+	var cosigner1 localthreshold.Cosigner
+	var cosigner2 localthreshold.Cosigner
+	var cosigner3 localthreshold.Cosigner
 
-	cosigner1 = NewLocalCosigner(config1)
-	cosigner2 = NewLocalCosigner(config2)
-	cosigner3 = NewLocalCosigner(config3)
+	cosigner1 = localthreshold.NewLocalCosigner(config1)
+	cosigner2 = localthreshold.NewLocalCosigner(config2)
+	cosigner3 = localthreshold.NewLocalCosigner(config3)
 
 	require.Equal(t, cosigner1.GetID(), 1)
 	require.Equal(t, cosigner2.GetID(), 2)
 	require.Equal(t, cosigner3.GetID(), 3)
 
-	thresholdPeers := make([]Cosigner, 0)
+	thresholdPeers := make([]localthreshold.Cosigner, 0)
 	thresholdPeers = append(thresholdPeers, cosigner2, cosigner3)
 
 	tmpDir, _ := ioutil.TempDir("", "store_test")

@@ -19,8 +19,9 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/rcommodum/horcrux/signer/localthreshold"
+
 	"github.com/spf13/cobra"
-	"github.com/strangelove-ventures/horcrux/signer"
 	"github.com/tendermint/tendermint/libs/os"
 )
 
@@ -38,12 +39,12 @@ func CreateCosignerSharesCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			threshold, _ := strconv.ParseInt(args[1], 10, 64)
 			numShares, _ := strconv.ParseInt(args[2], 10, 64)
-			csKeys, err := signer.CreateCosignerSharesFromFile(args[0], threshold, numShares)
+			csKeys, err := localthreshold.CreateCosignerSharesFromFile(args[0], threshold, numShares)
 			if err != nil {
 				return err
 			}
 			for _, c := range csKeys {
-				if err = signer.WriteCosignerShareFile(c, fmt.Sprintf("private_share_%d.json", c.ID)); err != nil {
+				if err = localthreshold.WriteCosignerShareFile(c, fmt.Sprintf("private_share_%d.json", c.ID)); err != nil {
 					return err
 				}
 				fmt.Printf("Created Share %d\n", c.ID)

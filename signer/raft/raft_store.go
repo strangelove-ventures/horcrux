@@ -5,12 +5,11 @@
 //
 // Distributed consensus is provided via the Raft algorithm, specifically the
 // Hashicorp implementation.
-package signer
+package raft
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/strangelove-ventures/horcrux/signer/localthreshold"
 	"io"
 	"net"
 	"net/url"
@@ -19,12 +18,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rcommodum/horcrux/signer"
+	"github.com/rcommodum/horcrux/signer/localthreshold"
+
 	"github.com/Jille/raft-grpc-leader-rpc/leaderhealth"
 	gRPCTransport "github.com/Jille/raft-grpc-transport"
 	"github.com/Jille/raftadmin"
 	"github.com/hashicorp/raft"
 	boltdb "github.com/hashicorp/raft-boltdb"
-	proto "github.com/strangelove-ventures/horcrux/signer/proto"
+	proto "github.com/rcommodum/horcrux/signer/proto"
 	"github.com/tendermint/tendermint/libs/log"
 	"github.com/tendermint/tendermint/libs/service"
 	"google.golang.org/grpc"
@@ -53,13 +55,13 @@ type RaftStore struct {
 	Peers       []localthreshold.Cosigner
 
 	mu sync.Mutex
-	m  map[string]string // The key-value store for the system.
+	M  map[string]string // The key-value store for the system.
 
-	raft *raft.Raft // The consensus mechanism
+	Raft *raft.Raft // The consensus mechanism
 
-	logger             log.Logger
-	cosigner           *localthreshold.LocalCosigner
-	thresholdValidator *ThresholdValidator
+	Logger             log.Logger
+	Cosigner           *localthreshold.LocalCosigner
+	thresholdValidator *signer.ThresholdValidator
 }
 
 // New returns a new Store.
@@ -71,9 +73,9 @@ func NewRaftStore(
 		RaftDir:     directory,
 		RaftBind:    bindAddress,
 		RaftTimeout: timeout,
-		m:           make(map[string]string),
-		logger:      logger,
-		cosigner:    cosigner,
+		M:           make(map[string]string),
+		Logger:      logger,
+		Cosigner:    cosigner,
 		Peers:       raftPeers,
 	}
 
@@ -81,12 +83,12 @@ func NewRaftStore(
 	return cosignerRaftStore
 }
 
-func (s *RaftStore) SetThresholdValidator(thresholdValidator *ThresholdValidator) {
+func (s *RaftStore) SetThresholdValidator(thresholdValidator *signer.ThresholdValidator) {
 	s.thresholdValidator = thresholdValidator
 }
 
 func (s *RaftStore) init() error {
-	host := p2pURLToRaftAddress(s.RaftBind)
+	host := P2pURLToRaftAddress(s.RaftBind)
 	_, port, err := net.SplitHostPort(host)
 	if err != nil {
 		return fmt.Errorf("failed to parse local address: %s, %v", host, err)
@@ -100,14 +102,14 @@ func (s *RaftStore) init() error {
 		return err
 	}
 	grpcServer := grpc.NewServer()
-	proto.RegisterCosignerGRPCServer(grpcServer, &GRPCServer{
-		cosigner:           s.cosigner,
+	proto.RegisterCosignerGRPCServer(grpcServer, &signer.GRPCServer{
+		cosigner:           s.Cosigner,
 		thresholdValidator: s.thresholdValidator,
 		raftStore:          s,
 	})
 	transportManager.Register(grpcServer)
-	leaderhealth.Setup(s.raft, grpcServer, []string{"Leader"})
-	raftadmin.Register(grpcServer, s.raft)
+	leaderhealth.Setup(s.Raft, grpcServer, []string{"Leader"})
+	raftadmin.Register(grpcServer, s.Raft)
 	reflection.Register(grpcServer)
 	if err := grpcServer.Serve(sock); err != nil {
 		return err
@@ -127,7 +129,7 @@ func (s *RaftStore) OnStart() error {
 	return nil
 }
 
-func p2pURLToRaftAddress(p2pURL string) string {
+func P2pURLToRaftAddress(p2pURL string) string {
 	url, err := url.Parse(p2pURL)
 	if err != nil {
 		return p2pURL
@@ -163,7 +165,7 @@ func (s *RaftStore) Open() (*gRPCTransport.Manager, error) {
 		return nil, fmt.Errorf(`boltdb.NewBoltStore(%q): %v`, stableStoreFile, err)
 	}
 
-	raftAddress := raft.ServerAddress(p2pURLToRaftAddress(s.RaftBind))
+	raftAddress := raft.ServerAddress(P2pURLToRaftAddress(s.RaftBind))
 
 	// Setup Raft communication.
 	transportManager := gRPCTransport.New(raftAddress, []grpc.DialOption{
@@ -175,7 +177,7 @@ func (s *RaftStore) Open() (*gRPCTransport.Manager, error) {
 	if err != nil {
 		return nil, fmt.Errorf("new raft: %s", err)
 	}
-	s.raft = ra
+	s.Raft = ra
 
 	configuration := raft.Configuration{
 		Servers: []raft.Server{
@@ -188,10 +190,10 @@ func (s *RaftStore) Open() (*gRPCTransport.Manager, error) {
 	for _, peer := range s.Peers {
 		configuration.Servers = append(configuration.Servers, raft.Server{
 			ID:      raft.ServerID(fmt.Sprint(peer.GetID())),
-			Address: raft.ServerAddress(p2pURLToRaftAddress(peer.GetAddress())),
+			Address: raft.ServerAddress(P2pURLToRaftAddress(peer.GetAddress())),
 		})
 	}
-	s.raft.BootstrapCluster(configuration)
+	s.Raft.BootstrapCluster(configuration)
 
 	return transportManager, nil
 }
@@ -200,7 +202,7 @@ func (s *RaftStore) Open() (*gRPCTransport.Manager, error) {
 func (s *RaftStore) Get(key string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.m[key], nil
+	return s.M[key], nil
 }
 
 func (s *RaftStore) Emit(key string, value interface{}) error {
@@ -213,7 +215,7 @@ func (s *RaftStore) Emit(key string, value interface{}) error {
 
 // Set sets the value for the given key.
 func (s *RaftStore) Set(key, value string) error {
-	if s.raft.State() != raft.Leader {
+	if s.Raft.State() != raft.Leader {
 		return fmt.Errorf("not leader")
 	}
 
@@ -227,13 +229,13 @@ func (s *RaftStore) Set(key, value string) error {
 		return err
 	}
 
-	f := s.raft.Apply(b, s.RaftTimeout)
+	f := s.Raft.Apply(b, s.RaftTimeout)
 	return f.Error()
 }
 
 // Delete deletes the given key.
 func (s *RaftStore) Delete(key string) error {
-	if s.raft.State() != raft.Leader {
+	if s.Raft.State() != raft.Leader {
 		return fmt.Errorf("not leader")
 	}
 
@@ -246,16 +248,16 @@ func (s *RaftStore) Delete(key string) error {
 		return err
 	}
 
-	f := s.raft.Apply(b, s.RaftTimeout)
+	f := s.Raft.Apply(b, s.RaftTimeout)
 	return f.Error()
 }
 
 // Join joins a node, identified by nodeID and located at addr, to this store.
 // The node must be ready to respond to Raft communications at that address.
 func (s *RaftStore) Join(nodeID, addr string) error {
-	configFuture := s.raft.GetConfiguration()
+	configFuture := s.Raft.GetConfiguration()
 	if err := configFuture.Error(); err != nil {
-		s.logger.Error("failed to get raft configuration", err)
+		s.Logger.Error("failed to get raft configuration", err)
 		return err
 	}
 
@@ -266,27 +268,27 @@ func (s *RaftStore) Join(nodeID, addr string) error {
 			// However if *both* the ID and the address are the same, then nothing -- not even
 			// a join operation -- is needed.
 			if srv.Address == raft.ServerAddress(addr) && srv.ID == raft.ServerID(nodeID) {
-				s.logger.Error("node already member of cluster, ignoring join request", nodeID, addr)
+				s.Logger.Error("node already member of cluster, ignoring join request", nodeID, addr)
 				return nil
 			}
 
-			future := s.raft.RemoveServer(srv.ID, 0, 0)
+			future := s.Raft.RemoveServer(srv.ID, 0, 0)
 			if err := future.Error(); err != nil {
 				return fmt.Errorf("error removing existing node %s at %s: %s", nodeID, addr, err)
 			}
 		}
 	}
 
-	f := s.raft.AddVoter(raft.ServerID(nodeID), raft.ServerAddress(addr), 0, 0)
+	f := s.Raft.AddVoter(raft.ServerID(nodeID), raft.ServerAddress(addr), 0, 0)
 	if f.Error() != nil {
 		return f.Error()
 	}
-	s.logger.Info("node joined successfully", nodeID, addr)
+	s.Logger.Info("node joined successfully", nodeID, addr)
 	return nil
 }
 
 func (s *RaftStore) GetLeader() raft.ServerAddress {
-	return s.raft.Leader()
+	return s.Raft.Leader()
 }
 
 type fsm RaftStore
@@ -295,7 +297,7 @@ type fsm RaftStore
 func (f *fsm) Apply(l *raft.Log) interface{} {
 	var c command
 	if err := json.Unmarshal(l.Data, &c); err != nil {
-		f.logger.Error("failed to unmarshal command", err.Error())
+		f.Logger.Error("failed to unmarshal command", err.Error())
 		return nil
 	}
 
@@ -305,7 +307,7 @@ func (f *fsm) Apply(l *raft.Log) interface{} {
 	case "delete":
 		return f.applyDelete(c.Key)
 	default:
-		f.logger.Error("unrecognized command op", c.Op)
+		f.Logger.Error("unrecognized command op", c.Op)
 		return nil
 	}
 }
@@ -317,10 +319,10 @@ func (f *fsm) Snapshot() (raft.FSMSnapshot, error) {
 
 	// Clone the map.
 	o := make(map[string]string)
-	for k, v := range f.m {
+	for k, v := range f.M {
 		o[k] = v
 	}
-	return &fsmSnapshot{store: o, logger: f.logger}, nil
+	return &fsmSnapshot{store: o, logger: f.Logger}, nil
 }
 
 // Restore stores the key-value store to a previous state.
@@ -332,7 +334,7 @@ func (f *fsm) Restore(rc io.ReadCloser) error {
 
 	// Set the state from the snapshot, no lock required according to
 	// Hashicorp docs.
-	f.m = o
+	f.M = o
 	return nil
 }
 
@@ -346,14 +348,14 @@ func (f *fsm) applySet(key, value string) interface{} {
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.m[key] = value
+	f.M[key] = value
 	return nil
 }
 
 func (f *fsm) applyDelete(key string) interface{} {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	delete(f.m, key)
+	delete(f.M, key)
 	return nil
 }
 
