@@ -27,6 +27,12 @@ func SetupTestRun(t *testing.T) (context.Context, string, *dockertest.Pool, *doc
 	network, err := CreateTestNetwork(pool, fmt.Sprintf("horcrux-%s", RandLowerCaseLetterString(8)), t)
 	require.NoError(t, err)
 
+	// set the test cleanup function
+	t.Cleanup(Cleanup(pool, t.Name(), home))
+
+	// build the horcrux image
+	require.NoError(t, BuildTestSignerImage(pool))
+
 	return context.Background(), home, pool, network
 }
 

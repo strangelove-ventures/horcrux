@@ -159,6 +159,13 @@ func GetValidators(
 	return
 }
 
+func GetAllNodes(nodes ...TestNodes) (out TestNodes) {
+	for _, testNodes := range nodes {
+		out = append(out, testNodes...)
+	}
+	return
+}
+
 // NewClient creates and assigns a new Tendermint RPC client to the TestNode
 func (tn *TestNode) NewClient(addr string) error {
 	httpClient, err := libclient.DefaultHTTPClient(addr)
@@ -317,7 +324,7 @@ func (tn *TestNode) SetValidatorConfigAndPeers(peers string, enablePrivVal bool)
 	tmconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
 }
 
-func (tn *TestNode) SetPrivValdidatorListen(peers string) {
+func (tn *TestNode) SetPrivValListen(peers string) {
 	cfg := tmconfig.DefaultConfig()
 	stdconfigchanges(cfg, peers, true) // Reapply the changes made to the config file in SetValidatorConfigAndPeers()
 	tmconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
@@ -575,6 +582,16 @@ func (tn *TestNode) StopContainer() error {
 	return tn.Pool.Client.StopContainer(tn.Container.ID, uint(time.Second*30))
 }
 
+func (tn *TestNode) StopAndRemoveContainer(force bool) error {
+	if err := tn.StopContainer(); err != nil && !force {
+		return err
+	}
+	return tn.Pool.Client.RemoveContainer(docker.RemoveContainerOptions{
+		ID:    tn.Container.ID,
+		Force: force,
+	})
+}
+
 func (tn *TestNode) StartContainer(ctx context.Context) error {
 	if err := tn.Pool.Client.StartContainer(tn.Container.ID, nil); err != nil {
 		return err
@@ -745,7 +762,22 @@ func (tn TestNodes) WaitForHeight(height int64) {
 }
 
 func (tn *TestNode) GetPrivVal() (privval.FilePVKey, error) {
-	return signer.ReadPrivValidatorFile(path.Join(tn.Dir(), "config", "priv_validator_key.json"))
+	return signer.ReadPrivValidatorFile(tn.privValKeyPath())
+}
+
+func (tn *TestNode) privValKeyPath() string {
+	return path.Join(tn.Dir(), "config", "priv_validator_key.json")
+}
+
+func (tn *TestNode) privValStatePath() string {
+	return path.Join(tn.Dir(), "config", "priv_validator_state.json")
+}
+
+func (tn *TestNode) GenNewPrivVal() {
+	_ = os.Remove(tn.privValKeyPath())
+	_ = os.Remove(tn.privValStatePath())
+	newFilePV := privval.GenFilePV(tn.privValKeyPath(), tn.privValStatePath())
+	newFilePV.Save()
 }
 
 func (tn *TestNode) PubKeyJSON() string {

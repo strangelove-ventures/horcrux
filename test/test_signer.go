@@ -440,6 +440,16 @@ func (ts *TestSigner) StopContainer() error {
 	return ts.Pool.Client.StopContainer(ts.Container.ID, uint(time.Second*30))
 }
 
+func (ts *TestSigner) StopAndRemoveContainer(force bool) error {
+	if err := ts.StopContainer(); err != nil && !force {
+		return err
+	}
+	return ts.Pool.Client.RemoveContainer(docker.RemoveContainerOptions{
+		ID:    ts.Container.ID,
+		Force: force,
+	})
+}
+
 func (ts *TestSigner) PauseContainer() error {
 	return ts.Pool.Client.PauseContainer(ts.Container.ID)
 }
