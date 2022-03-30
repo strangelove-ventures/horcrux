@@ -1,9 +1,11 @@
 package test
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	b64 "encoding/base64"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -21,7 +23,6 @@ import (
 
 	"github.com/avast/retry-go"
 	"github.com/cosmos/cosmos-sdk/client"
-	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/cosmos/cosmos-sdk/simapp"
 	"github.com/cosmos/cosmos-sdk/simapp/params"
@@ -32,6 +33,7 @@ import (
 	"github.com/strangelove-ventures/horcrux/signer"
 	"github.com/stretchr/testify/require"
 	tmconfig "github.com/tendermint/tendermint/config"
+	tmBytes "github.com/tendermint/tendermint/libs/bytes"
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/privval"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
@@ -79,17 +81,18 @@ type ChainType struct {
 
 // TestNode represents a node in the test network that is being created
 type TestNode struct {
-	Home         string
-	Index        int
-	ChainID      string
-	Chain        *ChainType
-	GenesisCoins string
-	Validator    bool
-	Pool         *dockertest.Pool
-	Client       rpcclient.Client
-	Container    *docker.Container
-	t            *testing.T
-	ec           params.EncodingConfig
+	Home           string
+	Index          int
+	ValidatorIndex int
+	ChainID        string
+	Chain          *ChainType
+	GenesisCoins   string
+	Validator      bool
+	Pool           *dockertest.Pool
+	Client         rpcclient.Client
+	Container      *docker.Container
+	t              *testing.T
+	ec             params.EncodingConfig
 }
 
 type ContainerPort struct {
@@ -114,8 +117,15 @@ func (tn *TestNode) CliContext() client.Context {
 }
 
 // MakeTestNodes creates the test node objects required for bootstrapping tests
-func MakeTestNodes(count int, home, chainid string, chainType *ChainType,
-	pool *dockertest.Pool, t *testing.T) (out TestNodes) {
+func MakeTestNodes(
+	validatorIndex,
+	count int,
+	home,
+	chainID string,
+	chainType *ChainType,
+	pool *dockertest.Pool,
+	t *testing.T,
+) (out TestNodes) {
 	err := pool.Client.PullImage(docker.PullImageOptions{
 		Repository: chainType.Repository,
 		Tag:        chainType.Version,
@@ -124,7 +134,7 @@ func MakeTestNodes(count int, home, chainid string, chainType *ChainType,
 		t.Logf("Error pulling image: %v", err)
 	}
 	for i := 0; i < count; i++ {
-		tn := &TestNode{Home: home, Index: i, Chain: chainType, ChainID: chainid,
+		tn := &TestNode{Home: home, Index: i, ValidatorIndex: validatorIndex, Chain: chainType, ChainID: chainID,
 			Pool: pool, t: t, ec: simapp.MakeTestEncodingConfig()}
 		tn.MkDir()
 		out = append(out, tn)
@@ -132,74 +142,21 @@ func MakeTestNodes(count int, home, chainid string, chainType *ChainType,
 	return
 }
 
-// StartNodeContainers is passed a chain id and arrays of validators and full nodes to configure
-func StartNodeContainers(t *testing.T, ctx context.Context, net *docker.Network, validators, fullnodes []*TestNode) {
-	var eg errgroup.Group
-
-	// sign gentx for each validator
-	for _, v := range validators {
-		v := v
-		eg.Go(func() error { return v.InitValidatorFiles(ctx) })
+// Creates indexed validator test nodes
+func GetValidators(
+	startingValidatorIndex,
+	count,
+	sentriesPerValidator int,
+	home,
+	chainID string,
+	chain *ChainType,
+	pool *dockertest.Pool,
+	t *testing.T,
+) (out TestNodes) {
+	for i := startingValidatorIndex; i < startingValidatorIndex+count; i++ {
+		out = append(out, MakeTestNodes(i, sentriesPerValidator, home, chainID, chain, pool, t)...)
 	}
-
-	// just initialize folder for any full nodes
-	for _, n := range fullnodes {
-		n := n
-		eg.Go(func() error { return n.InitFullNodeFiles(ctx) })
-	}
-
-	// wait for this to finish
-	require.NoError(t, eg.Wait())
-
-	// for the validators we need to collect the gentxs and the accounts
-	// to the first node's genesis file
-	validator0 := validators[0]
-	for i := 1; i < len(validators); i++ {
-		validatorN := validators[i]
-		n0key, err := validatorN.GetKey(valKey)
-		require.NoError(t, err)
-
-		require.NoError(t, validator0.AddGenesisAccount(ctx, n0key.GetAddress().String()))
-		nNid, err := validatorN.NodeID()
-		require.NoError(t, err)
-		oldPath := path.Join(validatorN.Dir(), "config", "gentx", fmt.Sprintf("gentx-%s.json", nNid))
-		newPath := path.Join(validator0.Dir(), "config", "gentx", fmt.Sprintf("gentx-%s.json", nNid))
-		require.NoError(t, os.Rename(oldPath, newPath))
-	}
-	require.NoError(t, eg.Wait())
-	require.NoError(t, validator0.CollectGentxs(ctx))
-
-	genbz, err := ioutil.ReadFile(validator0.GenesisFilePath())
-	require.NoError(t, err)
-
-	nodes := validators
-	nodes = append(nodes, fullnodes...)
-
-	for i := 1; i < len(nodes); i++ {
-		require.NoError(t, ioutil.WriteFile(nodes[i].GenesisFilePath(), genbz, 0644)) //nolint
-	}
-
-	TestNodes(nodes).LogGenesisHashes()
-
-	for _, n := range nodes {
-		n := n
-		eg.Go(func() error {
-			return n.CreateNodeContainer(net.ID, true)
-		})
-	}
-	require.NoError(t, eg.Wait())
-
-	peers := TestNodes(nodes).PeerString()
-
-	for _, n := range nodes {
-		n := n
-		t.Logf("{%s} => starting container...", n.Name())
-		eg.Go(func() error {
-			n.SetValidatorConfigAndPeers(peers)
-			return n.StartContainer(ctx)
-		})
-	}
-	require.NoError(t, eg.Wait())
+	return
 }
 
 // NewClient creates and assigns a new Tendermint RPC client to the TestNode
@@ -229,7 +186,6 @@ func (tn *TestNode) GetHosts() (out Hosts) {
 			Port:      k,
 		}
 		out = append(out, host)
-		break
 	}
 	return
 }
@@ -266,30 +222,27 @@ func isReachable(wg *sync.WaitGroup, t *testing.T, host ContainerPort, ch chan<-
 	ch <- connectionAttempt(t, host)
 }
 
-func (hosts Hosts) WaitForAllToStart(t *testing.T, timeout int) {
+func (hosts Hosts) WaitForAllToStart(t *testing.T, timeout int) error {
 	if len(hosts) == 0 {
-		return
+		return nil
 	}
 	for seconds := 1; seconds <= timeout; seconds++ {
 		var wg sync.WaitGroup
 
 		results := make(chan bool, len(hosts))
-		for i := 0; i < len(hosts); i++ {
-			host := hosts[i]
-			wg.Add(1)
+		wg.Add(len(hosts))
+		for _, host := range hosts {
 			go isReachable(&wg, t, host, results)
 		}
+		wg.Wait()
 
-		go func() {
-			wg.Wait()
-			close(results)
-		}()
+		close(results)
 
 		foundUnreachable := false
 
 		for reachable := range results {
 			if !reachable {
-				t.Logf("A signer node is not reachable")
+				t.Logf("A host is not reachable")
 				foundUnreachable = true
 				break
 			}
@@ -297,15 +250,15 @@ func (hosts Hosts) WaitForAllToStart(t *testing.T, timeout int) {
 		if foundUnreachable {
 			continue
 		}
-		t.Logf("All signers are reachable after %d seconds", seconds)
-		return
+		t.Logf("All hosts are reachable after %d seconds", seconds)
+		return nil
 	}
-	t.Logf("Timed out after %d seconds waiting for signers", timeout)
+	return fmt.Errorf("timed out after %d seconds waiting for hosts", timeout)
 }
 
 // Name is the hostname of the test node container
 func (tn *TestNode) Name() string {
-	return fmt.Sprintf("node-%d-%s", tn.Index, tn.t.Name())
+	return fmt.Sprintf("val-%d-node-%d-%s", tn.ValidatorIndex, tn.Index, tn.t.Name())
 }
 
 // Dir is the directory where the test node files are stored
@@ -353,12 +306,12 @@ func (tn *TestNode) Keybase() keyring.Keyring {
 }
 
 // SetValidatorConfigAndPeers modifies the config for a validator node to start a chain
-func (tn *TestNode) SetValidatorConfigAndPeers(peers string) {
+func (tn *TestNode) SetValidatorConfigAndPeers(peers string, enablePrivVal bool) {
 	// Pull default config
 	cfg := tmconfig.DefaultConfig()
 
 	// change config to include everything needed
-	stdconfigchanges(cfg, peers)
+	stdconfigchanges(cfg, peers, enablePrivVal)
 
 	// overwrite with the new config
 	tmconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
@@ -366,34 +319,35 @@ func (tn *TestNode) SetValidatorConfigAndPeers(peers string) {
 
 func (tn *TestNode) SetPrivValdidatorListen(peers string) {
 	cfg := tmconfig.DefaultConfig()
-	cfg.BaseConfig.PrivValidatorListenAddr = "tcp://0.0.0.0:1234"
-	stdconfigchanges(cfg, peers) // Reapply the changes made to the config file in SetValidatorConfigAndPeers()
+	stdconfigchanges(cfg, peers, true) // Reapply the changes made to the config file in SetValidatorConfigAndPeers()
 	tmconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
 }
 
-func (tn *TestNode) getValSigningInfo() *slashingtypes.QuerySigningInfoResponse {
+func (tn *TestNode) getValSigningInfo(address tmBytes.HexBytes) *slashingtypes.QuerySigningInfoResponse {
 	slashInfo, err := slashingtypes.NewQueryClient(
 		tn.CliContext()).SigningInfo(context.Background(), &slashingtypes.QuerySigningInfoRequest{
-		ConsAddress: tn.GetConsPub(),
+		ConsAddress: sdk.ConsAddress(address).String(),
 	})
 	require.NoError(tn.t, err)
 	return slashInfo
 }
 
-func (tn *TestNode) GetMostRecentConsecutiveSignedBlocks(max int64) (count int64, latestHeight int64) {
+func (tn *TestNode) GetMostRecentConsecutiveSignedBlocks(
+	max int64,
+	address tmBytes.HexBytes,
+) (count int64, latestHeight int64, err error) {
 	status, err := tn.Client.Status(context.Background())
-	require.NoError(tn.t, err)
+	if err != nil {
+		return
+	}
 
 	latestHeight = status.SyncInfo.LatestBlockHeight
-
-	pv, err := tn.GetPrivVal()
-	require.NoError(tn.t, err)
 
 	for i := latestHeight; i > latestHeight-max && i > 0; i-- {
 		block, err := tn.Client.Block(context.Background(), &i)
 		require.NoError(tn.t, err)
 		for _, voter := range block.Block.LastCommit.Signatures {
-			if reflect.DeepEqual(voter.ValidatorAddress, pv.Address) {
+			if reflect.DeepEqual(voter.ValidatorAddress, address) {
 				count++
 				break
 			}
@@ -402,34 +356,45 @@ func (tn *TestNode) GetMostRecentConsecutiveSignedBlocks(max int64) (count int64
 	return
 }
 
-func (tn *TestNode) getMissingBlocks() int64 {
-	return tn.getValSigningInfo().ValSigningInfo.MissedBlocksCounter
+func (tn *TestNode) getMissingBlocks(address tmBytes.HexBytes) int64 {
+	return tn.getValSigningInfo(address).ValSigningInfo.MissedBlocksCounter
 }
 
-func (tn *TestNode) EnsureNotSlashed() {
+func (tn *TestNode) EnsureNotSlashed(address tmBytes.HexBytes) error {
 	for i := 0; i < 50; i++ {
 		time.Sleep(1 * time.Second)
-		slashInfo := tn.getValSigningInfo()
+		slashInfo := tn.getValSigningInfo(address)
 
 		if i == 0 {
-			tn.t.Log("{EnsureNotSlashed} Initial Missed blocks:", slashInfo.ValSigningInfo.MissedBlocksCounter)
+			tn.t.Logf("{EnsureNotSlashed} val-%d Initial Missed blocks: %d", tn.ValidatorIndex,
+				slashInfo.ValSigningInfo.MissedBlocksCounter)
 			continue
 		}
 		if i%2 == 0 {
 			// require.Equal(tn.t, missed, slashInfo.ValSigningInfo.MissedBlocksCounter)
 			stat, err := tn.Client.Status(context.Background())
 			require.NoError(tn.t, err)
-			tn.t.Log("{EnsureNotSlashed} Missed blocks:",
-				slashInfo.ValSigningInfo.MissedBlocksCounter, "block", stat.SyncInfo.LatestBlockHeight)
+			tn.t.Logf("{EnsureNotSlashed} val-%d Missed blocks: %d block: %d", tn.ValidatorIndex,
+				slashInfo.ValSigningInfo.MissedBlocksCounter, stat.SyncInfo.LatestBlockHeight)
 		}
-		require.False(tn.t, slashInfo.ValSigningInfo.Tombstoned)
+		if slashInfo.ValSigningInfo.Tombstoned {
+			return errors.New("validator is tombstoned")
+		}
 	}
+	return nil
+}
+
+func min(a, b int64) int64 {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // Wait until we have signed n blocks in a row
-func (tn *TestNode) WaitForConsecutiveBlocks(blocks int64) {
-	initialMissed := tn.getMissingBlocks()
-	tn.t.Log("{WaitForConsecutiveBlocks} Initial Missed blocks:", initialMissed)
+func (tn *TestNode) WaitForConsecutiveBlocks(blocks int64, address tmBytes.HexBytes) error {
+	initialMissed := tn.getMissingBlocks(address)
+	tn.t.Logf("{WaitForConsecutiveBlocks} val-%d Initial Missed blocks: %d", tn.ValidatorIndex, initialMissed)
 	stat, err := tn.Client.Status(context.Background())
 	require.NoError(tn.t, err)
 
@@ -439,26 +404,34 @@ func (tn *TestNode) WaitForConsecutiveBlocks(blocks int64) {
 	for i := int64(0); i < timeoutSeconds; i++ {
 		time.Sleep(1 * time.Second)
 
-		recentSignedBlocksCount, checkingBlock := tn.GetMostRecentConsecutiveSignedBlocks(blocks)
-		deltaMissed := blocks - recentSignedBlocksCount
+		recentSignedBlocksCount, checkingBlock, err := tn.GetMostRecentConsecutiveSignedBlocks(blocks, address)
+		if err != nil {
+			continue
+		}
+		deltaMissed := min(blocks, checkingBlock) - recentSignedBlocksCount
 		deltaBlocks := checkingBlock - startingBlock
 
-		tn.t.Log("{WaitForConsecutiveBlocks} Missed blocks:", deltaMissed, "block", checkingBlock)
+		tn.t.Logf("{WaitForConsecutiveBlocks} val-%d Missed blocks: %d block: %d",
+			tn.ValidatorIndex, deltaMissed, checkingBlock)
 		if deltaMissed == 0 && deltaBlocks >= blocks {
-			tn.t.Log(fmt.Sprintf("Time (sec) to sign %d consecutive blocks:", blocks), i+1)
-			return // done waiting for consecutive signed blocks
+			tn.t.Logf("Time (sec) to sign %d consecutive blocks: %d", blocks, i+1)
+			return nil // done waiting for consecutive signed blocks
 		}
 	}
-	require.NoError(tn.t, errors.New("timed out waiting for cluster to recover signing blocks"))
+	return errors.New("timed out waiting for cluster to recover signing blocks")
 }
 
-func stdconfigchanges(cfg *tmconfig.Config, peers string) {
+func stdconfigchanges(cfg *tmconfig.Config, peers string, enablePrivVal bool) {
 	// turn down blocktimes to make the chain faster
 	cfg.Consensus.TimeoutCommit = blockTime * time.Second
 	cfg.Consensus.TimeoutPropose = blockTime * time.Second
 
 	// Open up rpc address
 	cfg.RPC.ListenAddress = "tcp://0.0.0.0:26657"
+
+	if enablePrivVal {
+		cfg.BaseConfig.PrivValidatorListenAddr = "tcp://0.0.0.0:1234"
+	}
 
 	// Allow for some p2p weirdness
 	cfg.P2P.AllowDuplicateIP = true
@@ -473,7 +446,7 @@ func stdconfigchanges(cfg *tmconfig.Config, peers string) {
 
 // NodeJob run a container for a specific job and block until the container exits
 // NOTE: on job containers generate random name
-func (tn *TestNode) NodeJob(ctx context.Context, cmd []string) (int, error) {
+func (tn *TestNode) NodeJob(ctx context.Context, cmd []string) (string, int, string, string, error) {
 	container := RandLowerCaseLetterString(10)
 	tn.t.Logf("{%s}[%s] -> '%s'", tn.Name(), container, strings.Join(cmd, " "))
 	cont, err := tn.Pool.Client.CreateContainer(docker.CreateContainerOptions{
@@ -490,7 +463,7 @@ func (tn *TestNode) NodeJob(ctx context.Context, cmd []string) (int, error) {
 		HostConfig: &docker.HostConfig{
 			Binds:           tn.Bind(),
 			PublishAllPorts: true,
-			AutoRemove:      true,
+			AutoRemove:      false,
 		},
 		NetworkingConfig: &docker.NetworkingConfig{
 			EndpointsConfig: map[string]*docker.EndpointConfig{},
@@ -498,12 +471,27 @@ func (tn *TestNode) NodeJob(ctx context.Context, cmd []string) (int, error) {
 		Context: nil,
 	})
 	if err != nil {
-		return 1, err
+		return container, 1, "", "", err
 	}
 	if err := tn.Pool.Client.StartContainer(cont.ID, nil); err != nil {
-		return 1, err
+		return container, 1, "", "", err
 	}
-	return tn.Pool.Client.WaitContainerWithContext(cont.ID, ctx)
+	exitCode, err := tn.Pool.Client.WaitContainerWithContext(cont.ID, ctx)
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	_ = tn.Pool.Client.Logs(docker.LogsOptions{
+		Context:      ctx,
+		Container:    cont.ID,
+		OutputStream: stdout,
+		ErrorStream:  stderr,
+		Stdout:       true,
+		Stderr:       true,
+		Tail:         "100",
+		Follow:       false,
+		Timestamps:   false,
+	})
+	_ = tn.Pool.Client.RemoveContainer(docker.RemoveContainerOptions{ID: cont.ID})
+	return container, exitCode, stdout.String(), stderr.String(), err
 }
 
 // InitHomeFolder initializes a home folder for the given node
@@ -534,8 +522,9 @@ func (tn *TestNode) AddGenesisAccount(ctx context.Context, address string) error
 }
 
 // Gentx generates the gentx for a given node
-func (tn *TestNode) Gentx(ctx context.Context, name string) error {
+func (tn *TestNode) Gentx(ctx context.Context, name, pubKey string) error {
 	command := []string{tn.Chain.Bin, "gentx", valKey, "100000000000stake",
+		"--pubkey", pubKey,
 		"--keyring-backend", "test",
 		"--home", tn.NodeHome(),
 		"--chain-id", tn.ChainID,
@@ -551,7 +540,7 @@ func (tn *TestNode) CollectGentxs(ctx context.Context) error {
 	return handleNodeJobError(tn.NodeJob(ctx, command))
 }
 
-func (tn *TestNode) CreateNodeContainer(networkID string, rm bool) error {
+func (tn *TestNode) CreateNodeContainer(networkID string) error {
 	cont, err := tn.Pool.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: tn.Name(),
 		Config: &docker.Config{
@@ -566,7 +555,7 @@ func (tn *TestNode) CreateNodeContainer(networkID string, rm bool) error {
 		HostConfig: &docker.HostConfig{
 			Binds:           tn.Bind(),
 			PublishAllPorts: true,
-			AutoRemove:      rm,
+			AutoRemove:      false,
 		},
 		NetworkingConfig: &docker.NetworkingConfig{
 			EndpointsConfig: map[string]*docker.EndpointConfig{
@@ -622,7 +611,7 @@ func (tn *TestNode) StartContainer(ctx context.Context) error {
 }
 
 // InitValidatorFiles creates the node files and signs a genesis transaction
-func (tn *TestNode) InitValidatorFiles(ctx context.Context) error {
+func (tn *TestNode) InitValidatorFiles(ctx context.Context, pubKey string) error {
 	if err := tn.InitHomeFolder(ctx); err != nil {
 		return err
 	}
@@ -636,19 +625,24 @@ func (tn *TestNode) InitValidatorFiles(ctx context.Context) error {
 	if err := tn.AddGenesisAccount(ctx, key.GetAddress().String()); err != nil {
 		return err
 	}
-	return tn.Gentx(ctx, valKey)
+	// if override pubkey is not provided, use the one from this TestNode
+	if pubKey == "" {
+		pubKey = tn.PubKeyJSON()
+	}
+	return tn.Gentx(ctx, valKey, pubKey)
 }
 
 func (tn *TestNode) InitFullNodeFiles(ctx context.Context) error {
 	return tn.InitHomeFolder(ctx)
 }
 
-func handleNodeJobError(i int, err error) error {
+func handleNodeJobError(container string, i int, stdout string, stderr string, err error) error {
 	if err != nil {
-		return err
+		return fmt.Errorf("%v\n%s\n%s", err, stdout, stderr)
 	}
 	if i != 0 {
-		return fmt.Errorf("container returned non-zero error code: %d", i)
+		return fmt.Errorf("container [%s] returned non-zero error code: %d\nstdout:\n%s\nstderr:\n%s",
+			container, i, stdout, stderr)
 	}
 	return nil
 }
@@ -754,23 +748,12 @@ func (tn *TestNode) GetPrivVal() (privval.FilePVKey, error) {
 	return signer.ReadPrivValidatorFile(path.Join(tn.Dir(), "config", "priv_validator_key.json"))
 }
 
-func (tn *TestNode) GetConsPub() string {
+func (tn *TestNode) PubKeyJSON() string {
 	pv, err := tn.GetPrivVal()
 	require.NoError(tn.t, err)
 
-	pubkey, err := cryptocodec.FromTmPubKeyInterface(pv.PubKey)
-	require.NoError(tn.t, err)
-
-	return sdk.ConsAddress(pubkey.Address()).String()
-
-	// return sdk.Bech32ifyPubKey(sdk.Bech32PubKeyTypeValPub, pubkey)
-}
-
-func (tn *TestNode) CreateKeyShares(threshold, total int64) []signer.CosignerKey {
-	shares, err := signer.CreateCosignerSharesFromFile(
-		path.Join(tn.Dir(), "config", "priv_validator_key.json"), threshold, total)
-	require.NoError(tn.t, err)
-	return shares
+	sEnc := b64.StdEncoding.EncodeToString(pv.PubKey.Bytes())
+	return fmt.Sprintf("{\"@type\":\"/cosmos.crypto.ed25519.PubKey\",\"key\":\"%s\"}", sEnc)
 }
 
 func getDockerUserString() string {
