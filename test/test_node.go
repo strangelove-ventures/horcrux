@@ -12,10 +12,10 @@ import (
 	"math/big"
 	"net"
 	"os"
+	"os/exec"
 	"path"
 	"reflect"
 	"runtime"
-	dbg "runtime/debug"
 	"strings"
 	"sync"
 	"testing"
@@ -59,13 +59,12 @@ var cosmosNodePorts = map[docker.Port]struct{}{
 }
 
 func getGoModuleVersion(pkg string) string {
-	bi, _ := dbg.ReadBuildInfo()
-	for _, dep := range bi.Deps {
-		if dep.Path == pkg {
-			return dep.Version
-		}
+	cmd := exec.Command("go", "list", "-m", "-u", "-f", "{{.Version}}", pkg)
+	out, err := cmd.Output()
+	if err != nil {
+		panic(fmt.Sprintf("failed to evaluate Go module version: %v", err))
 	}
-	return ""
+	return strings.TrimSpace(string(out))
 }
 
 func getHeighlinerChain(
