@@ -159,6 +159,8 @@ func initCmd() *cobra.Command {
 					return err
 				}
 			}
+
+			fmt.Printf("Successfully initialized configuration: %s\n", configYamlPath)
 			return nil
 		},
 	}

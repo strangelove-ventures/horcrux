@@ -14,6 +14,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
+	"github.com/strangelove-ventures/horcrux/signer"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 )
@@ -58,10 +59,16 @@ func Genesis(
 
 	for _, v := range horcruxValidators {
 		v := v
+
+		bech32Prefix := ""
+		if chain.PubKeyAsBech32 {
+			bech32Prefix = chain.Bech32Prefix
+		}
+
 		// using the first sentry for each horcrux validator as the keyring for the account key (not consensus key)
 		// to sign gentx
 		eg.Go(func() error {
-			return v.Sentries[0].InitValidatorFiles(ctx, v.PubKey(chain.Bech32Prefix, chain.PubKeyAsBech32))
+			return v.Sentries[0].InitValidatorFiles(ctx, signer.PubKey(bech32Prefix, v.PubKey))
 		})
 		sentries := v.Sentries[1:]
 		for _, sentry := range sentries {

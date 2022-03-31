@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	b64 "encoding/base64"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -23,8 +22,6 @@ import (
 
 	"github.com/avast/retry-go"
 	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/codec/legacy"
-	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/cosmos/cosmos-sdk/simapp"
 	"github.com/cosmos/cosmos-sdk/simapp/params"
@@ -701,7 +698,15 @@ func (tn *TestNode) InitValidatorFiles(ctx context.Context, pubKey string) error
 	}
 	// if override pubkey is not provided, use the one from this TestNode
 	if pubKey == "" {
-		pubKey = tn.PubKey(tn.Chain.PubKeyAsBech32)
+		bech32Prefix := ""
+		if tn.Chain.PubKeyAsBech32 {
+			bech32Prefix = tn.Chain.Bech32Prefix
+		}
+		pv, err := tn.GetPrivVal()
+		if err != nil {
+			return err
+		}
+		pubKey = signer.PubKey(bech32Prefix, pv.PubKey)
 	}
 	// some chains need additional steps, such as genesis.json modification, before executing gentx
 	if tn.Chain.PreGenTx != nil {
@@ -841,27 +846,6 @@ func (tn *TestNode) GenNewPrivVal() {
 	_ = os.Remove(tn.privValStatePath())
 	newFilePV := privval.GenFilePV(tn.privValKeyPath(), tn.privValStatePath())
 	newFilePV.Save()
-}
-
-func (tn *TestNode) PubKey(pubKeyAsBech32 bool) string {
-	pv, err := tn.GetPrivVal()
-	require.NoError(tn.t, err)
-
-	if pubKeyAsBech32 {
-		pubkey, err := cryptocodec.FromTmPubKeyInterface(pv.PubKey)
-		if err != nil {
-			return ""
-		}
-		consPubPrefix := fmt.Sprintf("%svalconspub", tn.Chain.Bech32Prefix)
-		pubKeyBech32, err := bech32.ConvertAndEncode(consPubPrefix, legacy.Cdc.Amino.MustMarshalBinaryBare(pubkey))
-		if err != nil {
-			return ""
-		}
-		return pubKeyBech32
-	}
-
-	sEnc := b64.StdEncoding.EncodeToString(pv.PubKey.Bytes())
-	return fmt.Sprintf("{\"@type\":\"/cosmos.crypto.ed25519.PubKey\",\"key\":\"%s\"}", sEnc)
 }
 
 func getDockerUserString() string {

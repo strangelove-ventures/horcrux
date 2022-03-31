@@ -7,18 +7,12 @@ import (
 	"path"
 	"testing"
 
-	b64 "encoding/base64"
-
-	"github.com/cosmos/cosmos-sdk/codec/legacy"
-	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
-	"github.com/cosmos/cosmos-sdk/types/bech32"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
 	"github.com/strangelove-ventures/horcrux/signer"
 	"github.com/stretchr/testify/require"
 	crypto "github.com/tendermint/tendermint/crypto"
 	ed25519 "github.com/tendermint/tendermint/crypto/ed25519"
-	"github.com/tendermint/tendermint/libs/bytes"
 	"github.com/tendermint/tendermint/privval"
 )
 
@@ -28,7 +22,7 @@ type TestValidator struct {
 	Signers       TestSigners
 	t             *testing.T
 	Home          string
-	pubKey        crypto.PubKey
+	PubKey        crypto.PubKey
 	PrivKeyShares []signer.CosignerKey
 	Threshold     int
 }
@@ -94,27 +88,6 @@ func (tv *TestValidator) Dir() string {
 	return fmt.Sprintf("%s/%s", tv.Home, tv.Name())
 }
 
-func (tv *TestValidator) Address() bytes.HexBytes {
-	return tv.pubKey.Address()
-}
-
-func (tv *TestValidator) PubKey(bech32Prefix string, pubKeyAsBech32 bool) string {
-	if pubKeyAsBech32 {
-		pubkey, err := cryptocodec.FromTmPubKeyInterface(tv.pubKey)
-		if err != nil {
-			return ""
-		}
-		consPubPrefix := fmt.Sprintf("%svalconspub", bech32Prefix)
-		pubKeyBech32, err := bech32.ConvertAndEncode(consPubPrefix, legacy.Cdc.Amino.MustMarshalBinaryBare(pubkey))
-		if err != nil {
-			return ""
-		}
-		return pubKeyBech32
-	}
-	sEnc := b64.StdEncoding.EncodeToString(tv.pubKey.Bytes())
-	return fmt.Sprintf("{\"@type\":\"/cosmos.crypto.ed25519.PubKey\",\"key\":\"%s\"}", sEnc)
-}
-
 // Generate Ed25519 Private Key
 func (tv *TestValidator) genPrivKeyAndShares() {
 	privKey := ed25519.GenPrivKey()
@@ -128,7 +101,7 @@ func (tv *TestValidator) genPrivKeyAndShares() {
 }
 
 func (tv *TestValidator) generateShares(filePVKey privval.FilePVKey) {
-	tv.pubKey = filePVKey.PubKey
+	tv.PubKey = filePVKey.PubKey
 	shares, err := signer.CreateCosignerShares(filePVKey, int64(tv.Threshold), int64(len(tv.Signers)))
 	require.NoError(tv.t, err)
 	tv.PrivKeyShares = shares
@@ -150,9 +123,9 @@ func (tv *TestValidator) StartHorcruxCluster(
 }
 
 func (tv *TestValidator) WaitForConsecutiveBlocks(blocks int64) error {
-	return tv.Sentries[0].WaitForConsecutiveBlocks(blocks, tv.Address())
+	return tv.Sentries[0].WaitForConsecutiveBlocks(blocks, tv.PubKey.Address())
 }
 
 func (tv *TestValidator) EnsureNotSlashed() error {
-	return tv.Sentries[0].EnsureNotSlashed(tv.Address())
+	return tv.Sentries[0].EnsureNotSlashed(tv.PubKey.Address())
 }

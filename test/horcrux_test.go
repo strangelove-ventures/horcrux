@@ -384,7 +384,13 @@ func TestChainPureHorcrux(t *testing.T) {
 	const sentriesPerValidator = 2
 	const threshold = 2
 	const sentriesPerSigner = sentriesPerValidator
-	chain := getSentinelChain(ctx, "v0.8.3")
+	var chain *ChainType
+	if false {
+		// keeping this here as example of testing another chain
+		chain = getSentinelChain(ctx, "v0.8.3")
+	} else {
+		chain = getSimdChain()
+	}
 
 	var validators []*TestValidator
 	var startValidatorsErrGroup errgroup.Group

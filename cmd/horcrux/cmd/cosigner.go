@@ -30,8 +30,10 @@ var cosignerCmd = &cobra.Command{
 }
 
 type AddressCmdOutput struct {
-	HexAddress     string
-	ValConsAddress string
+	HexAddress        string
+	PubKey            string
+	ValConsAddress    string
+	ValConsPubAddress string
 }
 
 func AddressCmd() *cobra.Command {
@@ -57,18 +59,25 @@ func AddressCmd() *cobra.Command {
 				return fmt.Errorf("error reading cosigner key: %s", err)
 			}
 
-			pubKey := key.PubKey.Address()
+			pubKey := key.PubKey
+			pubKeyAddress := pubKey.Address()
 
 			output := AddressCmdOutput{
-				HexAddress: strings.ToUpper(hex.EncodeToString(pubKey)),
+				HexAddress: strings.ToUpper(hex.EncodeToString(pubKeyAddress)),
+				PubKey:     signer.PubKey("", pubKey),
 			}
 
 			if len(args) == 1 {
-				bech32ValConsAddress, err := bech32.ConvertAndEncode(args[0], pubKey)
+				bech32ValConsAddress, err := bech32.ConvertAndEncode(args[0]+"valcons", pubKeyAddress)
 				if err != nil {
 					return err
 				}
 				output.ValConsAddress = bech32ValConsAddress
+				output.ValConsPubAddress = signer.PubKey(args[0], pubKey)
+			} else {
+				bech32Hint := "Pass bech32 base prefix as argument to generate (e.g. cosmos)"
+				output.ValConsAddress = bech32Hint
+				output.ValConsPubAddress = bech32Hint
 			}
 
 			jsonOut, err := json.Marshal(output)
