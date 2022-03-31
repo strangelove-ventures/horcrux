@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
 	"github.com/stretchr/testify/require"
@@ -41,6 +42,7 @@ func Genesis(
 	t *testing.T,
 	ctx context.Context,
 	net *docker.Network,
+	chain *ChainType,
 	nonHorcruxValidators,
 	fullnodes []*TestNode,
 	horcruxValidators []*TestValidator,
@@ -58,7 +60,9 @@ func Genesis(
 		v := v
 		// using the first sentry for each horcrux validator as the keyring for the account key (not consensus key)
 		// to sign gentx
-		eg.Go(func() error { return v.Sentries[0].InitValidatorFiles(ctx, v.PubKeyJSON()) })
+		eg.Go(func() error {
+			return v.Sentries[0].InitValidatorFiles(ctx, v.PubKey(chain.Bech32Prefix, chain.PubKeyAsBech32))
+		})
 		sentries := v.Sentries[1:]
 		for _, sentry := range sentries {
 			s := sentry
@@ -100,7 +104,9 @@ func Genesis(
 		n0key, err := validatorN.GetKey(valKey)
 		require.NoError(t, err)
 
-		require.NoError(t, validatorNodeToUseForGenTx.AddGenesisAccount(ctx, n0key.GetAddress().String()))
+		bech32Address, err := types.Bech32ifyAddressBytes(chain.Bech32Prefix, n0key.GetAddress())
+		require.NoError(t, err)
+		require.NoError(t, validatorNodeToUseForGenTx.AddGenesisAccount(ctx, bech32Address))
 		nNid, err := validatorN.NodeID()
 		require.NoError(t, err)
 		oldPath := path.Join(validatorN.Dir(), "config", "gentx", fmt.Sprintf("gentx-%s.json", nNid))

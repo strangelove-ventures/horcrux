@@ -12,10 +12,10 @@ import (
 	"math/big"
 	"net"
 	"os"
-	"os/exec"
 	"path"
 	"reflect"
 	"runtime"
+	dbg "runtime/debug"
 	"strings"
 	"sync"
 	"testing"
@@ -23,10 +23,13 @@ import (
 
 	"github.com/avast/retry-go"
 	"github.com/cosmos/cosmos-sdk/client"
+	"github.com/cosmos/cosmos-sdk/codec/legacy"
+	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/cosmos/cosmos-sdk/simapp"
 	"github.com/cosmos/cosmos-sdk/simapp/params"
-	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/types/bech32"
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
@@ -47,28 +50,61 @@ const (
 	blockTime = 3 // seconds
 )
 
+var cosmosNodePorts = map[docker.Port]struct{}{
+	"26656/tcp": {},
+	"26657/tcp": {},
+	"9090/tcp":  {},
+	"1337/tcp":  {},
+	"1234/tcp":  {},
+}
+
 func getGoModuleVersion(pkg string) string {
-	cmd := exec.Command("go", "list", "-m", "-u", "-f", "{{.Version}}", pkg)
-	out, err := cmd.Output()
-	if err != nil {
-		panic(fmt.Sprintf("failed to evaluate Go module version: %v", err))
+	bi, _ := dbg.ReadBuildInfo()
+	for _, dep := range bi.Deps {
+		if dep.Path == pkg {
+			return dep.Version
+		}
 	}
-	return strings.TrimSpace(string(out))
+	return ""
+}
+
+func getHeighlinerChain(
+	chain,
+	version,
+	binary,
+	bech32Prefix string,
+	pubKeyAsBech32 bool,
+	preGenTx func(tn *TestNode) error,
+) *ChainType {
+	return &ChainType{
+		Repository:     fmt.Sprintf("ghcr.io/strangelove-ventures/heighliner/%s", chain),
+		Version:        version,
+		Bin:            binary,
+		Bech32Prefix:   bech32Prefix,
+		PubKeyAsBech32: pubKeyAsBech32,
+		Ports:          cosmosNodePorts,
+		PreGenTx:       preGenTx,
+	}
 }
 
 func getSimdChain() *ChainType {
-	return &ChainType{
-		Repository: "ghcr.io/strangelove-ventures/heighliner/sim",
-		Version:    getGoModuleVersion("github.com/cosmos/cosmos-sdk"),
-		Bin:        "simd",
-		Ports: map[docker.Port]struct{}{
-			"26656/tcp": {},
-			"26657/tcp": {},
-			"9090/tcp":  {},
-			"1337/tcp":  {},
-			"1234/tcp":  {},
-		},
+	return getHeighlinerChain("sim", getGoModuleVersion("github.com/cosmos/cosmos-sdk"), "simd", "cosmos", false, nil)
+}
+
+func getSentinelChain(ctx context.Context, version string) *ChainType {
+	// sets "approve_by" in the genesis.json
+	// this is required for sentinel, genesis validation fails without it.
+	sentinelGenesisJSONModification := func(tn *TestNode) error {
+		genesisJSON := path.Join(tn.NodeHome(), "config", "genesis.json")
+		address, err := tn.Bech32AddressForKey(valKey)
+		if err != nil {
+			return err
+		}
+		command := []string{"sed", "-i", fmt.Sprintf("s/\"approve_by\": \"\"/\"approve_by\": \"%s\"/g", address), genesisJSON}
+		return handleNodeJobError(tn.NodeJob(ctx, command))
 	}
+
+	return getHeighlinerChain("sentinel", version, "sentinelhub", "sent", true, sentinelGenesisJSONModification)
 }
 
 // ChainType represents the type of chain to instantiate
@@ -76,7 +112,14 @@ type ChainType struct {
 	Repository string
 	Version    string
 	Bin        string
-	Ports      map[docker.Port]struct{}
+
+	Bech32Prefix   string
+	PubKeyAsBech32 bool // true - gentx uses bech32 consval address. false - gentx uses json pubkey
+
+	Ports map[docker.Port]struct{}
+
+	// some chains need additional steps, such as genesis.json modification, before executing gentx
+	PreGenTx func(tn *TestNode) error
 }
 
 // TestNode represents a node in the test network that is being created
@@ -331,9 +374,12 @@ func (tn *TestNode) SetPrivValListen(peers string) {
 }
 
 func (tn *TestNode) getValSigningInfo(address tmBytes.HexBytes) *slashingtypes.QuerySigningInfoResponse {
+	valConsPrefix := fmt.Sprintf("%svalcons", tn.Chain.Bech32Prefix)
+	bech32ValConsAddress, err := bech32.ConvertAndEncode(valConsPrefix, address)
+	require.NoError(tn.t, err)
 	slashInfo, err := slashingtypes.NewQueryClient(
 		tn.CliContext()).SigningInfo(context.Background(), &slashingtypes.QuerySigningInfoRequest{
-		ConsAddress: sdk.ConsAddress(address).String(),
+		ConsAddress: bech32ValConsAddress,
 	})
 	require.NoError(tn.t, err)
 	return slashInfo
@@ -407,7 +453,7 @@ func (tn *TestNode) WaitForConsecutiveBlocks(blocks int64, address tmBytes.HexBy
 
 	startingBlock := stat.SyncInfo.LatestBlockHeight
 	// timeout after ~1 minute plus block time
-	timeoutSeconds := blocks*int64(blockTime) + int64(60)
+	timeoutSeconds := blocks*(int64(blockTime)+1) + int64(60)
 	for i := int64(0); i < timeoutSeconds; i++ {
 		time.Sleep(1 * time.Second)
 
@@ -415,7 +461,7 @@ func (tn *TestNode) WaitForConsecutiveBlocks(blocks int64, address tmBytes.HexBy
 		if err != nil {
 			continue
 		}
-		deltaMissed := min(blocks, checkingBlock) - recentSignedBlocksCount
+		deltaMissed := min(blocks, checkingBlock-1) - recentSignedBlocksCount
 		deltaBlocks := checkingBlock - startingBlock
 
 		tn.t.Logf("{WaitForConsecutiveBlocks} val-%d Missed blocks: %d block: %d",
@@ -627,6 +673,18 @@ func (tn *TestNode) StartContainer(ctx context.Context) error {
 	}, retry.DelayType(retry.BackOffDelay))
 }
 
+func (tn *TestNode) Bech32AddressForKey(keyName string) (string, error) {
+	key, err := tn.GetKey(valKey)
+	if err != nil {
+		return "", err
+	}
+	bech32Address, err := types.Bech32ifyAddressBytes(tn.Chain.Bech32Prefix, key.GetAddress())
+	if err != nil {
+		return "", err
+	}
+	return bech32Address, nil
+}
+
 // InitValidatorFiles creates the node files and signs a genesis transaction
 func (tn *TestNode) InitValidatorFiles(ctx context.Context, pubKey string) error {
 	if err := tn.InitHomeFolder(ctx); err != nil {
@@ -635,16 +693,22 @@ func (tn *TestNode) InitValidatorFiles(ctx context.Context, pubKey string) error
 	if err := tn.CreateKey(ctx, valKey); err != nil {
 		return err
 	}
-	key, err := tn.GetKey(valKey)
+	bech32Address, err := tn.Bech32AddressForKey(valKey)
 	if err != nil {
 		return err
 	}
-	if err := tn.AddGenesisAccount(ctx, key.GetAddress().String()); err != nil {
+	if err := tn.AddGenesisAccount(ctx, bech32Address); err != nil {
 		return err
 	}
 	// if override pubkey is not provided, use the one from this TestNode
 	if pubKey == "" {
-		pubKey = tn.PubKeyJSON()
+		pubKey = tn.PubKey(tn.Chain.PubKeyAsBech32)
+	}
+	// some chains need additional steps, such as genesis.json modification, before executing gentx
+	if tn.Chain.PreGenTx != nil {
+		if err := tn.Chain.PreGenTx(tn); err != nil {
+			return err
+		}
 	}
 	return tn.Gentx(ctx, valKey, pubKey)
 }
@@ -731,7 +795,7 @@ func (tn TestNodes) ListenAddrs() string {
 // LogGenesisHashes logs the genesis hashes for the various nodes
 func (tn TestNodes) LogGenesisHashes() {
 	for _, n := range tn {
-		gen, err := ioutil.ReadFile(path.Join(n.Dir(), "config", "genesis.json"))
+		gen, err := ioutil.ReadFile(n.GenesisFilePath())
 		require.NoError(tn[0].t, err)
 		tn[0].t.Log(fmt.Sprintf("{%s} genesis hash %x", n.Name(), sha256.Sum256(gen)))
 	}
@@ -780,9 +844,22 @@ func (tn *TestNode) GenNewPrivVal() {
 	newFilePV.Save()
 }
 
-func (tn *TestNode) PubKeyJSON() string {
+func (tn *TestNode) PubKey(pubKeyAsBech32 bool) string {
 	pv, err := tn.GetPrivVal()
 	require.NoError(tn.t, err)
+
+	if pubKeyAsBech32 {
+		pubkey, err := cryptocodec.FromTmPubKeyInterface(pv.PubKey)
+		if err != nil {
+			return ""
+		}
+		consPubPrefix := fmt.Sprintf("%svalconspub", tn.Chain.Bech32Prefix)
+		pubKeyBech32, err := bech32.ConvertAndEncode(consPubPrefix, legacy.Cdc.Amino.MustMarshalBinaryBare(pubkey))
+		if err != nil {
+			return ""
+		}
+		return pubKeyBech32
+	}
 
 	sEnc := b64.StdEncoding.EncodeToString(pv.PubKey.Bytes())
 	return fmt.Sprintf("{\"@type\":\"/cosmos.crypto.ed25519.PubKey\",\"key\":\"%s\"}", sEnc)

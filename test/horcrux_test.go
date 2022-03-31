@@ -45,7 +45,7 @@ func Test4Of7SignerTwoSentries(t *testing.T) {
 	require.NoError(t, ourValidator.StartHorcruxCluster(ctx, network, sentriesPerSigner))
 
 	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	Genesis(t, ctx, network, otherValidatorNodes, []*TestNode{}, []*TestValidator{ourValidator})
+	Genesis(t, ctx, network, chain, otherValidatorNodes, []*TestNode{}, []*TestValidator{ourValidator})
 
 	// Wait for all nodes to get to given block height
 	GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5)
@@ -78,7 +78,7 @@ func Test2Of3SignerTwoSentries(t *testing.T) {
 	require.NoError(t, ourValidator.StartHorcruxCluster(ctx, network, sentriesPerSigner))
 
 	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	Genesis(t, ctx, network, otherValidatorNodes, []*TestNode{}, []*TestValidator{ourValidator})
+	Genesis(t, ctx, network, chain, otherValidatorNodes, []*TestNode{}, []*TestValidator{ourValidator})
 
 	// Wait for all nodes to get to given block height
 	GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5)
@@ -111,7 +111,7 @@ func Test2Of3SignerUniqueSentry(t *testing.T) {
 	require.NoError(t, ourValidator.StartHorcruxCluster(ctx, network, sentriesPerSigner))
 
 	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	Genesis(t, ctx, network, otherValidatorNodes, []*TestNode{}, []*TestValidator{ourValidator})
+	Genesis(t, ctx, network, chain, otherValidatorNodes, []*TestNode{}, []*TestValidator{ourValidator})
 
 	// Wait for all nodes to get to given block height
 	GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5)
@@ -153,7 +153,7 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 	signers := MakeTestSigners(0, totalSigners, home, pool, t)
 
 	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	Genesis(t, ctx, network, validatorAccountNodes, sentries, []*TestValidator{})
+	Genesis(t, ctx, network, chain, validatorAccountNodes, sentries, []*TestValidator{})
 
 	allNodes := GetAllNodes(validatorAccountNodes, sentries)
 
@@ -222,7 +222,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	ourValidatorNode := validators[0]
 
 	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	Genesis(t, ctx, network, validators, []*TestNode{}, []*TestValidator{})
+	Genesis(t, ctx, network, chain, validators, []*TestNode{}, []*TestValidator{})
 
 	// Wait for all validators to get to given block height
 	validators.WaitForHeight(5)
@@ -286,7 +286,7 @@ func TestDownedSigners2of3(t *testing.T) {
 	require.NoError(t, ourValidator.StartHorcruxCluster(ctx, network, sentriesPerSigner))
 
 	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	Genesis(t, ctx, network, otherValidatorNodes, []*TestNode{}, []*TestValidator{ourValidator})
+	Genesis(t, ctx, network, chain, otherValidatorNodes, []*TestNode{}, []*TestValidator{ourValidator})
 
 	// Wait for all nodes to get to given block height
 	GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5)
@@ -333,7 +333,7 @@ func TestDownedSigners3of5(t *testing.T) {
 	require.NoError(t, ourValidator.StartHorcruxCluster(ctx, network, sentriesPerSigner))
 
 	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	Genesis(t, ctx, network, otherValidatorNodes, []*TestNode{}, []*TestValidator{ourValidator})
+	Genesis(t, ctx, network, chain, otherValidatorNodes, []*TestNode{}, []*TestValidator{ourValidator})
 
 	// Wait for all nodes to get to given block height
 	GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5)
@@ -384,7 +384,7 @@ func TestChainPureHorcrux(t *testing.T) {
 	const sentriesPerValidator = 2
 	const threshold = 2
 	const sentriesPerSigner = sentriesPerValidator
-	chain := getSimdChain()
+	chain := getSentinelChain(ctx, "v0.8.3")
 
 	var validators []*TestValidator
 	var startValidatorsErrGroup errgroup.Group
@@ -405,7 +405,7 @@ func TestChainPureHorcrux(t *testing.T) {
 	require.NoError(t, startValidatorsErrGroup.Wait())
 
 	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	Genesis(t, ctx, network, []*TestNode{}, []*TestNode{}, validators)
+	Genesis(t, ctx, network, chain, []*TestNode{}, []*TestNode{}, validators)
 
 	allNodes.WaitForHeight(5)
 
