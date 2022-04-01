@@ -62,9 +62,14 @@ func AddressCmd() *cobra.Command {
 			pubKey := key.PubKey
 			pubKeyAddress := pubKey.Address()
 
+			pubKeyJSON, err := signer.PubKey("", pubKey)
+			if err != nil {
+				return err
+			}
+
 			output := AddressCmdOutput{
 				HexAddress: strings.ToUpper(hex.EncodeToString(pubKeyAddress)),
-				PubKey:     signer.PubKey("", pubKey),
+				PubKey:     pubKeyJSON,
 			}
 
 			if len(args) == 1 {
@@ -73,7 +78,11 @@ func AddressCmd() *cobra.Command {
 					return err
 				}
 				output.ValConsAddress = bech32ValConsAddress
-				output.ValConsPubAddress = signer.PubKey(args[0], pubKey)
+				pubKeyBech32, err := signer.PubKey(args[0], pubKey)
+				if err != nil {
+					return err
+				}
+				output.ValConsPubAddress = pubKeyBech32
 			} else {
 				bech32Hint := "Pass bech32 base prefix as argument to generate (e.g. cosmos)"
 				output.ValConsAddress = bech32Hint

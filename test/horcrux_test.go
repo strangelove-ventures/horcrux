@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ory/dockertest"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 )
@@ -12,14 +11,6 @@ import (
 var (
 	chainID = "horcrux"
 )
-
-func TestBuildSignerContainer(t *testing.T) {
-	// NOTE: this test isn't skipped because we are debbuging it in CIs
-	t.Skip()
-	pool, err := dockertest.NewPool("")
-	require.NoError(t, err)
-	require.NoError(t, BuildTestSignerImage(pool))
-}
 
 // Test4Of7SignerTwoSentries will spin up a chain with three single-node validators and one horcrux validator
 // the horcrux validator will have seven signer nodes with a threshold of four, and two sentry nodes

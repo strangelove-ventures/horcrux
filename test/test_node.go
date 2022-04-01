@@ -706,7 +706,10 @@ func (tn *TestNode) InitValidatorFiles(ctx context.Context, pubKey string) error
 		if err != nil {
 			return err
 		}
-		pubKey = signer.PubKey(bech32Prefix, pv.PubKey)
+		pubKey, err = signer.PubKey(bech32Prefix, pv.PubKey)
+		if err != nil {
+			return err
+		}
 	}
 	// some chains need additional steps, such as genesis.json modification, before executing gentx
 	if tn.Chain.PreGenTx != nil {

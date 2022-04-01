@@ -65,10 +65,13 @@ func Genesis(
 			bech32Prefix = chain.Bech32Prefix
 		}
 
+		pubKey, err := signer.PubKey(bech32Prefix, v.PubKey)
+		require.NoError(t, err)
+
 		// using the first sentry for each horcrux validator as the keyring for the account key (not consensus key)
 		// to sign gentx
 		eg.Go(func() error {
-			return v.Sentries[0].InitValidatorFiles(ctx, signer.PubKey(bech32Prefix, v.PubKey))
+			return v.Sentries[0].InitValidatorFiles(ctx, pubKey)
 		})
 		sentries := v.Sentries[1:]
 		for _, sentry := range sentries {

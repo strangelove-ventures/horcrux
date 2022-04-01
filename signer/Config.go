@@ -1,12 +1,15 @@
 package signer
 
 import (
-	"encoding/base64"
 	"fmt"
 	"os"
 
+	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/codec/legacy"
+	"github.com/cosmos/cosmos-sdk/codec/types"
 	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
+	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/cosmos/cosmos-sdk/types/bech32"
 	"github.com/tendermint/tendermint/crypto"
 )
@@ -38,20 +41,32 @@ func (cfg *Config) KeyFileExists() error {
 	return nil
 }
 
-func PubKey(bech32BasePrefix string, pubKey crypto.PubKey) string {
+func PubKey(bech32BasePrefix string, pubKey crypto.PubKey) (string, error) {
 	if bech32BasePrefix != "" {
 		pubkey, err := cryptocodec.FromTmPubKeyInterface(pubKey)
 		if err != nil {
-			return ""
+			return "", err
 		}
 		consPubPrefix := bech32BasePrefix + "valconspub"
 		pubKeyBech32, err := bech32.ConvertAndEncode(consPubPrefix, legacy.Cdc.Amino.MustMarshalBinaryBare(pubkey))
 		if err != nil {
-			return ""
+			return "", err
 		}
-		return pubKeyBech32
+		return pubKeyBech32, nil
 	}
 
-	sEnc := base64.StdEncoding.EncodeToString(pubKey.Bytes())
-	return fmt.Sprintf("{\"@type\":\"/cosmos.crypto.ed25519.PubKey\",\"key\":\"%s\"}", sEnc)
+	registry := types.NewInterfaceRegistry()
+	marshaler := codec.NewProtoCodec(registry)
+	var pk *cryptotypes.PubKey
+	registry.RegisterInterface("cosmos.crypto.PubKey", pk)
+	registry.RegisterImplementations(pk, &ed25519.PubKey{})
+	sdkPK, err := cryptocodec.FromTmPubKeyInterface(pubKey)
+	if err != nil {
+		return "", err
+	}
+	pubKeyJSON, err := marshaler.MarshalInterfaceJSON(sdkPK)
+	if err != nil {
+		return "", err
+	}
+	return string(pubKeyJSON), nil
 }
