@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/ory/dockertest"
@@ -85,7 +85,7 @@ func (tv *TestValidator) Name() string {
 
 // Dir is the directory where the test validator files are stored
 func (tv *TestValidator) Dir() string {
-	return fmt.Sprintf("%s/%s", tv.Home, tv.Name())
+	return filepath.Join(tv.Home, tv.Name())
 }
 
 // Generate Ed25519 Private Key
@@ -107,8 +107,8 @@ func (tv *TestValidator) generateShares(filePVKey privval.FilePVKey) {
 	tv.PrivKeyShares = shares
 	for i, s := range tv.Signers {
 		tv.t.Logf("{%s} -> Writing Key Share To File... ", s.Name())
-		require.NoError(tv.t, os.MkdirAll(s.Dir(), 0777))
-		privateFilename := path.Join(s.Dir(), "share.json")
+		require.NoError(tv.t, os.MkdirAll(s.Dir(), 0700))
+		privateFilename := filepath.Join(s.Dir(), "share.json")
 		require.NoError(tv.t, signer.WriteCosignerShareFile(shares[i], privateFilename))
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path"
@@ -20,8 +19,7 @@ import (
 )
 
 func SetupTestRun(t *testing.T) (context.Context, string, *dockertest.Pool, *docker.Network) {
-	home, err := ioutil.TempDir("", "")
-	require.NoError(t, err)
+	home := t.TempDir()
 
 	pool, err := dockertest.NewPool("")
 	require.NoError(t, err)
@@ -126,11 +124,11 @@ func Genesis(
 	require.NoError(t, eg.Wait())
 	require.NoError(t, validatorNodeToUseForGenTx.CollectGentxs(ctx))
 
-	genbz, err := ioutil.ReadFile(validatorNodeToUseForGenTx.GenesisFilePath())
+	genbz, err := os.ReadFile(validatorNodeToUseForGenTx.GenesisFilePath())
 	require.NoError(t, err)
 
 	for i := 1; i < len(nodes); i++ {
-		require.NoError(t, ioutil.WriteFile(nodes[i].GenesisFilePath(), genbz, 0644)) //nolint
+		require.NoError(t, os.WriteFile(nodes[i].GenesisFilePath(), genbz, 0644)) //nolint
 	}
 
 	nodes.LogGenesisHashes()

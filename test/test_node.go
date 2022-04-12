@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"net"
 	"os"
@@ -96,7 +95,7 @@ func getSentinelChain(ctx context.Context, version string) *ChainType {
 		if err != nil {
 			return err
 		}
-		command := []string{"sed", "-i", fmt.Sprintf("s/\"approve_by\": \"\"/\"approve_by\": \"%s\"/g", address), genesisJSON}
+		command := []string{"sed", "-i", fmt.Sprintf(`s/"approve_by": ""/"approve_by": "%s"/g`, address), genesisJSON}
 		return handleNodeJobError(tn.NodeJob(ctx, command))
 	}
 
@@ -272,6 +271,7 @@ func (hosts Hosts) WaitForAllToStart(t *testing.T, timeout int) error {
 	if len(hosts) == 0 {
 		return nil
 	}
+ReachableCheckLoop:
 	for seconds := 1; seconds <= timeout; seconds++ {
 		var wg sync.WaitGroup
 
@@ -284,18 +284,13 @@ func (hosts Hosts) WaitForAllToStart(t *testing.T, timeout int) error {
 
 		close(results)
 
-		foundUnreachable := false
-
 		for reachable := range results {
 			if !reachable {
 				t.Logf("A host is not reachable")
-				foundUnreachable = true
-				break
+				continue ReachableCheckLoop
 			}
 		}
-		if foundUnreachable {
-			continue
-		}
+
 		t.Logf("All hosts are reachable after %d seconds", seconds)
 		return nil
 	}
@@ -802,7 +797,7 @@ func (tn TestNodes) ListenAddrs() string {
 // LogGenesisHashes logs the genesis hashes for the various nodes
 func (tn TestNodes) LogGenesisHashes() {
 	for _, n := range tn {
-		gen, err := ioutil.ReadFile(n.GenesisFilePath())
+		gen, err := os.ReadFile(n.GenesisFilePath())
 		require.NoError(tn[0].t, err)
 		tn[0].t.Log(fmt.Sprintf("{%s} genesis hash %x", n.Name(), sha256.Sum256(gen)))
 	}

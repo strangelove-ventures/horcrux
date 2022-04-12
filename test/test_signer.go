@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -84,7 +85,7 @@ func StartSingleSignerContainers(
 	pvFile, err := tmjson.Marshal(pv)
 	require.NoError(t, err)
 
-	err = ioutil.WriteFile(path.Join(testSigners[0].Dir(), "priv_validator_key.json"), pvFile, 0600)
+	err = os.WriteFile(filepath.Join(testSigners[0].Dir(), "priv_validator_key.json"), pvFile, 0600)
 	require.NoError(t, err)
 
 	// create containers & start signer nodes
@@ -273,12 +274,12 @@ func (ts *TestSigner) MkDir() {
 
 // Dir is the directory where the TestSigner files are stored
 func (ts *TestSigner) Dir() string {
-	return fmt.Sprintf("%s/%s/", ts.Home, ts.Name())
+	return filepath.Join(ts.Home, ts.Name())
 }
 
 // GetConfigFile returns the direct path to the signers config file as a string
 func (ts *TestSigner) GetConfigFile() string {
-	return path.Join(ts.Dir(), "config.yaml")
+	return filepath.Join(ts.Dir(), "config.yaml")
 }
 
 // Name is the hostname of the TestSigner container
