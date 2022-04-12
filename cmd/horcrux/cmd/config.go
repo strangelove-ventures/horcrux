@@ -67,13 +67,19 @@ func initCmd() *cobra.Command {
 				home, _ = homedir.Dir()
 				home = path.Join(home, ".horcrux")
 			}
-			if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
-				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
+
+			configYamlPath := path.Join(home, "config.yaml")
+
+			cmdFlags := cmd.Flags()
+			overwrite, _ := cmdFlags.GetBool("overwrite")
+
+			if _, err := os.Stat(configYamlPath); !os.IsNotExist(err) && !overwrite {
+				return fmt.Errorf("%s already exists. Provide the -o flag to overwrite the existing config",
+					configYamlPath)
 			}
 
 			var cfg *Config
 
-			cmdFlags := cmd.Flags()
 			cs, _ := cmdFlags.GetBool("cosigner")
 			keyFile, _ := cmdFlags.GetString("keyfile")
 			if cs {
@@ -136,7 +142,7 @@ func initCmd() *cobra.Command {
 				return err
 			}
 			// create the config file
-			if err = writeConfigFile(path.Join(home, "config.yaml"), cfg); err != nil {
+			if err = writeConfigFile(configYamlPath, cfg); err != nil {
 				return err
 			}
 
@@ -153,6 +159,8 @@ func initCmd() *cobra.Command {
 					return err
 				}
 			}
+
+			fmt.Printf("Successfully initialized configuration: %s\n", configYamlPath)
 			return nil
 		},
 	}
@@ -165,6 +173,7 @@ func initCmd() *cobra.Command {
 		"priv val key file path (full key for single signer, or key share for cosigner)")
 	cmd.Flags().String("timeout", "1500ms", "configure cosigner rpc server timeout value, \n"+
 		"accepts valid duration strings for Go's time.ParseDuration() e.g. 1s, 1000ms, 1.5m")
+	cmd.Flags().BoolP("overwrite", "o", false, "set to overwrite an existing config.yaml")
 	return cmd
 }
 
@@ -235,9 +244,6 @@ func addNodesCmd() *cobra.Command {
 				home, _ = homedir.Dir()
 				home = path.Join(home, ".horcrux")
 			}
-			if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
-				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
-			}
 
 			argNodes, err := chainNodesFromArg(args[0])
 			if err != nil {
@@ -277,9 +283,6 @@ func removeNodesCmd() *cobra.Command {
 			} else {
 				home, _ = homedir.Dir()
 				home = path.Join(home, ".horcrux")
-			}
-			if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
-				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
 			}
 
 			argNodes, err := chainNodesFromArg(args[0])
@@ -344,9 +347,6 @@ func addPeersCmd() *cobra.Command {
 				home, _ = homedir.Dir()
 				home = path.Join(home, ".horcrux")
 			}
-			if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
-				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
-			}
 
 			argPeers, err := peersFromFlag(args[0])
 			if err != nil {
@@ -386,9 +386,6 @@ func removePeersCmd() *cobra.Command {
 			} else {
 				home, _ = homedir.Dir()
 				home = path.Join(home, ".horcrux")
-			}
-			if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
-				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
 			}
 
 			var argPeers []CosignerPeer
@@ -439,9 +436,6 @@ func setSharesCmd() *cobra.Command {
 			} else {
 				home, _ = homedir.Dir()
 				home = path.Join(home, ".horcrux")
-			}
-			if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
-				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
 			}
 
 			numShares, err := strconv.Atoi(args[0])
@@ -499,9 +493,6 @@ func setChainIDCmd() *cobra.Command {
 			} else {
 				home, _ = homedir.Dir()
 				home = path.Join(home, ".horcrux")
-			}
-			if _, err = os.Stat(homeDir); !os.IsNotExist(err) {
-				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
 			}
 
 			stateDir := path.Join(home, "state")
