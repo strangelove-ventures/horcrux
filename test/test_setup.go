@@ -18,6 +18,12 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+type TestLogger interface {
+	Name() string
+	Log(...interface{})
+	Logf(string, ...interface{})
+}
+
 func SetupTestRun(t *testing.T) (context.Context, string, *dockertest.Pool, *docker.Network) {
 	home := t.TempDir()
 
@@ -38,14 +44,14 @@ func SetupTestRun(t *testing.T) (context.Context, string, *dockertest.Pool, *doc
 
 // assemble gentx, build genesis file, configure peering, and start chain
 func Genesis(
-	t *testing.T,
+	tl TestLogger,
 	ctx context.Context,
 	net *docker.Network,
 	chain *ChainType,
 	nonHorcruxValidators,
 	fullnodes []*TestNode,
 	horcruxValidators []*TestValidator,
-) {
+) error {
 	var eg errgroup.Group
 
 	// sign gentx for each validator
@@ -64,7 +70,9 @@ func Genesis(
 		}
 
 		pubKey, err := signer.PubKey(bech32Prefix, v.PubKey)
-		require.NoError(t, err)
+		if err != nil {
+			return err
+		}
 
 		// using the first sentry for each horcrux validator as the keyring for the account key (not consensus key)
 		// to sign gentx
@@ -85,7 +93,9 @@ func Genesis(
 	}
 
 	// wait for this to finish
-	require.NoError(t, eg.Wait())
+	if err := eg.Wait(); err != nil {
+		return err
+	}
 
 	var validators TestNodes
 	var nodes TestNodes
@@ -110,28 +120,48 @@ func Genesis(
 	for i := 1; i < len(validators); i++ {
 		validatorN := validators[i]
 		n0key, err := validatorN.GetKey(valKey)
-		require.NoError(t, err)
+		if err != nil {
+			return err
+		}
 
 		bech32Address, err := types.Bech32ifyAddressBytes(chain.Bech32Prefix, n0key.GetAddress())
-		require.NoError(t, err)
-		require.NoError(t, validatorNodeToUseForGenTx.AddGenesisAccount(ctx, bech32Address))
+		if err != nil {
+			return err
+		}
+		if err := validatorNodeToUseForGenTx.AddGenesisAccount(ctx, bech32Address); err != nil {
+			return err
+		}
 		nNid, err := validatorN.NodeID()
-		require.NoError(t, err)
+		if err != nil {
+			return err
+		}
 		oldPath := path.Join(validatorN.Dir(), "config", "gentx", fmt.Sprintf("gentx-%s.json", nNid))
 		newPath := path.Join(validatorNodeToUseForGenTx.Dir(), "config", "gentx", fmt.Sprintf("gentx-%s.json", nNid))
-		require.NoError(t, os.Rename(oldPath, newPath))
+		if err := os.Rename(oldPath, newPath); err != nil {
+			return err
+		}
 	}
-	require.NoError(t, eg.Wait())
-	require.NoError(t, validatorNodeToUseForGenTx.CollectGentxs(ctx))
+	if err := eg.Wait(); err != nil {
+		return err
+	}
+	if err := validatorNodeToUseForGenTx.CollectGentxs(ctx); err != nil {
+		return err
+	}
 
 	genbz, err := os.ReadFile(validatorNodeToUseForGenTx.GenesisFilePath())
-	require.NoError(t, err)
-
-	for i := 1; i < len(nodes); i++ {
-		require.NoError(t, os.WriteFile(nodes[i].GenesisFilePath(), genbz, 0644)) //nolint
+	if err != nil {
+		return err
 	}
 
-	nodes.LogGenesisHashes()
+	for i := 1; i < len(nodes); i++ {
+		if err := os.WriteFile(nodes[i].GenesisFilePath(), genbz, 0644); err != nil { // nolint
+			return err
+		}
+	}
+
+	if err := nodes.LogGenesisHashes(); err != nil {
+		return err
+	}
 
 	for _, n := range nodes {
 		n := n
@@ -139,7 +169,9 @@ func Genesis(
 			return n.CreateNodeContainer(net.ID)
 		})
 	}
-	require.NoError(t, eg.Wait())
+	if err := eg.Wait(); err != nil {
+		return err
+	}
 
 	peers := nodes.PeerString()
 
@@ -147,7 +179,7 @@ func Genesis(
 	for _, v := range horcruxValidators {
 		for _, sentry := range v.Sentries {
 			s := sentry
-			t.Logf("{%s} => starting container...", s.Name())
+			tl.Logf("{%s} => starting container...", s.Name())
 			eg.Go(func() error {
 				s.SetValidatorConfigAndPeers(peers, true)
 				return s.StartContainer(ctx)
@@ -158,7 +190,7 @@ func Genesis(
 	// start non-horcrux validators. privval listener disabled
 	for _, v := range nonHorcruxValidators {
 		v := v
-		t.Logf("{%s} => starting container...", v.Name())
+		tl.Logf("{%s} => starting container...", v.Name())
 		eg.Go(func() error {
 			v.SetValidatorConfigAndPeers(peers, false)
 			return v.StartContainer(ctx)
@@ -168,14 +200,14 @@ func Genesis(
 	// start full nodes. privval listener disabled
 	for _, n := range fullnodes {
 		n := n
-		t.Logf("{%s} => starting container...", n.Name())
+		tl.Logf("{%s} => starting container...", n.Name())
 		eg.Go(func() error {
 			n.SetValidatorConfigAndPeers(peers, false)
 			return n.StartContainer(ctx)
 		})
 	}
 
-	require.NoError(t, eg.Wait())
+	return eg.Wait()
 }
 
 // GetHostPort returns a resource's published port with an address.

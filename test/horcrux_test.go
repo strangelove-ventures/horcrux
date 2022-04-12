@@ -27,7 +27,8 @@ func Test4Of7SignerTwoSentries(t *testing.T) {
 	chain := getSimdChain()
 
 	// setup a horcrux validator for us
-	ourValidator := NewHorcruxValidator(t, pool, home, chainID, 0, totalSentries, totalSigners, threshold, chain)
+	ourValidator, err := NewHorcruxValidator(t, pool, home, chainID, 0, totalSentries, totalSigners, threshold, chain)
+	require.NoError(t, err)
 
 	// other vals are single node (non-horcrux)
 	otherValidatorNodes := GetValidators(1, totalValidators-1, 1, home, chainID, chain, pool, t)
@@ -36,10 +37,10 @@ func Test4Of7SignerTwoSentries(t *testing.T) {
 	require.NoError(t, ourValidator.StartHorcruxCluster(ctx, network, sentriesPerSigner))
 
 	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	Genesis(t, ctx, network, chain, otherValidatorNodes, []*TestNode{}, []*TestValidator{ourValidator})
+	require.NoError(t, Genesis(t, ctx, network, chain, otherValidatorNodes, []*TestNode{}, []*TestValidator{ourValidator}))
 
 	// Wait for all nodes to get to given block height
-	GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5)
+	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5))
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
 	require.NoError(t, ourValidator.EnsureNotSlashed())
@@ -60,7 +61,8 @@ func Test2Of3SignerTwoSentries(t *testing.T) {
 	chain := getSimdChain()
 
 	// setup a horcrux validator for us
-	ourValidator := NewHorcruxValidator(t, pool, home, chainID, 0, totalSentries, totalSigners, threshold, chain)
+	ourValidator, err := NewHorcruxValidator(t, pool, home, chainID, 0, totalSentries, totalSigners, threshold, chain)
+	require.NoError(t, err)
 
 	// remaining validators are single-node non-horcrux
 	otherValidatorNodes := GetValidators(1, totalValidators-1, 1, home, chainID, chain, pool, t)
@@ -69,10 +71,10 @@ func Test2Of3SignerTwoSentries(t *testing.T) {
 	require.NoError(t, ourValidator.StartHorcruxCluster(ctx, network, sentriesPerSigner))
 
 	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	Genesis(t, ctx, network, chain, otherValidatorNodes, []*TestNode{}, []*TestValidator{ourValidator})
+	require.NoError(t, Genesis(t, ctx, network, chain, otherValidatorNodes, []*TestNode{}, []*TestValidator{ourValidator}))
 
 	// Wait for all nodes to get to given block height
-	GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5)
+	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5))
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
 	require.NoError(t, ourValidator.EnsureNotSlashed())
@@ -93,7 +95,8 @@ func Test2Of3SignerUniqueSentry(t *testing.T) {
 	chain := getSimdChain()
 
 	// setup a horcrux validator for us
-	ourValidator := NewHorcruxValidator(t, pool, home, chainID, 0, totalSentries, totalSigners, threshold, chain)
+	ourValidator, err := NewHorcruxValidator(t, pool, home, chainID, 0, totalSentries, totalSigners, threshold, chain)
+	require.NoError(t, err)
 
 	// remaining validators are single-node non-horcrux
 	otherValidatorNodes := GetValidators(1, totalValidators-1, 1, home, chainID, chain, pool, t)
@@ -102,10 +105,10 @@ func Test2Of3SignerUniqueSentry(t *testing.T) {
 	require.NoError(t, ourValidator.StartHorcruxCluster(ctx, network, sentriesPerSigner))
 
 	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	Genesis(t, ctx, network, chain, otherValidatorNodes, []*TestNode{}, []*TestValidator{ourValidator})
+	require.NoError(t, Genesis(t, ctx, network, chain, otherValidatorNodes, []*TestNode{}, []*TestValidator{ourValidator}))
 
 	// Wait for all nodes to get to given block height
-	GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5)
+	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5))
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
 	require.NoError(t, ourValidator.EnsureNotSlashed())
@@ -144,15 +147,15 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 	signers := MakeTestSigners(0, totalSigners, home, pool, t)
 
 	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	Genesis(t, ctx, network, chain, validatorAccountNodes, sentries, []*TestValidator{})
+	require.NoError(t, Genesis(t, ctx, network, chain, validatorAccountNodes, sentries, []*TestValidator{}))
 
 	allNodes := GetAllNodes(validatorAccountNodes, sentries)
 
 	// Wait for all nodes to get to given block height
-	allNodes.WaitForHeight(5)
+	require.NoError(t, allNodes.WaitForHeight(5))
 
 	// start remote signer
-	StartSingleSignerContainers(t, signers, ourValidatorAccountNode, ourValidatorNodes, network)
+	require.NoError(t, StartSingleSignerContainers(signers, ourValidatorAccountNode, ourValidatorNodes, network))
 
 	// Stop the validator node and sentry node before upgrading to horcrux
 	t.Logf("{%s} -> Stopping Node...", ourValidatorAccountNode.Name())
@@ -213,18 +216,19 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	ourValidatorNode := validators[0]
 
 	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	Genesis(t, ctx, network, chain, validators, []*TestNode{}, []*TestValidator{})
+	require.NoError(t, Genesis(t, ctx, network, chain, validators, []*TestNode{}, []*TestValidator{}))
 
 	// Wait for all validators to get to given block height
-	validators.WaitForHeight(5)
+	require.NoError(t, validators.WaitForHeight(5))
 
 	// get the consensus key from our validator
 	ourValidatorPrivValKey, err := ourValidatorNode.GetPrivVal()
 	require.NoError(t, err)
 
 	// create horcrux validator with same consensus key
-	ourValidatorUpgradedToHorcrux := NewHorcruxValidatorWithPrivValKey(t, pool, home, chainID,
-		0, 0, totalSigners, threshold, getSimdChain(), ourValidatorPrivValKey)
+	ourValidatorUpgradedToHorcrux, err := NewHorcruxValidatorWithPrivValKey(t, pool, home,
+		chainID, 0, 0, totalSigners, threshold, getSimdChain(), ourValidatorPrivValKey)
+	require.NoError(t, err)
 
 	// stop our validator node before upgrading to horcrux
 	t.Logf("{%s} -> Stopping Node...", ourValidatorNode.Name())
@@ -268,7 +272,8 @@ func TestDownedSigners2of3(t *testing.T) {
 	chain := getSimdChain()
 
 	// setup a horcrux validator for us
-	ourValidator := NewHorcruxValidator(t, pool, home, chainID, 0, totalSentries, totalSigners, threshold, chain)
+	ourValidator, err := NewHorcruxValidator(t, pool, home, chainID, 0, totalSentries, totalSigners, threshold, chain)
+	require.NoError(t, err)
 
 	// remaining validators are single-node non-horcrux
 	otherValidatorNodes := GetValidators(1, totalValidators-1, 1, home, chainID, chain, pool, t)
@@ -277,10 +282,10 @@ func TestDownedSigners2of3(t *testing.T) {
 	require.NoError(t, ourValidator.StartHorcruxCluster(ctx, network, sentriesPerSigner))
 
 	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	Genesis(t, ctx, network, chain, otherValidatorNodes, []*TestNode{}, []*TestValidator{ourValidator})
+	require.NoError(t, Genesis(t, ctx, network, chain, otherValidatorNodes, []*TestNode{}, []*TestValidator{ourValidator}))
 
 	// Wait for all nodes to get to given block height
-	GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5)
+	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5))
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
 	require.NoError(t, ourValidator.EnsureNotSlashed())
@@ -315,7 +320,8 @@ func TestDownedSigners3of5(t *testing.T) {
 	chain := getSimdChain()
 
 	// setup a horcrux validator for us
-	ourValidator := NewHorcruxValidator(t, pool, home, chainID, 0, totalSentries, totalSigners, threshold, chain)
+	ourValidator, err := NewHorcruxValidator(t, pool, home, chainID, 0, totalSentries, totalSigners, threshold, chain)
+	require.NoError(t, err)
 
 	// remaining validators are single-node non-horcrux
 	otherValidatorNodes := GetValidators(1, totalValidators-1, 1, home, chainID, chain, pool, t)
@@ -324,10 +330,10 @@ func TestDownedSigners3of5(t *testing.T) {
 	require.NoError(t, ourValidator.StartHorcruxCluster(ctx, network, sentriesPerSigner))
 
 	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	Genesis(t, ctx, network, chain, otherValidatorNodes, []*TestNode{}, []*TestValidator{ourValidator})
+	require.NoError(t, Genesis(t, ctx, network, chain, otherValidatorNodes, []*TestNode{}, []*TestValidator{ourValidator}))
 
 	// Wait for all nodes to get to given block height
-	GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5)
+	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5))
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
 	require.NoError(t, ourValidator.EnsureNotSlashed())
@@ -390,8 +396,9 @@ func TestChainPureHorcrux(t *testing.T) {
 
 	// start horcrux cluster for each validator
 	for i := 0; i < totalValidators; i++ {
-		validator := NewHorcruxValidator(t, pool, home, chainID, i,
+		validator, err := NewHorcruxValidator(t, pool, home, chainID, i,
 			sentriesPerValidator, signersPerValidator, threshold, chain)
+		require.NoError(t, err)
 		validators = append(validators, validator)
 		allNodes = append(allNodes, validator.Sentries...)
 		startValidatorsErrGroup.Go(func() error {
@@ -402,9 +409,9 @@ func TestChainPureHorcrux(t *testing.T) {
 	require.NoError(t, startValidatorsErrGroup.Wait())
 
 	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	Genesis(t, ctx, network, chain, []*TestNode{}, []*TestNode{}, validators)
+	require.NoError(t, Genesis(t, ctx, network, chain, []*TestNode{}, []*TestNode{}, validators))
 
-	allNodes.WaitForHeight(5)
+	require.NoError(t, allNodes.WaitForHeight(5))
 
 	var blockWaitErrGroup errgroup.Group
 

@@ -9,13 +9,11 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"testing"
 	"time"
 
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
 	"github.com/strangelove-ventures/horcrux/signer"
-	"github.com/stretchr/testify/require"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	"golang.org/x/sync/errgroup"
 )
@@ -33,7 +31,7 @@ type TestSigner struct {
 	Pool           *dockertest.Pool
 	Container      *docker.Container
 	Key            signer.CosignerKey
-	t              *testing.T
+	tl             TestLogger
 }
 
 type TestSigners []*TestSigner
@@ -62,12 +60,11 @@ func BuildTestSignerImage(pool *dockertest.Pool) error {
 // StartSingleSignerContainers will generate the necessary config files for the signer node, copy over the validators
 // priv_validator_key.json file, and start the signer
 func StartSingleSignerContainers(
-	t *testing.T,
 	testSigners TestSigners,
 	validator *TestNode,
 	sentryNodes TestNodes,
 	network *docker.Network,
-) {
+) error {
 	eg := new(errgroup.Group)
 	ctx := context.Background()
 
@@ -76,17 +73,25 @@ func StartSingleSignerContainers(
 		s := s
 		eg.Go(func() error { return s.InitSingleSignerConfig(ctx, sentryNodes) })
 	}
-	require.NoError(t, eg.Wait())
+	if err := eg.Wait(); err != nil {
+		return err
+	}
 
 	// Get Validators Priv Val key & copy it over to the signers home directory
 	pv, err := validator.GetPrivVal()
-	require.NoError(t, err)
+	if err != nil {
+		return err
+	}
 
 	pvFile, err := tmjson.Marshal(pv)
-	require.NoError(t, err)
+	if err != nil {
+		return err
+	}
 
 	err = os.WriteFile(filepath.Join(testSigners[0].Dir(), "priv_validator_key.json"), pvFile, 0600)
-	require.NoError(t, err)
+	if err != nil {
+		return err
+	}
 
 	// create containers & start signer nodes
 	for _, s := range testSigners {
@@ -95,16 +100,18 @@ func StartSingleSignerContainers(
 			return s.CreateSingleSignerContainer(network.ID)
 		})
 	}
-	require.NoError(t, eg.Wait())
+	if err := eg.Wait(); err != nil {
+		return err
+	}
 
 	for _, s := range testSigners {
 		s := s
-		t.Logf("{%s} => starting container...", s.Name())
+		s.tl.Logf("{%s} => starting container...", s.Name())
 		eg.Go(func() error {
 			return s.StartContainer()
 		})
 	}
-	require.NoError(t, eg.Wait())
+	return eg.Wait()
 }
 
 // StartCosignerContainers will generate the necessary config files for the nodes in the signer cluster,
@@ -113,7 +120,6 @@ func StartSingleSignerContainers(
 // NOTE: Zero or negative values for sentriesPerSigner configures the nodes in the signer cluster to connect to the
 //       same sentry node.
 func StartCosignerContainers(
-	t *testing.T,
 	signers TestSigners,
 	sentries TestNodes,
 	threshold, total,
@@ -206,16 +212,12 @@ func StartCosignerContainers(
 
 	for _, s := range signers {
 		s := s
-		t.Logf("{%s} => starting container...", s.Name())
+		s.tl.Logf("{%s} => starting container...", s.Name())
 		eg.Go(func() error {
 			return s.StartContainer()
 		})
 	}
-	err = eg.Wait()
-	if err != nil {
-		return err
-	}
-	return nil
+	return eg.Wait()
 }
 
 // PeerString returns a string representing a TestSigner's connectable private peers
@@ -232,7 +234,7 @@ func (ts TestSigners) PeerString(skip int) string {
 }
 
 // MakeTestSigners creates the TestSigner objects required for bootstrapping tests
-func MakeTestSigners(validatorIndex, count int, home string, pool *dockertest.Pool, t *testing.T) (out TestSigners) {
+func MakeTestSigners(validatorIndex, count int, home string, pool *dockertest.Pool, tl TestLogger) (out TestSigners) {
 	for i := 0; i < count; i++ {
 		ts := &TestSigner{
 			Home:           home,
@@ -241,7 +243,7 @@ func MakeTestSigners(validatorIndex, count int, home string, pool *dockertest.Po
 			Pool:           pool,
 			Container:      nil,
 			Key:            signer.CosignerKey{},
-			t:              t,
+			tl:             tl,
 		}
 		out = append(out, ts)
 	}
@@ -284,7 +286,7 @@ func (ts *TestSigner) GetConfigFile() string {
 
 // Name is the hostname of the TestSigner container
 func (ts *TestSigner) Name() string {
-	return fmt.Sprintf("val-%d-sgn-%d-%s", ts.ValidatorIndex, ts.Index, ts.t.Name())
+	return fmt.Sprintf("val-%d-sgn-%d-%s", ts.ValidatorIndex, ts.Index, ts.tl.Name())
 }
 
 // InitSingleSignerConfig creates and runs a container to init a single signers config files
@@ -296,7 +298,7 @@ func (ts *TestSigner) InitSingleSignerConfig(ctx context.Context, listenNodes Te
 		listenNodes[0].ChainID, listenNodes.ListenAddrs(),
 		fmt.Sprintf("--home=%s", ts.Dir()),
 	}
-	ts.t.Logf("{%s}[%s] -> '%s'", ts.Name(), container, strings.Join(cmd, " "))
+	ts.tl.Logf("{%s}[%s] -> '%s'", ts.Name(), container, strings.Join(cmd, " "))
 	cont, err := ts.Pool.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: container,
 		Config: &docker.Config{
@@ -307,7 +309,7 @@ func (ts *TestSigner) InitSingleSignerConfig(ctx context.Context, listenNodes Te
 			},
 			Image:  signerImage,
 			Cmd:    cmd,
-			Labels: map[string]string{"horcrux-test": ts.t.Name()},
+			Labels: map[string]string{"horcrux-test": ts.tl.Name()},
 		},
 		HostConfig: &docker.HostConfig{
 			PublishAllPorts: true,
@@ -365,7 +367,7 @@ func (ts *TestSigner) InitCosignerConfig(
 		fmt.Sprintf("--home=%s", ts.Dir()),
 		fmt.Sprintf("--listen=tcp://%s:%s", ts.Name(), signerPort),
 	}
-	ts.t.Logf("{%s}[%s] -> '%s'", ts.Name(), container, strings.Join(cmd, " "))
+	ts.tl.Logf("{%s}[%s] -> '%s'", ts.Name(), container, strings.Join(cmd, " "))
 	cont, err := ts.Pool.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: container,
 		Config: &docker.Config{
@@ -376,7 +378,7 @@ func (ts *TestSigner) InitCosignerConfig(
 			},
 			Image:  signerImage,
 			Cmd:    cmd,
-			Labels: map[string]string{"horcrux-test": ts.t.Name()},
+			Labels: map[string]string{"horcrux-test": ts.tl.Name()},
 		},
 		HostConfig: &docker.HostConfig{
 			PublishAllPorts: true,
@@ -472,7 +474,7 @@ func (ts *TestSigner) CreateSingleSignerContainer(networkID string) error {
 			},
 			DNS:    []string{},
 			Image:  signerImage,
-			Labels: map[string]string{"horcrux-test": ts.t.Name()},
+			Labels: map[string]string{"horcrux-test": ts.tl.Name()},
 		},
 		HostConfig: &docker.HostConfig{
 			PublishAllPorts: true,
@@ -514,7 +516,7 @@ func (ts *TestSigner) CreateCosignerContainer(networkID string) error {
 			},
 			DNS:    []string{},
 			Image:  signerImage,
-			Labels: map[string]string{"horcrux-test": ts.t.Name()},
+			Labels: map[string]string{"horcrux-test": ts.tl.Name()},
 		},
 		HostConfig: &docker.HostConfig{
 			PublishAllPorts: true,

@@ -30,13 +30,13 @@ import (
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
 	"github.com/strangelove-ventures/horcrux/signer"
-	"github.com/stretchr/testify/require"
 	tmconfig "github.com/tendermint/tendermint/config"
 	tmBytes "github.com/tendermint/tendermint/libs/bytes"
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/privval"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	rpchttp "github.com/tendermint/tendermint/rpc/client/http"
+	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	libclient "github.com/tendermint/tendermint/rpc/jsonrpc/client"
 	"golang.org/x/sync/errgroup"
 )
@@ -129,7 +129,7 @@ type TestNode struct {
 	Pool           *dockertest.Pool
 	Client         rpcclient.Client
 	Container      *docker.Container
-	t              *testing.T
+	tl             TestLogger
 	ec             params.EncodingConfig
 }
 
@@ -162,18 +162,18 @@ func MakeTestNodes(
 	chainID string,
 	chainType *ChainType,
 	pool *dockertest.Pool,
-	t *testing.T,
+	tl TestLogger,
 ) (out TestNodes) {
 	err := pool.Client.PullImage(docker.PullImageOptions{
 		Repository: chainType.Repository,
 		Tag:        chainType.Version,
 	}, docker.AuthConfiguration{})
 	if err != nil {
-		t.Logf("Error pulling image: %v", err)
+		tl.Logf("Error pulling image: %v", err)
 	}
 	for i := 0; i < count; i++ {
 		tn := &TestNode{Home: home, Index: i, ValidatorIndex: validatorIndex, Chain: chainType, ChainID: chainID,
-			Pool: pool, t: t, ec: simapp.MakeTestEncodingConfig()}
+			Pool: pool, tl: tl, ec: simapp.MakeTestEncodingConfig()}
 		tn.MkDir()
 		out = append(out, tn)
 	}
@@ -299,7 +299,7 @@ ReachableCheckLoop:
 
 // Name is the hostname of the test node container
 func (tn *TestNode) Name() string {
-	return fmt.Sprintf("val-%d-node-%d-%s", tn.ValidatorIndex, tn.Index, tn.t.Name())
+	return fmt.Sprintf("val-%d-node-%d-%s", tn.ValidatorIndex, tn.Index, tn.tl.Name())
 }
 
 // Dir is the directory where the test node files are stored
@@ -364,23 +364,24 @@ func (tn *TestNode) SetPrivValListen(peers string) {
 	tmconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
 }
 
-func (tn *TestNode) getValSigningInfo(address tmBytes.HexBytes) *slashingtypes.QuerySigningInfoResponse {
+func (tn *TestNode) getValSigningInfo(address tmBytes.HexBytes) (*slashingtypes.QuerySigningInfoResponse, error) {
 	valConsPrefix := fmt.Sprintf("%svalcons", tn.Chain.Bech32Prefix)
 	bech32ValConsAddress, err := bech32.ConvertAndEncode(valConsPrefix, address)
-	require.NoError(tn.t, err)
-	slashInfo, err := slashingtypes.NewQueryClient(
+	if err != nil {
+		return nil, err
+	}
+	return slashingtypes.NewQueryClient(
 		tn.CliContext()).SigningInfo(context.Background(), &slashingtypes.QuerySigningInfoRequest{
 		ConsAddress: bech32ValConsAddress,
 	})
-	require.NoError(tn.t, err)
-	return slashInfo
 }
 
 func (tn *TestNode) GetMostRecentConsecutiveSignedBlocks(
 	max int64,
 	address tmBytes.HexBytes,
 ) (count int64, latestHeight int64, err error) {
-	status, err := tn.Client.Status(context.Background())
+	var status *ctypes.ResultStatus
+	status, err = tn.Client.Status(context.Background())
 	if err != nil {
 		return
 	}
@@ -388,8 +389,11 @@ func (tn *TestNode) GetMostRecentConsecutiveSignedBlocks(
 	latestHeight = status.SyncInfo.LatestBlockHeight
 
 	for i := latestHeight; i > latestHeight-max && i > 0; i-- {
-		block, err := tn.Client.Block(context.Background(), &i)
-		require.NoError(tn.t, err)
+		var block *ctypes.ResultBlock
+		block, err = tn.Client.Block(context.Background(), &i)
+		if err != nil {
+			return
+		}
 		for _, voter := range block.Block.LastCommit.Signatures {
 			if reflect.DeepEqual(voter.ValidatorAddress, address) {
 				count++
@@ -400,25 +404,35 @@ func (tn *TestNode) GetMostRecentConsecutiveSignedBlocks(
 	return
 }
 
-func (tn *TestNode) getMissingBlocks(address tmBytes.HexBytes) int64 {
-	return tn.getValSigningInfo(address).ValSigningInfo.MissedBlocksCounter
+func (tn *TestNode) getMissingBlocks(address tmBytes.HexBytes) (int64, error) {
+	missedBlocks, err := tn.getValSigningInfo(address)
+	if err != nil {
+		return 0, err
+	}
+	return missedBlocks.ValSigningInfo.MissedBlocksCounter, nil
 }
 
 func (tn *TestNode) EnsureNotSlashed(address tmBytes.HexBytes) error {
 	for i := 0; i < 50; i++ {
 		time.Sleep(1 * time.Second)
-		slashInfo := tn.getValSigningInfo(address)
+		slashInfo, err := tn.getValSigningInfo(address)
+		if err != nil {
+			return err
+		}
 
 		if i == 0 {
-			tn.t.Logf("{EnsureNotSlashed} val-%d Initial Missed blocks: %d", tn.ValidatorIndex,
+			tn.tl.Logf("{EnsureNotSlashed} val-%d Initial Missed blocks: %d", tn.ValidatorIndex,
 				slashInfo.ValSigningInfo.MissedBlocksCounter)
 			continue
 		}
 		if i%2 == 0 {
 			// require.Equal(tn.t, missed, slashInfo.ValSigningInfo.MissedBlocksCounter)
 			stat, err := tn.Client.Status(context.Background())
-			require.NoError(tn.t, err)
-			tn.t.Logf("{EnsureNotSlashed} val-%d Missed blocks: %d block: %d", tn.ValidatorIndex,
+			if err != nil {
+				return err
+			}
+
+			tn.tl.Logf("{EnsureNotSlashed} val-%d Missed blocks: %d block: %d", tn.ValidatorIndex,
 				slashInfo.ValSigningInfo.MissedBlocksCounter, stat.SyncInfo.LatestBlockHeight)
 		}
 		if slashInfo.ValSigningInfo.Tombstoned {
@@ -437,10 +451,15 @@ func min(a, b int64) int64 {
 
 // Wait until we have signed n blocks in a row
 func (tn *TestNode) WaitForConsecutiveBlocks(blocks int64, address tmBytes.HexBytes) error {
-	initialMissed := tn.getMissingBlocks(address)
-	tn.t.Logf("{WaitForConsecutiveBlocks} val-%d Initial Missed blocks: %d", tn.ValidatorIndex, initialMissed)
+	initialMissed, err := tn.getMissingBlocks(address)
+	if err != nil {
+		return err
+	}
+	tn.tl.Logf("{WaitForConsecutiveBlocks} val-%d Initial Missed blocks: %d", tn.ValidatorIndex, initialMissed)
 	stat, err := tn.Client.Status(context.Background())
-	require.NoError(tn.t, err)
+	if err != nil {
+		return err
+	}
 
 	startingBlock := stat.SyncInfo.LatestBlockHeight
 	// timeout after ~1 minute plus block time
@@ -455,10 +474,10 @@ func (tn *TestNode) WaitForConsecutiveBlocks(blocks int64, address tmBytes.HexBy
 		deltaMissed := min(blocks, checkingBlock-1) - recentSignedBlocksCount
 		deltaBlocks := checkingBlock - startingBlock
 
-		tn.t.Logf("{WaitForConsecutiveBlocks} val-%d Missed blocks: %d block: %d",
+		tn.tl.Logf("{WaitForConsecutiveBlocks} val-%d Missed blocks: %d block: %d",
 			tn.ValidatorIndex, deltaMissed, checkingBlock)
 		if deltaMissed == 0 && deltaBlocks >= blocks {
-			tn.t.Logf("Time (sec) to sign %d consecutive blocks: %d", blocks, i+1)
+			tn.tl.Logf("Time (sec) to sign %d consecutive blocks: %d", blocks, i+1)
 			return nil // done waiting for consecutive signed blocks
 		}
 	}
@@ -492,7 +511,7 @@ func stdconfigchanges(cfg *tmconfig.Config, peers string, enablePrivVal bool) {
 // NOTE: on job containers generate random name
 func (tn *TestNode) NodeJob(ctx context.Context, cmd []string) (string, int, string, string, error) {
 	container := RandLowerCaseLetterString(10)
-	tn.t.Logf("{%s}[%s] -> '%s'", tn.Name(), container, strings.Join(cmd, " "))
+	tn.tl.Logf("{%s}[%s] -> '%s'", tn.Name(), container, strings.Join(cmd, " "))
 	cont, err := tn.Pool.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: container,
 		Config: &docker.Config{
@@ -502,7 +521,7 @@ func (tn *TestNode) NodeJob(ctx context.Context, cmd []string) (string, int, str
 			DNS:          []string{},
 			Image:        fmt.Sprintf("%s:%s", tn.Chain.Repository, tn.Chain.Version),
 			Cmd:          cmd,
-			Labels:       map[string]string{"horcrux-test": tn.t.Name()},
+			Labels:       map[string]string{"horcrux-test": tn.tl.Name()},
 		},
 		HostConfig: &docker.HostConfig{
 			Binds:           tn.Bind(),
@@ -594,7 +613,7 @@ func (tn *TestNode) CreateNodeContainer(networkID string) error {
 			ExposedPorts: tn.Chain.Ports,
 			DNS:          []string{},
 			Image:        fmt.Sprintf("%s:%s", tn.Chain.Repository, tn.Chain.Version),
-			Labels:       map[string]string{"horcrux-test": tn.t.Name()},
+			Labels:       map[string]string{"horcrux-test": tn.tl.Name()},
 		},
 		HostConfig: &docker.HostConfig{
 			Binds:           tn.Bind(),
@@ -641,7 +660,7 @@ func (tn *TestNode) StartContainer(ctx context.Context) error {
 	tn.Container = c
 
 	port := GetHostPort(c, "26657/tcp")
-	tn.t.Logf("{%s} RPC => %s", tn.Name(), port)
+	tn.tl.Logf("{%s} RPC => %s", tn.Name(), port)
 
 	err = tn.NewClient(fmt.Sprintf("tcp://%s", port))
 	if err != nil {
@@ -770,7 +789,7 @@ func (tn TestNodes) PeerString() string {
 			return bldr.String()
 		}
 		ps := fmt.Sprintf("%s@%s:26656,", id, n.Name())
-		tn[0].t.Logf("{%s} peering (%s)", n.Name(), strings.TrimSuffix(ps, ","))
+		tn[0].tl.Logf("{%s} peering (%s)", n.Name(), strings.TrimSuffix(ps, ","))
 		bldr.WriteString(ps)
 	}
 	return strings.TrimSuffix(bldr.String(), ",")
@@ -795,17 +814,20 @@ func (tn TestNodes) ListenAddrs() string {
 }
 
 // LogGenesisHashes logs the genesis hashes for the various nodes
-func (tn TestNodes) LogGenesisHashes() {
+func (tn TestNodes) LogGenesisHashes() error {
 	for _, n := range tn {
 		gen, err := os.ReadFile(n.GenesisFilePath())
-		require.NoError(tn[0].t, err)
-		tn[0].t.Log(fmt.Sprintf("{%s} genesis hash %x", n.Name(), sha256.Sum256(gen)))
+		if err != nil {
+			return err
+		}
+		tn[0].tl.Log(fmt.Sprintf("{%s} genesis hash %x", n.Name(), sha256.Sum256(gen)))
 	}
+	return nil
 }
 
-func (tn TestNodes) WaitForHeight(height int64) {
+func (tn TestNodes) WaitForHeight(height int64) error {
 	var eg errgroup.Group
-	tn[0].t.Logf("Waiting For Nodes To Reach Block Height %d...", height)
+	tn[0].tl.Logf("Waiting For Nodes To Reach Block Height %d...", height)
 	for _, n := range tn {
 		n := n
 		eg.Go(func() error {
@@ -818,13 +840,13 @@ func (tn TestNodes) WaitForHeight(height int64) {
 				if stat.SyncInfo.CatchingUp || stat.SyncInfo.LatestBlockHeight < height {
 					return fmt.Errorf("node still under block %d: %d", height, stat.SyncInfo.LatestBlockHeight)
 				}
-				n.t.Logf("{%s} => reached block %d\n", n.Name(), height)
+				n.tl.Logf("{%s} => reached block %d\n", n.Name(), height)
 				return nil
 				// TODO: setup backup delay here
 			}, retry.DelayType(retry.BackOffDelay), retry.Attempts(15))
 		})
 	}
-	require.NoError(tn[0].t, eg.Wait())
+	return eg.Wait()
 }
 
 func (tn *TestNode) GetPrivVal() (privval.FilePVKey, error) {

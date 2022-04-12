@@ -3,10 +3,16 @@ module github.com/strangelove-ventures/horcrux
 go 1.17
 
 require (
+	github.com/Jille/grpc-multi-resolver v1.1.0
+	github.com/Jille/raft-grpc-leader-rpc v1.1.0
+	github.com/Jille/raft-grpc-transport v1.2.0
+	github.com/Jille/raftadmin v1.2.0
 	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/cosmos/cosmos-sdk v0.44.5
 	github.com/gogo/protobuf v1.3.3
+	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/hashicorp/raft v1.3.3
+	github.com/hashicorp/raft-boltdb v0.0.0-20211202195631-7d34b9fb3f42
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/ory/dockertest v3.3.5+incompatible
 	github.com/spf13/cobra v1.2.1
@@ -17,6 +23,8 @@ require (
 	gitlab.com/polychainlabs/edwards25519 v0.0.0-20200206000358-2272e01758fb
 	gitlab.com/polychainlabs/threshold-ed25519 v0.0.0-20200221030822-1c35a36a51c1
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	google.golang.org/grpc v1.44.0
+	google.golang.org/protobuf v1.27.1
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -26,10 +34,6 @@ require (
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/ChainSafe/go-schnorrkel v0.0.0-20200405005733-88cbf1b4c40d // indirect
 	github.com/DataDog/zstd v1.4.5 // indirect
-	github.com/Jille/grpc-multi-resolver v1.1.0 // indirect
-	github.com/Jille/raft-grpc-leader-rpc v1.1.0 // indirect
-	github.com/Jille/raft-grpc-transport v1.2.0 // indirect
-	github.com/Jille/raftadmin v1.2.0 // indirect
 	github.com/Microsoft/go-winio v0.5.0 // indirect
 	github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 // indirect
 	github.com/armon/go-metrics v0.3.9 // indirect
@@ -69,7 +73,6 @@ require (
 	github.com/gorilla/handlers v1.5.1 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
-	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0 // indirect
 	github.com/gsterjov/go-libsecret v0.0.0-20161001094733-a6f4afe4910c // indirect
 	github.com/gtank/merlin v0.1.1 // indirect
@@ -79,7 +82,6 @@ require (
 	github.com/hashicorp/go-msgpack v1.1.5 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
-	github.com/hashicorp/raft-boltdb v0.0.0-20211202195631-7d34b9fb3f42 // indirect
 	github.com/hdevalence/ed25519consensus v0.0.0-20210204194344-59a8610d2b87 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jmhodges/levigo v1.0.0 // indirect
@@ -126,8 +128,6 @@ require (
 	golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/genproto v0.0.0-20210903162649-d08c68adba83 // indirect
-	google.golang.org/grpc v1.44.0 // indirect
-	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/ini.v1 v1.62.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 )
