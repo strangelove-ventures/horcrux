@@ -1,3 +1,4 @@
+ARG BUILDPLATFORM
 FROM --platform=$BUILDPLATFORM golang:alpine AS build-env
 
 ENV PACKAGES make git
