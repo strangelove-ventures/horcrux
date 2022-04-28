@@ -8,7 +8,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -43,7 +42,7 @@ func BuildTestSignerImage(pool *dockertest.Pool) error {
 	if err != nil {
 		return err
 	}
-	dockerfile := path.Join("docker/horcrux/Dockerfile")
+	dockerfile := path.Join("docker/horcrux/native.Dockerfile")
 	return pool.Client.BuildImage(docker.BuildImageOptions{
 		Name:                signerImage,
 		Dockerfile:          dockerfile,
@@ -55,20 +54,6 @@ func BuildTestSignerImage(pool *dockertest.Pool) error {
 		Auth:                docker.AuthConfiguration{},
 		AuthConfigs:         docker.AuthConfigurations{},
 		ContextDir:          path.Dir(dir),
-		BuildArgs: []docker.BuildArg{
-			docker.BuildArg{
-				Name:  "BUILDPLATFORM",
-				Value: fmt.Sprintf("linux/%s", runtime.GOARCH),
-			},
-			docker.BuildArg{
-				Name:  "TARGETARCH",
-				Value: runtime.GOARCH,
-			},
-			docker.BuildArg{
-				Name:  "TARGETOS",
-				Value: "linux",
-			},
-		},
 	})
 }
 
