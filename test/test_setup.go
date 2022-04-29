@@ -36,6 +36,9 @@ func SetupTestRun(t *testing.T) (context.Context, string, *dockertest.Pool, *doc
 	// set the test cleanup function
 	t.Cleanup(Cleanup(pool, t.Name(), home))
 
+	// run cleanup to cleanup stale resources from any killed tests
+	Cleanup(pool, t.Name(), home)()
+
 	// build the horcrux image
 	require.NoError(t, BuildTestSignerImage(pool))
 
