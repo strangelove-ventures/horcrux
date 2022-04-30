@@ -10,10 +10,10 @@ import (
 )
 
 type CosignerGRPCServer struct {
-	cosigner           *LocalCosigner
-	thresholdValidator *ThresholdValidator
-	raftStore          *RaftStore
-	proto.UnimplementedCosignerGRPCServer
+	cosigner                              *LocalCosigner
+	thresholdValidator                    *ThresholdValidator
+	raftStore                             *RaftStore
+	proto.UnimplementedCosignerGRPCServer // embedding UnimplementedCosignerGRPCServer
 }
 
 func (rpc *CosignerGRPCServer) SignBlock(
@@ -34,6 +34,7 @@ func (rpc *CosignerGRPCServer) SignBlock(
 	}, nil
 }
 
+// implements CosignerGRPCServer interface in proto
 func (rpc *CosignerGRPCServer) SetEphemeralSecretPartsAndSign(
 	ctx context.Context,
 	req *proto.CosignerGRPCSetEphemeralSecretPartsAndSignRequest,
@@ -53,6 +54,7 @@ func (rpc *CosignerGRPCServer) SetEphemeralSecretPartsAndSign(
 	}, nil
 }
 
+// implements CosignerGRPCServer interface in proto
 func (rpc *CosignerGRPCServer) GetEphemeralSecretParts(
 	ctx context.Context,
 	req *proto.CosignerGRPCGetEphemeralSecretPartsRequest,
@@ -66,6 +68,7 @@ func (rpc *CosignerGRPCServer) GetEphemeralSecretParts(
 	}, nil
 }
 
+// implements CosignerGRPCServer interface in proto
 func (rpc *CosignerGRPCServer) TransferLeadership(
 	ctx context.Context,
 	req *proto.CosignerGRPCTransferLeadershipRequest,
