@@ -1,6 +1,6 @@
 FROM golang:1.17-alpine AS build-env
 
-ENV PACKAGES make
+ENV PACKAGES make git
 
 RUN apk add --no-cache $PACKAGES
 

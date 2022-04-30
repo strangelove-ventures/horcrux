@@ -7,7 +7,7 @@ To provide private key security, The key is sharded into multiple pieces using [
 - _Number of shards (n)_: How many total pieces should the key be split into?
 - _Threshold (t)_: How many of the pieces should be required to assemble a complete signature?
 
-Each piece of the key is added to a relative signer node that will run the horcrux application. These signer nodes are apart of an overall Horcrux cluster that will communicate with each other to sign each block, as requested by the configured sentry node(s).
+Each piece of the key is added to a relative signer node that will run the horcrux application. These signer nodes are part of an overall Horcrux cluster that will communicate with each other to sign each block, as requested by the configured sentry node(s).
 
 A higher threshold _`t`_ equates to more security, since more pieces of the key will be required to assemble a full signature. A higher threshold also means the fault tolerance is lower since you cannot tolerate as many missing participants, or in Horcrux' case, failed nodes. It is important to think about your specific use case to determine what the balance of _`n`_ and _`t`_. 
 

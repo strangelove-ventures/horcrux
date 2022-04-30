@@ -1,19 +1,19 @@
 package test
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
-	"testing"
 	"time"
 
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
 	"github.com/strangelove-ventures/horcrux/signer"
-	"github.com/stretchr/testify/require"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	"golang.org/x/sync/errgroup"
 )
@@ -25,12 +25,13 @@ var (
 
 // TestSigner represents a remote signer instance
 type TestSigner struct {
-	Home      string
-	Index     int
-	Pool      *dockertest.Pool
-	Container *docker.Container
-	Key       signer.CosignerKey
-	t         *testing.T
+	Home           string
+	Index          int
+	ValidatorIndex int
+	Pool           *dockertest.Pool
+	Container      *docker.Container
+	Key            signer.CosignerKey
+	tl             TestLogger
 }
 
 type TestSigners []*TestSigner
@@ -59,12 +60,11 @@ func BuildTestSignerImage(pool *dockertest.Pool) error {
 // StartSingleSignerContainers will generate the necessary config files for the signer node, copy over the validators
 // priv_validator_key.json file, and start the signer
 func StartSingleSignerContainers(
-	t *testing.T,
 	testSigners TestSigners,
 	validator *TestNode,
 	sentryNodes TestNodes,
 	network *docker.Network,
-) {
+) error {
 	eg := new(errgroup.Group)
 	ctx := context.Background()
 
@@ -73,17 +73,25 @@ func StartSingleSignerContainers(
 		s := s
 		eg.Go(func() error { return s.InitSingleSignerConfig(ctx, sentryNodes) })
 	}
-	require.NoError(t, eg.Wait())
+	if err := eg.Wait(); err != nil {
+		return err
+	}
 
 	// Get Validators Priv Val key & copy it over to the signers home directory
 	pv, err := validator.GetPrivVal()
-	require.NoError(t, err)
+	if err != nil {
+		return err
+	}
 
 	pvFile, err := tmjson.Marshal(pv)
-	require.NoError(t, err)
+	if err != nil {
+		return err
+	}
 
-	err = ioutil.WriteFile(path.Join(testSigners[0].Dir(), "priv_validator_key.json"), pvFile, 0600)
-	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(testSigners[0].Dir(), "priv_validator_key.json"), pvFile, 0600)
+	if err != nil {
+		return err
+	}
 
 	// create containers & start signer nodes
 	for _, s := range testSigners {
@@ -92,16 +100,18 @@ func StartSingleSignerContainers(
 			return s.CreateSingleSignerContainer(network.ID)
 		})
 	}
-	require.NoError(t, eg.Wait())
+	if err := eg.Wait(); err != nil {
+		return err
+	}
 
 	for _, s := range testSigners {
 		s := s
-		t.Logf("{%s} => starting container...", s.Name())
+		s.tl.Logf("{%s} => starting container...", s.Name())
 		eg.Go(func() error {
 			return s.StartContainer()
 		})
 	}
-	require.NoError(t, eg.Wait())
+	return eg.Wait()
 }
 
 // StartCosignerContainers will generate the necessary config files for the nodes in the signer cluster,
@@ -110,14 +120,12 @@ func StartSingleSignerContainers(
 // NOTE: Zero or negative values for sentriesPerSigner configures the nodes in the signer cluster to connect to the
 //       same sentry node.
 func StartCosignerContainers(
-	t *testing.T,
 	signers TestSigners,
-	validator *TestNode,
 	sentries TestNodes,
 	threshold, total,
 	sentriesPerSigner int,
 	network *docker.Network,
-) {
+) error {
 	eg := new(errgroup.Group)
 	ctx := context.Background()
 
@@ -125,79 +133,69 @@ func StartCosignerContainers(
 	switch {
 	// Each node in the signer cluster is connected to a unique sentry node
 	case sentriesPerSigner == 1:
-		var peers TestNodes
+		singleSentryIndex := 0
 		for i, s := range signers {
 			s := s
 
-			if i == len(signers)-1 {
-				// for the last signer don't use an ending index to avoid index out of range err
-				peers = sentries[i:]
+			var peers TestNodes
+
+			if len(sentries) == 1 || len(signers) > len(sentries) {
+				peers = sentries[singleSentryIndex : singleSentryIndex+1]
+				singleSentryIndex++
+				if singleSentryIndex >= len(sentries) {
+					singleSentryIndex = 0
+				}
 			} else {
 				peers = sentries[i : i+1]
 			}
 
-			p := peers
-			eg.Go(func() error { return s.InitCosignerConfig(ctx, p, signers, s.Index, threshold) })
+			eg.Go(func() error { return s.InitCosignerConfig(ctx, peers, signers, s.Index, threshold) })
 		}
 
 	// Each node in the signer cluster is connected to the number of sentry nodes specified by sentriesPerSigner
 	case sentriesPerSigner > 1:
-		var peers TestNodes
 		sentriesIndex := 0
 		for _, s := range signers {
 			s := s
-			peers = nil
+			var peers TestNodes
 			// if we are indexing sentries up to the end of the slice
 			switch {
-			case sentriesIndex+sentriesPerSigner-1 == len(sentries)-1:
-				peers = append(peers, sentries[sentriesIndex:]...)
+			case sentriesIndex+sentriesPerSigner == len(sentries):
+				peers = sentries[sentriesIndex:]
 				sentriesIndex += 1
 
 				// if there aren't enough sentries left in the slice use the sentries left in slice,
 				// calculate how many more are needed, then start back at the beginning of
 				// the slice to grab the rest. After, check if index into slice of sentries needs reset
-			case sentriesIndex+sentriesPerSigner-1 > len(sentries)-1:
-				sentriesLeftInSlice := len(sentries[sentriesIndex:])
-				peers = append(peers, sentries[sentriesIndex:]...)
+			case sentriesIndex+sentriesPerSigner > len(sentries):
+				remainingSentries := sentries[sentriesIndex:]
+				peers = append(peers, remainingSentries...)
 
-				neededSentries := sentriesPerSigner - sentriesLeftInSlice
+				neededSentries := sentriesPerSigner - len(remainingSentries)
 				peers = append(peers, sentries[0:neededSentries]...)
 
 				sentriesIndex += 1
-				if sentriesIndex > len(sentries)-1 {
+				if sentriesIndex >= len(sentries) {
 					sentriesIndex = 0
 				}
 			default:
 				peers = sentries[sentriesIndex : sentriesIndex+sentriesPerSigner]
 				sentriesIndex += 1
 			}
-			p := peers
-			eg.Go(func() error { return s.InitCosignerConfig(ctx, p, signers, s.Index, threshold) })
+
+			eg.Go(func() error { return s.InitCosignerConfig(ctx, peers, signers, s.Index, threshold) })
 		}
 
-	// All nodes in the signer cluster are connected to the same sentry node
+	// All nodes in the signer cluster are connected to all sentry nodes
 	default:
 		for _, s := range signers {
 			s := s
-			eg.Go(func() error { return s.InitCosignerConfig(ctx, TestNodes{validator}, signers, s.Index, threshold) })
+			eg.Go(func() error { return s.InitCosignerConfig(ctx, sentries, signers, s.Index, threshold) })
 		}
 	}
-	require.NoError(t, eg.Wait())
-
-	// generate key shares from validator private key
-	validator.t.Logf("{%s} -> Creating Private Key Shares...", validator.Name())
-	shares := validator.CreateKeyShares(int64(threshold), int64(total))
-	for i, s := range signers {
-		s := s
-		s.Key = shares[i]
-	}
-
-	// write key share to file in each signer nodes config directory
-	for _, s := range signers {
-		s := s
-		s.t.Logf("{%s} -> Writing Key Share To File... ", s.Name())
-		privateFilename := path.Join(s.Dir(), "share.json")
-		require.NoError(t, signer.WriteCosignerShareFile(s.Key, privateFilename))
+	err := eg.Wait()
+	if err != nil {
+		return err
 	}
 
 	// create containers & start signer nodes
@@ -207,16 +205,19 @@ func StartCosignerContainers(
 			return s.CreateCosignerContainer(network.ID)
 		})
 	}
-	require.NoError(t, eg.Wait())
+	err = eg.Wait()
+	if err != nil {
+		return err
+	}
 
 	for _, s := range signers {
 		s := s
-		t.Logf("{%s} => starting container...", s.Name())
+		s.tl.Logf("{%s} => starting container...", s.Name())
 		eg.Go(func() error {
 			return s.StartContainer()
 		})
 	}
-	require.NoError(t, eg.Wait())
+	return eg.Wait()
 }
 
 // PeerString returns a string representing a TestSigner's connectable private peers
@@ -233,15 +234,16 @@ func (ts TestSigners) PeerString(skip int) string {
 }
 
 // MakeTestSigners creates the TestSigner objects required for bootstrapping tests
-func MakeTestSigners(count int, home string, pool *dockertest.Pool, t *testing.T) (out TestSigners) {
+func MakeTestSigners(validatorIndex, count int, home string, pool *dockertest.Pool, tl TestLogger) (out TestSigners) {
 	for i := 0; i < count; i++ {
 		ts := &TestSigner{
-			Home:      home,
-			Index:     i + 1, // +1 is to ensure all Cosigner IDs end up being >0 as required in cosigner.go
-			Pool:      pool,
-			Container: nil,
-			Key:       signer.CosignerKey{},
-			t:         t,
+			Home:           home,
+			Index:          i + 1, // +1 is to ensure all Cosigner IDs end up being >0 as required in cosigner.go
+			ValidatorIndex: validatorIndex,
+			Pool:           pool,
+			Container:      nil,
+			Key:            signer.CosignerKey{},
+			tl:             tl,
 		}
 		out = append(out, ts)
 	}
@@ -274,17 +276,17 @@ func (ts *TestSigner) MkDir() {
 
 // Dir is the directory where the TestSigner files are stored
 func (ts *TestSigner) Dir() string {
-	return fmt.Sprintf("%s/%s/", ts.Home, ts.Name())
+	return filepath.Join(ts.Home, ts.Name())
 }
 
 // GetConfigFile returns the direct path to the signers config file as a string
 func (ts *TestSigner) GetConfigFile() string {
-	return path.Join(ts.Dir(), "config.yaml")
+	return filepath.Join(ts.Dir(), "config.yaml")
 }
 
 // Name is the hostname of the TestSigner container
 func (ts *TestSigner) Name() string {
-	return fmt.Sprintf("signer-%d-%s", ts.Index, ts.t.Name())
+	return fmt.Sprintf("val-%d-sgn-%d-%s", ts.ValidatorIndex, ts.Index, ts.tl.Name())
 }
 
 // InitSingleSignerConfig creates and runs a container to init a single signers config files
@@ -292,11 +294,11 @@ func (ts *TestSigner) Name() string {
 func (ts *TestSigner) InitSingleSignerConfig(ctx context.Context, listenNodes TestNodes) error {
 	container := RandLowerCaseLetterString(10)
 	cmd := []string{
-		chainid, "config", "init",
-		chainid, listenNodes.ListenAddrs(),
+		"horcrux", "config", "init",
+		listenNodes[0].ChainID, listenNodes.ListenAddrs(),
 		fmt.Sprintf("--home=%s", ts.Dir()),
 	}
-	ts.t.Logf("{%s}[%s] -> '%s'", ts.Name(), container, strings.Join(cmd, " "))
+	ts.tl.Logf("{%s}[%s] -> '%s'", ts.Name(), container, strings.Join(cmd, " "))
 	cont, err := ts.Pool.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: container,
 		Config: &docker.Config{
@@ -307,11 +309,11 @@ func (ts *TestSigner) InitSingleSignerConfig(ctx context.Context, listenNodes Te
 			},
 			Image:  signerImage,
 			Cmd:    cmd,
-			Labels: map[string]string{"horcrux-test": ts.t.Name()},
+			Labels: map[string]string{"horcrux-test": ts.tl.Name()},
 		},
 		HostConfig: &docker.HostConfig{
 			PublishAllPorts: true,
-			AutoRemove:      true,
+			AutoRemove:      false,
 			Mounts: []docker.HostMount{
 				{
 					Type:        "bind",
@@ -333,7 +335,22 @@ func (ts *TestSigner) InitSingleSignerConfig(ctx context.Context, listenNodes Te
 	if err := ts.Pool.Client.StartContainer(cont.ID, nil); err != nil {
 		return err
 	}
-	return handleNodeJobError(ts.Pool.Client.WaitContainerWithContext(cont.ID, ctx))
+	exitCode, err := ts.Pool.Client.WaitContainerWithContext(cont.ID, ctx)
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	_ = ts.Pool.Client.Logs(docker.LogsOptions{
+		Context:      ctx,
+		Container:    cont.ID,
+		OutputStream: stdout,
+		ErrorStream:  stderr,
+		Stdout:       true,
+		Stderr:       true,
+		Tail:         "100",
+		Follow:       false,
+		Timestamps:   false,
+	})
+	_ = ts.Pool.Client.RemoveContainer(docker.RemoveContainerOptions{ID: cont.ID})
+	return handleNodeJobError(container, exitCode, stdout.String(), stderr.String(), err)
 }
 
 // InitCosignerConfig creates and runs a container to init a signer nodes config files
@@ -342,15 +359,15 @@ func (ts *TestSigner) InitCosignerConfig(
 	ctx context.Context, listenNodes TestNodes, peers TestSigners, skip, threshold int) error {
 	container := RandLowerCaseLetterString(10)
 	cmd := []string{
-		chainid, "config", "init",
-		chainid, listenNodes.ListenAddrs(),
+		"horcrux", "config", "init",
+		listenNodes[0].ChainID, listenNodes.ListenAddrs(),
 		"--cosigner",
 		fmt.Sprintf("--peers=%s", peers.PeerString(skip)),
 		fmt.Sprintf("--threshold=%d", threshold),
 		fmt.Sprintf("--home=%s", ts.Dir()),
 		fmt.Sprintf("--listen=tcp://%s:%s", ts.Name(), signerPort),
 	}
-	ts.t.Logf("{%s}[%s] -> '%s'", ts.Name(), container, strings.Join(cmd, " "))
+	ts.tl.Logf("{%s}[%s] -> '%s'", ts.Name(), container, strings.Join(cmd, " "))
 	cont, err := ts.Pool.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: container,
 		Config: &docker.Config{
@@ -361,11 +378,11 @@ func (ts *TestSigner) InitCosignerConfig(
 			},
 			Image:  signerImage,
 			Cmd:    cmd,
-			Labels: map[string]string{"horcrux-test": ts.t.Name()},
+			Labels: map[string]string{"horcrux-test": ts.tl.Name()},
 		},
 		HostConfig: &docker.HostConfig{
 			PublishAllPorts: true,
-			AutoRemove:      true,
+			AutoRemove:      false,
 			Mounts: []docker.HostMount{
 				{
 					Type:        "bind",
@@ -387,7 +404,23 @@ func (ts *TestSigner) InitCosignerConfig(
 	if err := ts.Pool.Client.StartContainer(cont.ID, nil); err != nil {
 		return err
 	}
-	return handleNodeJobError(ts.Pool.Client.WaitContainerWithContext(cont.ID, ctx))
+
+	exitCode, err := ts.Pool.Client.WaitContainerWithContext(cont.ID, ctx)
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	_ = ts.Pool.Client.Logs(docker.LogsOptions{
+		Context:      ctx,
+		Container:    cont.ID,
+		OutputStream: stdout,
+		ErrorStream:  stderr,
+		Stdout:       true,
+		Stderr:       true,
+		Tail:         "100",
+		Follow:       false,
+		Timestamps:   false,
+	})
+	_ = ts.Pool.Client.RemoveContainer(docker.RemoveContainerOptions{ID: cont.ID})
+	return handleNodeJobError(container, exitCode, stdout.String(), stderr.String(), err)
 }
 
 // StartContainer starts a TestSigners container and assigns the new running container to replace the old one
@@ -408,6 +441,16 @@ func (ts *TestSigner) StartContainer() error {
 // StopContainer stops a TestSigners docker container
 func (ts *TestSigner) StopContainer() error {
 	return ts.Pool.Client.StopContainer(ts.Container.ID, uint(time.Second*30))
+}
+
+func (ts *TestSigner) StopAndRemoveContainer(force bool) error {
+	if err := ts.StopContainer(); err != nil && !force {
+		return err
+	}
+	return ts.Pool.Client.RemoveContainer(docker.RemoveContainerOptions{
+		ID:    ts.Container.ID,
+		Force: force,
+	})
 }
 
 func (ts *TestSigner) PauseContainer() error {
@@ -431,11 +474,11 @@ func (ts *TestSigner) CreateSingleSignerContainer(networkID string) error {
 			},
 			DNS:    []string{},
 			Image:  signerImage,
-			Labels: map[string]string{"horcrux-test": ts.t.Name()},
+			Labels: map[string]string{"horcrux-test": ts.tl.Name()},
 		},
 		HostConfig: &docker.HostConfig{
 			PublishAllPorts: true,
-			AutoRemove:      true,
+			AutoRemove:      false,
 			Mounts: []docker.HostMount{
 				{
 					Type:        "bind",
@@ -473,11 +516,11 @@ func (ts *TestSigner) CreateCosignerContainer(networkID string) error {
 			},
 			DNS:    []string{},
 			Image:  signerImage,
-			Labels: map[string]string{"horcrux-test": ts.t.Name()},
+			Labels: map[string]string{"horcrux-test": ts.tl.Name()},
 		},
 		HostConfig: &docker.HostConfig{
 			PublishAllPorts: true,
-			AutoRemove:      true,
+			AutoRemove:      false,
 			Mounts: []docker.HostMount{
 				{
 					Type:        "bind",

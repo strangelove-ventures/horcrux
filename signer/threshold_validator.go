@@ -11,7 +11,6 @@ import (
 	proto "github.com/strangelove-ventures/horcrux/signer/proto"
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/libs/log"
-	"github.com/tendermint/tendermint/libs/protoio"
 	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
 	rpcTypes "github.com/tendermint/tendermint/rpc/jsonrpc/types"
 	tm "github.com/tendermint/tendermint/types"
@@ -290,16 +289,6 @@ func (pv *ThresholdValidator) getExistingBlockSignature(block *Block) ([]byte, t
 
 func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, time.Time, error) {
 	height, round, step, stamp, signBytes := block.Height, block.Round, block.Step, block.Timestamp, block.SignBytes
-
-	if step == stepPrevote || step == stepPrecommit {
-		var vote tmProto.CanonicalVote
-		if err := protoio.UnmarshalDelimited(signBytes, &vote); err != nil {
-			return nil, stamp, fmt.Errorf("signBytes cannot be unmarshalled into vote: %v", err)
-		}
-		if vote.BlockID == nil {
-			return nil, stamp, fmt.Errorf("refusing to sign nil BlockID")
-		}
-	}
 
 	// Only the leader can execute this function. Followers can handle the requests,
 	// but they just need to proxy the request to the raft leader
