@@ -180,11 +180,11 @@ func StartCosignerCmd() *cobra.Command {
 			localCosignerConfig := signer.LocalCosignerConfig{
 				CosignerKey: key,
 				SignState:   &shareSignState,
-				RsaKey:      key.RSAKey,
-				Address:     cfg.ListenAddress,
-				Peers:       peers,
-				Total:       uint8(total),
-				Threshold:   uint8(cfg.CosignerThreshold),
+				//RsaKey:      key.RSAKey,
+				Address:   cfg.ListenAddress,
+				Peers:     peers,
+				Total:     uint8(total),
+				Threshold: uint8(cfg.CosignerThreshold),
 			}
 
 			localCosigner := signer.NewLocalCosigner(localCosignerConfig)
