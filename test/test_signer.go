@@ -439,7 +439,7 @@ func (ts *TestSigner) StartContainer() error {
 
 // StopContainer stops a TestSigners docker container
 func (ts *TestSigner) StopContainer() error {
-	return ts.Pool.Client.StopContainer(ts.Container.ID, 30)
+	return ts.Pool.Client.StopContainer(ts.Container.ID, 60)
 }
 
 func (ts *TestSigner) StopAndRemoveContainer(force bool) error {
