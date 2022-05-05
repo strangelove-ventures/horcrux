@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/ory/dockertest"
@@ -36,6 +37,33 @@ type TestSigner struct {
 
 type TestSigners []*TestSigner
 
+// KernelIsWSL2 checks if the kernel release contains the string WSL2
+func KernelIsWSL2() (bool, error) {
+	u := syscall.Utsname{}
+	if err := syscall.Uname(&u); err != nil {
+		return false, err
+	}
+
+	toString := func(f [65]int8) string {
+		out := make([]byte, 0, 64)
+		for _, v := range f[:] {
+			if v == 0 {
+				break
+			}
+			out = append(out, uint8(v))
+		}
+		return string(out)
+	}
+
+	kernelRelease := toString(u.Release)
+	if strings.Contains(kernelRelease, "WSL2") {
+		return true, nil
+	}
+
+	return false, nil
+
+}
+
 // BuildTestSignerImage builds a Docker image for horcrux from current Dockerfile
 func BuildTestSignerImage(pool *dockertest.Pool) error {
 	dir, err := os.Getwd()
@@ -43,7 +71,7 @@ func BuildTestSignerImage(pool *dockertest.Pool) error {
 		return err
 	}
 	dockerfile := path.Join("docker/horcrux/Dockerfile")
-	return pool.Client.BuildImage(docker.BuildImageOptions{
+	buildImageOptions := docker.BuildImageOptions{
 		Name:                signerImage,
 		Dockerfile:          dockerfile,
 		OutputStream:        ioutil.Discard,
@@ -54,7 +82,14 @@ func BuildTestSignerImage(pool *dockertest.Pool) error {
 		Auth:                docker.AuthConfiguration{},
 		AuthConfigs:         docker.AuthConfigurations{},
 		ContextDir:          path.Dir(dir),
-	})
+	}
+
+	// Need host mode Networking for WSL2
+	if ok, _ := KernelIsWSL2(); ok {
+		buildImageOptions.NetworkMode = "host"
+	}
+
+	return pool.Client.BuildImage(buildImageOptions)
 }
 
 // StartSingleSignerContainers will generate the necessary config files for the signer node, copy over the validators
