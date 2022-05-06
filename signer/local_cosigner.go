@@ -2,7 +2,6 @@ package signer
 
 import (
 	"crypto/rsa"
-	"fmt"
 	"time"
 
 	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
@@ -125,11 +124,13 @@ func NewLocalCosigner(cfg LocalCosignerConfig) *LocalCosigner {
 		address:     cfg.Address,
 		localsigner: &localsigner,
 	}
-	fmt.Println("\n", "LocalCosigner")
-	fmt.Printf("%+v\n", cosigner)
 
-	fmt.Println("\n", "Local Signer")
-	fmt.Printf("%+v\n", cosigner.localsigner)
+	//TODO: Delete this print statements:
+	//fmt.Println("\n", "LocalCosigner")
+	//fmt.Printf("%+v\n", cosigner)
+
+	//fmt.Println("\n", "Local Signer")
+	//fmt.Printf("%+v\n", cosigner.localsigner)
 
 	for _, peer := range cfg.Peers {
 		cosigner.localsigner.Peers[peer.ID] = peer

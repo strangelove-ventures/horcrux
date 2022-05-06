@@ -145,15 +145,6 @@ func TestThresholdValidator2of2(t *testing.T) {
 
 	signBytes := tm.ProposalSignBytes("chain-id", &proposal)
 
-	/*
-		empJSON_1, err := json.MarshalIndent(cosigner1, "", "  ")
-
-		fmt.Printf("%s\n", string(empJSON_1))
-		fmt.Printf("%+v\n", cosigner1)
-
-		empJSON_2, err := json.MarshalIndent(cosigner2, "", "  ")
-		fmt.Println("\n", "Cosigner2")
-	*/
 	fmt.Println("\n", "Cosigner1")
 	fmt.Printf("%+v\n", cosigner1)
 
