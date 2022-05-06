@@ -3,6 +3,7 @@ package signer
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"fmt"
 	"time"
 
 	"io/ioutil"
@@ -31,15 +32,18 @@ func getMockRaftStore(cosigner Cosigner, tmpDir string) *RaftStore {
 }
 
 func TestThresholdValidator2of2(t *testing.T) {
+
 	total := uint8(2)
 	threshold := uint8(2)
 
 	bitSize := 4096
 	rsaKey1, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(t, err)
+	//var localsigner1 LocalSoftSignThresholdEd25519Signature
 
 	rsaKey2, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(t, err)
+	//var localsigner2 LocalSoftSignThresholdEd25519Signature
 
 	peers := []CosignerPeer{{
 		ID:        1,
@@ -141,9 +145,23 @@ func TestThresholdValidator2of2(t *testing.T) {
 
 	signBytes := tm.ProposalSignBytes("chain-id", &proposal)
 
+	/*
+		empJSON_1, err := json.MarshalIndent(cosigner1, "", "  ")
+
+		fmt.Printf("%s\n", string(empJSON_1))
+		fmt.Printf("%+v\n", cosigner1)
+
+		empJSON_2, err := json.MarshalIndent(cosigner2, "", "  ")
+		fmt.Println("\n", "Cosigner2")
+	*/
+	fmt.Println("\n", "Cosigner1")
+	fmt.Printf("%+v\n", cosigner1)
+
+	fmt.Println("\n", "Cosigner2")
+	fmt.Printf("%+v\n", cosigner2)
+
 	err = validator.SignProposal("chain-id", &proposal)
 	require.NoError(t, err)
-
 	require.True(t, privateKey.PubKey().VerifySignature(signBytes, proposal.Signature))
 }
 

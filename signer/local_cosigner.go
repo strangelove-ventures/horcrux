@@ -2,6 +2,7 @@ package signer
 
 import (
 	"crypto/rsa"
+	"fmt"
 	"time"
 
 	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
@@ -54,13 +55,13 @@ type CosignerGetEphemeralSecretPartRequest struct {
 type LocalCosignerConfig struct {
 	CosignerKey CosignerKey
 	SignState   *SignState
-	//RsaKey      rsa.PrivateKey
+	RsaKey      rsa.PrivateKey
 	Peers       []CosignerPeer
 	Address     string
 	RaftAddress string
 	Total       uint8
 	Threshold   uint8
-	Signer      *LocalSoftSignThresholdEd25519Signature
+	//Localsigner LocalSoftSignThresholdEd25519Signature
 }
 
 type PeerMetadata struct {
@@ -80,51 +81,66 @@ type HrsMetadata struct {
 // TODO: Clarify what you mean with cosinger here.
 // LocalCosigner signing is thread safe
 type LocalCosigner struct {
+	/*
+		//key         CosignerKey		- moved to threshold
+		//rsaKey      rsa.PrivateKey	- moved to threshold
+		//threshold uint8 				- moved to threshold
+
+		// stores the last sign state for a share we have fully signed
+		// incremented whenever we are asked to sign a share
+		//lastSignState *SignState 		- moved to threshold
+
+		// signing is thread safe 		- moved to threshold
+		//lastSignStateMutex sync.Mutex - moved to threshold
+
+		// Height, Round, Step -> metadata 	- moved to threshold
+		//hrsMeta map[HRSTKey]HrsMetadata 	- moved to threshold
+
+	*/
 	pubKeyBytes []byte
-	//key         CosignerKey
-	//rsaKey      rsa.PrivateKey
-	total uint8
-	//threshold uint8
-
-	// stores the last sign state for a share we have fully signed
-	// incremented whenever we are asked to sign a share
-	//lastSignState *SignState
-
-	// signing is thread safe
-	//lastSignStateMutex sync.Mutex
-
-	// Height, Round, Step -> metadata
-	//hrsMeta map[HRSTKey]HrsMetadata
-	peers map[int]CosignerPeer
-
-	address string
-
-	localsigner LocalSoftSignThresholdEd25519Signature
+	total       uint8
+	address     string
+	//peers       map[int]CosignerPeer
+	localsigner *LocalSoftSignThresholdEd25519Signature
 }
 
 func (cosigner *LocalCosigner) SaveLastSignedState(signState SignStateConsensus) error {
-	return cosigner.localsigner.lastSignState.Save(signState, &cosigner.localsigner.lastSignStateMutex)
+	return cosigner.localsigner.LastSignState.Save(signState, &cosigner.localsigner.LastSignStateMutex)
 }
 
 func NewLocalCosigner(cfg LocalCosignerConfig) *LocalCosigner {
-	cosigner := &LocalCosigner{
-		//pubKeyBytes: []byte{},
-		//key:         cfg.CosignerKey,
-		total:   cfg.Total,
-		peers:   make(map[int]CosignerPeer),
-		address: cfg.Address,
-		//localsigner: cfg.Signer,
+	localsigner := LocalSoftSignThresholdEd25519Signature{
+		Key:           cfg.CosignerKey,
+		LastSignState: cfg.SignState,
+		RsaKey:        cfg.RsaKey,
+		HrsMeta:       make(map[HRSTKey]HrsMetadata),
+		Peers:         make(map[int]CosignerPeer),
+		Total:         cfg.Total,
+		Threshold:     cfg.Threshold,
 	}
+	cosigner := &LocalCosigner{
+		//key:         cfg.CosignerKey,
+		//pubKeyBytes: []byte{},
+		total:       cfg.Total,
+		address:     cfg.Address,
+		localsigner: &localsigner,
+	}
+	fmt.Println("\n", "LocalCosigner")
+	fmt.Printf("%+v\n", cosigner)
+
+	fmt.Println("\n", "Local Signer")
+	fmt.Printf("%+v\n", cosigner.localsigner)
 
 	for _, peer := range cfg.Peers {
-		cosigner.peers[peer.ID] = peer
+		cosigner.localsigner.Peers[peer.ID] = peer
 	}
 
 	// cache the public key bytes for signing operations
-	switch ed25519Key := cosigner.localsigner.key.PubKey.(type) {
+	switch ed25519Key := cosigner.localsigner.Key.PubKey.(type) {
 	case tmCryptoEd25519.PubKey:
-		cosigner.pubKeyBytes = make([]byte, len(ed25519Key))
-		copy(cosigner.pubKeyBytes, ed25519Key[:])
+		cosigner.localsigner.PubKeyBytes = make([]byte, len(ed25519Key))
+		copy(cosigner.localsigner.PubKeyBytes, ed25519Key[:])
+		cosigner.pubKeyBytes = cosigner.localsigner.PubKeyBytes
 	default:
 		panic("Not an ed25519 public key")
 	}
@@ -135,7 +151,7 @@ func NewLocalCosigner(cfg LocalCosignerConfig) *LocalCosigner {
 // GetID returns the id of the cosigner
 // Implements Cosigner interface
 func (cosigner *LocalCosigner) GetID() int {
-	return cosigner.localsigner.key.ID
+	return cosigner.localsigner.Key.ID
 }
 
 // GetAddress returns the GRPC URL of the cosigner
@@ -149,13 +165,13 @@ func (cosigner *LocalCosigner) GetAddress() string {
 func (cosigner *LocalCosigner) GetEphemeralSecretParts(
 	hrst HRSTKey) (*CosignerEphemeralSecretPartsResponse, error) {
 	res := &CosignerEphemeralSecretPartsResponse{
-		EncryptedSecrets: make([]CosignerEphemeralSecretPart, 0, len(cosigner.peers)-1),
+		EncryptedSecrets: make([]CosignerEphemeralSecretPart, 0, len(cosigner.localsigner.Peers)-1),
 	}
-	for _, peer := range cosigner.peers {
+	for _, peer := range cosigner.localsigner.Peers {
 		if peer.ID == cosigner.GetID() {
 			continue
 		}
-		secretPart, err := cosigner.localsigner.getEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
+		secretPart, err := cosigner.localsigner.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
 			ID:        peer.ID,
 			Height:    hrst.Height,
 			Round:     hrst.Round,
@@ -177,7 +193,7 @@ func (cosigner *LocalCosigner) GetEphemeralSecretParts(
 func (cosigner *LocalCosigner) SetEphemeralSecretPartsAndSign(
 	req CosignerSetEphemeralSecretPartsAndSignRequest) (*CosignerSignResponse, error) {
 	for _, secretPart := range req.EncryptedSecrets {
-		err := cosigner.localsigner.setEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
+		err := cosigner.localsigner.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
 			SourceID:                       secretPart.SourceID,
 			SourceEphemeralSecretPublicKey: secretPart.SourceEphemeralSecretPublicKey,
 			EncryptedSharePart:             secretPart.EncryptedSharePart,
@@ -192,7 +208,7 @@ func (cosigner *LocalCosigner) SetEphemeralSecretPartsAndSign(
 		}
 	}
 
-	res, err := cosigner.localsigner.sign(CosignerSignRequest{req.SignBytes})
+	res, err := cosigner.localsigner.Sign(CosignerSignRequest{req.SignBytes})
 	return &res, err
 }
 
