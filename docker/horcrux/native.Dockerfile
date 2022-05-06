@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:alpine AS build-env
+FROM golang:alpine AS build-env
 
 ENV PACKAGES make git
 
@@ -8,10 +8,7 @@ WORKDIR /go/src/github.com/strangelove-ventures/horcrux
 
 ADD . .
 
-ARG TARGETARCH
-ARG TARGETOS
-
-RUN export GOOS=${TARGETOS} GOARCH=${TARGETARCH} && make build
+RUN make build
 
 FROM alpine:edge
 
