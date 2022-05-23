@@ -635,7 +635,7 @@ func (tn *TestNode) CreateNodeContainer(networkID string) error {
 }
 
 func (tn *TestNode) StopContainer() error {
-	return tn.Pool.Client.StopContainer(tn.Container.ID, uint(time.Second*30))
+	return tn.Pool.Client.StopContainer(tn.Container.ID, 60)
 }
 
 func (tn *TestNode) StopAndRemoveContainer(force bool) error {
