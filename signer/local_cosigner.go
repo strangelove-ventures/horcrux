@@ -4,39 +4,10 @@ import (
 	"crypto/rsa"
 	"time"
 
+	"sync"
+
 	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
-	tsed25519 "gitlab.com/polychainlabs/threshold-ed25519/pkg"
 )
-
-// return true if we are less than the other key
-func (hrst *HRSTKey) Less(other HRSTKey) bool {
-	if hrst.Height < other.Height {
-		return true
-	}
-
-	if hrst.Height > other.Height {
-		return false
-	}
-
-	// height is equal, check round
-
-	if hrst.Round < other.Round {
-		return true
-	}
-
-	if hrst.Round > other.Round {
-		return false
-	}
-
-	// round is equal, check step
-
-	if hrst.Step < other.Step {
-		return true
-	}
-
-	// HRS is greater or equal
-	return false
-}
 
 type CosignerPeer struct {
 	ID        int
@@ -63,74 +34,69 @@ type LocalCosignerConfig struct {
 	//Localsigner LocalSoftSignThresholdEd25519Signature
 }
 
-type PeerMetadata struct {
-	Share                    []byte
-	EphemeralSecretPublicKey []byte
-}
+type LastSignStateStruct struct {
+	// signing is thread safe - lastSignStateMutex is used for putting locks so only one goroutine can r/w to the function
+	LastSignStateMutex sync.Mutex
 
-type HrsMetadata struct {
-	// need to be _total_ entries per player
-	Secret      []byte
-	DealtShares []tsed25519.Scalar
-	Peers       []PeerMetadata
+	// lastSignState stores the last sign state for a share we have fully signed
+	// incremented whenever we are asked to sign a share
+	LastSignState *SignState
 }
 
 // LocalCosigner responds to sign requests using their share key
 // The cosigner maintains a watermark to avoid double-signing
 // TODO: Clarify what you mean with cosinger here.
 // LocalCosigner signing is thread safe
+// Local Cosigner "embedd" the threshold signer.
 type LocalCosigner struct {
 	/*
-		//key         CosignerKey		- moved to threshold
-		//rsaKey      rsa.PrivateKey	- moved to threshold
-		//threshold uint8 				- moved to threshold
-
-		// stores the last sign state for a share we have fully signed
-		// incremented whenever we are asked to sign a share
-		//lastSignState *SignState 		- moved to threshold
-
-		// signing is thread safe 		- moved to threshold
-		//lastSignStateMutex sync.Mutex - moved to threshold
+		// key         CosignerKey		- moved to threshold
+		// rsaKey      rsa.PrivateKey	- moved to threshold
+		// threshold uint8 				- moved to threshold
 
 		// Height, Round, Step -> metadata 	- moved to threshold
 		//hrsMeta map[HRSTKey]HrsMetadata 	- moved to threshold
 
 	*/
-	pubKeyBytes []byte
-	total       uint8
-	address     string
-	//peers       map[int]CosignerPeer
-	localsigner *LocalSoftSignThresholdEd25519Signature
-}
-
-func (cosigner *LocalCosigner) SaveLastSignedState(signState SignStateConsensus) error {
-	return cosigner.localsigner.LastSignState.Save(signState, &cosigner.localsigner.LastSignStateMutex)
+	LastSignStateStruct *LastSignStateStruct
+	pubKeyBytes         []byte
+	total               uint8
+	address             string
+	// peers       map[int]CosignerPeer
+	localsigner *LocalSoftSignThresholdEd25519Signature // TODO: Change the mutex so that you can you can pass ThresholdEd25519Signature
 }
 
 func NewLocalCosigner(cfg LocalCosignerConfig) *LocalCosigner {
+	// TODO: localsigner should be passed as a parameter in the cfg rather than constructed here. We could add a method in the new LocalSoftSignThresholdEd25519Signature file to return this config such as func NewLocalThresholdEd25519Signature(key CosignerKey, rsaKey PrivateKey, total, threshold int) LocalSoftSignThresholdEd25519Signature { which could then be called and added to the LocalCosignerConfig from cmd/horcrux/cmd/cosigner.go
+
 	localsigner := LocalSoftSignThresholdEd25519Signature{
-		Key:           cfg.CosignerKey,
-		LastSignState: cfg.SignState,
-		RsaKey:        cfg.RsaKey,
-		HrsMeta:       make(map[HRSTKey]HrsMetadata),
-		Peers:         make(map[int]CosignerPeer),
-		Total:         cfg.Total,
-		Threshold:     cfg.Threshold,
+		Key:       cfg.CosignerKey,
+		RsaKey:    cfg.RsaKey,
+		HrsMeta:   make(map[HRSTKey]HrsMetadata),
+		Peers:     make(map[int]CosignerPeer),
+		Total:     cfg.Total,
+		Threshold: cfg.Threshold,
+	}
+
+	LastSignStateStruct := LastSignStateStruct{
+		LastSignStateMutex: sync.Mutex{},
+		LastSignState:      cfg.SignState,
 	}
 	cosigner := &LocalCosigner{
 		//key:         cfg.CosignerKey,
 		//pubKeyBytes: []byte{},
-		total:       cfg.Total,
-		address:     cfg.Address,
-		localsigner: &localsigner,
+		LastSignStateStruct: &LastSignStateStruct,
+		total:               cfg.Total,
+		address:             cfg.Address,
+		localsigner:         &localsigner,
 	}
 
-	//TODO: Delete this print statements:
-	//fmt.Println("\n", "LocalCosigner")
-	//fmt.Printf("%+v\n", cosigner)
+	// TODO: Delete this print statements:
+	// fmt.Println("\n", "LocalCosigner")
+	// fmt.Printf("%+v\n", cosigner)
 
-	//fmt.Println("\n", "Local Signer")
-	//fmt.Printf("%+v\n", cosigner.localsigner)
+	// fmt.Println("\n", "Local Signer")
+	// fmt.Printf("%+v\n", cosigner.localsigner)
 
 	for _, peer := range cfg.Peers {
 		cosigner.localsigner.Peers[peer.ID] = peer
@@ -147,6 +113,10 @@ func NewLocalCosigner(cfg LocalCosignerConfig) *LocalCosigner {
 	}
 
 	return cosigner
+}
+
+func (cosigner *LocalCosigner) SaveLastSignedState(signState SignStateConsensus) error {
+	return cosigner.LastSignStateStruct.LastSignState.Save(signState, &cosigner.LastSignStateStruct.LastSignStateMutex)
 }
 
 // GetID returns the id of the cosigner
@@ -178,7 +148,7 @@ func (cosigner *LocalCosigner) GetEphemeralSecretParts(
 			Round:     hrst.Round,
 			Step:      hrst.Step,
 			Timestamp: time.Unix(0, hrst.Timestamp),
-		})
+		}, cosigner.LastSignStateStruct)
 
 		if err != nil {
 			return nil, err
@@ -203,13 +173,13 @@ func (cosigner *LocalCosigner) SetEphemeralSecretPartsAndSign(
 			Round:                          req.HRST.Round,
 			Step:                           req.HRST.Step,
 			Timestamp:                      time.Unix(0, req.HRST.Timestamp),
-		})
+		}, cosigner.LastSignStateStruct)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	res, err := cosigner.localsigner.Sign(CosignerSignRequest{req.SignBytes})
+	res, err := cosigner.localsigner.Sign(CosignerSignRequest{req.SignBytes}, cosigner.LastSignStateStruct)
 	return &res, err
 }
 

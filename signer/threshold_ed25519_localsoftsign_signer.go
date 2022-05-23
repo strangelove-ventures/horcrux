@@ -8,27 +8,16 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"sync"
 
 	tmJson "github.com/tendermint/tendermint/libs/json"
 	"gitlab.com/polychainlabs/edwards25519"
 	tsed25519 "gitlab.com/polychainlabs/threshold-ed25519/pkg"
 )
 
-// Interface for which is used by local  Signer
-type ThresholdEd25519Signature interface {
-	DealShares(req CosignerGetEphemeralSecretPartRequest) (HrsMetadata, error)
-
-	GetEphemeralSecretPart(req CosignerGetEphemeralSecretPartRequest) (CosignerEphemeralSecretPart, error)
-
-	SetEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest) error
-
-	Sign(req CosignerSignRequest) (CosignerSignResponse, error)
-}
-
-// LocalSoftsignThresholdEd25519Signature
+// LocalSoftsignThresholdEd25519Signature implements the interface and signs the message for each local signer.
+// LocalSoftSignThresholdEd25519Signature is the implementation of a soft sign signer at the local level.
 type LocalSoftSignThresholdEd25519Signature struct {
-	//UnimplementedThresholdEd25519Signature // embedding unimplemented ThresholdEd25519Signature
+	// UnimplementedThresholdEd25519Signature // embedding unimplemented ThresholdEd25519Signature
 	PubKeyBytes []byte
 	Key         CosignerKey
 	RsaKey      rsa.PrivateKey
@@ -37,22 +26,22 @@ type LocalSoftSignThresholdEd25519Signature struct {
 
 	// stores the last sign state for a share we have fully signed
 	// incremented whenever we are asked to sign a share
-	LastSignState *SignState
+	//LastSignState *SignState // TODO lift this to the Cosigner
 
 	// signing is thread safe
-	LastSignStateMutex sync.Mutex
+	//LastSignStateMutex sync.Mutex // TODO lift this to the Cosigner
 
 	// Height, Round, Step -> metadata
 	HrsMeta map[HRSTKey]HrsMetadata
 	Peers   map[int]CosignerPeer
 }
 
-func (cosigner *LocalSoftSignThresholdEd25519Signature) Sign(req CosignerSignRequest) (CosignerSignResponse, error) {
-	cosigner.LastSignStateMutex.Lock()
-	defer cosigner.LastSignStateMutex.Unlock()
+func (localsigner *LocalSoftSignThresholdEd25519Signature) Sign(req CosignerSignRequest, m *LastSignStateStruct) (CosignerSignResponse, error) {
+	m.LastSignStateMutex.Lock()
+	defer m.LastSignStateMutex.Unlock()
 
 	res := CosignerSignResponse{}
-	lss := cosigner.LastSignState
+	lss := m.LastSignState
 
 	hrst, err := UnpackHRST(req.SignBytes)
 	if err != nil {
@@ -78,7 +67,7 @@ func (cosigner *LocalSoftSignThresholdEd25519Signature) Sign(req CosignerSignReq
 		// same HRS, and only differ by timestamp - ok to sign again
 	}
 
-	meta, ok := cosigner.HrsMeta[hrst]
+	meta, ok := localsigner.HrsMeta[hrst]
 	if !ok {
 		return res, errors.New("no metadata at HRS")
 	}
@@ -112,10 +101,10 @@ func (cosigner *LocalSoftSignThresholdEd25519Signature) Sign(req CosignerSignReq
 	}
 
 	sig := tsed25519.SignWithShare(
-		req.SignBytes, cosigner.Key.ShareKey, ephemeralShare, cosigner.PubKeyBytes, ephemeralPublic)
+		req.SignBytes, localsigner.Key.ShareKey, ephemeralShare, localsigner.PubKeyBytes, ephemeralPublic)
 
-	cosigner.LastSignState.EphemeralPublic = ephemeralPublic
-	err = cosigner.LastSignState.Save(SignStateConsensus{
+	m.LastSignState.EphemeralPublic = ephemeralPublic
+	err = m.LastSignState.Save(SignStateConsensus{
 		Height:    hrst.Height,
 		Round:     hrst.Round,
 		Step:      hrst.Step,
@@ -129,11 +118,11 @@ func (cosigner *LocalSoftSignThresholdEd25519Signature) Sign(req CosignerSignReq
 		}
 	}
 
-	for existingKey := range cosigner.HrsMeta {
+	for existingKey := range localsigner.HrsMeta {
 		// delete any HRS lower than our signed level
 		// we will not be providing parts for any lower HRS
 		if existingKey.Less(hrst) {
-			delete(cosigner.HrsMeta, existingKey)
+			delete(localsigner.HrsMeta, existingKey)
 		}
 	}
 
@@ -143,7 +132,7 @@ func (cosigner *LocalSoftSignThresholdEd25519Signature) Sign(req CosignerSignReq
 }
 
 // Implements ThresholdEd25519Signature interface
-func (cosigner *LocalSoftSignThresholdEd25519Signature) DealShares(req CosignerGetEphemeralSecretPartRequest) (HrsMetadata, error) {
+func (localsigner *LocalSoftSignThresholdEd25519Signature) DealShares(req CosignerGetEphemeralSecretPartRequest) (HrsMetadata, error) {
 	hrsKey := HRSTKey{
 		Height:    req.Height,
 		Round:     req.Round,
@@ -151,7 +140,7 @@ func (cosigner *LocalSoftSignThresholdEd25519Signature) DealShares(req CosignerG
 		Timestamp: req.Timestamp.UnixNano(),
 	}
 
-	meta, ok := cosigner.HrsMeta[hrsKey]
+	meta, ok := localsigner.HrsMeta[hrsKey]
 
 	if ok {
 		return meta, nil
@@ -164,14 +153,14 @@ func (cosigner *LocalSoftSignThresholdEd25519Signature) DealShares(req CosignerG
 
 	meta = HrsMetadata{
 		Secret: secret,
-		Peers:  make([]PeerMetadata, cosigner.Total),
+		Peers:  make([]PeerMetadata, localsigner.Total),
 	}
 
 	// split this secret with shamirs
 	// !! dealt shares need to be saved because dealing produces different shares each time!
-	meta.DealtShares = tsed25519.DealShares(meta.Secret, cosigner.Threshold, cosigner.Total)
+	meta.DealtShares = tsed25519.DealShares(meta.Secret, localsigner.Threshold, localsigner.Total)
 
-	cosigner.HrsMeta[hrsKey] = meta
+	localsigner.HrsMeta[hrsKey] = meta
 
 	return meta, nil
 }
@@ -179,13 +168,13 @@ func (cosigner *LocalSoftSignThresholdEd25519Signature) DealShares(req CosignerG
 // Get the ephemeral secret part for an ephemeral share
 // The ephemeral secret part is encrypted for the receiver
 // Implements ThresholdEd25519Signature interface
-func (cosigner *LocalSoftSignThresholdEd25519Signature) GetEphemeralSecretPart(
-	req CosignerGetEphemeralSecretPartRequest) (CosignerEphemeralSecretPart, error) {
+func (localsigner *LocalSoftSignThresholdEd25519Signature) GetEphemeralSecretPart(
+	req CosignerGetEphemeralSecretPartRequest, m *LastSignStateStruct) (CosignerEphemeralSecretPart, error) {
 	res := CosignerEphemeralSecretPart{}
 
 	// protects the meta map
-	cosigner.LastSignStateMutex.Lock()
-	defer cosigner.LastSignStateMutex.Unlock()
+	m.LastSignStateMutex.Lock()
+	defer m.LastSignStateMutex.Unlock()
 
 	hrst := HRSTKey{
 		Height:    req.Height,
@@ -194,10 +183,10 @@ func (cosigner *LocalSoftSignThresholdEd25519Signature) GetEphemeralSecretPart(
 		Timestamp: req.Timestamp.UnixNano(),
 	}
 
-	meta, ok := cosigner.HrsMeta[hrst]
+	meta, ok := localsigner.HrsMeta[hrst]
 	// generate metadata placeholder
 	if !ok {
-		newMeta, err := cosigner.DealShares(CosignerGetEphemeralSecretPartRequest{
+		newMeta, err := localsigner.DealShares(CosignerGetEphemeralSecretPartRequest{
 			Height:    req.Height,
 			Round:     req.Round,
 			Step:      req.Step,
@@ -209,17 +198,17 @@ func (cosigner *LocalSoftSignThresholdEd25519Signature) GetEphemeralSecretPart(
 		}
 
 		meta = newMeta
-		cosigner.HrsMeta[hrst] = meta
+		localsigner.HrsMeta[hrst] = meta
 	}
 
 	ourEphPublicKey := tsed25519.ScalarMultiplyBase(meta.Secret)
 
 	// set our values
-	meta.Peers[cosigner.Key.ID-1].Share = meta.DealtShares[cosigner.Key.ID-1]
-	meta.Peers[cosigner.Key.ID-1].EphemeralSecretPublicKey = ourEphPublicKey
+	meta.Peers[localsigner.Key.ID-1].Share = meta.DealtShares[localsigner.Key.ID-1]
+	meta.Peers[localsigner.Key.ID-1].EphemeralSecretPublicKey = ourEphPublicKey
 
 	// grab the peer info for the ID being requested
-	peer, ok := cosigner.Peers[req.ID]
+	peer, ok := localsigner.Peers[req.ID]
 	if !ok {
 		return res, errors.New("unknown peer ID")
 	}
@@ -232,7 +221,7 @@ func (cosigner *LocalSoftSignThresholdEd25519Signature) GetEphemeralSecretPart(
 		return res, err
 	}
 
-	res.SourceID = cosigner.Key.ID
+	res.SourceID = localsigner.Key.ID
 	res.SourceEphemeralSecretPublicKey = ourEphPublicKey
 	res.EncryptedSharePart = encrypted
 
@@ -246,7 +235,7 @@ func (cosigner *LocalSoftSignThresholdEd25519Signature) GetEphemeralSecretPart(
 		}
 
 		digest := sha256.Sum256(jsonBytes)
-		signature, err := rsa.SignPSS(rand.Reader, &cosigner.RsaKey, crypto.SHA256, digest[:], nil)
+		signature, err := rsa.SignPSS(rand.Reader, &localsigner.RsaKey, crypto.SHA256, digest[:], nil)
 		if err != nil {
 			return res, err
 		}
@@ -259,9 +248,9 @@ func (cosigner *LocalSoftSignThresholdEd25519Signature) GetEphemeralSecretPart(
 	return res, nil
 }
 
-// Store an ephemeral secret share part provided by another cosigner
+// Store an ephemeral secret share part provided by another cosigner (signer)
 // Implements ThresholdEd25519Signature interface
-func (cosigner *LocalSoftSignThresholdEd25519Signature) SetEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest) error {
+func (localsigner *LocalSoftSignThresholdEd25519Signature) SetEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest, m *LastSignStateStruct) error {
 
 	// Verify the source signature
 	{
@@ -280,7 +269,7 @@ func (cosigner *LocalSoftSignThresholdEd25519Signature) SetEphemeralSecretPart(r
 		}
 
 		digest := sha256.Sum256(digestBytes)
-		peer, ok := cosigner.Peers[req.SourceID]
+		peer, ok := localsigner.Peers[req.SourceID]
 
 		if !ok {
 			return fmt.Errorf("unknown cosigner: %d", req.SourceID)
@@ -294,8 +283,8 @@ func (cosigner *LocalSoftSignThresholdEd25519Signature) SetEphemeralSecretPart(r
 	}
 
 	// protects the meta map
-	cosigner.LastSignStateMutex.Lock()
-	defer cosigner.LastSignStateMutex.Unlock()
+	m.LastSignStateMutex.Lock()
+	defer m.LastSignStateMutex.Unlock()
 
 	hrst := HRSTKey{
 		Height:    req.Height,
@@ -304,10 +293,10 @@ func (cosigner *LocalSoftSignThresholdEd25519Signature) SetEphemeralSecretPart(r
 		Timestamp: req.Timestamp.UnixNano(),
 	}
 
-	meta, ok := cosigner.HrsMeta[hrst]
+	meta, ok := localsigner.HrsMeta[hrst]
 	// generate metadata placeholder
 	if !ok {
-		newMeta, err := cosigner.DealShares(CosignerGetEphemeralSecretPartRequest{
+		newMeta, err := localsigner.DealShares(CosignerGetEphemeralSecretPartRequest{
 			Height: req.Height,
 			Round:  req.Round,
 			Step:   req.Step,
@@ -318,11 +307,11 @@ func (cosigner *LocalSoftSignThresholdEd25519Signature) SetEphemeralSecretPart(r
 		}
 
 		meta = newMeta
-		cosigner.HrsMeta[hrst] = meta
+		localsigner.HrsMeta[hrst] = meta
 	}
 
 	// decrypt share
-	sharePart, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, &cosigner.RsaKey, req.EncryptedSharePart, nil)
+	sharePart, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, &localsigner.RsaKey, req.EncryptedSharePart, nil)
 	if err != nil {
 		return err
 	}
@@ -332,48 +321,3 @@ func (cosigner *LocalSoftSignThresholdEd25519Signature) SetEphemeralSecretPart(r
 	meta.Peers[req.SourceID-1].EphemeralSecretPublicKey = req.SourceEphemeralSecretPublicKey
 	return nil
 }
-
-//Local LocalHSMsignThresholdEd25519Signature
-
-type LocalHSMsignThresholdEd25519Signature struct {
-	// panic("Not Implemented") //TODO:
-	//UnimplementedThresholdEd25519Signature // embedding UnimplementedCosignerGRPCServer
-
-}
-
-/*
-
-// UnimplementedThresholdEd25519Signature must be embedded to have forward compatible implementations.
-type UnimplementedThresholdEd25519Signature struct {
-}
-
-func (UnimplementedThresholdEd25519Signature) dealShares(req CosignerGetEphemeralSecretPartRequest) (HrsMetadata, error) {
-	return HrsMetadata{}, errors.New("method dealShares not implemented")
-}
-func (UnimplementedThresholdEd25519Signature) setEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest) error {
-	return errors.New("method setEphemeralSecretPart not implemented")
-}
-func (UnimplementedThresholdEd25519Signature) getEphemeralSecretPart(req CosignerGetEphemeralSecretPartRequest) (CosignerEphemeralSecretPart, error) {
-	return CosignerEphemeralSecretPart{}, errors.New("method getEphemeralSecretPart")
-}
-func (UnimplementedThresholdEd25519Signature) sign(req CosignerSignRequest) (CosignerSignResponse, error) {
-	return CosignerSignResponse{}, errors.New("method sign not implemented")
-}
-
-func (cosigner LocalHSMsignThresholdEd25519Signature) dealShares(req CosignerGetEphemeralSecretPartRequest) (HrsMetadata, error) {
-	panic("Not Implemented") //TODO:
-	return HrsMetadata{}, errors.New("method dealShares not implemented")
-}
-func (cosigner LocalHSMsignThresholdEd25519Signature) setEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest) error {
-	panic("Not Implemented") //TODO:
-	return errors.New("method setEphemeralSecretPart not implemented")
-}
-func (cosigner LocalHSMsignThresholdEd25519Signature) getEphemeralSecretPart(req CosignerGetEphemeralSecretPartRequest) (CosignerEphemeralSecretPart, error) {
-	panic("Not Implemented") //TODO:
-	return CosignerEphemeralSecretPart{}, errors.New("method getEphemeralSecretPart")
-}
-func (cosigner LocalHSMsignThresholdEd25519Signature) sign(req CosignerSignRequest) (CosignerSignResponse, error) {
-	panic("Not Implemented") //TODO:
-	return CosignerSignResponse{}, errors.New("method sign not implemented")
-}
-*/
