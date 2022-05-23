@@ -6,12 +6,14 @@ import (
 	proto "github.com/strangelove-ventures/horcrux/signer/proto"
 )
 
+// Height Round Step Key
 type HRSKey struct {
 	Height int64
 	Round  int64
 	Step   int8
 }
 
+// Height Round Step Time Key
 type HRSTKey struct {
 	Height    int64
 	Round     int64
@@ -19,6 +21,7 @@ type HRSTKey struct {
 	Timestamp int64
 }
 
+// Gets
 func HRSTKeyFromProto(hrs *proto.HRST) HRSTKey {
 	return HRSTKey{
 		Height:    hrs.GetHeight(),
@@ -28,6 +31,7 @@ func HRSTKeyFromProto(hrs *proto.HRST) HRSTKey {
 	}
 }
 
+// toProto is a HRSTKey method that returns
 func (hrst HRSTKey) toProto() *proto.HRST {
 	return &proto.HRST{
 		Height:    hrst.Height,
@@ -35,6 +39,36 @@ func (hrst HRSTKey) toProto() *proto.HRST {
 		Step:      int32(hrst.Step),
 		Timestamp: hrst.Timestamp,
 	}
+}
+
+// HRSTKey method that return true if we are less than the other key
+func (hrst *HRSTKey) Less(other HRSTKey) bool {
+	if hrst.Height < other.Height {
+		return true
+	}
+
+	if hrst.Height > other.Height {
+		return false
+	}
+
+	// height is equal, check round
+
+	if hrst.Round < other.Round {
+		return true
+	}
+
+	if hrst.Round > other.Round {
+		return false
+	}
+
+	// round is equal, check step
+
+	if hrst.Step < other.Step {
+		return true
+	}
+
+	// HRS is greater or equal
+	return false
 }
 
 // CosignerSignRequest is sent to a co-signer to obtain their signature for the SignBytes
