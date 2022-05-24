@@ -8,21 +8,21 @@ import (
 type ThresholdEd25519Signature interface {
 	DealShares(req CosignerGetEphemeralSecretPartRequest) (HrsMetadata, error)
 
-	GetEphemeralSecretPart(req CosignerGetEphemeralSecretPartRequest) (CosignerEphemeralSecretPart, error)
+	GetEphemeralSecretPart(req CosignerGetEphemeralSecretPartRequest, m *LastSignStateStruct) (CosignerEphemeralSecretPart, error)
 
-	SetEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest) error
+	SetEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest, m *LastSignStateStruct) error
 
-	Sign(req CosignerSignRequest) (CosignerSignResponse, LastSignStateStruct, error)
+	Sign(req CosignerSignRequest, m *LastSignStateStruct) (CosignerSignResponse, error)
 }
 
 // PeerMetadata holds the share and the ephermeral secret public key
-// Moved from Local Cosigner to threshold_ed25519
+// Moved from Local cosigner to threshold_ed25519
 type PeerMetadata struct {
 	Share                    []byte
 	EphemeralSecretPublicKey []byte
 }
 
-// Moved from Local Cosigner to threshold_ed25519
+// Moved from Local cosigner to threshold_ed25519
 type HrsMetadata struct {
 	// need to be _total_ entries per player
 	Secret      []byte

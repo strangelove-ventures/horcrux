@@ -1,7 +1,6 @@
-package cosigner
+package signer
 
 import (
-	"github.com/strangelove-ventures/horcrux/signer"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"time"
 )
@@ -141,7 +140,7 @@ type CosignerSetEphemeralSecretPartRequest struct {
 
 type CosignerSignBlockRequest struct {
 	ChainID string
-	Block   *signer.Block
+	Block   *Block
 }
 
 type CosignerSignBlockResponse struct {

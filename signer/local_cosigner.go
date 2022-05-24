@@ -47,7 +47,7 @@ type LastSignStateStruct struct {
 // The cosigner maintains a watermark to avoid double-signing
 // TODO: Clarify what you mean with cosinger here.
 // LocalCosigner signing is thread safe
-// Local Cosigner "embedd" the threshold signer.
+// Local cosigner "embedd" the threshold signer.
 type LocalCosigner struct {
 	/*
 		// key         CosignerKey		- moved to threshold
@@ -120,19 +120,19 @@ func (cosigner *LocalCosigner) SaveLastSignedState(signState SignStateConsensus)
 }
 
 // GetID returns the id of the cosigner
-// Implements Cosigner interface
+// Implements cosigner interface
 func (cosigner *LocalCosigner) GetID() int {
 	return cosigner.localsigner.Key.ID
 }
 
 // GetAddress returns the GRPC URL of the cosigner
-// Implements Cosigner interface
+// Implements cosigner interface
 func (cosigner *LocalCosigner) GetAddress() string {
 	return cosigner.address
 }
 
 // GetEphemeralSecretParts
-// Implements Cosigner interface
+// Implements cosigner interface
 func (cosigner *LocalCosigner) GetEphemeralSecretParts(
 	hrst HRSTKey) (*CosignerEphemeralSecretPartsResponse, error) {
 	res := &CosignerEphemeralSecretPartsResponse{
@@ -160,7 +160,7 @@ func (cosigner *LocalCosigner) GetEphemeralSecretParts(
 }
 
 // SetEphemeralSecretPartsAndSign
-// Implements Cosigner interface
+// Implements cosigner interface
 func (cosigner *LocalCosigner) SetEphemeralSecretPartsAndSign(
 	req CosignerSetEphemeralSecretPartsAndSignRequest) (*CosignerSignResponse, error) {
 	for _, secretPart := range req.EncryptedSecrets {
@@ -186,7 +186,7 @@ func (cosigner *LocalCosigner) SetEphemeralSecretPartsAndSign(
 /*
 // sign the sign request using the cosigner's share
 // Return the signed bytes or an error
-// Implements Cosigner interface # Comment is this really true? Doesnt it implement ThresholdEd25519Signature
+// Implements cosigner interface # Comment is this really true? Doesnt it implement ThresholdEd25519Signature
 func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignResponse, error) {
 	cosigner.lastSignStateMutex.Lock()
 	defer cosigner.lastSignStateMutex.Unlock()
