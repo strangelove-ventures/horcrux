@@ -8,7 +8,7 @@ import (
 
 type LocalHSMsignThresholdEd25519Signature struct {
 	// panic("Not Implemented") // TODO:
-	//UnimplementedThresholdEd25519Signature // embedding UnimplementedCosignerGRPCServer
+	// UnimplementedThresholdEd25519Signature // embedding UnimplementedCosignerGRPCServer
 
 }
 

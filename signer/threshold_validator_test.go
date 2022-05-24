@@ -39,11 +39,11 @@ func TestThresholdValidator2of2(t *testing.T) {
 	bitSize := 4096
 	rsaKey1, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(t, err)
-	//var localsigner1 LocalSoftSignThresholdEd25519Signature
+	// var localsigner1 LocalSoftSignThresholdEd25519Signature
 
 	rsaKey2, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(t, err)
-	//var localsigner2 LocalSoftSignThresholdEd25519Signature
+	// var localsigner2 LocalSoftSignThresholdEd25519Signature
 
 	peers := []CosignerPeer{{
 		ID:        1,

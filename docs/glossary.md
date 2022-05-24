@@ -1,4 +1,4 @@
-# Glossary
+# Glossary - WORK IN PROGRESS
 
 - In cryptography, a **nonce** (number once) is an arbitrary number that can be used just once in a cryptographic communication.
 
