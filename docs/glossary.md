@@ -1,4 +1,4 @@
-# Migrating from Single Validator Instance to Signer Cluster
+# Glossary
 
 - In cryptography, a **nonce** (number once) is an arbitrary number that can be used just once in a cryptographic communication.
 
