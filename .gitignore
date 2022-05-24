@@ -7,3 +7,7 @@ priv_validator_key.json
 dist/
 utils/
 .DS_Store
+out/
+dist
+utils
+out

@@ -1,19 +1,18 @@
 package signer
 
 import (
+	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"time"
-
-	proto "github.com/strangelove-ventures/horcrux/signer/proto"
 )
 
-// Height Round Step Key
+// HRSKey Height Round Step Key
 type HRSKey struct {
 	Height int64
 	Round  int64
 	Step   int8
 }
 
-// Height Round Step Time Key
+// HRSTKey Height Round Step Time Key
 type HRSTKey struct {
 	Height    int64
 	Round     int64
@@ -21,7 +20,7 @@ type HRSTKey struct {
 	Timestamp int64
 }
 
-// Gets
+// HRSTKeyFromProto Gets TODO: Explain more
 func HRSTKeyFromProto(hrs *proto.HRST) HRSTKey {
 	return HRSTKey{
 		Height:    hrs.GetHeight(),
@@ -41,7 +40,7 @@ func (hrst HRSTKey) toProto() *proto.HRST {
 	}
 }
 
-// HRSTKey method that return true if we are less than the other key
+// Less is a HRSTKey method that return true if we are less than the other key
 func (hrst *HRSTKey) Less(other HRSTKey) bool {
 	if hrst.Height < other.Height {
 		return true
@@ -72,7 +71,7 @@ func (hrst *HRSTKey) Less(other HRSTKey) bool {
 }
 
 // CosignerSignRequest is sent to a co-signer to obtain their signature for the SignBytes
-// The SignBytes should be a serialized block
+// SignBytes should be a serialized block
 type CosignerSignRequest struct {
 	SignBytes []byte
 }
@@ -161,16 +160,16 @@ type CosignerSetEphemeralSecretPartsAndSignRequest struct {
 // Cosigner interface is a set of methods for an m-of-n threshold signature.
 // This interface abstracts the underlying key storage and management
 type Cosigner interface {
-	// Get the ID of the cosigner
+	// GetID gets the ID of the cosigner
 	// The ID is the shamir index: 1, 2, etc...
 	GetID() int
 
-	// Get the P2P URL (GRPC and Raft)
+	// GetAddress gets the P2P URL (GRPC and Raft)
 	GetAddress() string
 
-	// Get ephemeral secret part for all peers
+	// GetEphemeralSecretParts gets ephemeral secret part for all peers
 	GetEphemeralSecretParts(hrst HRSTKey) (*CosignerEphemeralSecretPartsResponse, error)
 
-	// Sign the requested bytes
+	// SetEphemeralSecretPartsAndSign sign the requested bytes
 	SetEphemeralSecretPartsAndSign(req CosignerSetEphemeralSecretPartsAndSignRequest) (*CosignerSignResponse, error)
 }

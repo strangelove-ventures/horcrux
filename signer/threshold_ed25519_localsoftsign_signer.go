@@ -8,7 +8,6 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-
 	tmJson "github.com/tendermint/tendermint/libs/json"
 	"gitlab.com/polychainlabs/edwards25519"
 	tsed25519 "gitlab.com/polychainlabs/threshold-ed25519/pkg"
@@ -26,10 +25,10 @@ type LocalSoftSignThresholdEd25519Signature struct {
 
 	// stores the last sign state for a share we have fully signed
 	// incremented whenever we are asked to sign a share
-	//LastSignState *SignState // TODO lift this to the Cosigner
+	//LastSignState *SignState // TODO lift this to the cosigner
 
 	// signing is thread safe
-	//LastSignStateMutex sync.Mutex // TODO lift this to the Cosigner
+	//LastSignStateMutex sync.Mutex // TODO lift this to the cosigner
 
 	// Height, Round, Step -> metadata
 	HrsMeta map[HRSTKey]HrsMetadata

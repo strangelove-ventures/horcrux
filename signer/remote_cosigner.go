@@ -41,7 +41,7 @@ func (cosigner *RemoteCosigner) GetID() int {
 }
 
 // GetAddress returns the P2P URL of the remote cosigner
-// Implements the Cosigner interface
+// Implements the cosigner interface
 func (cosigner *RemoteCosigner) GetAddress() string {
 	return cosigner.address
 }
@@ -61,7 +61,7 @@ func (cosigner *RemoteCosigner) getGRPCClient() (proto.CosignerGRPCClient, *grpc
 	return proto.NewCosignerGRPCClient(conn), conn, nil
 }
 
-// GetEphemeralSecretParts implements the Cosigner interface
+// GetEphemeralSecretParts implements the cosigner interface
 func (cosigner *RemoteCosigner) GetEphemeralSecretParts(
 	req HRSTKey) (*CosignerEphemeralSecretPartsResponse, error) {
 	client, conn, err := cosigner.getGRPCClient()
@@ -82,7 +82,7 @@ func (cosigner *RemoteCosigner) GetEphemeralSecretParts(
 	}, nil
 }
 
-// SetEphemeralSecretPartsAndSign implements the Cosigner interface
+// SetEphemeralSecretPartsAndSign implements the cosigner interface
 func (cosigner *RemoteCosigner) SetEphemeralSecretPartsAndSign(
 	req CosignerSetEphemeralSecretPartsAndSignRequest) (*CosignerSignResponse, error) {
 	client, conn, err := cosigner.getGRPCClient()
