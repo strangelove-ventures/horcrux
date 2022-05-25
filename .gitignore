@@ -4,10 +4,7 @@ build
 data
 private_share_*
 priv_validator_key.json
-dist/
-utils/
 .DS_Store
-out/
 dist
 utils
 out
