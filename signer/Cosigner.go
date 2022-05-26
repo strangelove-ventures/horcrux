@@ -1,8 +1,9 @@
 package signer
 
 import (
-	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"time"
+
+	proto "github.com/strangelove-ventures/horcrux/signer/proto"
 )
 
 // HRSKey Height Round Step Key

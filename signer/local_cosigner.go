@@ -31,7 +31,7 @@ type LocalCosignerConfig struct {
 	RaftAddress string
 	Total       uint8
 	Threshold   uint8
-	//Localsigner LocalSoftSignThresholdEd25519Signature
+	// Localsigner LocalSoftSignThresholdEd25519Signature
 }
 
 type LastSignStateStruct struct {
@@ -48,6 +48,10 @@ type LastSignStateStruct struct {
 // TODO: Clarify what you mean with cosinger here.
 // LocalCosigner signing is thread safe
 // Local cosigner "embedd" the threshold signer.
+
+// TODO temporary aliasing ThresholdEd25519Signature
+type thresholdEd25519Signature = *LocalSoftSignThresholdEd25519Signature
+
 type LocalCosigner struct {
 	/*
 		// key         CosignerKey		- moved to threshold
@@ -63,11 +67,15 @@ type LocalCosigner struct {
 	total               uint8
 	address             string
 	// peers       map[int]CosignerPeer
-	localsigner *LocalSoftSignThresholdEd25519Signature // TODO: Change the mutex so that you can you can pass ThresholdEd25519Signature
+	localsigner thresholdEd25519Signature
 }
 
 func NewLocalCosigner(cfg LocalCosignerConfig) *LocalCosigner {
-	// TODO: localsigner should be passed as a parameter in the cfg rather than constructed here. We could add a method in the new LocalSoftSignThresholdEd25519Signature file to return this config such as func NewLocalThresholdEd25519Signature(key CosignerKey, rsaKey PrivateKey, total, threshold int) LocalSoftSignThresholdEd25519Signature { which could then be called and added to the LocalCosignerConfig from cmd/horcrux/cmd/cosigner.go
+	// TODO: localsigner should be passed as a parameter in the cfg rather than constructed here.
+	// We could add a method in the new LocalSoftSignThresholdEd25519Signature file to return this
+	// config such as func NewLocalThresholdEd25519Signature(key CosignerKey, rsaKey PrivateKey, total, threshold int)
+	// LocalSoftSignThresholdEd25519Signature { which could then be called and added to the LocalCosignerConfig
+	//	from cmd/horcrux/cmd/cosigner.go
 
 	localsigner := LocalSoftSignThresholdEd25519Signature{
 		Key:       cfg.CosignerKey,
