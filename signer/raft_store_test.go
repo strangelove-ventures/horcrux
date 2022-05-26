@@ -59,7 +59,7 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 	}
 
 	if s == nil {
-		t.Fatalf("failed to create store")
+		t.Fatalf("failed to create raft store")
 	}
 
 	if _, err := s.Open(); err != nil {
