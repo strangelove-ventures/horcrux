@@ -198,11 +198,12 @@ func StartCosignerCmd() *cobra.Command {
 			localCosignerConfig := signer.LocalCosignerConfig{
 				CosignerKey: key,
 				SignState:   &shareSignState,
-				//RsaKey:      key.RSAKey,
-				Address:   cfg.ListenAddress,
-				Peers:     peers,
-				Total:     uint8(total),
-				Threshold: uint8(cfg.CosignerThreshold),
+				RsaKey:      key.RSAKey,
+				Address:     cfg.ListenAddress,
+				Peers:       peers,
+				Total:       uint8(total),
+				Threshold:   uint8(cfg.CosignerThreshold),
+				// TODO LocalSoftSignThresholdEd25519Signature instance should be passed into the config here as the desired ThresholdEd25519Signature
 			}
 
 			localCosigner := signer.NewLocalCosigner(localCosignerConfig)

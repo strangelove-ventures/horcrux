@@ -8,11 +8,15 @@ import (
 type ThresholdEd25519Signature interface {
 	DealShares(req CosignerGetEphemeralSecretPartRequest) (HrsMetadata, error)
 
-	GetEphemeralSecretPart(req CosignerGetEphemeralSecretPartRequest, m *LastSignStateStruct) (CosignerEphemeralSecretPart, error)
+	GetEphemeralSecretPart(req CosignerGetEphemeralSecretPartRequest, m *LastSignStateStruct,
+		peers map[int]CosignerPeer) (CosignerEphemeralSecretPart, error)
 
-	SetEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest, m *LastSignStateStruct) error
+	SetEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest, m *LastSignStateStruct,
+		peers map[int]CosignerPeer) error
 
 	Sign(req CosignerSignRequest, m *LastSignStateStruct) (CosignerSignResponse, error)
+
+	GetID() int
 }
 
 // PeerMetadata holds the share and the ephermeral secret public key
