@@ -86,11 +86,7 @@ func (s *RaftStore) SetThresholdValidator(thresholdValidator *ThresholdValidator
 
 func (s *RaftStore) init() error {
 	host := p2pURLToRaftAddress(s.RaftBind)
-	_, port, err := net.SplitHostPort(host)
-	if err != nil {
-		return fmt.Errorf("failed to parse local address: %s, %v", host, err)
-	}
-	sock, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
+	sock, err := net.Listen("tcp", host)
 	if err != nil {
 		return err
 	}
