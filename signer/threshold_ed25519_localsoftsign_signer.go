@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 
+	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	tmJson "github.com/tendermint/tendermint/libs/json"
 	"gitlab.com/polychainlabs/edwards25519"
 	tsed25519 "gitlab.com/polychainlabs/threshold-ed25519/pkg"
@@ -17,23 +18,13 @@ import (
 // LocalSoftsignThresholdEd25519Signature implements the interface and signs the message for each local signer.
 // LocalSoftSignThresholdEd25519Signature is the implementation of a soft sign signer at the local level.
 type LocalSoftSignThresholdEd25519Signature struct {
-	// UnimplementedThresholdEd25519Signature // embedding unimplemented ThresholdEd25519Signature
 	PubKeyBytes []byte
 	Key         CosignerKey
 	RsaKey      rsa.PrivateKey
 	Total       uint8
 	Threshold   uint8
-
-	// stores the last sign state for a share we have fully signed
-	// incremented whenever we are asked to sign a share
-	// LastSignState *SignState // TODO lift this to the cosigner
-
-	// signing is thread safe
-	// LastSignStateMutex sync.Mutex // TODO lift this to the cosigner
-
-	// Height, Round, Step -> metadata
+	// Height, Round, Step, Timestamp -> metadata
 	HrsMeta map[HRSTKey]HrsMetadata
-	// Peers   map[int]CosignerPeer
 }
 
 func NewLocalSoftSignThresholdEd25519Signature(cfg LocalCosignerConfig) *LocalSoftSignThresholdEd25519Signature {
@@ -43,6 +34,15 @@ func NewLocalSoftSignThresholdEd25519Signature(cfg LocalCosignerConfig) *LocalSo
 		HrsMeta:   make(map[HRSTKey]HrsMetadata),
 		Total:     cfg.Total,
 		Threshold: cfg.Threshold,
+	}
+
+	// cache the public key bytes for signing operations
+	switch ed25519Key := localsigner.Key.PubKey.(type) {
+	case tmCryptoEd25519.PubKey:
+		localsigner.PubKeyBytes = make([]byte, len(ed25519Key))
+		copy(localsigner.PubKeyBytes, ed25519Key[:])
+	default:
+		panic("Not an ed25519 public key")
 	}
 	return localsigner
 
