@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path"
 	"strconv"
+	"strings"
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
@@ -122,9 +123,14 @@ func setStateCmd() *cobra.Command {
 }
 
 func isRunning() bool {
-	pipe := "ps -ax | pgrep horcrux"
+	pipe := "ps -ax | grep horcrux | wc -l"
 	bz, _ := exec.Command("bash", "-c", pipe).Output()
-	return len(bz) != 0
+	numRunning, err := strconv.ParseUint(strings.TrimSpace(string(bz)), 10, 64)
+	if err != nil {
+		panic(err)
+	}
+	// one is the bash command, one is the grep command, one is this horcrux command. If any more, then horcrux is running as a daemon.
+	return numRunning > 3
 }
 
 func printSignState(ss signer.SignState) {
