@@ -123,14 +123,14 @@ func setStateCmd() *cobra.Command {
 }
 
 func isRunning() bool {
-	pipe := "ps -ax | grep horcrux | wc -l"
+	pipe := "ps -ax | grep horcrux | grep -v grep | wc -l"
 	bz, _ := exec.Command("bash", "-c", pipe).Output()
 	numRunning, err := strconv.ParseUint(strings.TrimSpace(string(bz)), 10, 64)
 	if err != nil {
 		panic(err)
 	}
-	// one is the bash command, one is the grep command, one is this horcrux command. If any more, then horcrux is running as a daemon.
-	return numRunning > 3
+	// If any more than this command, then horcrux is likely running as a daemon.
+	return numRunning > 1
 }
 
 func printSignState(ss signer.SignState) {
