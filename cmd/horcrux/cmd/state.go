@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path"
+	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/mitchellh/go-homedir"
+	"github.com/shirou/gopsutil/process"
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/signer"
 )
@@ -123,14 +123,26 @@ func setStateCmd() *cobra.Command {
 }
 
 func isRunning() bool {
-	pipe := "ps -ax | grep horcrux | grep -v grep | wc -l"
-	bz, _ := exec.Command("bash", "-c", pipe).Output()
-	numRunning, err := strconv.ParseUint(strings.TrimSpace(string(bz)), 10, 64)
+	processes, err := process.Processes()
 	if err != nil {
 		panic(err)
 	}
-	// If any more than this command, then horcrux is likely running as a daemon.
-	return numRunning > 1
+	count := 0
+	executable, err := os.Executable()
+	if err != nil {
+		panic(err)
+	}
+	binName := filepath.Base(executable)
+	for _, p := range processes {
+		n, err := p.Name()
+		if err != nil {
+			panic(err)
+		}
+		if n == binName {
+			count++
+		}
+	}
+	return count > 1
 }
 
 func printSignState(ss signer.SignState) {
