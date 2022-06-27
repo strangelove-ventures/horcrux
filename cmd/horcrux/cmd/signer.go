@@ -64,7 +64,9 @@ func StartSignerCmd() *cobra.Command {
 			logger.Info("Tendermint Validator", "mode", cfg.Mode,
 				"priv-key", cfg.PrivValKeyFile, "priv-state-dir", cfg.PrivValStateDir)
 
-			pv = &signer.PvGuard{PrivValidator: privval.LoadFilePVEmptyState(cfg.PrivValKeyFile, config.privValStateFile(chainID))}
+			pv = &signer.PvGuard{
+				PrivValidator: privval.LoadFilePVEmptyState(cfg.PrivValKeyFile, config.privValStateFile(chainID)),
+			}
 
 			pubkey, err := pv.GetPubKey()
 			if err != nil {
