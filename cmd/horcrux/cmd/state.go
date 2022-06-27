@@ -5,12 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 
-	"github.com/mitchellh/go-homedir"
-	"github.com/shirou/gopsutil/process"
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/signer"
 )
@@ -34,25 +31,16 @@ func showStateCmd() *cobra.Command {
 		Short:   "Show the priv validator and share sign state",
 		Args:    cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var stateDir string // In root.go we end up with our
-			if homeDir != "" {
-				stateDir = path.Join(homeDir, "state")
-			} else {
-				home, _ := homedir.Dir()
-				stateDir = path.Join(home, ".horcrux", "state")
-			}
-			if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
-				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
+			if _, err := os.Stat(config.HomeDir); os.IsNotExist(err) {
+				return fmt.Errorf("%s does not exist, initialize config with horcrux config init and try again", config.HomeDir)
 			}
 
-			filepath := path.Join(stateDir, config.ChainID+"_priv_validator_state.json")
-			pv, err := signer.LoadSignState(filepath)
+			pv, err := signer.LoadSignState(config.privValStateFile(config.Config.ChainID))
 			if err != nil {
 				return err
 			}
 
-			filepath = path.Join(stateDir, config.ChainID+"_share_sign_state.json")
-			share, err := signer.LoadSignState(filepath)
+			share, err := signer.LoadSignState(config.shareStateFile(config.Config.ChainID))
 			if err != nil {
 				return err
 			}
@@ -73,31 +61,23 @@ func setStateCmd() *cobra.Command {
 		Short:   "Set the height for both the priv validator and the share sign state",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if _, err := os.Stat(config.HomeDir); os.IsNotExist(err) {
+				return fmt.Errorf("%s does not exist, initialize config with horcrux config init and try again", config.HomeDir)
+			}
+
 			// Resetting the priv_validator_state.json should only be allowed if the
 			// signer is not running.
-			if isRunning() {
+			lockFilePath := filepath.Join(config.HomeDir, "horcrux.lock")
+			if _, err := os.Stat(lockFilePath); err == nil {
 				return errors.New("cannot modify state while horcrux is running")
 			}
 
-			var stateDir string // In root.go we end up with our
-			if homeDir != "" {
-				stateDir = path.Join(homeDir, "state")
-			} else {
-				home, _ := homedir.Dir()
-				stateDir = path.Join(home, ".horcrux", "state")
-			}
-			if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
-				return fmt.Errorf("%s is not empty, check for existing configuration and clear path before trying again", homeDir)
-			}
-
-			filepath := path.Join(stateDir, config.ChainID+"_priv_validator_state.json")
-			pv, err := signer.LoadSignState(filepath)
+			pv, err := signer.LoadSignState(config.privValStateFile(config.Config.ChainID))
 			if err != nil {
 				return err
 			}
 
-			filepath = path.Join(stateDir, config.ChainID+"_share_sign_state.json")
-			share, err := signer.LoadSignState(filepath)
+			share, err := signer.LoadSignState(config.shareStateFile(config.Config.ChainID))
 			if err != nil {
 				return err
 			}
@@ -120,29 +100,6 @@ func setStateCmd() *cobra.Command {
 			return nil
 		},
 	}
-}
-
-func isRunning() bool {
-	processes, err := process.Processes()
-	if err != nil {
-		panic(err)
-	}
-	count := 0
-	executable, err := os.Executable()
-	if err != nil {
-		panic(err)
-	}
-	binName := filepath.Base(executable)
-	for _, p := range processes {
-		n, err := p.Name()
-		if err != nil {
-			panic(err)
-		}
-		if n == binName {
-			count++
-		}
-	}
-	return count > 1
 }
 
 func printSignState(ss signer.SignState) {

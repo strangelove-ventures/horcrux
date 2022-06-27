@@ -30,15 +30,11 @@ To choose a specific leader, pass that leader's ID as an argument.
 `,
 	Args: cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
-		if config == nil {
-			return fmt.Errorf("no configuration file exists")
-		}
-
-		if config.CosignerConfig == nil {
+		if config.Config.CosignerConfig == nil {
 			return fmt.Errorf("cosigner configuration is not present in config file")
 		}
 
-		if len(config.CosignerConfig.Peers) == 0 {
+		if len(config.Config.CosignerConfig.Peers) == 0 {
 			return fmt.Errorf("cosigner configuration has no peers")
 		}
 
@@ -49,7 +45,7 @@ To choose a specific leader, pass that leader's ID as an argument.
 		}
 
 		var grpcAddresses []string
-		url, err := url.Parse(config.CosignerConfig.P2PListen)
+		url, err := url.Parse(config.Config.CosignerConfig.P2PListen)
 		if err != nil {
 			fmt.Printf("Error parsing peer URL: %v", err)
 		} else {
@@ -59,7 +55,7 @@ To choose a specific leader, pass that leader's ID as an argument.
 			}
 		}
 
-		for _, peer := range config.CosignerConfig.Peers {
+		for _, peer := range config.Config.CosignerConfig.Peers {
 			url, err := url.Parse(peer.P2PAddr)
 			if err != nil {
 				fmt.Printf("Error parsing peer URL: %v", err)

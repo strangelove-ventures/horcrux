@@ -3,7 +3,6 @@ package cmd
 import (
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"testing"
 
@@ -70,7 +69,7 @@ func TestConfigInitCmd(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			tmpConfig := path.Join(tc.home, ".horcrux")
+			tmpConfig := filepath.Join(tc.home, ".horcrux")
 
 			err := os.Setenv("HOME", tc.home)
 			require.NoError(t, err)
@@ -87,7 +86,7 @@ func TestConfigInitCmd(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 
-				ss, err := signer.LoadSignState(path.Join(tmpConfig, "state", chainID+"_priv_validator_state.json"))
+				ss, err := signer.LoadSignState(filepath.Join(tmpConfig, "state", chainID+"_priv_validator_state.json"))
 				require.NoError(t, err)
 				require.Equal(t, int64(0), ss.Height)
 				require.Equal(t, int64(0), ss.Round)
@@ -96,7 +95,7 @@ func TestConfigInitCmd(t *testing.T) {
 				require.Nil(t, ss.Signature)
 				require.Nil(t, ss.SignBytes)
 
-				ss, err = signer.LoadSignState(path.Join(tmpConfig, "state", chainID+"_share_sign_state.json"))
+				ss, err = signer.LoadSignState(filepath.Join(tmpConfig, "state", chainID+"_share_sign_state.json"))
 				require.NoError(t, err)
 				require.Equal(t, int64(0), ss.Height)
 				require.Equal(t, int64(0), ss.Round)
@@ -168,7 +167,7 @@ func TestConfigChainIDSetCmd(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, tc.args[0], config.ChainID)
+				require.Equal(t, tc.args[0], config.Config.ChainID)
 			}
 		})
 	}
@@ -315,7 +314,7 @@ func TestConfigNodesAddAndRemove(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			require.Equal(t, tc.expectNodes, config.ChainNodes)
+			require.Equal(t, tc.expectNodes, config.Config.ChainNodes)
 		})
 	}
 
@@ -462,7 +461,7 @@ func TestConfigPeersAddAndRemove(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			require.Equal(t, tc.expectPeers, config.CosignerConfig.Peers)
+			require.Equal(t, tc.expectPeers, config.Config.CosignerConfig.Peers)
 		})
 	}
 
@@ -660,10 +659,10 @@ func TestSetShares(t *testing.T) {
 
 			if tc.expectErr {
 				require.Error(t, err)
-				require.Equal(t, tc.expectShares, config.CosignerConfig.Shares)
+				require.Equal(t, tc.expectShares, config.Config.CosignerConfig.Shares)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, tc.expectShares, config.CosignerConfig.Shares)
+				require.Equal(t, tc.expectShares, config.Config.CosignerConfig.Shares)
 			}
 		})
 	}
