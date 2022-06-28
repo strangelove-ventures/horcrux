@@ -128,6 +128,10 @@ func initCmd() *cobra.Command {
 					return err
 				}
 			}
+
+			// silence usage after all input has been validated
+			cmd.SilenceUsage = true
+
 			// create all directories up to the state directory
 			if err = os.MkdirAll(config.StateDir, 0755); err != nil {
 				return err
@@ -236,6 +240,9 @@ func addNodesCmd() *cobra.Command {
 				return err
 			}
 
+			// silence usage after all input has been validated
+			cmd.SilenceUsage = true
+
 			config.Config.ChainNodes = diff
 			if err := config.writeConfigFile(); err != nil {
 				return err
@@ -268,6 +275,9 @@ func removeNodesCmd() *cobra.Command {
 			if err := validateChainNodes(diff); err != nil {
 				return err
 			}
+
+			// silence usage after all input has been validated
+			cmd.SilenceUsage = true
 
 			config.Config.ChainNodes = diff
 			if err := config.writeConfigFile(); err != nil {
@@ -323,6 +333,9 @@ func addPeersCmd() *cobra.Command {
 				return err
 			}
 
+			// silence usage after all input has been validated
+			cmd.SilenceUsage = true
+
 			config.Config.CosignerConfig.Peers = diff
 			if err := config.writeConfigFile(); err != nil {
 				return err
@@ -365,6 +378,9 @@ func removePeersCmd() *cobra.Command {
 				return err
 			}
 
+			// silence usage after all input has been validated
+			cmd.SilenceUsage = true
+
 			config.Config.CosignerConfig.Peers = diff
 			if err := config.writeConfigFile(); err != nil {
 				return err
@@ -391,6 +407,9 @@ func setSharesCmd() *cobra.Command {
 			if err := validateCosignerPeers(config.Config.CosignerConfig.Peers, numShares); err != nil {
 				return err
 			}
+
+			// silence usage after all input has been validated
+			cmd.SilenceUsage = true
 
 			config.Config.CosignerConfig.Shares = numShares
 			if err := config.writeConfigFile(); err != nil {
@@ -431,7 +450,8 @@ func setChainIDCmd() *cobra.Command {
 		Long: "set the chain ID.\n\n" +
 			"[chain-id] is a string i.e.\n" +
 			"cosmoshub-4",
-		Args: cobra.ExactArgs(1),
+		SilenceUsage: true,
+		Args:         cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			oldChainID := config.Config.ChainID
 			newChainID := args[0]
@@ -468,16 +488,6 @@ type DiskConfig struct {
 	ChainNodes     []ChainNode     `json:"chain-nodes,omitempty" yaml:"chain-nodes,omitempty"`
 }
 
-func (c *DiskConfig) keyFilePath(home string) string {
-	if c.PrivValKeyFile != nil && *c.PrivValKeyFile != "" {
-		return *c.PrivValKeyFile
-	}
-	if c.CosignerConfig != nil {
-		return filepath.Join(home, "share.json")
-	}
-	return filepath.Join(home, "priv_validator_key.json")
-}
-
 func (c *DiskConfig) Nodes() []signer.NodeConfig {
 	out := make([]signer.NodeConfig, len(c.ChainNodes))
 	for i, n := range c.ChainNodes {
@@ -497,10 +507,19 @@ func (c *DiskConfig) MustMarshalYaml() []byte {
 type RuntimeConfig struct {
 	HomeDir    string
 	ConfigFile string
-	KeyFile    string
 	StateDir   string
-	LockFile   string
+	PidFile    string
 	Config     DiskConfig
+}
+
+func (c *RuntimeConfig) keyFilePath(cosigner bool) string {
+	if c.Config.PrivValKeyFile != nil && *c.Config.PrivValKeyFile != "" {
+		return *c.Config.PrivValKeyFile
+	}
+	if cosigner {
+		return filepath.Join(c.HomeDir, "share.json")
+	}
+	return filepath.Join(c.HomeDir, "priv_validator_key.json")
 }
 
 func (c RuntimeConfig) privValStateFile(chainID string) string {

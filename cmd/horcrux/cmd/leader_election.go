@@ -28,7 +28,8 @@ var leaderElectionCmd = &cobra.Command{
 	Long: `To choose the next eligible leader, pass no argument.
 To choose a specific leader, pass that leader's ID as an argument.
 `,
-	Args: cobra.RangeArgs(0, 1),
+	Args:         cobra.RangeArgs(0, 1),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		if config.Config.CosignerConfig == nil {
 			return fmt.Errorf("cosigner configuration is not present in config file")

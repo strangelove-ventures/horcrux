@@ -24,11 +24,12 @@ var signerCmd = &cobra.Command{
 
 func StartSignerCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "start",
-		Short: "Start single signer process",
-		Args:  cobra.NoArgs,
+		Use:          "start",
+		Short:        "Start single signer process",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			if err = signer.RequireNotRunning(config.LockFile); err == nil {
+			if err = signer.RequireNotRunning(config.PidFile); err != nil {
 				return err
 			}
 
@@ -48,7 +49,7 @@ func StartSignerCmd() *cobra.Command {
 
 			cfg = signer.Config{
 				Mode:            "single",
-				PrivValKeyFile:  config.KeyFile,
+				PrivValKeyFile:  config.keyFilePath(false),
 				PrivValStateDir: config.StateDir,
 				ChainID:         config.Config.ChainID,
 				Nodes:           config.Config.Nodes(),
@@ -76,7 +77,7 @@ func StartSignerCmd() *cobra.Command {
 				panic(err)
 			}
 
-			signer.WaitAndTerminate(logger, services, config.LockFile)
+			signer.WaitAndTerminate(logger, services, config.PidFile)
 
 			return nil
 		},

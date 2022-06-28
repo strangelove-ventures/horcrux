@@ -38,16 +38,17 @@ type AddressCmdOutput struct {
 
 func AddressCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "address",
-		Short: "Get public key hex address and valcons address",
-		Args:  cobra.RangeArgs(0, 1),
+		Use:          "address",
+		Short:        "Get public key hex address and valcons address",
+		SilenceUsage: true,
+		Args:         cobra.RangeArgs(0, 1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			err = validateCosignerConfig(config.Config)
 			if err != nil {
 				return
 			}
 
-			key, err := signer.LoadCosignerKey(config.KeyFile)
+			key, err := signer.LoadCosignerKey(config.keyFilePath(true))
 			if err != nil {
 				return fmt.Errorf("error reading cosigner key: %s", err)
 			}
@@ -98,17 +99,18 @@ func AddressCmd() *cobra.Command {
 
 func StartCosignerCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "start",
-		Short: "Start cosigner process",
-		Args:  cobra.NoArgs,
+		Use:          "start",
+		Short:        "Start cosigner process",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			if err = signer.RequireNotRunning(config.LockFile); err == nil {
+			if err = signer.RequireNotRunning(config.PidFile); err != nil {
 				return err
 			}
 
 			err = validateCosignerConfig(config.Config)
 			if err != nil {
-				return
+				return err
 			}
 
 			var (
@@ -122,7 +124,7 @@ func StartCosignerCmd() *cobra.Command {
 
 			cfg = signer.Config{
 				Mode:              "mpc",
-				PrivValKeyFile:    config.KeyFile,
+				PrivValKeyFile:    config.keyFilePath(true),
 				PrivValStateDir:   config.StateDir,
 				ChainID:           config.Config.ChainID,
 				CosignerThreshold: config.Config.CosignerConfig.Threshold,
@@ -241,7 +243,7 @@ func StartCosignerCmd() *cobra.Command {
 				panic(err)
 			}
 
-			signer.WaitAndTerminate(logger, services, config.LockFile)
+			signer.WaitAndTerminate(logger, services, config.PidFile)
 
 			return nil
 		},

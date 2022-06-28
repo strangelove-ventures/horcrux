@@ -25,7 +25,10 @@ var rootCmd = &cobra.Command{
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	handleInitError(rootCmd.Execute())
+	if err := rootCmd.Execute(); err != nil {
+		// Cobra will print the error
+		os.Exit(1)
+	}
 }
 
 func init() {
@@ -47,7 +50,7 @@ func initConfig() {
 		HomeDir:    home,
 		ConfigFile: filepath.Join(home, "config.yaml"),
 		StateDir:   filepath.Join(home, "state"),
-		LockFile:   filepath.Join(home, "horcrux.pid"),
+		PidFile:    filepath.Join(home, "horcrux.pid"),
 	}
 	viper.SetConfigFile(config.ConfigFile)
 	viper.SetEnvPrefix("horcrux")
@@ -61,7 +64,6 @@ func initConfig() {
 	bz, err := ioutil.ReadFile(viper.ConfigFileUsed())
 	handleInitError(err)
 	handleInitError(yaml.Unmarshal(bz, &config.Config))
-	config.KeyFile = config.Config.keyFilePath(config.HomeDir)
 }
 
 func handleInitError(err error) {

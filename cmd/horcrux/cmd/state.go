@@ -2,10 +2,8 @@ package cmd
 
 import (
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 
 	"github.com/spf13/cobra"
@@ -26,10 +24,11 @@ var stateCmd = &cobra.Command{
 
 func showStateCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:     "show",
-		Aliases: []string{"s"},
-		Short:   "Show the priv validator and share sign state",
-		Args:    cobra.ExactArgs(0),
+		Use:          "show",
+		Aliases:      []string{"s"},
+		Short:        "Show the priv validator and share sign state",
+		Args:         cobra.ExactArgs(0),
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if _, err := os.Stat(config.HomeDir); os.IsNotExist(err) {
 				return fmt.Errorf("%s does not exist, initialize config with horcrux config init and try again", config.HomeDir)
@@ -56,20 +55,21 @@ func showStateCmd() *cobra.Command {
 
 func setStateCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:     "set [height]",
-		Aliases: []string{"s"},
-		Short:   "Set the height for both the priv validator and the share sign state",
-		Args:    cobra.ExactArgs(1),
+		Use:          "set [height]",
+		Aliases:      []string{"s"},
+		Short:        "Set the height for both the priv validator and the share sign state",
+		Args:         cobra.ExactArgs(1),
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if _, err := os.Stat(config.HomeDir); os.IsNotExist(err) {
+				cmd.SilenceUsage = false
 				return fmt.Errorf("%s does not exist, initialize config with horcrux config init and try again", config.HomeDir)
 			}
 
 			// Resetting the priv_validator_state.json should only be allowed if the
 			// signer is not running.
-			lockFilePath := filepath.Join(config.HomeDir, "horcrux.lock")
-			if _, err := os.Stat(lockFilePath); err == nil {
-				return errors.New("cannot modify state while horcrux is running")
+			if err := signer.RequireNotRunning(config.PidFile); err != nil {
+				return err
 			}
 
 			pv, err := signer.LoadSignState(config.privValStateFile(config.Config.ChainID))
@@ -84,6 +84,7 @@ func setStateCmd() *cobra.Command {
 
 			height, err := strconv.ParseInt(args[0], 10, 64)
 			if err != nil {
+				cmd.SilenceUsage = false
 				return err
 			}
 
