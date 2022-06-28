@@ -36,26 +36,30 @@ func RequireNotRunning(pidFilePath string) error {
 
 	process, err := os.FindProcess(int(pid))
 	if err != nil {
-		return fmt.Errorf(`unclean shutdown detected. PID file exists at %s but PID %d is not running.
+		return fmt.Errorf(`unclean shutdown detected. PID file exists at %s but PID %d can not be found.
 manual deletion of PID file required. %w`, pidFilePath, pid, err)
 	}
 
 	err = process.Signal(syscall.Signal(0))
-	if err != nil {
-		errno, ok := err.(syscall.Errno)
-		if !ok {
-			return fmt.Errorf("unexpected error type from signaling horcrux PID: %d", pid)
-		}
-		switch errno {
-		case syscall.ESRCH:
-			return fmt.Errorf("permission denied accessing horcrux PID: %d", pid)
-		case syscall.EPERM:
-			return fmt.Errorf("permission denied accessing horcrux PID: %d", pid)
-		}
-		return fmt.Errorf("unexpected error while signaling horcrux PID: %d", pid)
+	if err == nil {
+		return fmt.Errorf("horcrux is already running on PID: %d", pid)
+	}
+	if err.Error() == "os: process already finished" {
+		return fmt.Errorf(`unclean shutdown detected. PID file exists at %s but PID %d is not running.
+manual deletion of PID file required`, pidFilePath, pid)
 	}
 
-	return fmt.Errorf("horcrux is already running on PID: %d", pid)
+	errno, ok := err.(syscall.Errno)
+	if !ok {
+		return fmt.Errorf("unexpected error type from signaling horcrux PID: %d", pid)
+	}
+	switch errno {
+	case syscall.ESRCH:
+		return fmt.Errorf("search error while signaling horcrux PID: %d", pid)
+	case syscall.EPERM:
+		return fmt.Errorf("permission denied accessing horcrux PID: %d", pid)
+	}
+	return fmt.Errorf("unexpected error while signaling horcrux PID: %d", pid)
 }
 
 func WaitAndTerminate(logger tmLog.Logger, services []tmService.Service, pidFilePath string) {
