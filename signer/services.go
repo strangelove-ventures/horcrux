@@ -18,7 +18,7 @@ func WaitAndTerminate(logger tmLog.Logger, services []tmService.Service, lockFil
 		panic(err)
 	}
 	file.Close()
-	defer tmOS.TrapSignal(logger, func() {
+	tmOS.TrapSignal(logger, func() {
 		_ = os.Remove(lockFilePath)
 		for _, service := range services {
 			err := service.Stop()
