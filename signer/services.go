@@ -31,12 +31,14 @@ func RequireNotRunning(lockFilePath string) error {
 
 	pid, err := strconv.ParseInt(trimmed, 10, 64)
 	if err != nil {
-		return fmt.Errorf("unexpected error parsing PID from lock file: %s. manual deletion of lockfile required. %w", lockFilePath, err)
+		return fmt.Errorf("unexpected error parsing PID from lock file: %s. manual deletion of lockfile required. %w",
+			lockFilePath, err)
 	}
 
 	_, err = os.FindProcess(int(pid))
 	if err != nil {
-		return fmt.Errorf("unclean shutdown detected. lockfile exists at %s but PID %d is not running. manual deletion of lockfile required. %w", lockFilePath, pid, err)
+		return fmt.Errorf("unclean shutdown detected. lockfile exists at %s but PID %d is not running. "+
+			"manual deletion of lockfile required. %w", lockFilePath, pid, err)
 	}
 
 	return fmt.Errorf("horcrux is already running on PID: %d", pid)
