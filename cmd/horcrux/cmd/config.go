@@ -70,7 +70,11 @@ func initCmd() *cobra.Command {
 			var cfg DiskConfig
 
 			cs, _ := cmdFlags.GetBool("cosigner")
-			keyFile, _ := cmdFlags.GetString("keyfile")
+			keyFileFlag, _ := cmdFlags.GetString("keyfile")
+			var keyFile *string
+			if keyFileFlag != "" {
+				keyFile = &keyFileFlag
+			}
 			if cs {
 				p, _ := cmdFlags.GetString("peers")
 				threshold, _ := cmdFlags.GetInt("threshold")
@@ -97,7 +101,7 @@ func initCmd() *cobra.Command {
 				}
 
 				cfg = DiskConfig{
-					PrivValKeyFile: &keyFile,
+					PrivValKeyFile: keyFile,
 					ChainID:        cid,
 					CosignerConfig: &CosignerConfig{
 						Threshold: threshold,
@@ -116,7 +120,7 @@ func initCmd() *cobra.Command {
 					return fmt.Errorf("must input at least one node")
 				}
 				cfg = DiskConfig{
-					PrivValKeyFile: &keyFile,
+					PrivValKeyFile: keyFile,
 					ChainID:        cid,
 					ChainNodes:     cn,
 				}
