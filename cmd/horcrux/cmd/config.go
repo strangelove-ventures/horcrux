@@ -469,7 +469,7 @@ type DiskConfig struct {
 }
 
 func (c *DiskConfig) keyFilePath(home string) string {
-	if c.PrivValKeyFile != nil {
+	if c.PrivValKeyFile != nil && *c.PrivValKeyFile != "" {
 		return *c.PrivValKeyFile
 	}
 	if c.CosignerConfig != nil {
