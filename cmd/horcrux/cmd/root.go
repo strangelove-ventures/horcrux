@@ -47,6 +47,7 @@ func initConfig() {
 		HomeDir:    home,
 		ConfigFile: filepath.Join(home, "config.yaml"),
 		StateDir:   filepath.Join(home, "state"),
+		LockFile:   filepath.Join(home, "horcrux.pid"),
 	}
 	viper.SetConfigFile(config.ConfigFile)
 	viper.SetEnvPrefix("horcrux")

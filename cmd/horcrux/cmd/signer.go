@@ -1,10 +1,8 @@
 package cmd
 
 import (
-	"errors"
 	"log"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/signer"
@@ -30,14 +28,13 @@ func StartSignerCmd() *cobra.Command {
 		Short: "Start single signer process",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			lockFilePath := filepath.Join(config.HomeDir, "horcrux.lock")
-			if _, err := os.Stat(lockFilePath); err == nil {
-				return errors.New("cannot start daemon, horcrux is already running")
+			if err = signer.RequireNotRunning(config.LockFile); err == nil {
+				return err
 			}
 
 			err = validateSingleSignerConfig(config.Config)
 			if err != nil {
-				return
+				return err
 			}
 
 			var (
@@ -79,7 +76,7 @@ func StartSignerCmd() *cobra.Command {
 				panic(err)
 			}
 
-			signer.WaitAndTerminate(logger, services, lockFilePath)
+			signer.WaitAndTerminate(logger, services, config.LockFile)
 
 			return nil
 		},

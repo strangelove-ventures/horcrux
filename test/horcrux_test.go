@@ -291,7 +291,15 @@ func TestDownedSigners2of3(t *testing.T) {
 	require.NoError(t, ourValidator.EnsureNotSlashed())
 
 	// Test taking down each node in the signer cluster for a period of time
-	for _, signer := range ourValidator.Signers {
+	for i, signer := range ourValidator.Signers {
+		toElect := i - 1
+		if toElect < 0 {
+			toElect = len(ourValidator.Signers) + toElect
+		}
+
+		t.Logf("{%s} -> Electing signer %d...", signer.Name(), toElect+1)
+		require.NoError(t, signer.Elect(toElect+1))
+
 		t.Logf("{%s} -> Stopping signer...", signer.Name())
 		require.NoError(t, signer.StopAndRemoveContainer(false))
 
@@ -347,6 +355,15 @@ func TestDownedSigners3of5(t *testing.T) {
 		} else {
 			signer2 = ourValidator.Signers[0]
 		}
+
+		toElect := i - 1
+		if toElect < 0 {
+			toElect = len(ourValidator.Signers) + toElect
+		}
+
+		t.Logf("{%s} -> Electing signer %d...", signer2.Name(), toElect+1)
+		require.NoError(t, signer2.Elect(toElect+1))
+
 		if i == 0 {
 			t.Logf("{%s} -> Stopping signer...", signer1.Name())
 			require.NoError(t, signer1.StopAndRemoveContainer(false))

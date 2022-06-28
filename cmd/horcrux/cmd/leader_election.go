@@ -45,22 +45,22 @@ To choose a specific leader, pass that leader's ID as an argument.
 		}
 
 		var grpcAddresses []string
-		url, err := url.Parse(config.Config.CosignerConfig.P2PListen)
+		u, err := url.Parse(config.Config.CosignerConfig.P2PListen)
 		if err != nil {
 			fmt.Printf("Error parsing peer URL: %v", err)
 		} else {
-			host, port, err := net.SplitHostPort(url.Host)
+			host, port, err := net.SplitHostPort(u.Host)
 			if err == nil {
 				grpcAddresses = append(grpcAddresses, fmt.Sprintf("%s:%s", host, port))
 			}
 		}
 
 		for _, peer := range config.Config.CosignerConfig.Peers {
-			url, err := url.Parse(peer.P2PAddr)
+			u, err := url.Parse(peer.P2PAddr)
 			if err != nil {
 				fmt.Printf("Error parsing peer URL: %v", err)
 			} else {
-				host, port, err := net.SplitHostPort(url.Host)
+				host, port, err := net.SplitHostPort(u.Host)
 				if err == nil {
 					grpcAddresses = append(grpcAddresses, fmt.Sprintf("%s:%s", host, port))
 				}

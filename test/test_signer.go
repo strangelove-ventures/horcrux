@@ -543,3 +543,39 @@ func (ts *TestSigner) CreateCosignerContainer(networkID string) error {
 	ts.Container = cont
 	return nil
 }
+
+// CreateCosignerContainer creates a docker container to run a mpc validator node
+func (ts *TestSigner) Elect(networkID string, nodeID int) error {
+	_, err := ts.Pool.Client.CreateContainer(docker.CreateContainerOptions{
+		Name: ts.Name() + RandLowerCaseLetterString(3),
+		Config: &docker.Config{
+			User:   getDockerUserString(),
+			Cmd:    []string{"horcrux", "elect", fmt.Sprint(nodeID), fmt.Sprintf("--home=%s", ts.Dir())},
+			DNS:    []string{},
+			Image:  signerImage,
+			Labels: map[string]string{"horcrux-test": ts.tl.Name()},
+		},
+		HostConfig: &docker.HostConfig{
+			AutoRemove: true,
+			Mounts: []docker.HostMount{
+				{
+					Type:        "bind",
+					Source:      ts.Dir(),
+					Target:      ts.Dir(),
+					ReadOnly:    false,
+					BindOptions: nil,
+				},
+			},
+		},
+		NetworkingConfig: &docker.NetworkingConfig{
+			EndpointsConfig: map[string]*docker.EndpointConfig{
+				ts.Container.NetworkSettings.NetworkID: {},
+			},
+		},
+		Context: nil,
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}

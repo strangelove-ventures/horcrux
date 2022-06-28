@@ -499,6 +499,7 @@ type RuntimeConfig struct {
 	ConfigFile string
 	KeyFile    string
 	StateDir   string
+	LockFile   string
 	Config     DiskConfig
 }
 

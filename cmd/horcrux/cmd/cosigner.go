@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -103,9 +102,8 @@ func StartCosignerCmd() *cobra.Command {
 		Short: "Start cosigner process",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			lockFilePath := filepath.Join(config.HomeDir, "horcrux.lock")
-			if _, err := os.Stat(lockFilePath); err == nil {
-				return errors.New("cannot start daemon, horcrux is already running")
+			if err = signer.RequireNotRunning(config.LockFile); err == nil {
+				return err
 			}
 
 			err = validateCosignerConfig(config.Config)
@@ -197,7 +195,10 @@ func StartCosignerCmd() *cobra.Command {
 
 			localCosigner := signer.NewLocalCosigner(localCosignerConfig)
 
-			timeout, _ := time.ParseDuration(config.Config.CosignerConfig.Timeout)
+			timeout, err := time.ParseDuration(config.Config.CosignerConfig.Timeout)
+			if err != nil {
+				log.Fatalf("Error parsing configured timeout: %s. %v\n", config.Config.CosignerConfig.Timeout, err)
+			}
 
 			raftDir := filepath.Join(config.HomeDir, "raft")
 			if err := os.MkdirAll(raftDir, 0700); err != nil {
@@ -240,7 +241,7 @@ func StartCosignerCmd() *cobra.Command {
 				panic(err)
 			}
 
-			signer.WaitAndTerminate(logger, services, lockFilePath)
+			signer.WaitAndTerminate(logger, services, config.LockFile)
 
 			return nil
 		},
