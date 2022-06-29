@@ -1,6 +1,7 @@
 package signer
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -44,7 +45,7 @@ manual deletion of PID file required. %w`, pidFilePath, pid, err)
 	if err == nil {
 		return fmt.Errorf("horcrux is already running on PID: %d", pid)
 	}
-	if err.Error() == "os: process already finished" {
+	if errors.Is(err, os.ErrProcessDone) {
 		return fmt.Errorf(`unclean shutdown detected. PID file exists at %s but PID %d is not running.
 manual deletion of PID file required`, pidFilePath, pid)
 	}
@@ -66,11 +67,12 @@ func WaitAndTerminate(logger tmLog.Logger, services []tmService.Service, pidFile
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
-	err := os.WriteFile(
-		pidFilePath,
-		[]byte(fmt.Sprintf("%d\n", os.Getpid())),
-		0600,
-	)
+	pidFile, err := os.OpenFile(pidFilePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		panic(fmt.Errorf("error opening PID file: %s. %w", pidFilePath, err))
+	}
+	_, err = pidFile.Write([]byte(fmt.Sprintf("%d\n", os.Getpid())))
+	pidFile.Close()
 	if err != nil {
 		panic(fmt.Errorf("error writing to lock file: %s. %w", pidFilePath, err))
 	}

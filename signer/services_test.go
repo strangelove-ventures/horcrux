@@ -5,12 +5,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/strangelove-ventures/horcrux/signer"
+	tmlog "github.com/tendermint/tendermint/libs/log"
+	tmservice "github.com/tendermint/tendermint/libs/service"
 
 	"github.com/stretchr/testify/require"
 )
@@ -57,7 +62,7 @@ func getNonExistentPid() (int, error) {
 		if err == nil {
 			continue
 		}
-		if err.Error() == "os: process already finished" {
+		if errors.Is(err, os.ErrProcessDone) {
 			return pid, nil
 		}
 		errno, ok := err.(syscall.Errno)
@@ -72,6 +77,10 @@ func getNonExistentPid() (int, error) {
 }
 
 func TestIsRunningNonExistentPid(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip()
+	}
+
 	homeDir := t.TempDir()
 	pidFilePath := filepath.Join(homeDir, "horcrux.pid")
 
@@ -88,5 +97,60 @@ func TestIsRunningNonExistentPid(t *testing.T) {
 	err = signer.RequireNotRunning(pidFilePath)
 	expectedErrorMsg := fmt.Sprintf(`unclean shutdown detected. PID file exists at %s but PID %d is not running.
 manual deletion of PID file required`, pidFilePath, pid)
+	require.EqualError(t, err, expectedErrorMsg)
+}
+
+func TestConcurrentStart(t *testing.T) {
+	homeDir := t.TempDir()
+	pidFilePath := filepath.Join(homeDir, "horcrux.pid")
+	var logger tmlog.Logger
+	var services []tmservice.Service
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	doneCount := 0
+	panicCount := 0
+
+	recoverFromPanic := func() {
+		_ = recover()
+		panicCount++
+		for doneCount < 2 {
+			doneCount++
+			wg.Done()
+		}
+	}
+
+	go func() {
+		defer recoverFromPanic()
+		signer.WaitAndTerminate(logger, services, pidFilePath)
+		doneCount++
+		wg.Done()
+	}()
+	go func() {
+		defer recoverFromPanic()
+		signer.WaitAndTerminate(logger, services, pidFilePath)
+		doneCount++
+		wg.Done()
+	}()
+
+	wg.Wait()
+
+	require.FileExists(t, pidFilePath, "PID file does not exist")
+
+	require.Equal(t, 1, panicCount, "1 did not panic")
+}
+
+func TestIsRunningAndWaitForService(t *testing.T) {
+	homeDir := t.TempDir()
+	pidFilePath := filepath.Join(homeDir, "horcrux.pid")
+
+	var logger tmlog.Logger
+	var services []tmservice.Service
+	go func() { signer.WaitAndTerminate(logger, services, pidFilePath) }()
+
+	time.Sleep(20 * time.Millisecond)
+
+	err := signer.RequireNotRunning(pidFilePath)
+	expectedErrorMsg := fmt.Sprintf("horcrux is already running on PID: %d", os.Getpid())
 	require.EqualError(t, err, expectedErrorMsg)
 }
