@@ -148,9 +148,18 @@ func TestIsRunningAndWaitForService(t *testing.T) {
 	var services []tmservice.Service
 	go func() { signer.WaitAndTerminate(logger, services, pidFilePath) }()
 
-	time.Sleep(20 * time.Millisecond)
+	// Wait for signer.WaitAndTerminate to create pidFile
+	var err error
+	for i := 0; i < 5; i++ {
+		time.Sleep(1 * time.Millisecond)
+		_, err = os.Stat(pidFilePath)
+		if err == nil {
+			break
+		}
+	}
+	require.NoError(t, err, "PID file does not exist after max attempts")
 
-	err := signer.RequireNotRunning(pidFilePath)
+	err = signer.RequireNotRunning(pidFilePath)
 	expectedErrorMsg := fmt.Sprintf("horcrux is already running on PID: %d", os.Getpid())
 	require.EqualError(t, err, expectedErrorMsg)
 }
