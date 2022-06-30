@@ -23,12 +23,14 @@ func init() {
 }
 
 var leaderElectionCmd = &cobra.Command{
-	Use:   "elect",
+	Use:   "elect [node_id]",
 	Short: "Elect new raft leader",
 	Long: `To choose the next eligible leader, pass no argument.
 To choose a specific leader, pass that leader's ID as an argument.
 `,
-	Args:         cobra.RangeArgs(0, 1),
+	Args: cobra.RangeArgs(0, 1),
+	Example: `horcrux elect # elect random leader
+horcrux elect 2 # elect specific leader`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		if config.Config.CosignerConfig == nil {

@@ -38,8 +38,9 @@ type AddressCmdOutput struct {
 
 func AddressCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:          "address",
+		Use:          "address [bech32]",
 		Short:        "Get public key hex address and valcons address",
+		Example:      `horcrux cosigner address cosmos`,
 		SilenceUsage: true,
 		Args:         cobra.RangeArgs(0, 1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
