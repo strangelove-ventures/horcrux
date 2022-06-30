@@ -21,7 +21,7 @@ func RequireNotRunning(pidFilePath string) error {
 			// or performing other tasks that require horcrux daemon to be stopped.
 			return nil
 		}
-		return fmt.Errorf("unexpected error while checking for existence of lock file at %s: %w", pidFilePath, err)
+		return fmt.Errorf("unexpected error while checking for existence of PID file at %s: %w", pidFilePath, err)
 	}
 
 	lockFile, err := os.ReadFile(pidFilePath)
@@ -31,8 +31,13 @@ func RequireNotRunning(pidFilePath string) error {
 
 	pid, err := strconv.ParseInt(strings.TrimSpace(string(lockFile)), 10, 64)
 	if err != nil {
-		return fmt.Errorf("unexpected error parsing PID from lock file: %s. manual deletion of PID file required. %w",
+		return fmt.Errorf("unexpected error parsing PID from PID file: %s. manual deletion of PID file required. %w",
 			pidFilePath, err)
+	}
+
+	if int(pid) == os.Getpid() {
+		return fmt.Errorf("error checking PID file: %s, PID: %d matches current process.",
+			pidFilePath, pid)
 	}
 
 	process, err := os.FindProcess(int(pid))

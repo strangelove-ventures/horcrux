@@ -23,7 +23,7 @@ import (
 func TestIsRunning(t *testing.T) {
 	homeDir := t.TempDir()
 	pidFilePath := filepath.Join(homeDir, "horcrux.pid")
-	pid := os.Getpid()
+	pid := os.Getpid() + 1
 	err := os.WriteFile(
 		pidFilePath,
 		[]byte(fmt.Sprintf("%d\n", pid)),
@@ -78,7 +78,7 @@ func getNonExistentPid() (int, error) {
 
 func TestIsRunningNonExistentPid(t *testing.T) {
 	if runtime.GOOS != "linux" {
-		t.Skip()
+		t.Skip("test only valid on Linux")
 	}
 
 	homeDir := t.TempDir()
@@ -101,43 +101,44 @@ manual deletion of PID file required`, pidFilePath, pid)
 }
 
 func TestConcurrentStart(t *testing.T) {
+	concurrentAttempts := 10
+
 	homeDir := t.TempDir()
 	pidFilePath := filepath.Join(homeDir, "horcrux.pid")
+
 	var logger tmlog.Logger
 	var services []tmservice.Service
 
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(concurrentAttempts)
 	doneCount := 0
 	panicCount := 0
 
 	recoverFromPanic := func() {
 		_ = recover()
 		panicCount++
-		for doneCount < 2 {
-			doneCount++
-			wg.Done()
+		if panicCount == concurrentAttempts-1 {
+			for doneCount < concurrentAttempts {
+				doneCount++
+				wg.Done()
+			}
 		}
 	}
 
-	go func() {
-		defer recoverFromPanic()
-		signer.WaitAndTerminate(logger, services, pidFilePath)
-		doneCount++
-		wg.Done()
-	}()
-	go func() {
-		defer recoverFromPanic()
-		signer.WaitAndTerminate(logger, services, pidFilePath)
-		doneCount++
-		wg.Done()
-	}()
+	for i := 0; i < concurrentAttempts; i++ {
+		go func() {
+			defer recoverFromPanic()
+			signer.WaitAndTerminate(logger, services, pidFilePath)
+			doneCount++
+			wg.Done()
+		}()
+	}
 
 	wg.Wait()
 
 	require.FileExists(t, pidFilePath, "PID file does not exist")
 
-	require.Equal(t, 1, panicCount, "1 did not panic")
+	require.Equal(t, concurrentAttempts-1, panicCount, "did not panic")
 }
 
 func TestIsRunningAndWaitForService(t *testing.T) {
@@ -160,6 +161,6 @@ func TestIsRunningAndWaitForService(t *testing.T) {
 	require.NoError(t, err, "PID file does not exist after max attempts")
 
 	err = signer.RequireNotRunning(pidFilePath)
-	expectedErrorMsg := fmt.Sprintf("horcrux is already running on PID: %d", os.Getpid())
+	expectedErrorMsg := fmt.Sprintf("error checking PID file: %s, PID: %d matches current process.", pidFilePath, os.Getpid())
 	require.EqualError(t, err, expectedErrorMsg)
 }
