@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -38,23 +38,17 @@ type AddressCmdOutput struct {
 
 func AddressCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "address",
-		Short: "Get public key hex address and valcons address",
-		Args:  cobra.RangeArgs(0, 1),
+		Use:          "address",
+		Short:        "Get public key hex address and valcons address",
+		SilenceUsage: true,
+		Args:         cobra.RangeArgs(0, 1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			err = validateCosignerConfig(config)
+			err = validateCosignerConfig(config.Config)
 			if err != nil {
 				return
 			}
 
-			var privValKeyFile string
-			if config.PrivValKeyFile == "" {
-				privValKeyFile = path.Join(config.HomeDir, "share.json")
-			} else {
-				privValKeyFile = config.PrivValKeyFile
-			}
-
-			key, err := signer.LoadCosignerKey(privValKeyFile)
+			key, err := signer.LoadCosignerKey(config.keyFilePath(true))
 			if err != nil {
 				return fmt.Errorf("error reading cosigner key: %s", err)
 			}
@@ -105,40 +99,38 @@ func AddressCmd() *cobra.Command {
 
 func StartCosignerCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "start",
-		Short: "Start cosigner process",
-		Args:  cobra.NoArgs,
+		Use:          "start",
+		Short:        "Start cosigner process",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			err = validateCosignerConfig(config)
+			if err = signer.RequireNotRunning(config.PidFile); err != nil {
+				return err
+			}
+
+			err = validateCosignerConfig(config.Config)
 			if err != nil {
-				return
+				return err
 			}
 
 			var (
 				// services to stop on shutdown
 				services []tmService.Service
 				pv       types.PrivValidator
-				chainID  = config.ChainID
+				chainID  = config.Config.ChainID
 				logger   = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator")
 				cfg      signer.Config
 			)
 
-			var privValKeyFile string
-			if config.PrivValKeyFile == "" {
-				privValKeyFile = path.Join(config.HomeDir, "share.json")
-			} else {
-				privValKeyFile = config.PrivValKeyFile
-			}
-
 			cfg = signer.Config{
 				Mode:              "mpc",
-				PrivValKeyFile:    privValKeyFile,
-				PrivValStateDir:   path.Join(config.HomeDir, "state"),
-				ChainID:           config.ChainID,
-				CosignerThreshold: config.CosignerConfig.Threshold,
-				ListenAddress:     config.CosignerConfig.P2PListen,
-				Nodes:             config.Nodes(),
-				Cosigners:         config.CosignerPeers(),
+				PrivValKeyFile:    config.keyFilePath(true),
+				PrivValStateDir:   config.StateDir,
+				ChainID:           config.Config.ChainID,
+				CosignerThreshold: config.Config.CosignerConfig.Threshold,
+				ListenAddress:     config.Config.CosignerConfig.P2PListen,
+				Nodes:             config.Config.Nodes(),
+				Cosigners:         config.Config.CosignerPeers(),
 			}
 
 			if err = cfg.KeyFileExists(); err != nil {
@@ -157,16 +149,14 @@ func StartCosignerCmd() *cobra.Command {
 
 			// ok to auto initialize on disk since the cosigner share is the one that actually
 			// protects against double sign - this exists as a cache for the final signature
-			stateFile := path.Join(cfg.PrivValStateDir, fmt.Sprintf("%s_priv_validator_state.json", chainID))
-			signState, err := signer.LoadOrCreateSignState(stateFile)
+			signState, err := signer.LoadOrCreateSignState(config.privValStateFile(chainID))
 			if err != nil {
 				panic(err)
 			}
 
 			// state for our cosigner share
 			// Not automatically initialized on disk to avoid double sign risk
-			shareStateFile := path.Join(cfg.PrivValStateDir, fmt.Sprintf("%s_share_sign_state.json", chainID))
-			shareSignState, err := signer.LoadSignState(shareStateFile)
+			shareSignState, err := signer.LoadSignState(config.shareStateFile(chainID))
 			if err != nil {
 				panic(err)
 			}
@@ -207,9 +197,12 @@ func StartCosignerCmd() *cobra.Command {
 
 			localCosigner := signer.NewLocalCosigner(localCosignerConfig)
 
-			timeout, _ := time.ParseDuration(config.CosignerConfig.Timeout)
+			timeout, err := time.ParseDuration(config.Config.CosignerConfig.Timeout)
+			if err != nil {
+				log.Fatalf("Error parsing configured timeout: %s. %v\n", config.Config.CosignerConfig.Timeout, err)
+			}
 
-			raftDir := path.Join(config.HomeDir, "raft")
+			raftDir := filepath.Join(config.HomeDir, "raft")
 			if err := os.MkdirAll(raftDir, 0700); err != nil {
 				log.Fatalf("Error creating raft directory: %v\n", err)
 			}
@@ -250,7 +243,7 @@ func StartCosignerCmd() *cobra.Command {
 				panic(err)
 			}
 
-			signer.WaitAndTerminate(logger, services)
+			signer.WaitAndTerminate(logger, services, config.PidFile)
 
 			return nil
 		},

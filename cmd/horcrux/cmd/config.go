@@ -7,12 +7,11 @@ import (
 	"net"
 	"net/url"
 	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/signer"
 	"gopkg.in/yaml.v2"
@@ -60,28 +59,22 @@ func initCmd() *cobra.Command {
 				}
 			}
 
-			var home string // In root.go we end up with our
-			if homeDir != "" {
-				home = homeDir
-			} else {
-				home, _ = homedir.Dir()
-				home = path.Join(home, ".horcrux")
-			}
-
-			configYamlPath := path.Join(home, "config.yaml")
-
 			cmdFlags := cmd.Flags()
 			overwrite, _ := cmdFlags.GetBool("overwrite")
 
-			if _, err := os.Stat(configYamlPath); !os.IsNotExist(err) && !overwrite {
+			if _, err := os.Stat(config.ConfigFile); !os.IsNotExist(err) && !overwrite {
 				return fmt.Errorf("%s already exists. Provide the -o flag to overwrite the existing config",
-					configYamlPath)
+					config.ConfigFile)
 			}
 
-			var cfg *Config
+			var cfg DiskConfig
 
 			cs, _ := cmdFlags.GetBool("cosigner")
-			keyFile, _ := cmdFlags.GetString("keyfile")
+			keyFileFlag, _ := cmdFlags.GetString("keyfile")
+			var keyFile *string
+			if keyFileFlag != "" {
+				keyFile = &keyFileFlag
+			}
 			if cs {
 				p, _ := cmdFlags.GetString("peers")
 				threshold, _ := cmdFlags.GetInt("threshold")
@@ -107,8 +100,7 @@ func initCmd() *cobra.Command {
 					return errors.New("host cannot be 0.0.0.0, must be reachable from other peers")
 				}
 
-				cfg = &Config{
-					HomeDir:        home,
+				cfg = DiskConfig{
 					PrivValKeyFile: keyFile,
 					ChainID:        cid,
 					CosignerConfig: &CosignerConfig{
@@ -127,8 +119,7 @@ func initCmd() *cobra.Command {
 				if len(cn) == 0 {
 					return fmt.Errorf("must input at least one node")
 				}
-				cfg = &Config{
-					HomeDir:        home,
+				cfg = DiskConfig{
 					PrivValKeyFile: keyFile,
 					ChainID:        cid,
 					ChainNodes:     cn,
@@ -137,30 +128,33 @@ func initCmd() *cobra.Command {
 					return err
 				}
 			}
+
+			// silence usage after all input has been validated
+			cmd.SilenceUsage = true
+
 			// create all directories up to the state directory
-			if err = os.MkdirAll(path.Join(home, "state"), 0755); err != nil {
+			if err = os.MkdirAll(config.StateDir, 0755); err != nil {
 				return err
 			}
 			// create the config file
-			if err = writeConfigFile(configYamlPath, cfg); err != nil {
+			config.Config = cfg
+			if err = config.writeConfigFile(); err != nil {
 				return err
 			}
 
 			// initialize state/{chainid}_priv_validator_state.json file
-			if _, err = signer.LoadOrCreateSignState(
-				path.Join(home, "state", fmt.Sprintf("%s_priv_validator_state.json", cid))); err != nil {
+			if _, err = signer.LoadOrCreateSignState(config.privValStateFile(cid)); err != nil {
 				return err
 			}
 
 			// if node is a cosigner initialize state/{chainid}_priv_validator_state.json file
 			if cs {
-				if _, err = signer.LoadOrCreateSignState(
-					path.Join(home, "state", fmt.Sprintf("%s_share_sign_state.json", cid))); err != nil {
+				if _, err = signer.LoadOrCreateSignState(config.shareStateFile(cid)); err != nil {
 					return err
 				}
 			}
 
-			fmt.Printf("Successfully initialized configuration: %s\n", configYamlPath)
+			fmt.Printf("Successfully initialized configuration: %s\n", config.ConfigFile)
 			return nil
 		},
 	}
@@ -177,11 +171,7 @@ func initCmd() *cobra.Command {
 	return cmd
 }
 
-func writeConfigFile(path string, cfg *Config) error {
-	return ioutil.WriteFile(path, cfg.MustMarshalYaml(), 0644) //nolint
-}
-
-func validateSingleSignerConfig(cfg *Config) error {
+func validateSingleSignerConfig(cfg DiskConfig) error {
 	if cfg.ChainID == "" {
 		return fmt.Errorf("chain-id cannot be empty")
 	}
@@ -194,7 +184,7 @@ func validateSingleSignerConfig(cfg *Config) error {
 	return nil
 }
 
-func validateCosignerConfig(cfg *Config) error {
+func validateCosignerConfig(cfg DiskConfig) error {
 	if cfg.ChainID == "" {
 		return fmt.Errorf("chain-id cannot be empty")
 	}
@@ -237,29 +227,24 @@ func addNodesCmd() *cobra.Command {
 			"tcp://chain-node-1:1234,tcp://chain-node-2:1234",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			var home string // In root.go we end up with our
-			if homeDir != "" {
-				home = homeDir
-			} else {
-				home, _ = homedir.Dir()
-				home = path.Join(home, ".horcrux")
-			}
-
 			argNodes, err := chainNodesFromArg(args[0])
 			if err != nil {
 				return err
 			}
-			diff := diffSetChainNode(argNodes, config.ChainNodes)
+			diff := diffSetChainNode(argNodes, config.Config.ChainNodes)
 			if len(diff) == 0 {
 				return errors.New("no new chain nodes in args")
 			}
-			diff = append(config.ChainNodes, diff...)
+			diff = append(config.Config.ChainNodes, diff...)
 			if err := validateChainNodes(diff); err != nil {
 				return err
 			}
 
-			config.ChainNodes = diff
-			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
+			// silence usage after all input has been validated
+			cmd.SilenceUsage = true
+
+			config.Config.ChainNodes = diff
+			if err := config.writeConfigFile(); err != nil {
 				return err
 			}
 			return nil
@@ -277,19 +262,11 @@ func removeNodesCmd() *cobra.Command {
 			"tcp://chain-node-1:1234,tcp://chain-node-2:1234",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			var home string // In root.go we end up with our
-			if homeDir != "" {
-				home = homeDir
-			} else {
-				home, _ = homedir.Dir()
-				home = path.Join(home, ".horcrux")
-			}
-
 			argNodes, err := chainNodesFromArg(args[0])
 			if err != nil {
 				return err
 			}
-			diff := diffSetChainNode(config.ChainNodes, argNodes)
+			diff := diffSetChainNode(config.Config.ChainNodes, argNodes)
 			if len(diff) == 0 {
 				return errors.New("cannot remove all chain nodes from config, please leave at least one")
 			}
@@ -299,8 +276,11 @@ func removeNodesCmd() *cobra.Command {
 				return err
 			}
 
-			config.ChainNodes = diff
-			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
+			// silence usage after all input has been validated
+			cmd.SilenceUsage = true
+
+			config.Config.ChainNodes = diff
+			if err := config.writeConfigFile(); err != nil {
 				return err
 			}
 			return nil
@@ -340,29 +320,24 @@ func addPeersCmd() *cobra.Command {
 			"tcp://peer-node-1:1234,tcp://peer-node-2:1234",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			var home string // In root.go we end up with our
-			if homeDir != "" {
-				home = homeDir
-			} else {
-				home, _ = homedir.Dir()
-				home = path.Join(home, ".horcrux")
-			}
-
 			argPeers, err := peersFromFlag(args[0])
 			if err != nil {
 				return err
 			}
-			diff := diffSetCosignerPeer(argPeers, config.CosignerConfig.Peers)
+			diff := diffSetCosignerPeer(argPeers, config.Config.CosignerConfig.Peers)
 			if len(diff) == 0 {
 				return errors.New("no new peer nodes in args")
 			}
-			diff = append(config.CosignerConfig.Peers, diff...)
-			if err := validateCosignerPeers(diff, config.CosignerConfig.Shares); err != nil {
+			diff = append(config.Config.CosignerConfig.Peers, diff...)
+			if err := validateCosignerPeers(diff, config.Config.CosignerConfig.Shares); err != nil {
 				return err
 			}
 
-			config.CosignerConfig.Peers = diff
-			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
+			// silence usage after all input has been validated
+			cmd.SilenceUsage = true
+
+			config.Config.CosignerConfig.Peers = diff
+			if err := config.writeConfigFile(); err != nil {
 				return err
 			}
 			return nil
@@ -380,16 +355,8 @@ func removePeersCmd() *cobra.Command {
 			"1,2",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			var home string // In root.go we end up with our
-			if homeDir != "" {
-				home = homeDir
-			} else {
-				home, _ = homedir.Dir()
-				home = path.Join(home, ".horcrux")
-			}
-
 			var argPeers []CosignerPeer
-			for _, peer := range config.CosignerConfig.Peers {
+			for _, peer := range config.Config.CosignerConfig.Peers {
 				for _, id := range strings.Split(args[0], ",") {
 					id, err := strconv.Atoi(id)
 					if err != nil {
@@ -401,18 +368,21 @@ func removePeersCmd() *cobra.Command {
 				}
 			}
 
-			diff := diffSetCosignerPeer(config.CosignerConfig.Peers, argPeers)
+			diff := diffSetCosignerPeer(config.Config.CosignerConfig.Peers, argPeers)
 			if len(diff) == 0 {
 				return errors.New("cannot remove all peer nodes from config, please leave at least one")
 			}
 			// If none of the peer nodes in the args are listed in the config, just continue
 			// without throwing an error, as the peer nodes in the config remain untouched.
-			if err := validateCosignerPeers(diff, config.CosignerConfig.Shares); err != nil {
+			if err := validateCosignerPeers(diff, config.Config.CosignerConfig.Shares); err != nil {
 				return err
 			}
 
-			config.CosignerConfig.Peers = diff
-			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
+			// silence usage after all input has been validated
+			cmd.SilenceUsage = true
+
+			config.Config.CosignerConfig.Peers = diff
+			if err := config.writeConfigFile(); err != nil {
 				return err
 			}
 			return nil
@@ -430,24 +400,19 @@ func setSharesCmd() *cobra.Command {
 			"3",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var home string // In root.go we end up with our
-			if homeDir != "" {
-				home = homeDir
-			} else {
-				home, _ = homedir.Dir()
-				home = path.Join(home, ".horcrux")
-			}
-
 			numShares, err := strconv.Atoi(args[0])
 			if err != nil {
 				return err
 			}
-			if err := validateCosignerPeers(config.CosignerConfig.Peers, numShares); err != nil {
+			if err := validateCosignerPeers(config.Config.CosignerConfig.Peers, numShares); err != nil {
 				return err
 			}
 
-			config.CosignerConfig.Shares = numShares
-			if err := writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
+			// silence usage after all input has been validated
+			cmd.SilenceUsage = true
+
+			config.Config.CosignerConfig.Shares = numShares
+			if err := config.writeConfigFile(); err != nil {
 				return err
 			}
 			return nil
@@ -485,31 +450,29 @@ func setChainIDCmd() *cobra.Command {
 		Long: "set the chain ID.\n\n" +
 			"[chain-id] is a string i.e.\n" +
 			"cosmoshub-4",
-		Args: cobra.ExactArgs(1),
+		SilenceUsage: true,
+		Args:         cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			var home string // In root.go we end up with our
-			if homeDir != "" {
-				home = homeDir
-			} else {
-				home, _ = homedir.Dir()
-				home = path.Join(home, ".horcrux")
+			oldChainID := config.Config.ChainID
+			newChainID := args[0]
+			pvOldPath := config.privValStateFile(oldChainID)
+			pvNewPath := config.privValStateFile(newChainID)
+			shareOldPath := config.shareStateFile(oldChainID)
+			shareNewPath := config.shareStateFile(newChainID)
+
+			if _, err := os.Stat(pvOldPath); err == nil {
+				if err = os.Rename(pvOldPath, pvNewPath); err != nil {
+					return err
+				}
+			}
+			if _, err := os.Stat(shareOldPath); err == nil {
+				if err = os.Rename(shareOldPath, shareNewPath); err != nil {
+					return err
+				}
 			}
 
-			stateDir := path.Join(home, "state")
-			pvOldPath := path.Join(stateDir, config.ChainID+"_priv_validator_state.json")
-			pvNewPath := path.Join(stateDir, args[0]+"_priv_validator_state.json")
-			shareOldPath := path.Join(stateDir, config.ChainID+"_share_sign_state.json")
-			shareNewPath := path.Join(stateDir, args[0]+"_share_sign_state.json")
-
-			if err = os.Rename(pvOldPath, pvNewPath); err != nil {
-				return err
-			}
-			if err = os.Rename(shareOldPath, shareNewPath); err != nil {
-				return err
-			}
-
-			config.ChainID = args[0]
-			if err = writeConfigFile(path.Join(home, "config.yaml"), config); err != nil {
+			config.Config.ChainID = args[0]
+			if err = config.writeConfigFile(); err != nil {
 				return err
 			}
 			return nil
@@ -517,27 +480,58 @@ func setChainIDCmd() *cobra.Command {
 	}
 }
 
-type Config struct {
-	HomeDir        string          `json:"home-dir" yaml:"home-dir"`
-	PrivValKeyFile string          `json:"key-file,omitempty" yaml:"key-file,omitempty"`
+// Config maps to the on-disk JSON format
+type DiskConfig struct {
+	PrivValKeyFile *string         `json:"key-file,omitempty" yaml:"key-file,omitempty"`
 	ChainID        string          `json:"chain-id" yaml:"chain-id"`
 	CosignerConfig *CosignerConfig `json:"cosigner,omitempty" yaml:"cosigner,omitempty"`
 	ChainNodes     []ChainNode     `json:"chain-nodes,omitempty" yaml:"chain-nodes,omitempty"`
 }
 
-func (c *Config) Nodes() (out []signer.NodeConfig) {
-	for _, n := range c.ChainNodes {
-		out = append(out, signer.NodeConfig{Address: n.PrivValAddr})
+func (c *DiskConfig) Nodes() []signer.NodeConfig {
+	out := make([]signer.NodeConfig, len(c.ChainNodes))
+	for i, n := range c.ChainNodes {
+		out[i] = signer.NodeConfig{Address: n.PrivValAddr}
 	}
-	return
+	return out
 }
 
-func (c *Config) MustMarshalYaml() []byte {
+func (c *DiskConfig) MustMarshalYaml() []byte {
 	out, err := yaml.Marshal(c)
 	if err != nil {
 		panic(err)
 	}
 	return out
+}
+
+type RuntimeConfig struct {
+	HomeDir    string
+	ConfigFile string
+	StateDir   string
+	PidFile    string
+	Config     DiskConfig
+}
+
+func (c *RuntimeConfig) keyFilePath(cosigner bool) string {
+	if c.Config.PrivValKeyFile != nil && *c.Config.PrivValKeyFile != "" {
+		return *c.Config.PrivValKeyFile
+	}
+	if cosigner {
+		return filepath.Join(c.HomeDir, "share.json")
+	}
+	return filepath.Join(c.HomeDir, "priv_validator_key.json")
+}
+
+func (c RuntimeConfig) privValStateFile(chainID string) string {
+	return filepath.Join(c.StateDir, fmt.Sprintf("%s_priv_validator_state.json", chainID))
+}
+
+func (c RuntimeConfig) shareStateFile(chainID string) string {
+	return filepath.Join(c.StateDir, fmt.Sprintf("%s_share_sign_state.json", chainID))
+}
+
+func (c RuntimeConfig) writeConfigFile() error {
+	return ioutil.WriteFile(c.ConfigFile, c.Config.MustMarshalYaml(), 0644) //nolint
 }
 
 type CosignerConfig struct {
@@ -548,7 +542,7 @@ type CosignerConfig struct {
 	Timeout   string         `json:"rpc-timeout" yaml:"rpc-timeout"`
 }
 
-func (c *Config) CosignerPeers() (out []signer.CosignerConfig) {
+func (c *DiskConfig) CosignerPeers() (out []signer.CosignerConfig) {
 	for _, p := range c.CosignerConfig.Peers {
 		out = append(out, signer.CosignerConfig{ID: p.ShareID, Address: p.P2PAddr})
 	}

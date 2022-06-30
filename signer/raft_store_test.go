@@ -58,10 +58,6 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 		Peers:       []Cosigner{},
 	}
 
-	if s == nil {
-		t.Fatalf("failed to create store")
-	}
-
 	if _, err := s.Open(); err != nil {
 		t.Fatalf("failed to open store: %s", err)
 	}

@@ -38,10 +38,15 @@ func CreateCosignerSharesCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			threshold, _ := strconv.ParseInt(args[1], 10, 64)
 			numShares, _ := strconv.ParseInt(args[2], 10, 64)
+
 			csKeys, err := signer.CreateCosignerSharesFromFile(args[0], threshold, numShares)
 			if err != nil {
 				return err
 			}
+
+			// silence usage after all input has been validated
+			cmd.SilenceUsage = true
+
 			for _, c := range csKeys {
 				if err = signer.WriteCosignerShareFile(c, fmt.Sprintf("private_share_%d.json", c.ID)); err != nil {
 					return err

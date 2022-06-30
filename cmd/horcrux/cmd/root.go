@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
@@ -14,7 +14,7 @@ import (
 
 var (
 	homeDir string
-	config  *Config
+	config  RuntimeConfig
 )
 
 var rootCmd = &cobra.Command{
@@ -25,7 +25,10 @@ var rootCmd = &cobra.Command{
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	handleInitError(rootCmd.Execute())
+	if err := rootCmd.Execute(); err != nil {
+		// Cobra will print the error
+		os.Exit(1)
+	}
 }
 
 func init() {
@@ -35,16 +38,21 @@ func init() {
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
-	cfg := Config{}
-	if homeDir != "" {
-		cfgFile := path.Join(homeDir, "config.yaml")
-		viper.SetConfigFile(cfgFile)
-	} else {
-		home, err := homedir.Dir()
+	var home string
+	if homeDir == "" {
+		userHome, err := homedir.Dir()
 		handleInitError(err)
-		viper.AddConfigPath(path.Join(home, ".horcrux"))
-		viper.SetConfigName("config")
+		home = filepath.Join(userHome, ".horcrux")
+	} else {
+		home = homeDir
 	}
+	config = RuntimeConfig{
+		HomeDir:    home,
+		ConfigFile: filepath.Join(home, "config.yaml"),
+		StateDir:   filepath.Join(home, "state"),
+		PidFile:    filepath.Join(home, "horcrux.pid"),
+	}
+	viper.SetConfigFile(config.ConfigFile)
 	viper.SetEnvPrefix("horcrux")
 	viper.AutomaticEnv()
 	err := viper.ReadInConfig()
@@ -52,11 +60,10 @@ func initConfig() {
 		fmt.Println("no config exists at default location", err)
 		return
 	}
-	handleInitError(viper.Unmarshal(&cfg))
+	handleInitError(viper.Unmarshal(&config.Config))
 	bz, err := ioutil.ReadFile(viper.ConfigFileUsed())
 	handleInitError(err)
-	handleInitError(yaml.Unmarshal(bz, &cfg))
-	config = &cfg
+	handleInitError(yaml.Unmarshal(bz, &config.Config))
 }
 
 func handleInitError(err error) {
