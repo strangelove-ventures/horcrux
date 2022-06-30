@@ -161,6 +161,7 @@ func TestIsRunningAndWaitForService(t *testing.T) {
 	require.NoError(t, err, "PID file does not exist after max attempts")
 
 	err = signer.RequireNotRunning(pidFilePath)
-	expectedErrorMsg := fmt.Sprintf("error checking PID file: %s, PID: %d matches current process.", pidFilePath, os.Getpid())
+	expectedErrorMsg := fmt.Sprintf("error checking PID file: %s, PID: %d matches current process",
+		pidFilePath, os.Getpid())
 	require.EqualError(t, err, expectedErrorMsg)
 }

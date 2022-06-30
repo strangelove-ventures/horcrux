@@ -36,7 +36,7 @@ func RequireNotRunning(pidFilePath string) error {
 	}
 
 	if int(pid) == os.Getpid() {
-		return fmt.Errorf("error checking PID file: %s, PID: %d matches current process.",
+		return fmt.Errorf("error checking PID file: %s, PID: %d matches current process",
 			pidFilePath, pid)
 	}
 
