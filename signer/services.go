@@ -36,8 +36,8 @@ func RequireNotRunning(pidFilePath string) error {
 	}
 
 	if int(pid) == os.Getpid() {
-		return fmt.Errorf("error checking PID file: %s, PID: %d matches current process",
-			pidFilePath, pid)
+		panic(fmt.Errorf("error checking PID file: %s, PID: %d matches current process",
+			pidFilePath, pid))
 	}
 
 	process, err := os.FindProcess(int(pid))
