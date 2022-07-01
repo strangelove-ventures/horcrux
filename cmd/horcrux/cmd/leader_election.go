@@ -29,7 +29,7 @@ var leaderElectionCmd = &cobra.Command{
 To choose a specific leader, pass that leader's ID as an argument.
 `,
 	Args: cobra.RangeArgs(0, 1),
-	Example: `horcrux elect # elect random leader
+	Example: `horcrux elect # elect next eligible leader
 horcrux elect 2 # elect specific leader`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
