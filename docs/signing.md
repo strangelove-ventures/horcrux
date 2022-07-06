@@ -19,6 +19,9 @@ _`n: 5`_ and _`t: 3`_ is also a good configuration to enable higher availability
 
 Horcrux is designed with performance in mind, so it will sign and return the full block signature as soon as _`t`_ signer nodes have participated in the block signature.
 
+**N.B**
+Additional to the _Threshold (t)_ >  _Number of shards (n)_/2 requirement steaming from the [Ed25519 Threshold Signatures] layer, the [Raft](https://raft.github.io/)  layer (protocol) requires the number of signer nodes to be an odd number. I.e it means the set up must adhere to the following pattern, (threshold/signer nodes): 2/3, 3/5, 4/7, 5/9 etc.
+
 ### Horcrux multi-party computation (MPC) signing flow
 
 The [Raft](https://raft.github.io/) protocol, specifically the [hashicorp/raft](https://github.com/hashicorp/raft) golang implementation, is used in the Horcrux cluster for the purposes of leader election and high watermark consensus to provide fault tolerance and double sign avoidance.
