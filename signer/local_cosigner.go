@@ -29,36 +29,45 @@ type LastSignStateStruct struct {
 	LastSignState *SignState
 }
 
-// LocalCosigner responds to sign requests using their share key
-// The cosigner maintains a watermark to avoid double-signing
-// TODO: Clarify what you mean with cosinger here.
-// LocalCosigner signing is thread safe
-// Local cosigner "embedd" the threshold signer.
-
 type LocalCosignerConfig struct {
 	CosignerKey CosignerKey
 	SignState   *SignState
 	RsaKey      rsa.PrivateKey
 	Peers       []CosignerPeer
 	Address     string
-	RaftAddress string
+	RaftAddress string // FIXME this attribute looks really redundant - dont understand what it does.
 	Total       uint8
 	Threshold   uint8
-	// Localsigner LocalSoftSignThresholdEd25519Signature
+	Localsigner ThresholdEd25519Signature
 }
 
-// TODO refactorise temporary aliasing ThresholdEd25519Signature
-type thresholdEd25519Signature = *LocalSoftSignThresholdEd25519Signature
+// DELETE refactorise temporary aliasing ThresholdEd25519Signature
+// type thresholdEd25519Signature = *LocalSoftSignThresholdEd25519Signature
 
+// LocalCosigner responds to sign requests using their share key
+// The cosigner maintains a watermark to avoid double-signing
+// TODO: Clarify what you mean with cosinger here.
+// LocalCosigner signing is thread safe
+// LocalCosigner "embedd" the threshold signer.
 type LocalCosigner struct {
 	LastSignStateStruct *LastSignStateStruct
-	total               uint8
-	address             string
-	Peers               map[int]CosignerPeer
-	localsigner         thresholdEd25519Signature
+	// total               uint8
+	address     string
+	Peers       map[int]CosignerPeer
+	localsigner ThresholdEd25519Signature
 }
 
 func NewLocalCosigner(cfg LocalCosignerConfig) *LocalCosigner {
+
+	// TODO: factorise out localsigner, should be passed as a parameter in the cfg rather than constructed here. And the same for the init of the local signer config.
+	localsignerconfig := LocalSoftSignThresholdEd25519SignatureConfig{
+		CosignerKey: cfg.CosignerKey,
+		RsaKey:      cfg.RsaKey,
+		Total:       cfg.Total,
+		Threshold:   cfg.Threshold,
+	}
+
+	localsigner := localsignerconfig.NewThresholdEd25519Signature()
 
 	LastSignStateStruct := LastSignStateStruct{
 		LastSignStateMutex: sync.Mutex{},
@@ -66,12 +75,10 @@ func NewLocalCosigner(cfg LocalCosignerConfig) *LocalCosigner {
 	}
 	cosigner := &LocalCosigner{
 		LastSignStateStruct: &LastSignStateStruct,
-		total:               cfg.Total,
-		address:             cfg.Address,
-		// TODO take localsigner as parameter
-		// TODO: localsigner should be passed as a parameter in the cfg rather than constructed here.
+		// total:               cfg.Total,
+		address: cfg.Address,
 
-		localsigner: NewLocalSoftSignThresholdEd25519Signature(cfg),
+		localsigner: localsigner,
 		Peers:       make(map[int]CosignerPeer),
 	}
 

@@ -194,6 +194,8 @@ func StartCosignerCmd() *cobra.Command {
 				})
 			}
 
+			// TODO Add switch statement o build a var which is a ThresholdEd25519Signature and then it would be added to the config on your
+
 			total := len(cfg.Cosigners) + 1
 			localCosignerConfig := signer.LocalCosignerConfig{
 				CosignerKey: key,
@@ -203,7 +205,7 @@ func StartCosignerCmd() *cobra.Command {
 				Peers:       peers,
 				Total:       uint8(total),
 				Threshold:   uint8(cfg.CosignerThreshold),
-				// TODO LocalSoftSignThresholdEd25519Signature instance should be passed into the config here as the desired ThresholdEd25519Signature
+				// Localsigner:  // TODO LocalSoftSignThresholdEd25519Signature instance should be passed into the config here as the desired ThresholdEd25519Signature
 			}
 
 			localCosigner := signer.NewLocalCosigner(localCosignerConfig)

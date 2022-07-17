@@ -33,3 +33,7 @@ type HrsMetadata struct {
 	DealtShares []tsed25519.Scalar
 	Peers       []PeerMetadata
 }
+
+type ThresholdEd25519SignatureConfig interface {
+	NewThresholdEd25519Signature() ThresholdEd25519Signature
+}

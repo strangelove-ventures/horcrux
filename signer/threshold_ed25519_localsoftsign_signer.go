@@ -27,7 +27,16 @@ type LocalSoftSignThresholdEd25519Signature struct {
 	HrsMeta map[HRSTKey]HrsMetadata
 }
 
-func NewLocalSoftSignThresholdEd25519Signature(cfg LocalCosignerConfig) *LocalSoftSignThresholdEd25519Signature {
+type LocalSoftSignThresholdEd25519SignatureConfig struct {
+	CosignerKey CosignerKey
+	RsaKey      rsa.PrivateKey
+	RaftAddress string
+	Total       uint8
+	Threshold   uint8
+}
+
+// Implements ThresholdEd25519SignatureConfig
+func (cfg LocalSoftSignThresholdEd25519SignatureConfig) NewThresholdEd25519Signature() *LocalSoftSignThresholdEd25519Signature {
 	localsigner := &LocalSoftSignThresholdEd25519Signature{
 		Key:       cfg.CosignerKey,
 		RsaKey:    cfg.RsaKey,
