@@ -14,7 +14,7 @@ import (
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tm "github.com/tendermint/tendermint/types"
-	tsed25519 "gitlab.com/polychainlabs/threshold-ed25519/pkg"
+	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
 func getMockRaftStore(cosigner Cosigner, tmpDir string) *RaftStore {
