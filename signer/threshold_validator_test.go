@@ -105,8 +105,11 @@ func TestThresholdValidator2of2(t *testing.T) {
 	var cosigner1 Cosigner
 	var cosigner2 Cosigner
 
-	cosigner1 = NewLocalCosigner(config1)
-	cosigner2 = NewLocalCosigner(config2)
+	localsigner1 := NewLocalSigner("SoftSign", config1)
+	cosigner1 = NewLocalCosigner(config1, localsigner1)
+
+	localsigner2 := NewLocalSigner("SoftSign", config2)
+	cosigner2 = NewLocalCosigner(config2, localsigner2)
 
 	require.Equal(t, cosigner1.GetID(), 1)
 	require.Equal(t, cosigner2.GetID(), 2)
@@ -257,9 +260,14 @@ func TestThresholdValidator3of3(t *testing.T) {
 	var cosigner2 Cosigner
 	var cosigner3 Cosigner
 
-	cosigner1 = NewLocalCosigner(config1)
-	cosigner2 = NewLocalCosigner(config2)
-	cosigner3 = NewLocalCosigner(config3)
+	localsigner1 := NewLocalSigner("SoftSign", config1)
+	cosigner1 = NewLocalCosigner(config1, localsigner1)
+
+	localsigner2 := NewLocalSigner("SoftSign", config2)
+	cosigner2 = NewLocalCosigner(config2, localsigner2)
+
+	localsigner3 := NewLocalSigner("SoftSign", config3)
+	cosigner3 = NewLocalCosigner(config3, localsigner3)
 
 	require.Equal(t, cosigner1.GetID(), 1)
 	require.Equal(t, cosigner2.GetID(), 2)
@@ -409,9 +417,14 @@ func TestThresholdValidator2of3(t *testing.T) {
 	var cosigner2 Cosigner
 	var cosigner3 Cosigner
 
-	cosigner1 = NewLocalCosigner(config1)
-	cosigner2 = NewLocalCosigner(config2)
-	cosigner3 = NewLocalCosigner(config3)
+	localsigner1 := NewLocalSigner("SoftSign", config1)
+	cosigner1 = NewLocalCosigner(config1, localsigner1)
+
+	localsigner2 := NewLocalSigner("SoftSign", config2)
+	cosigner2 = NewLocalCosigner(config2, localsigner2)
+
+	localsigner3 := NewLocalSigner("SoftSign", config3)
+	cosigner3 = NewLocalCosigner(config3, localsigner3)
 
 	require.Equal(t, cosigner1.GetID(), 1)
 	require.Equal(t, cosigner2.GetID(), 2)

@@ -35,10 +35,8 @@ type LocalCosignerConfig struct {
 	RsaKey      rsa.PrivateKey
 	Peers       []CosignerPeer
 	Address     string
-	RaftAddress string // FIXME this attribute looks really redundant - dont understand what it does.
 	Total       uint8
 	Threshold   uint8
-	Localsigner ThresholdEd25519Signature
 }
 
 // DELETE refactorise temporary aliasing ThresholdEd25519Signature
@@ -57,17 +55,7 @@ type LocalCosigner struct {
 	localsigner ThresholdEd25519Signature
 }
 
-func NewLocalCosigner(cfg LocalCosignerConfig) *LocalCosigner {
-
-	// TODO: factorise out localsigner, should be passed as a parameter in the cfg rather than constructed here. And the same for the init of the local signer config.
-	localsignerconfig := LocalSoftSignThresholdEd25519SignatureConfig{
-		CosignerKey: cfg.CosignerKey,
-		RsaKey:      cfg.RsaKey,
-		Total:       cfg.Total,
-		Threshold:   cfg.Threshold,
-	}
-
-	localsigner := localsignerconfig.NewThresholdEd25519Signature()
+func NewLocalCosigner(cfg LocalCosignerConfig, localsigner ThresholdEd25519Signature) *LocalCosigner {
 
 	LastSignStateStruct := LastSignStateStruct{
 		LastSignStateMutex: sync.Mutex{},

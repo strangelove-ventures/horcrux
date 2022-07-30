@@ -27,6 +27,17 @@ type LocalSoftSignThresholdEd25519Signature struct {
 	HrsMeta map[HRSTKey]HrsMetadata
 }
 
+func NewLocalSoftSignThresholdEd25519SignatureConfig(cfg LocalCosignerConfig) LocalSoftSignThresholdEd25519SignatureConfig {
+	// TODO: factorise out localsigner, should be passed as a parameter in the cfg rather than constructed here. And the same for the init of the local signer config.
+	localsignerconfig := LocalSoftSignThresholdEd25519SignatureConfig{
+		CosignerKey: cfg.CosignerKey,
+		RsaKey:      cfg.RsaKey,
+		Total:       cfg.Total,
+		Threshold:   cfg.Threshold,
+	}
+	return localsignerconfig
+}
+
 type LocalSoftSignThresholdEd25519SignatureConfig struct {
 	CosignerKey CosignerKey
 	RsaKey      rsa.PrivateKey

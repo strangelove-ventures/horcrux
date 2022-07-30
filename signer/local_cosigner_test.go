@@ -43,7 +43,8 @@ func TestLocalCosignerGetID(t *testing.T) {
 		}},
 	}
 
-	cosigner := NewLocalCosigner(config)
+	localsigner := NewLocalSigner("SoftSign", config)
+	cosigner := NewLocalCosigner(config, localsigner)
 	require.Equal(t, cosigner.GetID(), 1)
 }
 
@@ -120,8 +121,11 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	var cosigner1 Cosigner
 	var cosigner2 Cosigner
 
-	cosigner1 = NewLocalCosigner(config1)
-	cosigner2 = NewLocalCosigner(config2)
+	localsigner1 := NewLocalSigner("SoftSign", config1)
+	cosigner1 = NewLocalCosigner(config1, localsigner1)
+
+	localsigner2 := NewLocalSigner("SoftSign", config2)
+	cosigner2 = NewLocalCosigner(config2, localsigner2)
 
 	require.Equal(t, cosigner1.GetID(), 1)
 	require.Equal(t, cosigner2.GetID(), 2)

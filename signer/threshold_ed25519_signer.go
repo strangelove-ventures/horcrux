@@ -37,3 +37,18 @@ type HrsMetadata struct {
 type ThresholdEd25519SignatureConfig interface {
 	NewThresholdEd25519Signature() ThresholdEd25519Signature
 }
+
+// TODO: Fix so that also HSM can be called
+func NewLocalSigner(signertype string, cfg LocalCosignerConfig) ThresholdEd25519Signature {
+	switch signertype {
+	case "SoftSign":
+		localsigner := NewLocalSoftSignThresholdEd25519SignatureConfig(cfg)
+		return localsigner.NewThresholdEd25519Signature()
+	case "HSMsign":
+		panic("Not Implemented")
+		// localsigner := NewLocalHSMSignThresholdEd25519SignatureConfig(cfg)
+		// return localsigner.NewThresholdEd25519Signature()
+	default:
+		panic("Need to be Softsign as its the only one implemented")
+	}
+}
