@@ -139,6 +139,7 @@ func StartCosignerCmd() *cobra.Command {
 				ListenAddress:     config.CosignerConfig.P2PListen,
 				Nodes:             config.Nodes(),
 				Cosigners:         config.CosignerPeers(),
+				// FIXME Might need to change the code and add Threshold signer here when HSM signer is implemented.
 			}
 
 			if err = cfg.KeyFileExists(); err != nil {
@@ -194,8 +195,6 @@ func StartCosignerCmd() *cobra.Command {
 				})
 			}
 
-			// TODO Add switch statement o build a var which is a ThresholdEd25519Signature and then it would be added to the config on your
-
 			total := len(cfg.Cosigners) + 1
 			localCosignerConfig := signer.LocalCosignerConfig{
 				CosignerKey: key,
@@ -205,10 +204,11 @@ func StartCosignerCmd() *cobra.Command {
 				Peers:       peers,
 				Total:       uint8(total),
 				Threshold:   uint8(cfg.CosignerThreshold),
-				// Localsigner:  // TODO LocalSoftSignThresholdEd25519Signature instance should be passed into the config here as the desired ThresholdEd25519Signature
 			}
 
-			localCosigner := signer.NewLocalCosigner(localCosignerConfig)
+			// Instanciace the localsigner of choice via a switch statement which is a ThresholdEd25519Signature, so it can be passed to signer.NewLocalCosigner
+			localsigner := signer.NewLocalSigner(cfg.ThresholdSigner, localCosignerConfig)
+			localCosigner := signer.NewLocalCosigner(localCosignerConfig, localsigner)
 
 			timeout, _ := time.ParseDuration(config.CosignerConfig.Timeout)
 

@@ -45,7 +45,8 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 		}},
 	}
 
-	cosigner := NewLocalCosigner(config)
+	localsigner := NewLocalSigner("SoftSign", config)
+	cosigner := NewLocalCosigner(config, localsigner)
 
 	s := &RaftStore{
 		NodeID:      "1",
