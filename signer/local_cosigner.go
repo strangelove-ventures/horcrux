@@ -84,7 +84,8 @@ func (cosigner *LocalCosigner) SaveLastSignedState(signState SignStateConsensus)
 // GetID returns the id of the cosigner
 // Implements cosigner interface
 func (cosigner *LocalCosigner) GetID() int {
-	return cosigner.localsigner.GetID()
+	id, _ := cosigner.localsigner.GetID()
+	return id
 }
 
 // GetAddress returns the GRPC URL of the cosigner

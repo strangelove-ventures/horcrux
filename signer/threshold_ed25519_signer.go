@@ -16,7 +16,7 @@ type ThresholdEd25519Signature interface {
 
 	Sign(req CosignerSignRequest, m *LastSignStateStruct) (CosignerSignResponse, error)
 
-	GetID() int
+	GetID() (int, error)
 }
 
 // PeerMetadata holds the share and the ephermeral secret public key
@@ -42,12 +42,13 @@ type ThresholdEd25519SignatureConfig interface {
 func NewLocalSigner(signertype string, cfg LocalCosignerConfig) ThresholdEd25519Signature {
 	switch signertype {
 	case "SoftSign":
+		// calling the function to initiase a Config struct for Softsign
 		localsigner := NewLocalSoftSignThresholdEd25519SignatureConfig(cfg)
 		return localsigner.NewThresholdEd25519Signature()
 	case "HSMsign":
-		panic("Not Implemented")
-		// localsigner := NewLocalHSMSignThresholdEd25519SignatureConfig(cfg)
-		// return localsigner.NewThresholdEd25519Signature()
+		// placeholder for implementation
+		localsigner := NewLocalHSMSignThresholdEd25519SignatureConfig(cfg)
+		return localsigner.NewThresholdEd25519Signature()
 	default:
 		panic("Need to be Softsign as its the only one implemented")
 	}
