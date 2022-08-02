@@ -28,7 +28,7 @@ type LocalSoftSignThresholdEd25519Signature struct {
 }
 
 func NewLocalSoftSignThresholdEd25519SignatureConfig(cfg LocalCosignerConfig) LocalSoftSignThresholdEd25519SignatureConfig {
-	// TODO: factorise out localsigner, should be passed as a parameter in the cfg rather than constructed here. And the same for the init of the local signer config.
+	// inistiates the LocalSoftSignThresholdEd25519SignatureConfig
 	localsignerconfig := LocalSoftSignThresholdEd25519SignatureConfig{
 		CosignerKey: cfg.CosignerKey,
 		RsaKey:      cfg.RsaKey,
@@ -47,7 +47,7 @@ type LocalSoftSignThresholdEd25519SignatureConfig struct {
 }
 
 // Implements ThresholdEd25519SignatureConfig
-func (cfg LocalSoftSignThresholdEd25519SignatureConfig) NewThresholdEd25519Signature() *LocalSoftSignThresholdEd25519Signature {
+func (cfg *LocalSoftSignThresholdEd25519SignatureConfig) NewThresholdEd25519Signature() ThresholdEd25519Signature {
 	localsigner := &LocalSoftSignThresholdEd25519Signature{
 		Key:       cfg.CosignerKey,
 		RsaKey:    cfg.RsaKey,
@@ -69,8 +69,8 @@ func (cfg LocalSoftSignThresholdEd25519SignatureConfig) NewThresholdEd25519Signa
 }
 
 // Implements the ThresholdEd25519Signature interface from threshold_ed25519_signer.go
-func (localsigner *LocalSoftSignThresholdEd25519Signature) GetID() int {
-	return localsigner.Key.ID
+func (localsigner *LocalSoftSignThresholdEd25519Signature) GetID() (int, error) {
+	return localsigner.Key.ID, nil
 }
 
 // Implements the ThresholdEd25519Signature interface from threshold_ed25519_signer.go
