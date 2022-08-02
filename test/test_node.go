@@ -11,7 +11,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"strings"
@@ -90,7 +90,7 @@ func getSentinelChain(ctx context.Context, version string) *ChainType {
 	// sets "approve_by" in the genesis.json
 	// this is required for sentinel, genesis validation fails without it.
 	sentinelGenesisJSONModification := func(tn *TestNode) error {
-		genesisJSON := path.Join(tn.NodeHome(), "config", "genesis.json")
+		genesisJSON := filepath.Join(tn.NodeHome(), "config", "genesis.json")
 		address, err := tn.Bech32AddressForKey(valKey)
 		if err != nil {
 			return err
@@ -317,15 +317,15 @@ func (tn *TestNode) MkDir() {
 // GentxPath returns the path to the gentx for a node
 func (tn *TestNode) GentxPath() (string, error) {
 	id, err := tn.NodeID()
-	return path.Join(tn.Dir(), "config", "gentx", fmt.Sprintf("gentx-%s.json", id)), err
+	return filepath.Join(tn.Dir(), "config", "gentx", fmt.Sprintf("gentx-%s.json", id)), err
 }
 
 func (tn *TestNode) GenesisFilePath() string {
-	return path.Join(tn.Dir(), "config", "genesis.json")
+	return filepath.Join(tn.Dir(), "config", "genesis.json")
 }
 
 func (tn *TestNode) TMConfigPath() string {
-	return path.Join(tn.Dir(), "config", "config.toml")
+	return filepath.Join(tn.Dir(), "config", "config.toml")
 }
 
 // Bind returns the home folder bind point for running the node
@@ -751,7 +751,7 @@ func handleNodeJobError(container string, i int, stdout string, stderr string, e
 
 // NodeID returns the node of a given node
 func (tn *TestNode) NodeID() (string, error) {
-	nodeKey, err := p2p.LoadNodeKey(path.Join(tn.Dir(), "config", "node_key.json"))
+	nodeKey, err := p2p.LoadNodeKey(filepath.Join(tn.Dir(), "config", "node_key.json"))
 	if err != nil {
 		return "", err
 	}
@@ -854,11 +854,11 @@ func (tn *TestNode) GetPrivVal() (privval.FilePVKey, error) {
 }
 
 func (tn *TestNode) privValKeyPath() string {
-	return path.Join(tn.Dir(), "config", "priv_validator_key.json")
+	return filepath.Join(tn.Dir(), "config", "priv_validator_key.json")
 }
 
 func (tn *TestNode) privValStatePath() string {
-	return path.Join(tn.Dir(), "config", "priv_validator_state.json")
+	return filepath.Join(tn.Dir(), "config", "priv_validator_state.json")
 }
 
 func (tn *TestNode) GenNewPrivVal() {
