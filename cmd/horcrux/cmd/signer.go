@@ -1,10 +1,8 @@
 package cmd
 
 import (
-	"fmt"
 	"log"
 	"os"
-	"path"
 
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/signer"
@@ -26,37 +24,35 @@ var signerCmd = &cobra.Command{
 
 func StartSignerCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "start",
-		Short: "Start single signer process",
-		Args:  cobra.NoArgs,
+		Use:          "start",
+		Short:        "Start single signer process",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			err = validateSingleSignerConfig(config)
+			if err = signer.RequireNotRunning(config.PidFile); err != nil {
+				return err
+			}
+
+			err = validateSingleSignerConfig(config.Config)
 			if err != nil {
-				return
+				return err
 			}
 
 			var (
 				// services to stop on shutdown
 				services []tmService.Service
 				pv       types.PrivValidator
-				chainID  = config.ChainID
+				chainID  = config.Config.ChainID
 				logger   = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator")
 				cfg      signer.Config
 			)
 
-			var privValKeyFile string
-			if config.PrivValKeyFile == "" {
-				privValKeyFile = path.Join(config.HomeDir, "priv_validator_key.json")
-			} else {
-				privValKeyFile = config.PrivValKeyFile
-			}
-
 			cfg = signer.Config{
 				Mode:            "single",
-				PrivValKeyFile:  privValKeyFile,
-				PrivValStateDir: path.Join(config.HomeDir, "state"),
-				ChainID:         config.ChainID,
-				Nodes:           config.Nodes(),
+				PrivValKeyFile:  config.keyFilePath(false),
+				PrivValStateDir: config.StateDir,
+				ChainID:         config.Config.ChainID,
+				Nodes:           config.Config.Nodes(),
 			}
 
 			if err = cfg.KeyFileExists(); err != nil {
@@ -66,18 +62,9 @@ func StartSignerCmd() *cobra.Command {
 			logger.Info("Tendermint Validator", "mode", cfg.Mode,
 				"priv-key", cfg.PrivValKeyFile, "priv-state-dir", cfg.PrivValStateDir)
 
-			var val types.PrivValidator
-			stateFile := path.Join(cfg.PrivValStateDir, fmt.Sprintf("%s_priv_validator_state.json", chainID))
-
-			// Triple check that this is how we will handle state file and that this behaves as intended
-			// if f, err := os.Stat(stateFile); os.IsNotExist(err) || f.Size() == 0 {
-			//  	val = privval.LoadFilePVEmptyState(cfg.PrivValKeyFile, stateFile)
-			// 	} else {
-			//  	val = privval.LoadFilePV(cfg.PrivValKeyFile, stateFile)
-			//  }
-			val = privval.LoadFilePVEmptyState(cfg.PrivValKeyFile, stateFile)
-
-			pv = &signer.PvGuard{PrivValidator: val}
+			pv = &signer.PvGuard{
+				PrivValidator: privval.LoadFilePVEmptyState(cfg.PrivValKeyFile, config.privValStateFile(chainID)),
+			}
 
 			pubkey, err := pv.GetPubKey()
 			if err != nil {
@@ -90,7 +77,7 @@ func StartSignerCmd() *cobra.Command {
 				panic(err)
 			}
 
-			signer.WaitAndTerminate(logger, services)
+			signer.WaitAndTerminate(logger, services, config.PidFile)
 
 			return nil
 		},

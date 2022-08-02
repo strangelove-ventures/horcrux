@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -138,8 +138,8 @@ func Genesis(
 		if err != nil {
 			return err
 		}
-		oldPath := path.Join(validatorN.Dir(), "config", "gentx", fmt.Sprintf("gentx-%s.json", nNid))
-		newPath := path.Join(validatorNodeToUseForGenTx.Dir(), "config", "gentx", fmt.Sprintf("gentx-%s.json", nNid))
+		oldPath := filepath.Join(validatorN.Dir(), "config", "gentx", fmt.Sprintf("gentx-%s.json", nNid))
+		newPath := filepath.Join(validatorNodeToUseForGenTx.Dir(), "config", "gentx", fmt.Sprintf("gentx-%s.json", nNid))
 		if err := os.Rename(oldPath, newPath); err != nil {
 			return err
 		}
