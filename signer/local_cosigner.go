@@ -13,8 +13,8 @@ import (
 
 	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	tmJson "github.com/tendermint/tendermint/libs/json"
-	"gitlab.com/polychainlabs/edwards25519"
-	tsed25519 "gitlab.com/polychainlabs/threshold-ed25519/pkg"
+	"gitlab.com/unit410/edwards25519"
+	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
 // return true if we are less than the other key
