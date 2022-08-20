@@ -21,14 +21,16 @@ type LocalSoftSignThresholdEd25519Signature struct {
 	PubKeyBytes []byte
 	Key         CosignerKey
 	RsaKey      rsa.PrivateKey
-	Total       uint8
-	Threshold   uint8
+	// Total signers
+	Total     uint8
+	Threshold uint8
 	// Height, Round, Step, Timestamp -> metadata
 	HrsMeta map[HRSTKey]HrsMetadata
 }
 
-func NewLocalSoftSignThresholdEd25519SignatureConfig(cfg LocalCosignerConfig) LocalSoftSignThresholdEd25519SignatureConfig {
-	// inistiates the LocalSoftSignThresholdEd25519SignatureConfig
+// Inistiates the LocalSoftSignThresholdEd25519SignatureConfig struct.
+func NewLocalSoftSignThresholdEd25519SignatureConfig(
+	cfg LocalCosignerConfig) LocalSoftSignThresholdEd25519SignatureConfig {
 	localsignerconfig := LocalSoftSignThresholdEd25519SignatureConfig{
 		CosignerKey: cfg.CosignerKey,
 		RsaKey:      cfg.RsaKey,
@@ -38,6 +40,7 @@ func NewLocalSoftSignThresholdEd25519SignatureConfig(cfg LocalCosignerConfig) Lo
 	return localsignerconfig
 }
 
+// Holds the configuration of the Local soft signer.
 type LocalSoftSignThresholdEd25519SignatureConfig struct {
 	CosignerKey CosignerKey
 	RsaKey      rsa.PrivateKey
@@ -46,7 +49,7 @@ type LocalSoftSignThresholdEd25519SignatureConfig struct {
 	Threshold   uint8
 }
 
-// Implements ThresholdEd25519SignatureConfig
+// Implements ThresholdEd25519SignatureConfig interface from threshold_ed25519_signer.go to create a new local signer.
 func (cfg *LocalSoftSignThresholdEd25519SignatureConfig) NewThresholdEd25519Signature() ThresholdEd25519Signature {
 	localsigner := &LocalSoftSignThresholdEd25519Signature{
 		Key:       cfg.CosignerKey,
@@ -74,7 +77,8 @@ func (localsigner *LocalSoftSignThresholdEd25519Signature) GetID() (int, error) 
 }
 
 // Implements the ThresholdEd25519Signature interface from threshold_ed25519_signer.go
-func (localsigner *LocalSoftSignThresholdEd25519Signature) Sign(req CosignerSignRequest, m *LastSignStateStruct) (CosignerSignResponse, error) {
+func (localsigner *LocalSoftSignThresholdEd25519Signature) Sign(
+	req CosignerSignRequest, m *LastSignStateStruct) (CosignerSignResponse, error) {
 	m.LastSignStateMutex.Lock()
 	defer m.LastSignStateMutex.Unlock()
 
@@ -170,7 +174,8 @@ func (localsigner *LocalSoftSignThresholdEd25519Signature) Sign(req CosignerSign
 }
 
 // Implements the ThresholdEd25519Signature interface from threshold_ed25519_signer.go
-func (localsigner *LocalSoftSignThresholdEd25519Signature) DealShares(req CosignerGetEphemeralSecretPartRequest) (HrsMetadata, error) {
+func (localsigner *LocalSoftSignThresholdEd25519Signature) DealShares(
+	req CosignerGetEphemeralSecretPartRequest) (HrsMetadata, error) {
 	hrsKey := HRSTKey{
 		Height:    req.Height,
 		Round:     req.Round,
@@ -207,7 +212,8 @@ func (localsigner *LocalSoftSignThresholdEd25519Signature) DealShares(req Cosign
 // The ephemeral secret part is encrypted for the receiver
 // Implements the ThresholdEd25519Signature interface from threshold_ed25519_signer.go
 func (localsigner *LocalSoftSignThresholdEd25519Signature) GetEphemeralSecretPart(
-	req CosignerGetEphemeralSecretPartRequest, m *LastSignStateStruct, peers map[int]CosignerPeer) (CosignerEphemeralSecretPart, error) {
+	req CosignerGetEphemeralSecretPartRequest, m *LastSignStateStruct, peers map[int]CosignerPeer) (
+	CosignerEphemeralSecretPart, error) {
 
 	res := CosignerEphemeralSecretPart{}
 
@@ -289,7 +295,8 @@ func (localsigner *LocalSoftSignThresholdEd25519Signature) GetEphemeralSecretPar
 
 // Store an ephemeral secret share part provided by another cosigner (signer)
 // Implements ThresholdEd25519Signature interface
-func (localsigner *LocalSoftSignThresholdEd25519Signature) SetEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest, m *LastSignStateStruct, peers map[int]CosignerPeer) error {
+func (localsigner *LocalSoftSignThresholdEd25519Signature) SetEphemeralSecretPart(
+	req CosignerSetEphemeralSecretPartRequest, m *LastSignStateStruct, peers map[int]CosignerPeer) error {
 
 	// Verify the source signature
 	{

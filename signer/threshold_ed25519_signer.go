@@ -38,6 +38,7 @@ type ThresholdEd25519SignatureConfig interface {
 	NewThresholdEd25519Signature() ThresholdEd25519Signature
 }
 
+// Inits the signer depending on the type of signer type coded in the config.
 // TODO: Fix so that also HSM can be called
 func NewLocalSigner(signertype string, cfg LocalCosignerConfig) ThresholdEd25519Signature {
 	switch signertype {
@@ -46,7 +47,7 @@ func NewLocalSigner(signertype string, cfg LocalCosignerConfig) ThresholdEd25519
 		localsigner := NewLocalSoftSignThresholdEd25519SignatureConfig(cfg)
 		return localsigner.NewThresholdEd25519Signature()
 	case "HSMsign":
-		// placeholder for implementation
+		// placeholder for HSM implementation. Mainly so lindint
 		localsigner := NewLocalHSMSignThresholdEd25519SignatureConfig(cfg)
 		return localsigner.NewThresholdEd25519Signature()
 	default:
