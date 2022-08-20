@@ -39,28 +39,26 @@ type LocalCosignerConfig struct {
 	Threshold   uint8
 }
 
-// DELETE refactorise temporary aliasing ThresholdEd25519Signature
-// type thresholdEd25519Signature = *LocalSoftSignThresholdEd25519Signature
-
 // LocalCosigner responds to sign requests using their share key
-// The cosigner maintains a watermark to avoid double-signing
-// TODO: Clarify what you mean with cosinger here.
 // LocalCosigner signing is thread safe
 // LocalCosigner "embedd" the threshold signer.
+// The cosigner maintains a watermark to avoid double-signing
+// TODO: Clarify what you mean with cosinger here, do you mean Local Cosigner?
 type LocalCosigner struct {
 	LastSignStateStruct *LastSignStateStruct
-	// total               uint8
-	address     string
-	Peers       map[int]CosignerPeer
-	localsigner ThresholdEd25519Signature
+	address             string
+	Peers               map[int]CosignerPeer
+	localsigner         ThresholdEd25519Signature
 }
 
+// Initiatise a Local Cosigner
 func NewLocalCosigner(cfg LocalCosignerConfig, localsigner ThresholdEd25519Signature) *LocalCosigner {
 
 	LastSignStateStruct := LastSignStateStruct{
 		LastSignStateMutex: sync.Mutex{},
 		LastSignState:      cfg.SignState,
 	}
+
 	cosigner := &LocalCosigner{
 		LastSignStateStruct: &LastSignStateStruct,
 		// total:               cfg.Total,
@@ -81,21 +79,21 @@ func (cosigner *LocalCosigner) SaveLastSignedState(signState SignStateConsensus)
 	return cosigner.LastSignStateStruct.LastSignState.Save(signState, &cosigner.LastSignStateStruct.LastSignStateMutex)
 }
 
-// GetID returns the id of the cosigner
-// Implements cosigner interface
+// GetID returns the id of the cosigner, via the localsigner getter
+// Implements the Cosigner interface from Cosigner.go
 func (cosigner *LocalCosigner) GetID() int {
 	id, _ := cosigner.localsigner.GetID()
 	return id
 }
 
 // GetAddress returns the GRPC URL of the cosigner
-// Implements cosigner interface
+// Implements the Cosigner interface from Cosigner.go
 func (cosigner *LocalCosigner) GetAddress() string {
 	return cosigner.address
 }
 
 // GetEphemeralSecretParts
-// Implements cosigner interface
+// // Implements the Cosigner interface from Cosigner.go
 func (cosigner *LocalCosigner) GetEphemeralSecretParts(
 	hrst HRSTKey) (*CosignerEphemeralSecretPartsResponse, error) {
 	res := &CosignerEphemeralSecretPartsResponse{
@@ -124,7 +122,7 @@ func (cosigner *LocalCosigner) GetEphemeralSecretParts(
 }
 
 // SetEphemeralSecretPartsAndSign
-// Implements cosigner interface
+// // Implements the Cosigner interface from Cosigner.go
 func (cosigner *LocalCosigner) SetEphemeralSecretPartsAndSign(
 	req CosignerSetEphemeralSecretPartsAndSignRequest) (*CosignerSignResponse, error) {
 	for _, secretPart := range req.EncryptedSecrets {

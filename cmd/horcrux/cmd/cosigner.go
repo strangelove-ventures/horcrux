@@ -124,7 +124,7 @@ func StartCosignerCmd() *cobra.Command {
 			)
 
 			cfg = signer.Config{
-      
+
 				Mode:              "mpc",
 				PrivValKeyFile:    config.keyFilePath(true),
 				PrivValStateDir:   config.StateDir,
@@ -133,8 +133,10 @@ func StartCosignerCmd() *cobra.Command {
 				ListenAddress:     config.Config.CosignerConfig.P2PListen,
 				Nodes:             config.Config.Nodes(),
 				Cosigners:         config.Config.CosignerPeers(),
-        // FIXME Might need to change the code and add Threshold signer here when HSM signer is implemented.
-        
+				// FIXME Add Threshold signer here when HSM signer is implemented. Now its Softsign by default
+				// Should look something like this:
+				// ThresholdSigner: config.Config.ThresholdSigner
+
 			}
 
 			if err = cfg.KeyFileExists(); err != nil {
@@ -199,8 +201,9 @@ func StartCosignerCmd() *cobra.Command {
 				Threshold:   uint8(cfg.CosignerThreshold),
 			}
 
-			// Instanciace the localsigner of choice via a switch statement which is a ThresholdEd25519Signature, so it can be passed to signer.NewLocalCosigner
+			// Initiase the localsigner (ThresholdEdSignature) of choice.
 			localsigner := signer.NewLocalSigner(cfg.ThresholdSigner, localCosignerConfig)
+			// Initiase the localCosigner. The localCosigner "embedds" the local signer
 			localCosigner := signer.NewLocalCosigner(localCosignerConfig, localsigner)
 
 			timeout, err := time.ParseDuration(config.Config.CosignerConfig.Timeout)
@@ -224,6 +227,7 @@ func StartCosignerCmd() *cobra.Command {
 			}
 			services = append(services, raftStore)
 
+			// Initiase the Threshold validator. The Threshold validator "embedds" the local cosigner
 			val = signer.NewThresholdValidator(&signer.ThresholdValidatorOpt{
 				Pubkey:    key.PubKey,
 				Threshold: cfg.CosignerThreshold,

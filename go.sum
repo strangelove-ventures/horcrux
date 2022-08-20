@@ -876,10 +876,10 @@ github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9dec
 github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
 github.com/zondax/hid v0.9.0 h1:eiT3P6vNxAEVxXMw66eZUAAnU2zD33JBkfG/EnfAKl8=
 github.com/zondax/hid v0.9.0/go.mod h1:l5wttcP0jwtdLjqjMMWFVEE7d1zO0jvSPA9OPZxWpEM=
-gitlab.com/polychainlabs/edwards25519 v0.0.0-20200206000358-2272e01758fb h1:AdKE1d1TA0YYg8FDChkZP/nFOQDOMOUxLYzac/eVYUU=
-gitlab.com/polychainlabs/edwards25519 v0.0.0-20200206000358-2272e01758fb/go.mod h1:3KUw8eOHmnX0bANpqw52h/JNsGJxfVIFyhIXH5zeprc=
-gitlab.com/polychainlabs/threshold-ed25519 v0.0.0-20200221030822-1c35a36a51c1 h1:zdHgoRHlPqZfRMew5hX7aPZuxNURbcobivw+4gMvipk=
-gitlab.com/polychainlabs/threshold-ed25519 v0.0.0-20200221030822-1c35a36a51c1/go.mod h1:jrwPQCmLa5H51H4qgUAZcigi2rz2kFLVEkGe3eNlzHw=
+gitlab.com/unit410/edwards25519 v0.0.0-20220725154547-61980033348e h1:/QfokHt2yG9PcjnFSdpIQhJwrz2Q1bmKA718vw4/He8=
+gitlab.com/unit410/edwards25519 v0.0.0-20220725154547-61980033348e/go.mod h1:lTSPILLBMt6qQOJgsiarbW85JhpkhoOfW2EBkxkcuSI=
+gitlab.com/unit410/threshold-ed25519 v0.0.0-20220725172740-6ee731f539ac h1:SUxQNWwBUVFdvRP72Wi1wZ8K2iD7+SXFfMUMJyMCJjc=
+gitlab.com/unit410/threshold-ed25519 v0.0.0-20220725172740-6ee731f539ac/go.mod h1:2TURxKmaBFbTDxXQa+B2nGuKSRWD0Jlcc3LETTAnSS0=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/bbolt v1.3.3/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/bbolt v1.3.5 h1:XAzx9gjCb0Rxj7EoqcClPD1d5ZBxZJk0jbuoPHenBt0=
