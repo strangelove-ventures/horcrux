@@ -8,7 +8,7 @@ import (
 
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/privval"
-	tsed25519 "gitlab.com/polychainlabs/threshold-ed25519/pkg"
+	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
 // CreateCosignerSharesFromFile creates cosigner key objects from a priv_validator_key.json file

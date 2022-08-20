@@ -1,7 +1,7 @@
 package signer
 
 import (
-	tsed25519 "gitlab.com/polychainlabs/threshold-ed25519/pkg"
+	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
 // Interface for the local signer whetever its a soft sign or hms
