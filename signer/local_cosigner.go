@@ -3,7 +3,6 @@ package signer
 import (
 	"crypto/rsa"
 	"time"
-
 	"sync"
 )
 
