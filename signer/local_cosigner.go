@@ -2,8 +2,8 @@ package signer
 
 import (
 	"crypto/rsa"
-	"time"
 	"sync"
+	"time"
 )
 
 type CosignerPeer struct {
