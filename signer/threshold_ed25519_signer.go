@@ -1,6 +1,8 @@
 package signer
 
 import (
+	"log"
+
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
@@ -51,6 +53,9 @@ func NewLocalSigner(signertype string, cfg LocalCosignerConfig) ThresholdEd25519
 		localsigner := NewLocalHSMSignThresholdEd25519SignatureConfig(cfg)
 		return localsigner.NewThresholdEd25519Signature()
 	default:
-		panic("Need to be Softsign as its the only one implemented")
+		// panic("Need to be Softsign as its the only one implemented")
+		log.Println("Defaulted to be Softsign as its the only one implemented so far")
+		localsigner := NewLocalSoftSignThresholdEd25519SignatureConfig(cfg)
+		return localsigner.NewThresholdEd25519Signature()
 	}
 }
