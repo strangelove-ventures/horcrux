@@ -3,12 +3,13 @@ package signer
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"encoding/json"
 	"fmt"
-	"time"
-
 	"io/ioutil"
+	"log"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
@@ -32,18 +33,15 @@ func getMockRaftStore(cosigner Cosigner, tmpDir string) *RaftStore {
 }
 
 func TestThresholdValidator2of2(t *testing.T) {
-
 	total := uint8(2)
 	threshold := uint8(2)
 
 	bitSize := 4096
 	rsaKey1, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(t, err)
-	// var localsigner1 LocalSoftSignThresholdEd25519Signature
 
 	rsaKey2, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(t, err)
-	// var localsigner2 LocalSoftSignThresholdEd25519Signature
 
 	peers := []CosignerPeer{{
 		ID:        1,
@@ -105,10 +103,10 @@ func TestThresholdValidator2of2(t *testing.T) {
 	var cosigner1 Cosigner
 	var cosigner2 Cosigner
 
-	localsigner1 := NewLocalSigner("SoftSign", config1)
+	localsigner1 := NewLocalSigner(SignerType, config1)
 	cosigner1 = NewLocalCosigner(config1, localsigner1)
 
-	localsigner2 := NewLocalSigner("SoftSign", config2)
+	localsigner2 := NewLocalSigner(SignerType, config2)
 	cosigner2 = NewLocalCosigner(config2, localsigner2)
 
 	require.Equal(t, cosigner1.GetID(), 1)
@@ -148,15 +146,23 @@ func TestThresholdValidator2of2(t *testing.T) {
 
 	signBytes := tm.ProposalSignBytes("chain-id", &proposal)
 
-	fmt.Println("\n", "Cosigner1")
-	fmt.Printf("%+v\n", cosigner1)
-
-	fmt.Println("\n", "Cosigner2")
-	fmt.Printf("%+v\n", cosigner2)
-
 	err = validator.SignProposal("chain-id", &proposal)
 	require.NoError(t, err)
 	require.True(t, privateKey.PubKey().VerifySignature(signBytes, proposal.Signature))
+
+	// TODO: Clean up a bit into nice loggnig and asserts/requires.
+	cosigner1JSON, err := json.MarshalIndent(cosigner1, "", "  ")
+	if err != nil {
+		log.Println("cosigner1JSON error:", err.Error())
+	}
+	fmt.Printf("Cosigner1 output \n %s\n", string(cosigner1JSON))
+
+	cosigner2JSON, err := json.MarshalIndent(cosigner2, "", "  ")
+	if err != nil {
+		log.Println("cosigner2JSON error:", err.Error())
+	}
+	fmt.Printf("Cosigner2 output \n %s\n", string(cosigner2JSON))
+
 }
 
 func TestThresholdValidator3of3(t *testing.T) {
@@ -260,13 +266,13 @@ func TestThresholdValidator3of3(t *testing.T) {
 	var cosigner2 Cosigner
 	var cosigner3 Cosigner
 
-	localsigner1 := NewLocalSigner("SoftSign", config1)
+	localsigner1 := NewLocalSigner(SignerType, config1)
 	cosigner1 = NewLocalCosigner(config1, localsigner1)
 
-	localsigner2 := NewLocalSigner("SoftSign", config2)
+	localsigner2 := NewLocalSigner(SignerType, config2)
 	cosigner2 = NewLocalCosigner(config2, localsigner2)
 
-	localsigner3 := NewLocalSigner("SoftSign", config3)
+	localsigner3 := NewLocalSigner(SignerType, config3)
 	cosigner3 = NewLocalCosigner(config3, localsigner3)
 
 	require.Equal(t, cosigner1.GetID(), 1)
@@ -417,13 +423,13 @@ func TestThresholdValidator2of3(t *testing.T) {
 	var cosigner2 Cosigner
 	var cosigner3 Cosigner
 
-	localsigner1 := NewLocalSigner("SoftSign", config1)
+	localsigner1 := NewLocalSigner(SignerType, config1)
 	cosigner1 = NewLocalCosigner(config1, localsigner1)
 
-	localsigner2 := NewLocalSigner("SoftSign", config2)
+	localsigner2 := NewLocalSigner(SignerType, config2)
 	cosigner2 = NewLocalCosigner(config2, localsigner2)
 
-	localsigner3 := NewLocalSigner("SoftSign", config3)
+	localsigner3 := NewLocalSigner(SignerType, config3)
 	cosigner3 = NewLocalCosigner(config3, localsigner3)
 
 	require.Equal(t, cosigner1.GetID(), 1)

@@ -41,19 +41,19 @@ func (localsigner *LocalHSMsignThresholdEd25519Signature) GetEphemeralSecretPart
 	req CosignerGetEphemeralSecretPartRequest, m *LastSignStateStruct, peers map[int]CosignerPeer) (
 	CosignerEphemeralSecretPart, error) {
 
-	// panic("Not Implemented")
-	return CosignerEphemeralSecretPart{}, errors.New("method getEphemeralSecretPart")
+	panic("Not Implemented")
+	// return CosignerEphemeralSecretPart{}, errors.New("method getEphemeralSecretPart")
 }
 func (localsigner *LocalHSMsignThresholdEd25519Signature) Sign(
 	req CosignerSignRequest, m *LastSignStateStruct) (CosignerSignResponse, error) {
 
-	// panic("Not Implemented")
-	return CosignerSignResponse{}, errors.New("method sign not implemented")
+	panic("Not Implemented")
+	// return CosignerSignResponse{}, errors.New("method sign not implemented")
 }
 
 // Implements the ThresholdEd25519Signature interface from threshold_ed25519_signer.go
 func (localsigner *LocalHSMsignThresholdEd25519Signature) GetID() (int, error) {
 
-	// panic("Not implemented")
-	return 0, errors.New("method GetID not implemented")
+	panic("Not implemented")
+	// return 0, errors.New("method GetID not implemented")
 }

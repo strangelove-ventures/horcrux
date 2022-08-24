@@ -15,6 +15,9 @@ import (
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
+// TODO: Ccheck if this is the corecto way correct?
+const SignerType = SignerTypeSoftSign
+
 func TestLocalCosignerGetID(t *testing.T) {
 	dummyPub := tmCryptoEd25519.PubKey{}
 
@@ -43,7 +46,7 @@ func TestLocalCosignerGetID(t *testing.T) {
 		}},
 	}
 
-	localsigner := NewLocalSigner("SoftSign", config)
+	localsigner := NewLocalSigner(SignerType, config)
 	cosigner := NewLocalCosigner(config, localsigner)
 	require.Equal(t, cosigner.GetID(), 1)
 }
@@ -121,10 +124,10 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	var cosigner1 Cosigner
 	var cosigner2 Cosigner
 
-	localsigner1 := NewLocalSigner("SoftSign", config1)
+	localsigner1 := NewLocalSigner(SignerType, config1)
 	cosigner1 = NewLocalCosigner(config1, localsigner1)
 
-	localsigner2 := NewLocalSigner("SoftSign", config2)
+	localsigner2 := NewLocalSigner(SignerType, config2)
 	cosigner2 = NewLocalCosigner(config2, localsigner2)
 
 	require.Equal(t, cosigner1.GetID(), 1)

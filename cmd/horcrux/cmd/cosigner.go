@@ -201,9 +201,9 @@ func StartCosignerCmd() *cobra.Command {
 				Threshold:   uint8(cfg.CosignerThreshold),
 			}
 
-			// Initiase the localsigner (ThresholdEdSignature) of choice.
+			// Initialize the localsigner (ThresholdEdSignature) of choice.
 			localsigner := signer.NewLocalSigner(cfg.ThresholdSigner, localCosignerConfig)
-			// Initiase the localCosigner. The localCosigner "embedds" the local signer
+			// Initialize the localCosigner. The localCosigner "embeds" the local signer
 			localCosigner := signer.NewLocalCosigner(localCosignerConfig, localsigner)
 
 			timeout, err := time.ParseDuration(config.Config.CosignerConfig.Timeout)
@@ -227,7 +227,7 @@ func StartCosignerCmd() *cobra.Command {
 			}
 			services = append(services, raftStore)
 
-			// Initiase the Threshold validator. The Threshold validator "embedds" the local cosigner
+			// Initialize the Threshold validator. The Threshold validator "embeds" the local cosigner
 			val = signer.NewThresholdValidator(&signer.ThresholdValidatorOpt{
 				Pubkey:    key.PubKey,
 				Threshold: cfg.CosignerThreshold,
