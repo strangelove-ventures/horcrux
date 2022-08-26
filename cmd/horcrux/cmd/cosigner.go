@@ -133,7 +133,9 @@ func StartCosignerCmd() *cobra.Command {
 				ListenAddress:     config.Config.CosignerConfig.P2PListen,
 				Nodes:             config.Config.Nodes(),
 				Cosigners:         config.Config.CosignerPeers(),
-				// FIXME Add Threshold signer here when HSM signer is implemented. Now its Softsign by default
+				// TODO: Potentially add signer type here so we can "automatically "
+				// call correct signer to create.
+				// Maybe should hard code it as well for the moment being?
 				// Should look something like this:
 				// ThresholdSigner: config.Config.ThresholdSigner
 
