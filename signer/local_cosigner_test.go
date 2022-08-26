@@ -36,20 +36,20 @@ func TestLocalCosignerGetID(t *testing.T) {
 		Step:   0,
 	}
 
-	cosigner_config := LocalCosignerConfig{
+	cosignerConfig := LocalCosignerConfig{
 		SignState: &signState,
 		Peers: []CosignerPeer{{
 			ID:        1,
 			PublicKey: rsaKey.PublicKey,
 		}},
 	}
-	signer_config := SignerTypeConfig{
+	signerConfig := SignerTypeConfig{
 		CosignerKey: key,
 		RsaKey:      *rsaKey,
 	}
 
-	localsigner := NewLocalSigner(SignerType, signer_config)
-	cosigner := NewLocalCosigner(cosigner_config, localsigner)
+	localsigner := NewLocalSigner(SignerType, signerConfig)
+	cosigner := NewLocalCosigner(cosignerConfig, localsigner)
 	require.Equal(t, cosigner.GetID(), 1)
 }
 

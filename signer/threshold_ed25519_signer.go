@@ -12,10 +12,10 @@ const (
 	SignerTypeHSM      = "HSM"
 )
 
-type SignerConfig struct {
-	config     ThresholdEd25519SignatureConfig
-	SignerType string
-}
+// type SignerConfig struct {
+//	config     ThresholdEd25519SignatureConfig
+//	SignerType string
+// }
 
 type SignerTypeConfig struct {
 	CosignerKey CosignerKey
