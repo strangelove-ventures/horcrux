@@ -20,7 +20,7 @@ type CosignerGetEphemeralSecretPartRequest struct {
 }
 
 type LastSignStateStruct struct {
-	// signing is thread safe - lastSignStateMutex is used for putting locks so only one goroutine can r/w to the function
+	// Signing is thread safe - lastSignStateMutex is used for putting locks so only one goroutine can r/w to the function
 	LastSignStateMutex sync.Mutex
 
 	// lastSignState stores the last sign state for a share we have fully signed
@@ -29,20 +29,20 @@ type LastSignStateStruct struct {
 }
 
 type LocalCosignerConfig struct {
-	CosignerKey CosignerKey
-	SignState   *SignState
-	RsaKey      rsa.PrivateKey
-	Peers       []CosignerPeer
-	Address     string
-	Total       uint8
-	Threshold   uint8
+	// CosignerKey CosignerKey
+	SignState *SignState
+	// RsaKey      rsa.PrivateKey
+	Peers   []CosignerPeer
+	Address string
+	// localsigner is passed as parameter.
+	// Total       uint8
+	// Threshold   uint8
 }
 
 // LocalCosigner responds to sign requests using their share key
-// LocalCosigner signing is thread safe
-// LocalCosigner "embedd" the threshold signer.
-// The cosigner maintains a watermark to avoid double-signing
-// TODO: Clarify what you mean with cosinger here, do you mean Local Cosigner?
+// LocalCosigner "embeds" the Threshold signer.
+// LocalCosigner maintains a watermark to avoid double-signing via the embedded LastSignStateStruct.
+// LocalCosigner signing is thread safe by embedding *LastSignStateStruct which contains LastSignStateMutex sync.Mutex.
 type LocalCosigner struct {
 	LastSignStateStruct *LastSignStateStruct
 	address             string
@@ -50,21 +50,19 @@ type LocalCosigner struct {
 	localsigner         ThresholdEd25519Signature
 }
 
-// Initiatise a Local Cosigner
+// Initialize a Local Cosigner
 func NewLocalCosigner(cfg LocalCosignerConfig, localsigner ThresholdEd25519Signature) *LocalCosigner {
 
 	LastSignStateStruct := LastSignStateStruct{
-		LastSignStateMutex: sync.Mutex{},
-		LastSignState:      cfg.SignState,
+		// Mutex  doesnt need to be initialized mean we can skip: LastSignStateMutex: sync.Mutex{},
+		LastSignState: cfg.SignState,
 	}
 
 	cosigner := &LocalCosigner{
 		LastSignStateStruct: &LastSignStateStruct,
-		// total:               cfg.Total,
-		address: cfg.Address,
-
-		localsigner: localsigner,
-		Peers:       make(map[int]CosignerPeer),
+		address:             cfg.Address,
+		localsigner:         localsigner,
+		Peers:               make(map[int]CosignerPeer),
 	}
 
 	for _, peer := range cfg.Peers {
@@ -121,7 +119,7 @@ func (cosigner *LocalCosigner) GetEphemeralSecretParts(
 }
 
 // SetEphemeralSecretPartsAndSign
-// // Implements the Cosigner interface from Cosigner.go
+// Implements the Cosigner interface from Cosigner.go
 func (cosigner *LocalCosigner) SetEphemeralSecretPartsAndSign(
 	req CosignerSetEphemeralSecretPartsAndSignRequest) (*CosignerSignResponse, error) {
 	for _, secretPart := range req.EncryptedSecrets {
