@@ -12,11 +12,6 @@ const (
 	SignerTypeHSM      = "HSM"
 )
 
-// type SignerConfig struct {
-//	config     ThresholdEd25519SignatureConfig
-//	SignerType string
-// }
-
 type SignerTypeConfig struct {
 	CosignerKey CosignerKey
 	RsaKey      rsa.PrivateKey
@@ -59,7 +54,7 @@ type ThresholdEd25519SignatureConfig interface {
 }
 
 // Initializes the signer depending on the type of signer type coded in the config.
-// TODO: Fix so that also HSM can be called
+// TODO: Fix so that also HSM can be called and add tbe embedding SignerConfig
 func NewLocalSigner(signerType string, cfg SignerTypeConfig) ThresholdEd25519Signature {
 	switch signerType {
 	case SignerTypeHSM:
