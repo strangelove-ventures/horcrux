@@ -36,18 +36,20 @@ func TestLocalCosignerGetID(t *testing.T) {
 		Step:   0,
 	}
 
-	config := LocalCosignerConfig{
-		CosignerKey: key,
-		SignState:   &signState,
-		RsaKey:      *rsaKey,
+	cosigner_config := LocalCosignerConfig{
+		SignState: &signState,
 		Peers: []CosignerPeer{{
 			ID:        1,
 			PublicKey: rsaKey.PublicKey,
 		}},
 	}
+	signer_config := SignerTypeConfig{
+		CosignerKey: key,
+		RsaKey:      *rsaKey,
+	}
 
-	localsigner := NewLocalSigner(SignerType, config)
-	cosigner := NewLocalCosigner(config, localsigner)
+	localsigner := NewLocalSigner(SignerType, signer_config)
+	cosigner := NewLocalCosigner(cosigner_config, localsigner)
 	require.Equal(t, cosigner.GetID(), 1)
 }
 
@@ -103,32 +105,36 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	signState2, err := LoadOrCreateSignState(stateFile2.Name())
 	require.NoError(t, err)
 
-	config1 := LocalCosignerConfig{
+	signerTypeConfig1 := SignerTypeConfig{
 		CosignerKey: key1,
-		SignState:   &signState1,
 		RsaKey:      *rsaKey1,
-		Peers:       peers,
 		Total:       total,
 		Threshold:   threshold,
 	}
+	cosignerConfig1 := LocalCosignerConfig{
+		SignState: &signState1,
+		Peers:     peers,
+	}
 
-	config2 := LocalCosignerConfig{
+	signerTypeConfig2 := SignerTypeConfig{
 		CosignerKey: key2,
-		SignState:   &signState2,
 		RsaKey:      *rsaKey2,
-		Peers:       peers,
 		Total:       total,
 		Threshold:   threshold,
+	}
+	cosignerConfig2 := LocalCosignerConfig{
+		SignState: &signState2,
+		Peers:     peers,
 	}
 
 	var cosigner1 Cosigner
 	var cosigner2 Cosigner
 
-	localsigner1 := NewLocalSigner(SignerType, config1)
-	cosigner1 = NewLocalCosigner(config1, localsigner1)
+	localsigner1 := NewLocalSigner(SignerType, signerTypeConfig1)
+	cosigner1 = NewLocalCosigner(cosignerConfig1, localsigner1)
 
-	localsigner2 := NewLocalSigner(SignerType, config2)
-	cosigner2 = NewLocalCosigner(config2, localsigner2)
+	localsigner2 := NewLocalSigner(SignerType, signerTypeConfig2)
+	cosigner2 = NewLocalCosigner(cosignerConfig2, localsigner2)
 
 	require.Equal(t, cosigner1.GetID(), 1)
 	require.Equal(t, cosigner2.GetID(), 2)

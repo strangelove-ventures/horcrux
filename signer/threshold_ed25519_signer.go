@@ -1,6 +1,7 @@
 package signer
 
 import (
+	"crypto/rsa"
 	"log"
 
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
@@ -10,6 +11,18 @@ const (
 	SignerTypeSoftSign = "SoftSign"
 	SignerTypeHSM      = "HSM"
 )
+
+type SignerConfig struct {
+	config     ThresholdEd25519SignatureConfig
+	SignerType string
+}
+
+type SignerTypeConfig struct {
+	CosignerKey CosignerKey
+	RsaKey      rsa.PrivateKey
+	Total       uint8
+	Threshold   uint8
+}
 
 // Interface for the local signer whetever its a soft sign or hms
 type ThresholdEd25519Signature interface {
@@ -47,17 +60,14 @@ type ThresholdEd25519SignatureConfig interface {
 
 // Initializes the signer depending on the type of signer type coded in the config.
 // TODO: Fix so that also HSM can be called
-func NewLocalSigner(signerType string, cfg LocalCosignerConfig) ThresholdEd25519Signature {
+func NewLocalSigner(signerType string, cfg SignerTypeConfig) ThresholdEd25519Signature {
 	switch signerType {
-	case SignerTypeSoftSign:
-		// calling the function to initialize a Config struct for Softsign
-		localsigner := NewLocalSoftSignThresholdEd25519SignatureConfig(cfg)
-		return localsigner.NewThresholdEd25519Signature()
 	case SignerTypeHSM:
 		// Placeholder for future HSM implementation.
 		localsigner := NewLocalHSMSignThresholdEd25519SignatureConfig(cfg)
 		return localsigner.NewThresholdEd25519Signature()
 	default:
+		// calling the function to initialize a Config struct for Softsign
 		// panic("Need to be Softsign as its the only one implemented")
 		log.Println("Default is Softsign. Softsign is the only SignerType implemented so far")
 		localsigner := NewLocalSoftSignThresholdEd25519SignatureConfig(cfg)

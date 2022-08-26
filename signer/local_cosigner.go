@@ -29,13 +29,14 @@ type LastSignStateStruct struct {
 }
 
 type LocalCosignerConfig struct {
-	CosignerKey CosignerKey
-	SignState   *SignState
-	RsaKey      rsa.PrivateKey
-	Peers       []CosignerPeer
-	Address     string
-	Total       uint8
-	Threshold   uint8
+	// CosignerKey CosignerKey
+	SignState *SignState
+	// RsaKey      rsa.PrivateKey
+	Peers   []CosignerPeer
+	Address string
+	// localsigner is passed as parameter.
+	// Total       uint8
+	// Threshold   uint8
 }
 
 // LocalCosigner responds to sign requests using their share key

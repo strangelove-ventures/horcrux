@@ -6,7 +6,7 @@ import (
 
 // Inistiates the LocalHSMsignThresholdEd25519SignatureConfig
 func NewLocalHSMSignThresholdEd25519SignatureConfig(
-	cfg LocalCosignerConfig) LocalHSMsignThresholdEd25519SignatureConfig {
+	cfg SignerTypeConfig) LocalHSMsignThresholdEd25519SignatureConfig {
 
 	panic("Not Implemented")
 }

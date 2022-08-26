@@ -30,7 +30,7 @@ type LocalSoftSignThresholdEd25519Signature struct {
 
 // Inistiates the LocalSoftSignThresholdEd25519SignatureConfig struct.
 func NewLocalSoftSignThresholdEd25519SignatureConfig(
-	cfg LocalCosignerConfig) LocalSoftSignThresholdEd25519SignatureConfig {
+	cfg SignerTypeConfig) LocalSoftSignThresholdEd25519SignatureConfig {
 	localsignerconfig := LocalSoftSignThresholdEd25519SignatureConfig{
 		CosignerKey: cfg.CosignerKey,
 		RsaKey:      cfg.RsaKey,

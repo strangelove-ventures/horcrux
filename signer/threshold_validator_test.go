@@ -1,5 +1,6 @@
 package signer
 
+// COMMENT: In the future differentiate test for different signers.
 import (
 	"crypto/rand"
 	"crypto/rsa"
@@ -82,32 +83,36 @@ func TestThresholdValidator2of2(t *testing.T) {
 	signState2, err := LoadOrCreateSignState(stateFile2.Name())
 	require.NoError(t, err)
 
-	config1 := LocalCosignerConfig{
+	signerTypeConfig1 := SignerTypeConfig{
 		CosignerKey: key1,
-		SignState:   &signState1,
 		RsaKey:      *rsaKey1,
-		Peers:       peers,
 		Total:       total,
 		Threshold:   threshold,
 	}
+	cosignerConfig1 := LocalCosignerConfig{
+		SignState: &signState1,
+		Peers:     peers,
+	}
 
-	config2 := LocalCosignerConfig{
+	signerTypeConfig2 := SignerTypeConfig{
 		CosignerKey: key2,
-		SignState:   &signState2,
 		RsaKey:      *rsaKey2,
-		Peers:       peers,
 		Total:       total,
 		Threshold:   threshold,
+	}
+	cosignerConfig2 := LocalCosignerConfig{
+		SignState: &signState2,
+		Peers:     peers,
 	}
 
 	var cosigner1 Cosigner
 	var cosigner2 Cosigner
 
-	localsigner1 := NewLocalSigner(SignerType, config1)
-	cosigner1 = NewLocalCosigner(config1, localsigner1)
+	localsigner1 := NewLocalSigner(SignerType, signerTypeConfig1)
+	cosigner1 = NewLocalCosigner(cosignerConfig1, localsigner1)
 
-	localsigner2 := NewLocalSigner(SignerType, config2)
-	cosigner2 = NewLocalCosigner(config2, localsigner2)
+	localsigner2 := NewLocalSigner(SignerType, signerTypeConfig2)
+	cosigner2 = NewLocalCosigner(cosignerConfig2, localsigner2)
 
 	require.Equal(t, cosigner1.GetID(), 1)
 	require.Equal(t, cosigner2.GetID(), 2)
@@ -235,45 +240,50 @@ func TestThresholdValidator3of3(t *testing.T) {
 	signState3, err := LoadOrCreateSignState(stateFile3.Name())
 	require.NoError(t, err)
 
-	config1 := LocalCosignerConfig{
+	signerTypeConfig1 := SignerTypeConfig{
 		CosignerKey: key1,
-		SignState:   &signState1,
 		RsaKey:      *rsaKey1,
-		Peers:       peers,
 		Total:       total,
 		Threshold:   threshold,
 	}
+	cosignerConfig1 := LocalCosignerConfig{
+		SignState: &signState1,
+		Peers:     peers,
+	}
 
-	config2 := LocalCosignerConfig{
+	signerTypeConfig2 := SignerTypeConfig{
 		CosignerKey: key2,
-		SignState:   &signState2,
 		RsaKey:      *rsaKey2,
-		Peers:       peers,
 		Total:       total,
 		Threshold:   threshold,
 	}
+	cosignerConfig2 := LocalCosignerConfig{
+		SignState: &signState2,
+		Peers:     peers,
+	}
 
-	config3 := LocalCosignerConfig{
+	signerTypeConfig3 := SignerTypeConfig{
 		CosignerKey: key3,
-		SignState:   &signState3,
 		RsaKey:      *rsaKey3,
-		Peers:       peers,
 		Total:       total,
 		Threshold:   threshold,
 	}
-
+	cosignerConfig3 := LocalCosignerConfig{
+		SignState: &signState3,
+		Peers:     peers,
+	}
 	var cosigner1 Cosigner
 	var cosigner2 Cosigner
 	var cosigner3 Cosigner
 
-	localsigner1 := NewLocalSigner(SignerType, config1)
-	cosigner1 = NewLocalCosigner(config1, localsigner1)
+	localsigner1 := NewLocalSigner(SignerType, signerTypeConfig1)
+	cosigner1 = NewLocalCosigner(cosignerConfig1, localsigner1)
 
-	localsigner2 := NewLocalSigner(SignerType, config2)
-	cosigner2 = NewLocalCosigner(config2, localsigner2)
+	localsigner2 := NewLocalSigner(SignerType, signerTypeConfig2)
+	cosigner2 = NewLocalCosigner(cosignerConfig2, localsigner2)
 
-	localsigner3 := NewLocalSigner(SignerType, config3)
-	cosigner3 = NewLocalCosigner(config3, localsigner3)
+	localsigner3 := NewLocalSigner(SignerType, signerTypeConfig3)
+	cosigner3 = NewLocalCosigner(cosignerConfig3, localsigner3)
 
 	require.Equal(t, cosigner1.GetID(), 1)
 	require.Equal(t, cosigner2.GetID(), 2)
@@ -392,45 +402,50 @@ func TestThresholdValidator2of3(t *testing.T) {
 	signState3, err := LoadOrCreateSignState(stateFile3.Name())
 	require.NoError(t, err)
 
-	config1 := LocalCosignerConfig{
+	signerTypeConfig1 := SignerTypeConfig{
 		CosignerKey: key1,
-		SignState:   &signState1,
 		RsaKey:      *rsaKey1,
-		Peers:       peers,
 		Total:       total,
 		Threshold:   threshold,
 	}
+	cosignerConfig1 := LocalCosignerConfig{
+		SignState: &signState1,
+		Peers:     peers,
+	}
 
-	config2 := LocalCosignerConfig{
+	signerTypeConfig2 := SignerTypeConfig{
 		CosignerKey: key2,
-		SignState:   &signState2,
 		RsaKey:      *rsaKey2,
-		Peers:       peers,
 		Total:       total,
 		Threshold:   threshold,
 	}
+	cosignerConfig2 := LocalCosignerConfig{
+		SignState: &signState2,
+		Peers:     peers,
+	}
 
-	config3 := LocalCosignerConfig{
+	signerTypeConfig3 := SignerTypeConfig{
 		CosignerKey: key3,
-		SignState:   &signState3,
 		RsaKey:      *rsaKey3,
-		Peers:       peers,
 		Total:       total,
 		Threshold:   threshold,
 	}
-
+	cosignerConfig3 := LocalCosignerConfig{
+		SignState: &signState3,
+		Peers:     peers,
+	}
 	var cosigner1 Cosigner
 	var cosigner2 Cosigner
 	var cosigner3 Cosigner
 
-	localsigner1 := NewLocalSigner(SignerType, config1)
-	cosigner1 = NewLocalCosigner(config1, localsigner1)
+	localsigner1 := NewLocalSigner(SignerType, signerTypeConfig1)
+	cosigner1 = NewLocalCosigner(cosignerConfig1, localsigner1)
 
-	localsigner2 := NewLocalSigner(SignerType, config2)
-	cosigner2 = NewLocalCosigner(config2, localsigner2)
+	localsigner2 := NewLocalSigner(SignerType, signerTypeConfig2)
+	cosigner2 = NewLocalCosigner(cosignerConfig2, localsigner2)
 
-	localsigner3 := NewLocalSigner(SignerType, config3)
-	cosigner3 = NewLocalCosigner(config3, localsigner3)
+	localsigner3 := NewLocalSigner(SignerType, signerTypeConfig3)
+	cosigner3 = NewLocalCosigner(cosignerConfig3, localsigner3)
 
 	require.Equal(t, cosigner1.GetID(), 1)
 	require.Equal(t, cosigner2.GetID(), 2)
