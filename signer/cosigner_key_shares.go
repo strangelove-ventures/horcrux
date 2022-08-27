@@ -57,7 +57,7 @@ func WriteCosignerShareFile(cosigner CosignerKey, file string) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(file, jsonBytes, 0644) // nolint
+	return ioutil.WriteFile(file, jsonBytes, 0644) //nolint
 }
 
 func makeRSAKeys(num int) (rsaKeys []*rsa.PrivateKey, pubKeys []*rsa.PublicKey, err error) {
