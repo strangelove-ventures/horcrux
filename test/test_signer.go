@@ -117,7 +117,8 @@ func StartSingleSignerContainers(
 // shard the validator's priv_validator_key.json key, write the sharded key shares to the appropriate
 // signer nodes directory and start the signer cluster.
 // NOTE: Zero or negative values for sentriesPerSigner configures the nodes in the signer cluster to connect to the
-//       same sentry node.
+//
+//	same sentry node.
 func StartCosignerContainers(
 	signers TestSigners,
 	sentries TestNodes,
