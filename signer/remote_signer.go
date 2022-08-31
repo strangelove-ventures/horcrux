@@ -77,6 +77,7 @@ func (rs *ReconnRemoteSigner) loop() {
 			proto, address := tmNet.ProtocolAndAddress(rs.address)
 			netConn, err := rs.dialer.Dial(proto, address)
 			if err != nil {
+				totalSentryConnectTries.Inc()
 				rs.Logger.Error("Dialing", "err", err)
 				rs.Logger.Info("Retrying", "sleep (s)", 3, "address", rs.address)
 				time.Sleep(time.Second * 3)
@@ -155,6 +156,38 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(vote *tmProto.Vote) tmProtoP
 		return tmProtoPrivval.Message{Sum: msgSum}
 	}
 	rs.Logger.Info("Signed vote", "node", rs.address, "height", vote.Height, "round", vote.Round, "type", vote.Type)
+
+	if vote.Type == tmProto.PrecommitType {
+		stepSize := vote.Height - previousPrecommitHeight
+		if previousPrecommitHeight != 0 && stepSize > 1 {
+			missedPrecommits.Add(float64(stepSize))
+			totalMissedPrecommits.Add(float64(stepSize))
+		} else {
+			missedPrecommits.Set(0)
+		}
+		previousPrecommitHeight = vote.Height
+		previousPrecommitTime = time.Now()
+		lastPrecommitHeight.Set(float64(vote.Height))
+		lastPrecommitRound.Set(float64(vote.Round))
+		totalPrecommitsSigned.Inc()
+	}
+	if vote.Type == tmProto.PrevoteType {
+		stepSize := vote.Height - previousPrevoteHeight
+		if previousPrevoteHeight != 0 && stepSize > 1 {
+			missedPrevotes.Add(float64(stepSize))
+			totalMissedPrevotes.Add(float64(stepSize))
+		} else {
+			missedPrevotes.Set(0)
+		}
+
+		previousPrevoteHeight = vote.Height
+		previousPrevoteTime = time.Now()
+
+		lastPrevoteHeight.Set(float64(vote.Height))
+		lastPrevoteRound.Set(float64(vote.Round))
+		totalPrevotesSigned.Inc()
+	}
+
 	msgSum.SignedVoteResponse.Vote = *vote
 	return tmProtoPrivval.Message{Sum: msgSum}
 }
@@ -177,6 +210,9 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(proposal *tmProto.Propos
 	}
 	rs.Logger.Info("Signed proposal", "node", rs.address,
 		"height", proposal.Height, "round", proposal.Round, "type", proposal.Type)
+	lastProposalHeight.Set(float64(proposal.Height))
+	lastProposalRound.Set(float64(proposal.Round))
+	totalProposalsSigned.Inc()
 	msgSum.SignedProposalResponse.Proposal = *proposal
 	return tmProtoPrivval.Message{Sum: msgSum}
 }
@@ -219,6 +255,7 @@ func getRemoteSignerError(err error) *tmProtoPrivval.RemoteSignerError {
 func StartRemoteSigners(services []tmService.Service, logger tmLog.Logger, chainID string,
 	privVal tm.PrivValidator, nodes []NodeConfig) ([]tmService.Service, error) {
 	var err error
+	go StartMetrics()
 	for _, node := range nodes {
 		dialer := net.Dialer{Timeout: 30 * time.Second}
 		s := NewReconnRemoteSigner(node.Address, logger, chainID, privVal, dialer)

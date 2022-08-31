@@ -72,6 +72,8 @@ func StartSignerCmd() *cobra.Command {
 			}
 			logger.Info("Signer", "pubkey", pubkey)
 
+			go StartMetrics()
+
 			services, err = signer.StartRemoteSigners(services, logger, cfg.ChainID, pv, cfg.Nodes)
 			if err != nil {
 				panic(err)
