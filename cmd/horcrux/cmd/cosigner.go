@@ -133,6 +133,7 @@ func StartCosignerCmd() *cobra.Command {
 				ListenAddress:     config.Config.CosignerConfig.P2PListen,
 				Nodes:             config.Config.Nodes(),
 				Cosigners:         config.Config.CosignerPeers(),
+				ThresholdSigner:   "SoftSign", // Placeholder
 				// TODO: Potentially add signer type here so we can "automatically "
 				// call correct signer to create.
 				// Maybe should hard code it as well for the moment being?
@@ -145,8 +146,11 @@ func StartCosignerCmd() *cobra.Command {
 				return err
 			}
 
-			logger.Info("Tendermint Validator", "mode", cfg.Mode,
-				"priv-key", cfg.PrivValKeyFile, "priv-state-dir", cfg.PrivValStateDir)
+			logger.Info("Tendermint Validator",
+				"mode", cfg.Mode,
+				"priv-key", cfg.PrivValKeyFile,
+				"priv-state-dir", cfg.PrivValStateDir,
+				"threshold signer", cfg.ThresholdSigner)
 
 			var val types.PrivValidator
 
@@ -198,7 +202,7 @@ func StartCosignerCmd() *cobra.Command {
 				Peers:     peers,
 				Address:   cfg.ListenAddress,
 			}
-			localsignerConfig := signer.SignerTypeConfig{
+			localsignerConfig := signer.LocalSoftSignThresholdEd25519SignatureConfig{
 				Total:       uint8(total),
 				CosignerKey: key,
 				RsaKey:      key.RSAKey,

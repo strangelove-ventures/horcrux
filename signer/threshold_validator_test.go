@@ -83,7 +83,7 @@ func TestThresholdValidator2of2(t *testing.T) {
 	signState2, err := LoadOrCreateSignState(stateFile2.Name())
 	require.NoError(t, err)
 
-	signerTypeConfig1 := SignerTypeConfig{
+	signerTypeConfig1 := LocalSoftSignThresholdEd25519SignatureConfig{
 		CosignerKey: key1,
 		RsaKey:      *rsaKey1,
 		Total:       total,
@@ -94,7 +94,7 @@ func TestThresholdValidator2of2(t *testing.T) {
 		Peers:     peers,
 	}
 
-	signerTypeConfig2 := SignerTypeConfig{
+	signerTypeConfig2 := LocalSoftSignThresholdEd25519SignatureConfig{
 		CosignerKey: key2,
 		RsaKey:      *rsaKey2,
 		Total:       total,
@@ -240,7 +240,7 @@ func TestThresholdValidator3of3(t *testing.T) {
 	signState3, err := LoadOrCreateSignState(stateFile3.Name())
 	require.NoError(t, err)
 
-	signerTypeConfig1 := SignerTypeConfig{
+	signerTypeConfig1 := LocalSoftSignThresholdEd25519SignatureConfig{
 		CosignerKey: key1,
 		RsaKey:      *rsaKey1,
 		Total:       total,
@@ -251,7 +251,7 @@ func TestThresholdValidator3of3(t *testing.T) {
 		Peers:     peers,
 	}
 
-	signerTypeConfig2 := SignerTypeConfig{
+	signerTypeConfig2 := LocalSoftSignThresholdEd25519SignatureConfig{
 		CosignerKey: key2,
 		RsaKey:      *rsaKey2,
 		Total:       total,
@@ -262,7 +262,7 @@ func TestThresholdValidator3of3(t *testing.T) {
 		Peers:     peers,
 	}
 
-	signerTypeConfig3 := SignerTypeConfig{
+	signerTypeConfig3 := LocalSoftSignThresholdEd25519SignatureConfig{
 		CosignerKey: key3,
 		RsaKey:      *rsaKey3,
 		Total:       total,
@@ -402,7 +402,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 	signState3, err := LoadOrCreateSignState(stateFile3.Name())
 	require.NoError(t, err)
 
-	signerTypeConfig1 := SignerTypeConfig{
+	signerTypeConfig1 := LocalSoftSignThresholdEd25519SignatureConfig{
 		CosignerKey: key1,
 		RsaKey:      *rsaKey1,
 		Total:       total,
@@ -413,7 +413,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 		Peers:     peers,
 	}
 
-	signerTypeConfig2 := SignerTypeConfig{
+	signerTypeConfig2 := LocalSoftSignThresholdEd25519SignatureConfig{
 		CosignerKey: key2,
 		RsaKey:      *rsaKey2,
 		Total:       total,
@@ -424,7 +424,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 		Peers:     peers,
 	}
 
-	signerTypeConfig3 := SignerTypeConfig{
+	signerTypeConfig3 := LocalSoftSignThresholdEd25519SignatureConfig{
 		CosignerKey: key3,
 		RsaKey:      *rsaKey3,
 		Total:       total,

@@ -24,20 +24,8 @@ type LocalSoftSignThresholdEd25519Signature struct {
 	// Total signers
 	Total     uint8
 	Threshold uint8
-	// Height, Round, Step, Timestamp -> metadata
+	// Height, Round, Step, Timestamp --> metadata
 	HrsMeta map[HRSTKey]HrsMetadata
-}
-
-// Inistiates the LocalSoftSignThresholdEd25519SignatureConfig struct.
-func NewLocalSoftSignThresholdEd25519SignatureConfig(
-	cfg SignerTypeConfig) LocalSoftSignThresholdEd25519SignatureConfig {
-	localsignerconfig := LocalSoftSignThresholdEd25519SignatureConfig{
-		CosignerKey: cfg.CosignerKey,
-		RsaKey:      cfg.RsaKey,
-		Total:       cfg.Total,
-		Threshold:   cfg.Threshold,
-	}
-	return localsignerconfig
 }
 
 // Holds the configuration of the Local soft signer.
@@ -49,8 +37,8 @@ type LocalSoftSignThresholdEd25519SignatureConfig struct {
 	Threshold   uint8
 }
 
-// Implements ThresholdEd25519SignatureConfig interface from threshold_ed25519_signer.go to create a new local signer.
-func (cfg *LocalSoftSignThresholdEd25519SignatureConfig) NewThresholdEd25519Signature() ThresholdEd25519Signature {
+// Implements ThresholdEd25519SignatureOption interface from threshold_ed25519_signer.go to create a new local signer.
+func (cfg *LocalSoftSignThresholdEd25519SignatureConfig) createThresholdEd25519Signature() ThresholdEd25519Signature {
 	localsigner := &LocalSoftSignThresholdEd25519Signature{
 		Key:       cfg.CosignerKey,
 		RsaKey:    cfg.RsaKey,

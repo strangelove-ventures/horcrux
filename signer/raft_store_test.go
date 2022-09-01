@@ -34,7 +34,7 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 		Round:  0,
 		Step:   0,
 	}
-	signerTypeConfig := SignerTypeConfig{
+	signerTypeConfig := LocalSoftSignThresholdEd25519SignatureConfig{
 		CosignerKey: key,
 		RsaKey:      *rsaKey,
 	}

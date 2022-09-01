@@ -4,18 +4,11 @@ import (
 	"errors"
 )
 
-// Inistiates the LocalHSMsignThresholdEd25519SignatureConfig
-func NewLocalHSMSignThresholdEd25519SignatureConfig(
-	cfg SignerTypeConfig) LocalHSMsignThresholdEd25519SignatureConfig {
-
-	panic("Not Implemented")
-}
-
 // Placeholder for Local LocalHSMsignThresholdEd25519SignatureConfig
 type LocalHSMsignThresholdEd25519SignatureConfig struct {
 }
 
-func (cfg *LocalHSMsignThresholdEd25519SignatureConfig) NewThresholdEd25519Signature() ThresholdEd25519Signature {
+func (cfg *LocalHSMsignThresholdEd25519SignatureConfig) createThresholdEd25519Signature() ThresholdEd25519Signature {
 	panic("Not Implemented")
 
 	// return localsigner

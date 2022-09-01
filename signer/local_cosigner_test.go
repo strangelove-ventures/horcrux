@@ -43,7 +43,7 @@ func TestLocalCosignerGetID(t *testing.T) {
 			PublicKey: rsaKey.PublicKey,
 		}},
 	}
-	signerConfig := SignerTypeConfig{
+	signerConfig := LocalSoftSignThresholdEd25519SignatureConfig{
 		CosignerKey: key,
 		RsaKey:      *rsaKey,
 	}
@@ -105,7 +105,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	signState2, err := LoadOrCreateSignState(stateFile2.Name())
 	require.NoError(t, err)
 
-	signerTypeConfig1 := SignerTypeConfig{
+	signerTypeConfig1 := LocalSoftSignThresholdEd25519SignatureConfig{
 		CosignerKey: key1,
 		RsaKey:      *rsaKey1,
 		Total:       total,
@@ -116,7 +116,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		Peers:     peers,
 	}
 
-	signerTypeConfig2 := SignerTypeConfig{
+	signerTypeConfig2 := LocalSoftSignThresholdEd25519SignatureConfig{
 		CosignerKey: key2,
 		RsaKey:      *rsaKey2,
 		Total:       total,
