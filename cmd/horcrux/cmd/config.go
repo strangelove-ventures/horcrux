@@ -191,7 +191,7 @@ func validateCosignerConfig(cfg DiskConfig) error {
 	if cfg.CosignerConfig == nil {
 		return fmt.Errorf("cosigner config can't be empty")
 	}
-	if float32(len(cfg.CosignerConfig.Peers))/float32(2) <= float32(cfg.CosignerConfig.Threshold) {
+	if float32(len(cfg.CosignerConfig.Peers))/float32(2) >= float32(cfg.CosignerConfig.Threshold) {
 		return fmt.Errorf("number of peers/2 (%.1f) must be greater than threshold (%d)",
 			float32(len(cfg.CosignerConfig.Peers))/2, cfg.CosignerConfig.Threshold)
 	}
