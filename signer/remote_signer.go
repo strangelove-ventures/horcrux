@@ -84,7 +84,7 @@ func (rs *ReconnRemoteSigner) loop() {
 				continue
 			}
 
-			rs.Logger.Info("Connected", "address", rs.address)
+			rs.Logger.Info("Connected to Sentry", "address", rs.address)
 			conn, err = tmP2pConn.MakeSecretConnection(netConn, rs.privKey)
 			if err != nil {
 				conn = nil
@@ -148,9 +148,11 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(vote *tmProto.Vote) tmProtoP
 		switch typedErr := err.(type) {
 		case *BeyondBlockError:
 			rs.Logger.Debug("Rejecting sign vote request", "reason", typedErr.msg)
+			beyondBlockErrors.Inc()
 		default:
 			rs.Logger.Error("Failed to sign vote", "address", rs.address, "error", err, "vote_type", vote.Type,
 				"height", vote.Height, "round", vote.Round, "validator", fmt.Sprintf("%X", vote.ValidatorAddress))
+			failedSignVote.Inc()
 		}
 		msgSum.SignedVoteResponse.Error = getRemoteSignerError(err)
 		return tmProtoPrivval.Message{Sum: msgSum}
@@ -202,6 +204,7 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(proposal *tmProto.Propos
 		switch typedErr := err.(type) {
 		case *BeyondBlockError:
 			rs.Logger.Debug("Rejecting proposal sign request", "reason", typedErr.msg)
+			beyondBlockErrors.Inc()
 		default:
 			rs.Logger.Error("Failed to sign proposal", "address", rs.address, "error", err, "proposal", proposal)
 		}
@@ -218,6 +221,7 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(proposal *tmProto.Propos
 }
 
 func (rs *ReconnRemoteSigner) handlePubKeyRequest() tmProtoPrivval.Message {
+	totalPubKeyRequests.Inc()
 	msgSum := &tmProtoPrivval.Message_PubKeyResponse{PubKeyResponse: &tmProtoPrivval.PubKeyResponse{
 		PubKey: tmProtoCrypto.PublicKey{},
 		Error:  nil,

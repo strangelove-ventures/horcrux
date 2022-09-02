@@ -74,7 +74,9 @@ func initCmd() *cobra.Command {
 			if keyFileFlag != "" {
 				keyFile = &keyFileFlag
 			}
+			prometheusListenAddress, _ := cmdFlags.GetString("metrics")
 			if cs {
+				// Cosigner Config
 				p, _ := cmdFlags.GetString("peers")
 				threshold, _ := cmdFlags.GetInt("threshold")
 				timeout, _ := cmdFlags.GetString("timeout")
@@ -109,19 +111,23 @@ func initCmd() *cobra.Command {
 						Peers:     peers,
 						Timeout:   timeout,
 					},
-					ChainNodes: cn,
+					ChainNodes:              cn,
+					PrometheusListenAddress: prometheusListenAddress,
 				}
 				if err = validateCosignerConfig(cfg); err != nil {
 					return err
 				}
 			} else {
+				// Single Signer Config
 				if len(cn) == 0 {
 					return fmt.Errorf("must input at least one node")
 				}
+				prometheusListenAddress, _ := cmdFlags.GetString("metrics")
 				cfg = DiskConfig{
-					PrivValKeyFile: keyFile,
-					ChainID:        cid,
-					ChainNodes:     cn,
+					PrivValKeyFile:          keyFile,
+					ChainID:                 cid,
+					ChainNodes:              cn,
+					PrometheusListenAddress: prometheusListenAddress,
 				}
 				if err = validateSingleSignerConfig(cfg); err != nil {
 					return err
@@ -162,6 +168,7 @@ func initCmd() *cobra.Command {
 		"(i.e. \"tcp://node-1:2222|2,tcp://node-2:2222|3\")")
 	cmd.Flags().IntP("threshold", "t", 0, "indicate number of signatures required for threshold signature")
 	cmd.Flags().StringP("listen", "l", "", "listen address of the signer")
+	cmd.Flags().StringP("metrics", "m", "", "listen address for prometheus metrics")
 	cmd.Flags().StringP("keyfile", "k", "",
 		"priv val key file path (full key for single signer, or key share for cosigner)")
 	cmd.Flags().String("timeout", "1500ms", "configure cosigner rpc server timeout value, \n"+
@@ -481,10 +488,11 @@ func setChainIDCmd() *cobra.Command {
 
 // Config maps to the on-disk JSON format
 type DiskConfig struct {
-	PrivValKeyFile *string         `json:"key-file,omitempty" yaml:"key-file,omitempty"`
-	ChainID        string          `json:"chain-id" yaml:"chain-id"`
-	CosignerConfig *CosignerConfig `json:"cosigner,omitempty" yaml:"cosigner,omitempty"`
-	ChainNodes     []ChainNode     `json:"chain-nodes,omitempty" yaml:"chain-nodes,omitempty"`
+	PrivValKeyFile          *string         `json:"key-file,omitempty" yaml:"key-file,omitempty"`
+	ChainID                 string          `json:"chain-id" yaml:"chain-id"`
+	CosignerConfig          *CosignerConfig `json:"cosigner,omitempty" yaml:"cosigner,omitempty"`
+	ChainNodes              []ChainNode     `json:"chain-nodes,omitempty" yaml:"chain-nodes,omitempty"`
+	PrometheusListenAddress string          `json:"prometheus-listen-address,omitempty" yaml:"prometheus-listen-address,omitempty"`
 }
 
 func (c *DiskConfig) Nodes() []signer.NodeConfig {
