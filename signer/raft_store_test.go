@@ -3,7 +3,6 @@ package signer
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -15,7 +14,7 @@ import (
 // Test_StoreInMemOpenSingleNode tests that a command can be applied to the log
 // stored in RAM.
 func Test_StoreInMemOpenSingleNode(t *testing.T) {
-	tmpDir, _ := ioutil.TempDir("", "store_test")
+	tmpDir, _ := os.MkdirTemp("", "store_test")
 	defer os.RemoveAll(tmpDir)
 
 	dummyPub := tmCryptoEd25519.PubKey{}

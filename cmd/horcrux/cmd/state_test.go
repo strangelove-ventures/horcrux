@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -23,7 +23,7 @@ func TestStateSetCmd(t *testing.T) {
 	require.NoError(t, err)
 
 	cmd := initCmd()
-	cmd.SetOutput(ioutil.Discard)
+	cmd.SetOutput(io.Discard)
 	cmd.SetArgs([]string{
 		chainid,
 		"tcp://10.168.0.1:1234",
@@ -56,7 +56,7 @@ func TestStateSetCmd(t *testing.T) {
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			cmd := setStateCmd()
-			cmd.SetOutput(ioutil.Discard)
+			cmd.SetOutput(io.Discard)
 			cmd.SetArgs(tc.args)
 			err = cmd.Execute()
 

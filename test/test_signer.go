@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -45,7 +45,7 @@ func BuildTestSignerImage(pool *dockertest.Pool) error {
 	return pool.Client.BuildImage(docker.BuildImageOptions{
 		Name:                signerImage,
 		Dockerfile:          dockerfile,
-		OutputStream:        ioutil.Discard,
+		OutputStream:        io.Discard,
 		SuppressOutput:      false,
 		Pull:                false,
 		RmTmpContainer:      true,

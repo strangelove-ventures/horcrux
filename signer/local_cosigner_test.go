@@ -3,7 +3,6 @@ package signer
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -86,7 +85,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		ID:       1,
 	}
 
-	stateFile1, err := ioutil.TempFile("", "state1.json")
+	stateFile1, err := os.CreateTemp("", "state1.json")
 	require.NoError(t, err)
 	defer os.Remove(stateFile1.Name())
 
@@ -99,7 +98,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		ID:       2,
 	}
 
-	stateFile2, err := ioutil.TempFile("", "state2.json")
+	stateFile2, err := os.CreateTemp("", "state2.json")
 	require.NoError(t, err)
 	defer os.Remove(stateFile2.Name())
 	signState2, err := LoadOrCreateSignState(stateFile2.Name())
@@ -216,7 +215,7 @@ func TestLocalCosignerWatermark(t *testing.T) {
 			ID:       1,
 		}
 
-		stateFile1, err := ioutil.TempFile("", "state1.json")
+		stateFile1, err := io.TempFile("", "state1.json")
 		require.NoError(t, err)
 		defer os.Remove(stateFile1.Name())
 

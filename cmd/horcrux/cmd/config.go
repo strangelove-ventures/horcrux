@@ -3,7 +3,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/url"
 	"os"
@@ -531,7 +530,7 @@ func (c RuntimeConfig) shareStateFile(chainID string) string {
 }
 
 func (c RuntimeConfig) writeConfigFile() error {
-	return ioutil.WriteFile(c.ConfigFile, c.Config.MustMarshalYaml(), 0644) //nolint
+	return os.WriteFile(c.ConfigFile, c.Config.MustMarshalYaml(), 0644) //nolint
 }
 
 type CosignerConfig struct {

@@ -6,7 +6,6 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"testing"
@@ -64,7 +63,7 @@ func TestThresholdValidator2of2(t *testing.T) {
 		ID:       1,
 	}
 
-	stateFile1, err := ioutil.TempFile("", "state1.json")
+	stateFile1, err := os.CreateTemp("", "state1.json")
 	require.NoError(t, err)
 	defer os.Remove(stateFile1.Name())
 
@@ -77,7 +76,7 @@ func TestThresholdValidator2of2(t *testing.T) {
 		ID:       2,
 	}
 
-	stateFile2, err := ioutil.TempFile("", "state2.json")
+	stateFile2, err := os.CreateTemp("", "state2.json")
 	require.NoError(t, err)
 	defer os.Remove(stateFile2.Name())
 	signState2, err := LoadOrCreateSignState(stateFile2.Name())
@@ -120,7 +119,7 @@ func TestThresholdValidator2of2(t *testing.T) {
 	thresholdPeers := make([]Cosigner, 0)
 	thresholdPeers = append(thresholdPeers, cosigner2)
 
-	tmpDir, _ := ioutil.TempDir("", "store_test")
+	tmpDir, _ := os.MkdirTemp("", "store_test")
 	defer os.RemoveAll(tmpDir)
 
 	raftStore := getMockRaftStore(cosigner1, tmpDir)
@@ -207,7 +206,7 @@ func TestThresholdValidator3of3(t *testing.T) {
 		ID:       1,
 	}
 
-	stateFile1, err := ioutil.TempFile("", "state1.json")
+	stateFile1, err := os.CreateTemp("", "state1.json")
 	require.NoError(t, err)
 	defer os.Remove(stateFile1.Name())
 
@@ -220,7 +219,7 @@ func TestThresholdValidator3of3(t *testing.T) {
 		ID:       2,
 	}
 
-	stateFile2, err := ioutil.TempFile("", "state2.json")
+	stateFile2, err := os.CreateTemp("", "state2.json")
 	require.NoError(t, err)
 	defer os.Remove(stateFile2.Name())
 
@@ -233,7 +232,7 @@ func TestThresholdValidator3of3(t *testing.T) {
 		ID:       3,
 	}
 
-	stateFile3, err := ioutil.TempFile("", "state3.json")
+	stateFile3, err := os.CreateTemp("", "state3.json")
 	require.NoError(t, err)
 	defer os.Remove(stateFile3.Name())
 
@@ -292,7 +291,7 @@ func TestThresholdValidator3of3(t *testing.T) {
 	thresholdPeers := make([]Cosigner, 0)
 	thresholdPeers = append(thresholdPeers, cosigner2, cosigner3)
 
-	tmpDir, _ := ioutil.TempDir("", "store_test")
+	tmpDir, _ := os.MkdirTemp("", "store_test")
 	defer os.RemoveAll(tmpDir)
 
 	raftStore := getMockRaftStore(cosigner1, tmpDir)
@@ -369,7 +368,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 		ID:       1,
 	}
 
-	stateFile1, err := ioutil.TempFile("", "state1.json")
+	stateFile1, err := os.CreateTemp("", "state1.json")
 	require.NoError(t, err)
 	defer os.Remove(stateFile1.Name())
 
@@ -382,7 +381,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 		ID:       2,
 	}
 
-	stateFile2, err := ioutil.TempFile("", "state2.json")
+	stateFile2, err := os.CreateTemp("", "state2.json")
 	require.NoError(t, err)
 	defer os.Remove(stateFile2.Name())
 
@@ -395,7 +394,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 		ID:       3,
 	}
 
-	stateFile3, err := ioutil.TempFile("", "state3.json")
+	stateFile3, err := os.CreateTemp("", "state3.json")
 	require.NoError(t, err)
 	defer os.Remove(stateFile3.Name())
 
@@ -454,7 +453,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 	thresholdPeers := make([]Cosigner, 0)
 	thresholdPeers = append(thresholdPeers, cosigner2, cosigner3)
 
-	tmpDir, _ := ioutil.TempDir("", "store_test")
+	tmpDir, _ := os.MkdirTemp("", "store_test")
 	defer os.RemoveAll(tmpDir)
 
 	raftStore := getMockRaftStore(cosigner1, tmpDir)

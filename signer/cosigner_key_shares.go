@@ -4,7 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
-	"io/ioutil"
+	"os"
 
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/privval"
@@ -42,7 +42,7 @@ func CreateCosignerShares(pv privval.FilePVKey, threshold, shares int64) (out []
 // ReadPrivValidatorFile reads in a privval.FilePVKey from a given file
 func ReadPrivValidatorFile(priv string) (out privval.FilePVKey, err error) {
 	var bz []byte
-	if bz, err = ioutil.ReadFile(priv); err != nil {
+	if bz, err = os.ReadFile(priv); err != nil {
 		return
 	}
 	if err = tmjson.Unmarshal(bz, &out); err != nil {
@@ -57,7 +57,7 @@ func WriteCosignerShareFile(cosigner CosignerKey, file string) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(file, jsonBytes, 0644) //nolint
+	return os.WriteFile(file, jsonBytes, 0644) //nolint
 }
 
 func makeRSAKeys(num int) (rsaKeys []*rsa.PrivateKey, pubKeys []*rsa.PublicKey, err error) {

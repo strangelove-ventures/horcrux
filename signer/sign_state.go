@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"sync"
 
 	"github.com/gogo/protobuf/proto"
@@ -244,7 +244,7 @@ func (signState *SignState) GetErrorIfLessOrEqual(height int64, round int64, ste
 // LoadSignState loads a sign state from disk.
 func LoadSignState(filepath string) (SignState, error) {
 	state := SignState{}
-	stateJSONBytes, err := ioutil.ReadFile(filepath)
+	stateJSONBytes, err := os.ReadFile(filepath)
 	if err != nil {
 		return state, err
 	}
