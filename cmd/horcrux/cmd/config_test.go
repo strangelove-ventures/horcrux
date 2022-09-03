@@ -65,6 +65,20 @@ func TestConfigInitCmd(t *testing.T) {
 			},
 			expectErr: true,
 		},
+		{
+			name: "invalid threshold setting",
+			home: tmpHome + "_invalid_threshold_setting",
+			args: []string{
+				chainID,
+				"tcp://10.168.0.1:1234",
+				"-c",
+				"-p", "tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3",
+				"-t", "1", // t =< p/2, should be t > p/2
+				"-l", "tcp://10.168.1.1:2222",
+				"--timeout", "1500ms",
+			},
+			expectErr: true,
+		},
 	}
 
 	for _, tc := range tcs {
