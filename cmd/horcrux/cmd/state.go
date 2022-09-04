@@ -119,9 +119,10 @@ func setStateCmd() *cobra.Command {
 
 func importStateCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:          "import [height]",
-		Aliases:      []string{"i"},
-		Short:        "Read the old priv_validator_state.json and set the height, round and step (good for migrations but NOT shared state update)",
+		Use:     "import [height]",
+		Aliases: []string{"i"},
+		Short: "Read the old priv_validator_state.json and set the height, round and step" +
+			"(good for migrations but NOT shared state update)",
 		Args:         cobra.ExactArgs(0),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -158,11 +159,11 @@ func importStateCmd() *cobra.Command {
 				}
 				textBuffer.WriteString(scanner.Text())
 			}
-			finalJson := textBuffer.String()
+			finalJSON := textBuffer.String()
 
 			pvState := &FilePVLastSignState{}
 
-			err = tmjson.Unmarshal([]byte(finalJson), &pvState)
+			err = tmjson.Unmarshal([]byte(finalJSON), &pvState)
 			if err != nil {
 				fmt.Println("Error parsing priv_validator_state.json")
 				return err

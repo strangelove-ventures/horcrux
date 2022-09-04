@@ -157,7 +157,7 @@ func Genesis(
 	}
 
 	for i := 1; i < len(nodes); i++ {
-		if err := os.WriteFile(nodes[i].GenesisFilePath(), genbz, 0644); err != nil { // nolint
+		if err := os.WriteFile(nodes[i].GenesisFilePath(), genbz, 0644); err != nil { //nolint
 			return err
 		}
 	}
