@@ -250,7 +250,8 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	res.EphemeralPublic = ephemeralPublic
 	res.Signature = sig
 
-	previousLocalSignFinishTime = time.Now() // Note - Function may return before this line so elapsed time for Finish may be multiple block times
+	// Note - Function may return before this line so elapsed time for Finish may be multiple block times
+	previousLocalSignFinishTime = time.Now()
 	return res, nil
 }
 

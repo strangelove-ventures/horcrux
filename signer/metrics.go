@@ -75,12 +75,13 @@ var (
 	})
 	secondsSinceLastLocalSignFinish = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "signer_seconds_since_last_local_sign_finish_time",
-		Help: "Seconds Since Last Local Finish Sign (May increase to about 2 * Block Time; If high, CoSigner is not signing) ",
+		Help: "Seconds Since Last Local Finish Sign (Should stay below 2 * Block Time)",
 	})
 
 	secondsSinceLastLocalEphemeralShareTime = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "signer_seconds_since_last_local_ephemeral_share_time",
-		Help: "Seconds Since Last Local Ephemeral Share Sign (Should not increase beyond block time; If high, may indicate raft joining issue for CoSigner) ",
+		Help: "Seconds Since Last Local Ephemeral Share Sign " +
+			"(Should not increase beyond block time; If high, may indicate raft joining issue for CoSigner) ",
 	})
 
 	missedPrecommits = promauto.NewGauge(prometheus.GaugeOpts{
@@ -114,10 +115,6 @@ var (
 		Help: "Total Times Signer Failed to sign block - Unstarted and Unexepcted Height",
 	})
 
-	flagRaftLeader = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "signer_is_raft_leader",
-		Help: "Signer is Raft Leader",
-	})
 	totalRaftLeader = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "signer_total_raft_leader",
 		Help: "Total Times Signer is Raft Leader",

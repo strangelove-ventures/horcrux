@@ -492,7 +492,7 @@ type DiskConfig struct {
 	ChainID                 string          `json:"chain-id" yaml:"chain-id"`
 	CosignerConfig          *CosignerConfig `json:"cosigner,omitempty" yaml:"cosigner,omitempty"`
 	ChainNodes              []ChainNode     `json:"chain-nodes,omitempty" yaml:"chain-nodes,omitempty"`
-	PrometheusListenAddress string          `json:"prometheus-listen-address,omitempty" yaml:"prometheus-listen-address,omitempty"`
+	PrometheusListenAddress string          `json:"prometheus-listen-address,omitempty" yaml:"prometheus-listen-address,omitempty"` //nolint
 }
 
 func (c *DiskConfig) Nodes() []signer.NodeConfig {
