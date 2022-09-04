@@ -261,7 +261,10 @@ func StartRemoteSigners(services []tmService.Service, logger tmLog.Logger, chain
 	var err error
 	go StartMetrics()
 	for _, node := range nodes {
-		dialer := net.Dialer{Timeout: 30 * time.Second}
+		// Tendermint requires a connection within 3 seconds of start or crashes
+		// A long timeout such as 30 seconds would cause the sentry to fail in loops
+		// Use a short timeout and dial often to connect within 3 second window
+		dialer := net.Dialer{Timeout: 2 * time.Second}
 		s := NewReconnRemoteSigner(node.Address, logger, chainID, privVal, dialer)
 
 		err = s.Start()
