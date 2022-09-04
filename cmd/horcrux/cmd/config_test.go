@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -77,7 +77,7 @@ func TestConfigInitCmd(t *testing.T) {
 			require.NoError(t, err)
 
 			cmd := initCmd()
-			cmd.SetOutput(ioutil.Discard)
+			cmd.SetOutput(io.Discard)
 			cmd.SetArgs(tc.args)
 			err = cmd.Execute()
 
@@ -126,7 +126,7 @@ func TestConfigChainIDSetCmd(t *testing.T) {
 	require.NoError(t, err)
 
 	cmd := initCmd()
-	cmd.SetOutput(ioutil.Discard)
+	cmd.SetOutput(io.Discard)
 	cmd.SetArgs([]string{
 		chainID,
 		"tcp://10.168.0.1:1234",
@@ -159,7 +159,7 @@ func TestConfigChainIDSetCmd(t *testing.T) {
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			cmd := setChainIDCmd()
-			cmd.SetOutput(ioutil.Discard)
+			cmd.SetOutput(io.Discard)
 			cmd.SetArgs(tc.args)
 			err := cmd.Execute()
 
@@ -186,7 +186,7 @@ func TestConfigNodesAddAndRemove(t *testing.T) {
 	require.NoError(t, err)
 
 	cmd := initCmd()
-	cmd.SetOutput(ioutil.Discard)
+	cmd.SetOutput(io.Discard)
 	cmd.SetArgs([]string{
 		chainID,
 		"tcp://10.168.0.1:1234",
@@ -304,7 +304,7 @@ func TestConfigNodesAddAndRemove(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			tc.cmd.SetOutput(ioutil.Discard)
+			tc.cmd.SetOutput(io.Discard)
 			tc.cmd.SetArgs(tc.args)
 			err = tc.cmd.Execute()
 
@@ -332,7 +332,7 @@ func TestConfigPeersAddAndRemove(t *testing.T) {
 	require.NoError(t, err)
 
 	cmd := initCmd()
-	cmd.SetOutput(ioutil.Discard)
+	cmd.SetOutput(io.Discard)
 	cmd.SetArgs([]string{
 		chainID,
 		"tcp://10.168.0.1:1234",
@@ -451,7 +451,7 @@ func TestConfigPeersAddAndRemove(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			tc.cmd.SetOutput(ioutil.Discard)
+			tc.cmd.SetOutput(io.Discard)
 			tc.cmd.SetArgs(tc.args)
 			err = tc.cmd.Execute()
 
@@ -611,7 +611,7 @@ func TestSetShares(t *testing.T) {
 	require.NoError(t, err)
 
 	cmd := initCmd()
-	cmd.SetOutput(ioutil.Discard)
+	cmd.SetOutput(io.Discard)
 	cmd.SetArgs([]string{
 		chainID,
 		"tcp://10.168.0.1:1234",
@@ -653,7 +653,7 @@ func TestSetShares(t *testing.T) {
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			cmd := setSharesCmd()
-			cmd.SetOutput(ioutil.Discard)
+			cmd.SetOutput(io.Discard)
 			cmd.SetArgs(tc.args)
 			err = cmd.Execute()
 
