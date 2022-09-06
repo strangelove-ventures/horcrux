@@ -641,7 +641,7 @@ func TestSetShares(t *testing.T) {
 	tcs := []struct {
 		name         string
 		args         []string
-		expectShares int
+		expectShares uint8
 		expectErr    bool
 	}{ // Do NOT change the order of the test cases!
 		{

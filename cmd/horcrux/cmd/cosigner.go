@@ -120,44 +120,26 @@ func StartCosignerCmd() *cobra.Command {
 				pv       types.PrivValidator
 				chainID  = config.Config.ChainID
 				logger   = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator")
-				cfg      signer.Config
 			)
 
-			cfg = signer.Config{
+			privValKeyFile := config.keyFilePath(true)
 
-				Mode:              "mpc",
-				PrivValKeyFile:    config.keyFilePath(true),
-				PrivValStateDir:   config.StateDir,
-				ChainID:           config.Config.ChainID,
-				CosignerThreshold: config.Config.CosignerConfig.Threshold,
-				ListenAddress:     config.Config.CosignerConfig.P2PListen,
-				Nodes:             config.Config.Nodes(),
-				Cosigners:         config.Config.CosignerPeers(),
-				ThresholdSigner:   "SoftSign", // Placeholder
-				// TODO: Potentially add signer type here so we can "automatically "
-				// call correct signer to create.
-				// Maybe should hard code it as well for the moment being?
-				// Should look something like this:
-				// ThresholdSigner: config.Config.ThresholdSigner
+			nodes := config.Config.Nodes()
+			cfgCosigners := config.Config.CosignerPeers()
 
-			}
-
-			if err = cfg.KeyFileExists(); err != nil {
-				return err
+			// Initialize the localsigner (ThresholdEdSignature) of choice.
+			key, thresholdSigner, err := config.Config.KeyAndThresholdSigner()
+			if err != nil {
+				panic(err)
 			}
 
 			logger.Info("Tendermint Validator",
-				"mode", cfg.Mode,
-				"priv-key", cfg.PrivValKeyFile,
-				"priv-state-dir", cfg.PrivValStateDir,
-				"threshold signer", cfg.ThresholdSigner)
+				"mode", "mpc",
+				"priv-key", privValKeyFile,
+				"priv-state-dir", config.StateDir,
+				"threshold signer", config.Config.CosignerConfig.SignerType)
 
 			var val types.PrivValidator
-
-			key, err := signer.LoadCosignerKey(cfg.PrivValKeyFile)
-			if err != nil {
-				return fmt.Errorf("error reading cosigner key: %s", err)
-			}
 
 			// ok to auto initialize on disk since the cosigner share is the one that actually
 			// protects against double sign - this exists as a cache for the final signature
@@ -173,7 +155,7 @@ func StartCosignerCmd() *cobra.Command {
 				panic(err)
 			}
 
-			cosigners := []signer.Cosigner{}
+			var cosigners []signer.Cosigner
 
 			// add ourselves as a peer so localcosigner can handle GetEphSecPart requests
 			peers := []signer.CosignerPeer{{
@@ -181,7 +163,7 @@ func StartCosignerCmd() *cobra.Command {
 				PublicKey: key.RSAKey.PublicKey,
 			}}
 
-			for _, cosignerConfig := range cfg.Cosigners {
+			for _, cosignerConfig := range cfgCosigners {
 				cosigner := signer.NewRemoteCosigner(cosignerConfig.ID, cosignerConfig.Address)
 				cosigners = append(cosigners, cosigner)
 
@@ -196,23 +178,13 @@ func StartCosignerCmd() *cobra.Command {
 				})
 			}
 
-			total := len(cfg.Cosigners) + 1
-			localCosignerConfig := signer.LocalCosignerConfig{
-				SignState: &shareSignState,
-				Peers:     peers,
-				Address:   cfg.ListenAddress,
-			}
-			localsignerConfig := signer.LocalSoftSignThresholdEd25519SignatureConfig{
-				Total:       uint8(total),
-				CosignerKey: key,
-				RsaKey:      key.RSAKey,
-				Threshold:   uint8(cfg.CosignerThreshold),
-			}
-
-			// Initialize the localsigner (ThresholdEdSignature) of choice.
-			localsigner := signer.NewLocalSigner(cfg.ThresholdSigner, localsignerConfig)
 			// Initialize the localCosigner. The localCosigner "embeds" the local signer
-			localCosigner := signer.NewLocalCosigner(localCosignerConfig, localsigner)
+			localCosigner := signer.NewLocalCosigner(
+				key.ID,
+				config.Config.CosignerConfig.P2PListen,
+				peers, &shareSignState,
+				thresholdSigner,
+			)
 
 			timeout, err := time.ParseDuration(config.Config.CosignerConfig.Timeout)
 			if err != nil {
@@ -229,7 +201,7 @@ func StartCosignerCmd() *cobra.Command {
 
 			// Start RAFT store listener
 			raftStore := signer.NewRaftStore(nodeID,
-				raftDir, cfg.ListenAddress, timeout, logger, localCosigner, cosigners)
+				raftDir, config.Config.CosignerConfig.P2PListen, timeout, logger, localCosigner, cosigners)
 			if err := raftStore.Start(); err != nil {
 				log.Fatalf("Error starting raft store: %v\n", err)
 			}
@@ -238,7 +210,7 @@ func StartCosignerCmd() *cobra.Command {
 			// Initialize the Threshold validator. The Threshold validator "embeds" the local cosigner
 			val = signer.NewThresholdValidator(&signer.ThresholdValidatorOpt{
 				Pubkey:    key.PubKey,
-				Threshold: cfg.CosignerThreshold,
+				Threshold: int(config.Config.CosignerConfig.Threshold),
 				SignState: signState,
 				Cosigner:  localCosigner,
 				Peers:     cosigners,
@@ -256,7 +228,7 @@ func StartCosignerCmd() *cobra.Command {
 			}
 			logger.Info("Signer", "address", pubkey.Address())
 
-			services, err = signer.StartRemoteSigners(services, logger, cfg.ChainID, pv, cfg.Nodes)
+			services, err = signer.StartRemoteSigners(services, logger, config.Config.ChainID, pv, nodes)
 			if err != nil {
 				panic(err)
 			}

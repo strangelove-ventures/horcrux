@@ -1,14 +1,9 @@
 package signer
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
 	"os"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/require"
-	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
 )
 
 // Test_StoreInMemOpenSingleNode tests that a command can be applied to the log
@@ -17,36 +12,13 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 	tmpDir, _ := os.MkdirTemp("", "store_test")
 	defer os.RemoveAll(tmpDir)
 
-	dummyPub := tmCryptoEd25519.PubKey{}
-
-	bitSize := 4096
-	rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
-	require.NoError(t, err)
-
-	key := CosignerKey{
-		PubKey:   dummyPub,
-		ShareKey: []byte{},
-		ID:       1,
-	}
 	signState := SignState{
 		Height: 0,
 		Round:  0,
 		Step:   0,
 	}
-	signerTypeConfig := LocalSoftSignThresholdEd25519SignatureConfig{
-		CosignerKey: key,
-		RsaKey:      *rsaKey,
-	}
-	cosignerConfig := LocalCosignerConfig{
-		SignState: &signState,
-		Peers: []CosignerPeer{{
-			ID:        1,
-			PublicKey: rsaKey.PublicKey,
-		}},
-	}
 
-	localsigner := NewLocalSigner(SignerType, signerTypeConfig)
-	cosigner := NewLocalCosigner(cosignerConfig, localsigner)
+	cosigner := NewLocalCosigner(1, "", nil, &signState, nil)
 
 	s := &RaftStore{
 		NodeID:      "1",

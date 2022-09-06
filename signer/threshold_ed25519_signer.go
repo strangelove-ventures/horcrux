@@ -1,8 +1,6 @@
 package signer
 
 import (
-	"log"
-
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
@@ -39,25 +37,4 @@ type HrsMetadata struct {
 	Secret      []byte
 	DealtShares []tsed25519.Scalar
 	Peers       []PeerMetadata
-}
-
-type ThresholdEd25519SignatureOption interface {
-	createThresholdEd25519Signature() ThresholdEd25519Signature
-}
-
-// Initializes the signer depending on the type of signer type coded in the config.
-// TODO: Fix so that also HSM can be called and add tbe embedding SignerConfig
-// FIXME: Maybe refactor to a option pattern?
-func NewLocalSigner(signerType string, cfg LocalSoftSignThresholdEd25519SignatureConfig) ThresholdEd25519Signature {
-	switch signerType {
-	case SignerTypeHSM:
-		// Placeholder for future HSM implementation.
-		// return cfg.createThresholdEd25519Signature() <-- would execute softsign
-		panic("signerType need to be Softsign as its the only one implemented")
-	default:
-		// calling the function to initialize a Config struct for Softsign
-		// panic("Need to be Softsign as its the only one implemented")
-		log.Println("Default is Softsign. Softsign is the only SignerType implemented so far")
-		return cfg.createThresholdEd25519Signature()
-	}
 }

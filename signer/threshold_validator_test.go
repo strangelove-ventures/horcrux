@@ -59,6 +59,7 @@ func TestThresholdValidator2of2(t *testing.T) {
 
 	key1 := CosignerKey{
 		PubKey:   privateKey.PubKey(),
+		RSAKey:   *rsaKey1,
 		ShareKey: secretShares[0],
 		ID:       1,
 	}
@@ -72,6 +73,7 @@ func TestThresholdValidator2of2(t *testing.T) {
 
 	key2 := CosignerKey{
 		PubKey:   privateKey.PubKey(),
+		RSAKey:   *rsaKey2,
 		ShareKey: secretShares[1],
 		ID:       2,
 	}
@@ -82,39 +84,11 @@ func TestThresholdValidator2of2(t *testing.T) {
 	signState2, err := LoadOrCreateSignState(stateFile2.Name())
 	require.NoError(t, err)
 
-	signerTypeConfig1 := LocalSoftSignThresholdEd25519SignatureConfig{
-		CosignerKey: key1,
-		RsaKey:      *rsaKey1,
-		Total:       total,
-		Threshold:   threshold,
-	}
-	cosignerConfig1 := LocalCosignerConfig{
-		SignState: &signState1,
-		Peers:     peers,
-	}
+	localSigner1 := NewLocalSoftSignThresholdEd25519Signature(key1, threshold, total)
+	cosigner1 := NewLocalCosigner(1, "", peers, &signState1, localSigner1)
 
-	signerTypeConfig2 := LocalSoftSignThresholdEd25519SignatureConfig{
-		CosignerKey: key2,
-		RsaKey:      *rsaKey2,
-		Total:       total,
-		Threshold:   threshold,
-	}
-	cosignerConfig2 := LocalCosignerConfig{
-		SignState: &signState2,
-		Peers:     peers,
-	}
-
-	var cosigner1 Cosigner
-	var cosigner2 Cosigner
-
-	localsigner1 := NewLocalSigner(SignerType, signerTypeConfig1)
-	cosigner1 = NewLocalCosigner(cosignerConfig1, localsigner1)
-
-	localsigner2 := NewLocalSigner(SignerType, signerTypeConfig2)
-	cosigner2 = NewLocalCosigner(cosignerConfig2, localsigner2)
-
-	require.Equal(t, cosigner1.GetID(), 1)
-	require.Equal(t, cosigner2.GetID(), 2)
+	localSigner2 := NewLocalSoftSignThresholdEd25519Signature(key2, threshold, total)
+	cosigner2 := NewLocalCosigner(2, "", peers, &signState2, localSigner2)
 
 	thresholdPeers := make([]Cosigner, 0)
 	thresholdPeers = append(thresholdPeers, cosigner2)
@@ -202,6 +176,7 @@ func TestThresholdValidator3of3(t *testing.T) {
 
 	key1 := CosignerKey{
 		PubKey:   privateKey.PubKey(),
+		RSAKey:   *rsaKey1,
 		ShareKey: secretShares[0],
 		ID:       1,
 	}
@@ -215,6 +190,7 @@ func TestThresholdValidator3of3(t *testing.T) {
 
 	key2 := CosignerKey{
 		PubKey:   privateKey.PubKey(),
+		RSAKey:   *rsaKey2,
 		ShareKey: secretShares[1],
 		ID:       2,
 	}
@@ -228,6 +204,7 @@ func TestThresholdValidator3of3(t *testing.T) {
 
 	key3 := CosignerKey{
 		PubKey:   privateKey.PubKey(),
+		RSAKey:   *rsaKey3,
 		ShareKey: secretShares[2],
 		ID:       3,
 	}
@@ -239,54 +216,14 @@ func TestThresholdValidator3of3(t *testing.T) {
 	signState3, err := LoadOrCreateSignState(stateFile3.Name())
 	require.NoError(t, err)
 
-	signerTypeConfig1 := LocalSoftSignThresholdEd25519SignatureConfig{
-		CosignerKey: key1,
-		RsaKey:      *rsaKey1,
-		Total:       total,
-		Threshold:   threshold,
-	}
-	cosignerConfig1 := LocalCosignerConfig{
-		SignState: &signState1,
-		Peers:     peers,
-	}
+	localSigner1 := NewLocalSoftSignThresholdEd25519Signature(key1, threshold, total)
+	cosigner1 := NewLocalCosigner(1, "", peers, &signState1, localSigner1)
 
-	signerTypeConfig2 := LocalSoftSignThresholdEd25519SignatureConfig{
-		CosignerKey: key2,
-		RsaKey:      *rsaKey2,
-		Total:       total,
-		Threshold:   threshold,
-	}
-	cosignerConfig2 := LocalCosignerConfig{
-		SignState: &signState2,
-		Peers:     peers,
-	}
+	localSigner2 := NewLocalSoftSignThresholdEd25519Signature(key2, threshold, total)
+	cosigner2 := NewLocalCosigner(2, "", peers, &signState2, localSigner2)
 
-	signerTypeConfig3 := LocalSoftSignThresholdEd25519SignatureConfig{
-		CosignerKey: key3,
-		RsaKey:      *rsaKey3,
-		Total:       total,
-		Threshold:   threshold,
-	}
-	cosignerConfig3 := LocalCosignerConfig{
-		SignState: &signState3,
-		Peers:     peers,
-	}
-	var cosigner1 Cosigner
-	var cosigner2 Cosigner
-	var cosigner3 Cosigner
-
-	localsigner1 := NewLocalSigner(SignerType, signerTypeConfig1)
-	cosigner1 = NewLocalCosigner(cosignerConfig1, localsigner1)
-
-	localsigner2 := NewLocalSigner(SignerType, signerTypeConfig2)
-	cosigner2 = NewLocalCosigner(cosignerConfig2, localsigner2)
-
-	localsigner3 := NewLocalSigner(SignerType, signerTypeConfig3)
-	cosigner3 = NewLocalCosigner(cosignerConfig3, localsigner3)
-
-	require.Equal(t, cosigner1.GetID(), 1)
-	require.Equal(t, cosigner2.GetID(), 2)
-	require.Equal(t, cosigner3.GetID(), 3)
+	localSigner3 := NewLocalSoftSignThresholdEd25519Signature(key3, threshold, total)
+	cosigner3 := NewLocalCosigner(3, "", peers, &signState3, localSigner3)
 
 	thresholdPeers := make([]Cosigner, 0)
 	thresholdPeers = append(thresholdPeers, cosigner2, cosigner3)
@@ -364,6 +301,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 
 	key1 := CosignerKey{
 		PubKey:   privateKey.PubKey(),
+		RSAKey:   *rsaKey1,
 		ShareKey: secretShares[0],
 		ID:       1,
 	}
@@ -377,6 +315,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 
 	key2 := CosignerKey{
 		PubKey:   privateKey.PubKey(),
+		RSAKey:   *rsaKey2,
 		ShareKey: secretShares[1],
 		ID:       2,
 	}
@@ -390,6 +329,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 
 	key3 := CosignerKey{
 		PubKey:   privateKey.PubKey(),
+		RSAKey:   *rsaKey3,
 		ShareKey: secretShares[2],
 		ID:       3,
 	}
@@ -401,54 +341,14 @@ func TestThresholdValidator2of3(t *testing.T) {
 	signState3, err := LoadOrCreateSignState(stateFile3.Name())
 	require.NoError(t, err)
 
-	signerTypeConfig1 := LocalSoftSignThresholdEd25519SignatureConfig{
-		CosignerKey: key1,
-		RsaKey:      *rsaKey1,
-		Total:       total,
-		Threshold:   threshold,
-	}
-	cosignerConfig1 := LocalCosignerConfig{
-		SignState: &signState1,
-		Peers:     peers,
-	}
+	localSigner1 := NewLocalSoftSignThresholdEd25519Signature(key1, threshold, total)
+	cosigner1 := NewLocalCosigner(1, "", peers, &signState1, localSigner1)
 
-	signerTypeConfig2 := LocalSoftSignThresholdEd25519SignatureConfig{
-		CosignerKey: key2,
-		RsaKey:      *rsaKey2,
-		Total:       total,
-		Threshold:   threshold,
-	}
-	cosignerConfig2 := LocalCosignerConfig{
-		SignState: &signState2,
-		Peers:     peers,
-	}
+	localSigner2 := NewLocalSoftSignThresholdEd25519Signature(key2, threshold, total)
+	cosigner2 := NewLocalCosigner(2, "", peers, &signState2, localSigner2)
 
-	signerTypeConfig3 := LocalSoftSignThresholdEd25519SignatureConfig{
-		CosignerKey: key3,
-		RsaKey:      *rsaKey3,
-		Total:       total,
-		Threshold:   threshold,
-	}
-	cosignerConfig3 := LocalCosignerConfig{
-		SignState: &signState3,
-		Peers:     peers,
-	}
-	var cosigner1 Cosigner
-	var cosigner2 Cosigner
-	var cosigner3 Cosigner
-
-	localsigner1 := NewLocalSigner(SignerType, signerTypeConfig1)
-	cosigner1 = NewLocalCosigner(cosignerConfig1, localsigner1)
-
-	localsigner2 := NewLocalSigner(SignerType, signerTypeConfig2)
-	cosigner2 = NewLocalCosigner(cosignerConfig2, localsigner2)
-
-	localsigner3 := NewLocalSigner(SignerType, signerTypeConfig3)
-	cosigner3 = NewLocalCosigner(cosignerConfig3, localsigner3)
-
-	require.Equal(t, cosigner1.GetID(), 1)
-	require.Equal(t, cosigner2.GetID(), 2)
-	require.Equal(t, cosigner3.GetID(), 3)
+	localSigner3 := NewLocalSoftSignThresholdEd25519Signature(key3, threshold, total)
+	cosigner3 := NewLocalCosigner(3, "", peers, &signState3, localSigner3)
 
 	thresholdPeers := make([]Cosigner, 0)
 	thresholdPeers = append(thresholdPeers, cosigner2, cosigner3)

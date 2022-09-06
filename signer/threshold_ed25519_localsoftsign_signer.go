@@ -20,7 +20,6 @@ import (
 type LocalSoftSignThresholdEd25519Signature struct {
 	PubKeyBytes []byte
 	Key         CosignerKey
-	RsaKey      rsa.PrivateKey
 	// Total signers
 	Total     uint8
 	Threshold uint8
@@ -28,23 +27,17 @@ type LocalSoftSignThresholdEd25519Signature struct {
 	HrsMeta map[HRSTKey]HrsMetadata
 }
 
-// Holds the configuration of the Local soft signer.
-type LocalSoftSignThresholdEd25519SignatureConfig struct {
-	CosignerKey CosignerKey
-	RsaKey      rsa.PrivateKey
-	RaftAddress string
-	Total       uint8
-	Threshold   uint8
-}
-
-// Implements ThresholdEd25519SignatureOption interface from threshold_ed25519_signer.go to create a new local signer.
-func (cfg *LocalSoftSignThresholdEd25519SignatureConfig) createThresholdEd25519Signature() ThresholdEd25519Signature {
+// NewLocalSoftSignThresholdEd25519Signature constructs a ThresholdEd25519Signature
+// that signs using the local key share file.
+func NewLocalSoftSignThresholdEd25519Signature(
+	key CosignerKey,
+	threshold, total uint8,
+) ThresholdEd25519Signature {
 	localsigner := &LocalSoftSignThresholdEd25519Signature{
-		Key:       cfg.CosignerKey,
-		RsaKey:    cfg.RsaKey,
+		Key:       key,
 		HrsMeta:   make(map[HRSTKey]HrsMetadata),
-		Total:     cfg.Total,
-		Threshold: cfg.Threshold,
+		Total:     total,
+		Threshold: threshold,
 	}
 
 	// cache the public key bytes for signing operations
@@ -56,7 +49,6 @@ func (cfg *LocalSoftSignThresholdEd25519SignatureConfig) createThresholdEd25519S
 		panic("Not an ed25519 public key")
 	}
 	return localsigner
-
 }
 
 // Implements the ThresholdEd25519Signature interface from threshold_ed25519_signer.go
@@ -268,7 +260,7 @@ func (localsigner *LocalSoftSignThresholdEd25519Signature) GetEphemeralSecretPar
 		}
 
 		digest := sha256.Sum256(jsonBytes)
-		signature, err := rsa.SignPSS(rand.Reader, &localsigner.RsaKey, crypto.SHA256, digest[:], nil)
+		signature, err := rsa.SignPSS(rand.Reader, &localsigner.Key.RSAKey, crypto.SHA256, digest[:], nil)
 		if err != nil {
 			return res, err
 		}
@@ -345,7 +337,7 @@ func (localsigner *LocalSoftSignThresholdEd25519Signature) SetEphemeralSecretPar
 	}
 
 	// decrypt share
-	sharePart, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, &localsigner.RsaKey, req.EncryptedSharePart, nil)
+	sharePart, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, &localsigner.Key.RSAKey, req.EncryptedSharePart, nil)
 	if err != nil {
 		return err
 	}

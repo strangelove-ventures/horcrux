@@ -28,44 +28,41 @@ type LastSignStateStruct struct {
 	LastSignState *SignState
 }
 
-type LocalCosignerConfig struct {
-	// CosignerKey CosignerKey - removed
-	SignState *SignState
-	// RsaKey      rsa.PrivateKey - removed
-	Peers   []CosignerPeer
-	Address string
-	// localsigner is passed as parameter.
-	// Total       uint8 - removed
-	// Threshold   uint8 - removed
-}
-
 // LocalCosigner responds to sign requests using their share key
 // LocalCosigner "embeds" the Threshold signer.
 // LocalCosigner maintains a watermark to avoid double-signing via the embedded LastSignStateStruct.
 // LocalCosigner signing is thread safe by embedding *LastSignStateStruct which contains LastSignStateMutex sync.Mutex.
 type LocalCosigner struct {
 	LastSignStateStruct *LastSignStateStruct
+	id                  int
 	address             string
 	Peers               map[int]CosignerPeer
-	localsigner         ThresholdEd25519Signature
+	thresholdSigner     ThresholdEd25519Signature
 }
 
 // Initialize a Local Cosigner
-func NewLocalCosigner(cfg LocalCosignerConfig, localsigner ThresholdEd25519Signature) *LocalCosigner {
+func NewLocalCosigner(
+	id int,
+	address string,
+	peers []CosignerPeer,
+	signState *SignState,
+	thresholdSigner ThresholdEd25519Signature,
+) *LocalCosigner {
 
 	LastSignStateStruct := LastSignStateStruct{
 		// Mutex  doesnt need to be initialized mean we can skip: LastSignStateMutex: sync.Mutex{},
-		LastSignState: cfg.SignState,
+		LastSignState: signState,
 	}
 
 	cosigner := &LocalCosigner{
 		LastSignStateStruct: &LastSignStateStruct,
-		address:             cfg.Address,
-		localsigner:         localsigner,
+		id:                  id,
+		address:             address,
+		thresholdSigner:     thresholdSigner,
 		Peers:               make(map[int]CosignerPeer),
 	}
 
-	for _, peer := range cfg.Peers {
+	for _, peer := range peers {
 		cosigner.Peers[peer.ID] = peer
 	}
 
@@ -79,8 +76,7 @@ func (cosigner *LocalCosigner) SaveLastSignedState(signState SignStateConsensus)
 // GetID returns the id of the cosigner, via the localsigner getter
 // Implements the Cosigner interface from Cosigner.go
 func (cosigner *LocalCosigner) GetID() int {
-	id, _ := cosigner.localsigner.GetID()
-	return id
+	return cosigner.id
 }
 
 // GetAddress returns the GRPC URL of the cosigner
@@ -100,7 +96,7 @@ func (cosigner *LocalCosigner) GetEphemeralSecretParts(
 		if peer.ID == cosigner.GetID() {
 			continue
 		}
-		secretPart, err := cosigner.localsigner.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
+		secretPart, err := cosigner.thresholdSigner.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
 			ID:        peer.ID,
 			Height:    hrst.Height,
 			Round:     hrst.Round,
@@ -123,7 +119,7 @@ func (cosigner *LocalCosigner) GetEphemeralSecretParts(
 func (cosigner *LocalCosigner) SetEphemeralSecretPartsAndSign(
 	req CosignerSetEphemeralSecretPartsAndSignRequest) (*CosignerSignResponse, error) {
 	for _, secretPart := range req.EncryptedSecrets {
-		err := cosigner.localsigner.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
+		err := cosigner.thresholdSigner.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
 			SourceID:                       secretPart.SourceID,
 			SourceEphemeralSecretPublicKey: secretPart.SourceEphemeralSecretPublicKey,
 			EncryptedSharePart:             secretPart.EncryptedSharePart,
@@ -138,6 +134,6 @@ func (cosigner *LocalCosigner) SetEphemeralSecretPartsAndSign(
 		}
 	}
 
-	res, err := cosigner.localsigner.Sign(CosignerSignRequest{req.SignBytes}, cosigner.LastSignStateStruct)
+	res, err := cosigner.thresholdSigner.Sign(CosignerSignRequest{req.SignBytes}, cosigner.LastSignStateStruct)
 	return &res, err
 }
