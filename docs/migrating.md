@@ -51,7 +51,7 @@ When installing `horcrux` we recommend using the prebuilt binaries from the [rel
 # On each signer VM
 $ wget https://github.com/strangelove-ventures/horcrux/releases/download/v2.0.0/horcrux_2.0.0_linux_amd64.tar.gz
 $ tar -xzf horcrux_2.0.0_linux_amd64.tar.gz
-$ mv horcrux /usr/bin/horcrux && rm horcrux_2.0.0_linux_amd64.tar.gz README.md LICENSE.md
+$ sudo mv horcrux /usr/bin/horcrux && rm horcrux_2.0.0_linux_amd64.tar.gz README.md LICENSE.md
 ```
 
 Once the binary is installed in `/usr/bin`, install the `systemd` unit file. You can find an [example here](./horcrux.service):
