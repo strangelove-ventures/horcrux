@@ -12,14 +12,6 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 	tmpDir, _ := os.MkdirTemp("", "store_test")
 	defer os.RemoveAll(tmpDir)
 
-	signState := SignState{
-		Height: 0,
-		Round:  0,
-		Step:   0,
-	}
-
-	cosigner := NewLocalCosigner(1, "", nil, &signState, nil)
-
 	s := &RaftStore{
 		NodeID:      "1",
 		RaftDir:     tmpDir,
@@ -27,7 +19,7 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 		RaftTimeout: 1 * time.Second,
 		m:           make(map[string]string),
 		logger:      nil,
-		cosigner:    cosigner,
+		cosigner:    NewLocalCosigner("", nil, nil, nil),
 		Peers:       []Cosigner{},
 	}
 

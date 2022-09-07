@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/signer"
+	tmlog "github.com/tendermint/tendermint/libs/log"
 	"gopkg.in/yaml.v2"
 )
 
@@ -550,11 +551,13 @@ func (c *DiskConfig) CosignerPeers() (out []signer.CosignerConfig) {
 	return
 }
 
-func (c *DiskConfig) KeyAndThresholdSigner() (signer.CosignerKey, signer.ThresholdEd25519Signature, error) {
+func (c *DiskConfig) KeyAndThresholdSigner(logger tmlog.Logger) (signer.CosignerKey, signer.ThresholdSigner, error) {
 	switch c.CosignerConfig.SignerType {
 	case "hsm", "HSM":
-		return signer.CosignerKey{}, signer.NewLocalHSMSignThresholdEd25519Signature(), nil
+		logger.Info("Cosigning with HSM")
+		return signer.CosignerKey{}, signer.NewThresholdSignerHSM(), nil
 	default:
+
 		keyFilePath := config.keyFilePath(true)
 		if _, err := os.Stat(keyFilePath); os.IsNotExist(err) {
 			return signer.CosignerKey{}, nil, fmt.Errorf("private key share doesn't exist at path(%s)", keyFilePath)
@@ -563,7 +566,13 @@ func (c *DiskConfig) KeyAndThresholdSigner() (signer.CosignerKey, signer.Thresho
 		if err != nil {
 			return signer.CosignerKey{}, nil, fmt.Errorf("error reading cosigner key: %s", err)
 		}
-		return key, signer.NewLocalSoftSignThresholdEd25519Signature(
+		logger.Info("Cosigning with soft key",
+			"file", keyFilePath,
+			"id", key.ID,
+			"threshold", c.CosignerConfig.Threshold,
+			"total", c.CosignerConfig.Shares,
+		)
+		return key, signer.NewThresholdSignerSoft(
 			key,
 			c.CosignerConfig.Threshold,
 			c.CosignerConfig.Shares,

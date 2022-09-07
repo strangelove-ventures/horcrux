@@ -9,8 +9,10 @@ const (
 	SignerTypeHSM      = "HSM"
 )
 
-// Interface for the local signer whetever its a soft sign or hms
-type ThresholdEd25519Signature interface {
+// Interface for the local signer whether it's a soft sign or HSM
+type ThresholdSigner interface {
+	Type() string
+
 	DealShares(req CosignerGetEphemeralSecretPartRequest) (HrsMetadata, error)
 
 	GetEphemeralSecretPart(req CosignerGetEphemeralSecretPartRequest, m *LastSignStateStruct,
@@ -31,7 +33,8 @@ type PeerMetadata struct {
 	EphemeralSecretPublicKey []byte
 }
 
-// Moved from Local cosigner to threshold_ed25519
+// HrsMetadata holds the ephemeral nonces from cosigner peers
+// for a given height, round, step.
 type HrsMetadata struct {
 	// need to be _total_ entries per player
 	Secret      []byte

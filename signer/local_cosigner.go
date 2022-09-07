@@ -34,19 +34,17 @@ type LastSignStateStruct struct {
 // LocalCosigner signing is thread safe by embedding *LastSignStateStruct which contains LastSignStateMutex sync.Mutex.
 type LocalCosigner struct {
 	LastSignStateStruct *LastSignStateStruct
-	id                  int
 	address             string
 	Peers               map[int]CosignerPeer
-	thresholdSigner     ThresholdEd25519Signature
+	thresholdSigner     ThresholdSigner
 }
 
 // Initialize a Local Cosigner
 func NewLocalCosigner(
-	id int,
 	address string,
 	peers []CosignerPeer,
 	signState *SignState,
-	thresholdSigner ThresholdEd25519Signature,
+	thresholdSigner ThresholdSigner,
 ) *LocalCosigner {
 
 	LastSignStateStruct := LastSignStateStruct{
@@ -56,7 +54,6 @@ func NewLocalCosigner(
 
 	cosigner := &LocalCosigner{
 		LastSignStateStruct: &LastSignStateStruct,
-		id:                  id,
 		address:             address,
 		thresholdSigner:     thresholdSigner,
 		Peers:               make(map[int]CosignerPeer),
@@ -73,10 +70,11 @@ func (cosigner *LocalCosigner) SaveLastSignedState(signState SignStateConsensus)
 	return cosigner.LastSignStateStruct.LastSignState.Save(signState, &cosigner.LastSignStateStruct.LastSignStateMutex)
 }
 
-// GetID returns the id of the cosigner, via the localsigner getter
+// GetID returns the id of the cosigner, via the thresholdSigner getter
 // Implements the Cosigner interface from Cosigner.go
 func (cosigner *LocalCosigner) GetID() int {
-	return cosigner.id
+	id, _ := cosigner.thresholdSigner.GetID()
+	return id
 }
 
 // GetAddress returns the GRPC URL of the cosigner

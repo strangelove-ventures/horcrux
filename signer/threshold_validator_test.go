@@ -84,11 +84,11 @@ func TestThresholdValidator2of2(t *testing.T) {
 	signState2, err := LoadOrCreateSignState(stateFile2.Name())
 	require.NoError(t, err)
 
-	localSigner1 := NewLocalSoftSignThresholdEd25519Signature(key1, threshold, total)
-	cosigner1 := NewLocalCosigner(1, "", peers, &signState1, localSigner1)
+	localSigner1 := NewThresholdSignerSoft(key1, threshold, total)
+	cosigner1 := NewLocalCosigner("", peers, &signState1, localSigner1)
 
-	localSigner2 := NewLocalSoftSignThresholdEd25519Signature(key2, threshold, total)
-	cosigner2 := NewLocalCosigner(2, "", peers, &signState2, localSigner2)
+	localSigner2 := NewThresholdSignerSoft(key2, threshold, total)
+	cosigner2 := NewLocalCosigner("", peers, &signState2, localSigner2)
 
 	thresholdPeers := make([]Cosigner, 0)
 	thresholdPeers = append(thresholdPeers, cosigner2)
@@ -216,14 +216,14 @@ func TestThresholdValidator3of3(t *testing.T) {
 	signState3, err := LoadOrCreateSignState(stateFile3.Name())
 	require.NoError(t, err)
 
-	localSigner1 := NewLocalSoftSignThresholdEd25519Signature(key1, threshold, total)
-	cosigner1 := NewLocalCosigner(1, "", peers, &signState1, localSigner1)
+	localSigner1 := NewThresholdSignerSoft(key1, threshold, total)
+	cosigner1 := NewLocalCosigner("", peers, &signState1, localSigner1)
 
-	localSigner2 := NewLocalSoftSignThresholdEd25519Signature(key2, threshold, total)
-	cosigner2 := NewLocalCosigner(2, "", peers, &signState2, localSigner2)
+	localSigner2 := NewThresholdSignerSoft(key2, threshold, total)
+	cosigner2 := NewLocalCosigner("", peers, &signState2, localSigner2)
 
-	localSigner3 := NewLocalSoftSignThresholdEd25519Signature(key3, threshold, total)
-	cosigner3 := NewLocalCosigner(3, "", peers, &signState3, localSigner3)
+	localSigner3 := NewThresholdSignerSoft(key3, threshold, total)
+	cosigner3 := NewLocalCosigner("", peers, &signState3, localSigner3)
 
 	thresholdPeers := make([]Cosigner, 0)
 	thresholdPeers = append(thresholdPeers, cosigner2, cosigner3)
@@ -341,14 +341,14 @@ func TestThresholdValidator2of3(t *testing.T) {
 	signState3, err := LoadOrCreateSignState(stateFile3.Name())
 	require.NoError(t, err)
 
-	localSigner1 := NewLocalSoftSignThresholdEd25519Signature(key1, threshold, total)
-	cosigner1 := NewLocalCosigner(1, "", peers, &signState1, localSigner1)
+	localSigner1 := NewThresholdSignerSoft(key1, threshold, total)
+	cosigner1 := NewLocalCosigner("", peers, &signState1, localSigner1)
 
-	localSigner2 := NewLocalSoftSignThresholdEd25519Signature(key2, threshold, total)
-	cosigner2 := NewLocalCosigner(2, "", peers, &signState2, localSigner2)
+	localSigner2 := NewThresholdSignerSoft(key2, threshold, total)
+	cosigner2 := NewLocalCosigner("", peers, &signState2, localSigner2)
 
-	localSigner3 := NewLocalSoftSignThresholdEd25519Signature(key3, threshold, total)
-	cosigner3 := NewLocalCosigner(3, "", peers, &signState3, localSigner3)
+	localSigner3 := NewThresholdSignerSoft(key3, threshold, total)
+	cosigner3 := NewLocalCosigner("", peers, &signState3, localSigner3)
 
 	thresholdPeers := make([]Cosigner, 0)
 	thresholdPeers = append(thresholdPeers, cosigner2, cosigner3)

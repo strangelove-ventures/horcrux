@@ -18,7 +18,8 @@ import (
 const SignerType = SignerTypeSoftSign
 
 func TestLocalCosignerGetID(t *testing.T) {
-	cosigner := NewLocalCosigner(1, "", nil, nil, nil)
+	thresholdSigner := NewThresholdSignerSoft(CosignerKey{ID: 1, PubKey: tmCryptoEd25519.PubKey{}}, 2, 3)
+	cosigner := NewLocalCosigner("", nil, nil, thresholdSigner)
 	require.Equal(t, cosigner.GetID(), 1)
 }
 
@@ -76,11 +77,11 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	signState2, err := LoadOrCreateSignState(stateFile2.Name())
 	require.NoError(t, err)
 
-	localSigner1 := NewLocalSoftSignThresholdEd25519Signature(key1, threshold, total)
-	cosigner1 := NewLocalCosigner(1, "", peers, &signState1, localSigner1)
+	localSigner1 := NewThresholdSignerSoft(key1, threshold, total)
+	cosigner1 := NewLocalCosigner("", peers, &signState1, localSigner1)
 
-	localSigner2 := NewLocalSoftSignThresholdEd25519Signature(key2, threshold, total)
-	cosigner2 := NewLocalCosigner(2, "", peers, &signState2, localSigner2)
+	localSigner2 := NewThresholdSignerSoft(key2, threshold, total)
+	cosigner2 := NewLocalCosigner("", peers, &signState2, localSigner2)
 
 	publicKeys := make([]tsed25519.Element, 0)
 

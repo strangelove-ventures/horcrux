@@ -122,22 +122,19 @@ func StartCosignerCmd() *cobra.Command {
 				logger   = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator")
 			)
 
-			privValKeyFile := config.keyFilePath(true)
-
 			nodes := config.Config.Nodes()
 			cfgCosigners := config.Config.CosignerPeers()
 
 			// Initialize the localsigner (ThresholdEdSignature) of choice.
-			key, thresholdSigner, err := config.Config.KeyAndThresholdSigner()
+			key, thresholdSigner, err := config.Config.KeyAndThresholdSigner(logger)
 			if err != nil {
 				panic(err)
 			}
 
 			logger.Info("Tendermint Validator",
 				"mode", "mpc",
-				"priv-key", privValKeyFile,
 				"priv-state-dir", config.StateDir,
-				"threshold signer", config.Config.CosignerConfig.SignerType)
+				"threshold-signer", thresholdSigner.Type())
 
 			var val types.PrivValidator
 
@@ -180,7 +177,6 @@ func StartCosignerCmd() *cobra.Command {
 
 			// Initialize the localCosigner. The localCosigner "embeds" the local signer
 			localCosigner := signer.NewLocalCosigner(
-				key.ID,
 				config.Config.CosignerConfig.P2PListen,
 				peers, &shareSignState,
 				thresholdSigner,
