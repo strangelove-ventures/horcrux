@@ -110,8 +110,16 @@ func setStateCmd() *cobra.Command {
 				Signature: nil,
 				SignBytes: nil,
 			}
-			_ = pv.Save(signState, nil)
-			_ = share.Save(signState, nil)
+			err = pv.Save(signState, nil, false)
+			if err != nil {
+				fmt.Printf("error saving privval sign state")
+				return err
+			}
+			err = share.Save(signState, nil, false)
+			if err != nil {
+				fmt.Printf("error saving share sign state")
+				return err
+			}
 			return nil
 		},
 	}
@@ -138,6 +146,10 @@ func importStateCmd() *cobra.Command {
 			}
 
 			pv, err := signer.LoadSignState(config.privValStateFile(config.Config.ChainID))
+			if err != nil {
+				return err
+			}
+			share, err := signer.LoadSignState(config.shareStateFile(config.Config.ChainID))
 			if err != nil {
 				return err
 			}
@@ -183,12 +195,16 @@ func importStateCmd() *cobra.Command {
 				"  Step:      %v\n",
 				signState.Height, signState.Round, signState.Step)
 
-			err = pv.Save(signState, nil)
+			err = pv.Save(signState, nil, false)
 			if err != nil {
-				fmt.Printf("error saving Sign State")
+				fmt.Printf("error saving privval sign state")
 				return err
 			}
-			<-time.After(100 * time.Millisecond) // some machines are too fast
+			err = share.Save(signState, nil, false)
+			if err != nil {
+				fmt.Printf("error saving share sign state")
+				return err
+			}
 			fmt.Printf("Update Successful\n")
 			return nil
 		},

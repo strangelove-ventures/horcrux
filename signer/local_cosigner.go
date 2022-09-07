@@ -109,7 +109,7 @@ type LocalCosigner struct {
 }
 
 func (cosigner *LocalCosigner) SaveLastSignedState(signState SignStateConsensus) error {
-	return cosigner.lastSignState.Save(signState, &cosigner.lastSignStateMutex)
+	return cosigner.lastSignState.Save(signState, &cosigner.lastSignStateMutex, true)
 }
 
 func NewLocalCosigner(cfg LocalCosignerConfig) *LocalCosigner {
@@ -229,7 +229,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		Step:      hrst.Step,
 		Signature: sig,
 		SignBytes: req.SignBytes,
-	}, nil)
+	}, nil, true)
 
 	if err != nil {
 		if _, isSameHRSError := err.(*SameHRSError); !isSameHRSError {
