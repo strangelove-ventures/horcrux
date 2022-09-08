@@ -15,12 +15,11 @@ import (
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
-// LocalSoftsignThresholdEd25519Signature implements the interface and signs the message for each local signer.
-// LocalSoftSignThresholdEd25519Signature is the implementation of a soft sign signer at the local level.
-type LocalSoftSignThresholdEd25519Signature struct {
+// ThresholdSignerSoft implements the interface and signs the message for each local signer.
+// ThresholdSignerSoft is the implementation of a soft sign signer at the local level.
+type ThresholdSignerSoft struct {
 	PubKeyBytes []byte
 	Key         CosignerKey
-	RsaKey      rsa.PrivateKey
 	// Total signers
 	Total     uint8
 	Threshold uint8
@@ -28,44 +27,42 @@ type LocalSoftSignThresholdEd25519Signature struct {
 	HrsMeta map[HRSTKey]HrsMetadata
 }
 
-// Holds the configuration of the Local soft signer.
-type LocalSoftSignThresholdEd25519SignatureConfig struct {
-	CosignerKey CosignerKey
-	RsaKey      rsa.PrivateKey
-	RaftAddress string
-	Total       uint8
-	Threshold   uint8
-}
-
-// Implements ThresholdEd25519SignatureOption interface from threshold_ed25519_signer.go to create a new local signer.
-func (cfg *LocalSoftSignThresholdEd25519SignatureConfig) createThresholdEd25519Signature() ThresholdEd25519Signature {
-	localsigner := &LocalSoftSignThresholdEd25519Signature{
-		Key:       cfg.CosignerKey,
-		RsaKey:    cfg.RsaKey,
+// NewThresholdSignerSoft constructs a ThresholdSigner
+// that signs using the local key share file.
+func NewThresholdSignerSoft(
+	key CosignerKey,
+	threshold, total uint8,
+) ThresholdSigner {
+	softSigner := &ThresholdSignerSoft{
+		Key:       key,
 		HrsMeta:   make(map[HRSTKey]HrsMetadata),
-		Total:     cfg.Total,
-		Threshold: cfg.Threshold,
+		Total:     total,
+		Threshold: threshold,
 	}
 
 	// cache the public key bytes for signing operations
-	switch ed25519Key := localsigner.Key.PubKey.(type) {
+	switch ed25519Key := softSigner.Key.PubKey.(type) {
 	case tmCryptoEd25519.PubKey:
-		localsigner.PubKeyBytes = make([]byte, len(ed25519Key))
-		copy(localsigner.PubKeyBytes, ed25519Key[:])
+		softSigner.PubKeyBytes = make([]byte, len(ed25519Key))
+		copy(softSigner.PubKeyBytes, ed25519Key[:])
 	default:
 		panic("Not an ed25519 public key")
 	}
-	return localsigner
-
+	return softSigner
 }
 
-// Implements the ThresholdEd25519Signature interface from threshold_ed25519_signer.go
-func (localsigner *LocalSoftSignThresholdEd25519Signature) GetID() (int, error) {
-	return localsigner.Key.ID, nil
+// Implements ThresholdSigner
+func (softSigner *ThresholdSignerSoft) Type() string {
+	return "soft"
 }
 
-// Implements the ThresholdEd25519Signature interface from threshold_ed25519_signer.go
-func (localsigner *LocalSoftSignThresholdEd25519Signature) Sign(
+// Implements ThresholdSigner
+func (softSigner *ThresholdSignerSoft) GetID() (int, error) {
+	return softSigner.Key.ID, nil
+}
+
+// Implements ThresholdSigner
+func (softSigner *ThresholdSignerSoft) Sign(
 	req CosignerSignRequest, m *LastSignStateStruct) (CosignerSignResponse, error) {
 	m.LastSignStateMutex.Lock()
 	defer m.LastSignStateMutex.Unlock()
@@ -97,7 +94,7 @@ func (localsigner *LocalSoftSignThresholdEd25519Signature) Sign(
 		// same HRS, and only differ by timestamp - ok to sign again
 	}
 
-	meta, ok := localsigner.HrsMeta[hrst]
+	meta, ok := softSigner.HrsMeta[hrst]
 	if !ok {
 		return res, errors.New("no metadata at HRS")
 	}
@@ -131,7 +128,7 @@ func (localsigner *LocalSoftSignThresholdEd25519Signature) Sign(
 	}
 
 	sig := tsed25519.SignWithShare(
-		req.SignBytes, localsigner.Key.ShareKey, ephemeralShare, localsigner.PubKeyBytes, ephemeralPublic)
+		req.SignBytes, softSigner.Key.ShareKey, ephemeralShare, softSigner.PubKeyBytes, ephemeralPublic)
 
 	m.LastSignState.EphemeralPublic = ephemeralPublic
 	err = m.LastSignState.Save(SignStateConsensus{
@@ -148,11 +145,11 @@ func (localsigner *LocalSoftSignThresholdEd25519Signature) Sign(
 		}
 	}
 
-	for existingKey := range localsigner.HrsMeta {
+	for existingKey := range softSigner.HrsMeta {
 		// delete any HRS lower than our signed level
 		// we will not be providing parts for any lower HRS
 		if existingKey.Less(hrst) {
-			delete(localsigner.HrsMeta, existingKey)
+			delete(softSigner.HrsMeta, existingKey)
 		}
 	}
 
@@ -161,8 +158,8 @@ func (localsigner *LocalSoftSignThresholdEd25519Signature) Sign(
 	return res, nil
 }
 
-// Implements the ThresholdEd25519Signature interface from threshold_ed25519_signer.go
-func (localsigner *LocalSoftSignThresholdEd25519Signature) DealShares(
+// Implements ThresholdSigner
+func (softSigner *ThresholdSignerSoft) DealShares(
 	req CosignerGetEphemeralSecretPartRequest) (HrsMetadata, error) {
 	hrsKey := HRSTKey{
 		Height:    req.Height,
@@ -171,7 +168,7 @@ func (localsigner *LocalSoftSignThresholdEd25519Signature) DealShares(
 		Timestamp: req.Timestamp.UnixNano(),
 	}
 
-	meta, ok := localsigner.HrsMeta[hrsKey]
+	meta, ok := softSigner.HrsMeta[hrsKey]
 
 	if ok {
 		return meta, nil
@@ -184,22 +181,22 @@ func (localsigner *LocalSoftSignThresholdEd25519Signature) DealShares(
 
 	meta = HrsMetadata{
 		Secret: secret,
-		Peers:  make([]PeerMetadata, localsigner.Total),
+		Peers:  make([]PeerMetadata, softSigner.Total),
 	}
 
 	// split this secret with shamirs
 	// !! dealt shares need to be saved because dealing produces different shares each time!
-	meta.DealtShares = tsed25519.DealShares(meta.Secret, localsigner.Threshold, localsigner.Total)
+	meta.DealtShares = tsed25519.DealShares(meta.Secret, softSigner.Threshold, softSigner.Total)
 
-	localsigner.HrsMeta[hrsKey] = meta
+	softSigner.HrsMeta[hrsKey] = meta
 
 	return meta, nil
 }
 
 // Get the ephemeral secret part for an ephemeral share
 // The ephemeral secret part is encrypted for the receiver
-// Implements the ThresholdEd25519Signature interface from threshold_ed25519_signer.go
-func (localsigner *LocalSoftSignThresholdEd25519Signature) GetEphemeralSecretPart(
+// Implements ThresholdSigner
+func (softSigner *ThresholdSignerSoft) GetEphemeralSecretPart(
 	req CosignerGetEphemeralSecretPartRequest, m *LastSignStateStruct, peers map[int]CosignerPeer) (
 	CosignerEphemeralSecretPart, error) {
 
@@ -216,10 +213,10 @@ func (localsigner *LocalSoftSignThresholdEd25519Signature) GetEphemeralSecretPar
 		Timestamp: req.Timestamp.UnixNano(),
 	}
 
-	meta, ok := localsigner.HrsMeta[hrst]
+	meta, ok := softSigner.HrsMeta[hrst]
 	// generate metadata placeholder
 	if !ok {
-		newMeta, err := localsigner.DealShares(CosignerGetEphemeralSecretPartRequest{
+		newMeta, err := softSigner.DealShares(CosignerGetEphemeralSecretPartRequest{
 			Height:    req.Height,
 			Round:     req.Round,
 			Step:      req.Step,
@@ -231,14 +228,14 @@ func (localsigner *LocalSoftSignThresholdEd25519Signature) GetEphemeralSecretPar
 		}
 
 		meta = newMeta
-		localsigner.HrsMeta[hrst] = meta
+		softSigner.HrsMeta[hrst] = meta
 	}
 
 	ourEphPublicKey := tsed25519.ScalarMultiplyBase(meta.Secret)
 
 	// set our values
-	meta.Peers[localsigner.Key.ID-1].Share = meta.DealtShares[localsigner.Key.ID-1]
-	meta.Peers[localsigner.Key.ID-1].EphemeralSecretPublicKey = ourEphPublicKey
+	meta.Peers[softSigner.Key.ID-1].Share = meta.DealtShares[softSigner.Key.ID-1]
+	meta.Peers[softSigner.Key.ID-1].EphemeralSecretPublicKey = ourEphPublicKey
 
 	// grab the peer info for the ID being requested
 	peer, ok := peers[req.ID]
@@ -254,7 +251,7 @@ func (localsigner *LocalSoftSignThresholdEd25519Signature) GetEphemeralSecretPar
 		return res, err
 	}
 
-	res.SourceID = localsigner.Key.ID
+	res.SourceID = softSigner.Key.ID
 	res.SourceEphemeralSecretPublicKey = ourEphPublicKey
 	res.EncryptedSharePart = encrypted
 
@@ -268,7 +265,7 @@ func (localsigner *LocalSoftSignThresholdEd25519Signature) GetEphemeralSecretPar
 		}
 
 		digest := sha256.Sum256(jsonBytes)
-		signature, err := rsa.SignPSS(rand.Reader, &localsigner.RsaKey, crypto.SHA256, digest[:], nil)
+		signature, err := rsa.SignPSS(rand.Reader, &softSigner.Key.RSAKey, crypto.SHA256, digest[:], nil)
 		if err != nil {
 			return res, err
 		}
@@ -282,8 +279,8 @@ func (localsigner *LocalSoftSignThresholdEd25519Signature) GetEphemeralSecretPar
 }
 
 // Store an ephemeral secret share part provided by another cosigner (signer)
-// Implements ThresholdEd25519Signature interface
-func (localsigner *LocalSoftSignThresholdEd25519Signature) SetEphemeralSecretPart(
+// Implements ThresholdSigner
+func (softSigner *ThresholdSignerSoft) SetEphemeralSecretPart(
 	req CosignerSetEphemeralSecretPartRequest, m *LastSignStateStruct, peers map[int]CosignerPeer) error {
 
 	// Verify the source signature
@@ -327,10 +324,10 @@ func (localsigner *LocalSoftSignThresholdEd25519Signature) SetEphemeralSecretPar
 		Timestamp: req.Timestamp.UnixNano(),
 	}
 
-	meta, ok := localsigner.HrsMeta[hrst]
+	meta, ok := softSigner.HrsMeta[hrst]
 	// generate metadata placeholder
 	if !ok {
-		newMeta, err := localsigner.DealShares(CosignerGetEphemeralSecretPartRequest{
+		newMeta, err := softSigner.DealShares(CosignerGetEphemeralSecretPartRequest{
 			Height: req.Height,
 			Round:  req.Round,
 			Step:   req.Step,
@@ -341,11 +338,11 @@ func (localsigner *LocalSoftSignThresholdEd25519Signature) SetEphemeralSecretPar
 		}
 
 		meta = newMeta
-		localsigner.HrsMeta[hrst] = meta
+		softSigner.HrsMeta[hrst] = meta
 	}
 
 	// decrypt share
-	sharePart, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, &localsigner.RsaKey, req.EncryptedSharePart, nil)
+	sharePart, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, &softSigner.Key.RSAKey, req.EncryptedSharePart, nil)
 	if err != nil {
 		return err
 	}
