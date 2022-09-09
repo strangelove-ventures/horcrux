@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"sync"
 
 	"github.com/gogo/protobuf/proto"
@@ -107,7 +107,7 @@ func (signState *SignState) GetFromCache(hrs HRSKey, lock *sync.Mutex) (HRSKey, 
 	return latestBlock, nil
 }
 
-func (signState *SignState) Save(ssc SignStateConsensus, lock *sync.Mutex) error {
+func (signState *SignState) Save(ssc SignStateConsensus, lock *sync.Mutex, async bool) error {
 	// One lock/unlock for less/equal check and mutation.
 	// Setting nil for lock for getErrorIfLessOrEqual to avoid recursive lock
 	if lock != nil {
@@ -133,9 +133,13 @@ func (signState *SignState) Save(ssc SignStateConsensus, lock *sync.Mutex) error
 	signState.Step = ssc.Step
 	signState.Signature = ssc.Signature
 	signState.SignBytes = ssc.SignBytes
-	go func() {
+	if async {
+		go func() {
+			signState.save()
+		}()
+	} else {
 		signState.save()
-	}()
+	}
 
 	return nil
 }
@@ -244,7 +248,7 @@ func (signState *SignState) GetErrorIfLessOrEqual(height int64, round int64, ste
 // LoadSignState loads a sign state from disk.
 func LoadSignState(filepath string) (SignState, error) {
 	state := SignState{}
-	stateJSONBytes, err := ioutil.ReadFile(filepath)
+	stateJSONBytes, err := os.ReadFile(filepath)
 	if err != nil {
 		return state, err
 	}

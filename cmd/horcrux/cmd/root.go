@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -61,7 +60,7 @@ func initConfig() {
 		return
 	}
 	handleInitError(viper.Unmarshal(&config.Config))
-	bz, err := ioutil.ReadFile(viper.ConfigFileUsed())
+	bz, err := os.ReadFile(viper.ConfigFileUsed())
 	handleInitError(err)
 	handleInitError(yaml.Unmarshal(bz, &config.Config))
 }

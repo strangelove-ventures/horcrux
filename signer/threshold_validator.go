@@ -75,11 +75,11 @@ func NewThresholdValidator(opt *ThresholdValidatorOpt) *ThresholdValidator {
 }
 
 func (pv *ThresholdValidator) SaveLastSignedState(signState SignStateConsensus) error {
-	return pv.lastSignState.Save(signState, &pv.lastSignStateMutex)
+	return pv.lastSignState.Save(signState, &pv.lastSignStateMutex, true)
 }
 
 func (pv *ThresholdValidator) SaveLastSignedStateInitiated(signState SignStateConsensus) error {
-	return pv.lastSignStateInitiated.Save(signState, &pv.lastSignStateInitiatedMutex)
+	return pv.lastSignStateInitiated.Save(signState, &pv.lastSignStateInitiatedMutex, true)
 }
 
 // GetPubKey returns the public key of the validator.
@@ -460,7 +460,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 		SignBytes: signBytes,
 	}
 	// Err will be present if newLss is not above high watermark
-	err = pv.lastSignState.Save(newLss, &pv.lastSignStateMutex)
+	err = pv.lastSignState.Save(newLss, &pv.lastSignStateMutex, true)
 	if err != nil {
 		if _, isSameHRSError := err.(*SameHRSError); !isSameHRSError {
 			return nil, stamp, err

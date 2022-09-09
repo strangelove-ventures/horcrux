@@ -4,7 +4,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/json"
-	"io/ioutil"
+	"os"
 
 	amino "github.com/tendermint/go-amino"
 	tmCrypto "github.com/tendermint/tendermint/crypto"
@@ -120,7 +120,7 @@ func (cosignerKey *CosignerKey) UnmarshalJSON(data []byte) error {
 // LoadCosignerKey loads a CosignerKey from file.
 func LoadCosignerKey(file string) (CosignerKey, error) {
 	pvKey := CosignerKey{}
-	keyJSONBytes, err := ioutil.ReadFile(file)
+	keyJSONBytes, err := os.ReadFile(file)
 	if err != nil {
 		return pvKey, err
 	}
