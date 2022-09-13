@@ -137,7 +137,7 @@ func (softSigner *ThresholdSignerSoft) Sign(
 		Step:      hrst.Step,
 		Signature: sig,
 		SignBytes: req.SignBytes,
-	}, nil)
+	}, nil, true) // TODO double check true here is correct for async?
 
 	if err != nil {
 		if _, isSameHRSError := err.(*SameHRSError); !isSameHRSError {

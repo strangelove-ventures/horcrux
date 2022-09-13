@@ -67,7 +67,8 @@ func NewLocalCosigner(
 }
 
 func (cosigner *LocalCosigner) SaveLastSignedState(signState SignStateConsensus) error {
-	return cosigner.LastSignStateStruct.LastSignState.Save(signState, &cosigner.LastSignStateStruct.LastSignStateMutex)
+	return cosigner.LastSignStateStruct.LastSignState.Save(
+		signState, &cosigner.LastSignStateStruct.LastSignStateMutex, true)
 }
 
 // GetID returns the id of the cosigner, via the thresholdSigner getter

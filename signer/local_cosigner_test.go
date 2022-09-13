@@ -160,7 +160,7 @@ func TestLocalCosignerWatermark(t *testing.T) {
 			ID:       1,
 		}
 
-		stateFile1, err := io.TempFile("", "state1.json")
+		stateFile1, err := os.CreateTemp("", "state1.json")
 		require.NoError(t, err)
 		defer os.Remove(stateFile1.Name())
 
