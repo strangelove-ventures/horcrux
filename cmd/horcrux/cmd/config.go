@@ -564,7 +564,7 @@ func (c *DiskConfig) KeyAndThresholdSigner(logger tmlog.Logger) (signer.Cosigner
 		}
 		key, err := signer.LoadCosignerKey(keyFilePath)
 		if err != nil {
-			return signer.CosignerKey{}, nil, fmt.Errorf("error reading cosigner key: %s", err)
+			return signer.CosignerKey{}, nil, fmt.Errorf("error reading cosigner key: %w", err)
 		}
 		logger.Info("Cosigning with soft key",
 			"file", keyFilePath,

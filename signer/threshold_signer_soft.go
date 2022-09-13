@@ -9,8 +9,8 @@ import (
 	"errors"
 	"fmt"
 
-	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
-	tmJson "github.com/tendermint/tendermint/libs/json"
+	tmcryptoed25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	tmjson "github.com/tendermint/tendermint/libs/json"
 	"gitlab.com/unit410/edwards25519"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
@@ -42,11 +42,11 @@ func NewThresholdSignerSoft(
 
 	// cache the public key bytes for signing operations
 	switch ed25519Key := softSigner.Key.PubKey.(type) {
-	case tmCryptoEd25519.PubKey:
+	case tmcryptoed25519.PubKey:
 		softSigner.PubKeyBytes = make([]byte, len(ed25519Key))
 		copy(softSigner.PubKeyBytes, ed25519Key[:])
 	default:
-		panic("Not an ed25519 public key")
+		panic("softSigner.Key.PubKey.(type) is not a tmcryptoed25519.PubKey! i.e not ed25519 public key")
 	}
 	return softSigner
 }
@@ -258,7 +258,7 @@ func (softSigner *ThresholdSignerSoft) GetEphemeralSecretPart(
 	// sign the response payload with our private key
 	// cosigners can verify the signature to confirm sender validity
 	{
-		jsonBytes, err := tmJson.Marshal(res)
+		jsonBytes, err := tmjson.Marshal(res)
 
 		if err != nil {
 			return res, err
@@ -294,7 +294,7 @@ func (softSigner *ThresholdSignerSoft) SetEphemeralSecretPart(
 		digestMsg.SourceEphemeralSecretPublicKey = req.SourceEphemeralSecretPublicKey
 		digestMsg.EncryptedSharePart = req.EncryptedSharePart
 
-		digestBytes, err := tmJson.Marshal(digestMsg)
+		digestBytes, err := tmjson.Marshal(digestMsg)
 		if err != nil {
 			return err
 		}

@@ -142,7 +142,7 @@ func StartCosignerCmd() *cobra.Command {
 			// protects against double sign - this exists as a cache for the final signature
 			signState, err := signer.LoadOrCreateSignState(config.privValStateFile(chainID))
 			if err != nil {
-				panic(err)
+				return err
 			}
 
 			// state for our cosigner share

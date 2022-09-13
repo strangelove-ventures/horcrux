@@ -5,8 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
-	"fmt"
-	"log"
 	"os"
 	"testing"
 	"time"
@@ -128,18 +126,21 @@ func TestThresholdValidator2of2(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, privateKey.PubKey().VerifySignature(signBytes, proposal.Signature))
 
-	// TODO: Clean up a bit into nice loggnig and asserts/requires.
+	// Introducing some 'visual' logging so you can manually inspect Cosigners,
+	// an easy way to avoid easyable human caused problems.
 	cosigner1JSON, err := json.MarshalIndent(cosigner1, "", "  ")
 	if err != nil {
-		log.Println("cosigner1JSON error:", err.Error())
+		t.Logf("cosigner1JSON error: %v", err.Error())
 	}
-	fmt.Printf("Cosigner1 output \n %s\n", string(cosigner1JSON))
+	// Logs Cosigner 2 output
+	t.Logf("Cosigner1 output \n %s\n", string(cosigner1JSON))
 
 	cosigner2JSON, err := json.MarshalIndent(cosigner2, "", "  ")
 	if err != nil {
-		log.Println("cosigner2JSON error:", err.Error())
+		t.Logf("cosigner2JSON error: %v", err.Error())
 	}
-	fmt.Printf("Cosigner2 output \n %s\n", string(cosigner2JSON))
+	// Logs Cosigner 2 output
+	t.Logf("Cosigner2 output \n %s\n", string(cosigner2JSON))
 
 }
 
