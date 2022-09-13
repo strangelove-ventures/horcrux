@@ -6,14 +6,14 @@ import (
 	proto "github.com/strangelove-ventures/horcrux/signer/proto"
 )
 
-// HRSKey Height Round Step Key
+// HRSKey Height Round Step Key to keep track of ...?
 type HRSKey struct {
 	Height int64
 	Round  int64
 	Step   int8
 }
 
-// HRSTKey Height Round Step Time Key
+// HRSTKey Height Round Step Time to keep track of ....?
 type HRSTKey struct {
 	Height    int64
 	Round     int64
@@ -31,7 +31,7 @@ func HRSTKeyFromProto(hrs *proto.HRST) HRSTKey {
 	}
 }
 
-// toProto is a HRSTKey method that returns
+// toProto is a HRSTKey method that returns proto.HRST
 func (hrst HRSTKey) toProto() *proto.HRST {
 	return &proto.HRST{
 		Height:    hrst.Height,
