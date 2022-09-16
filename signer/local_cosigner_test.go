@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
-	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
+	tmcryptoed25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tm "github.com/tendermint/tendermint/types"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
@@ -18,7 +18,7 @@ import (
 const SignerType = SignerTypeSoftSign
 
 func TestLocalCosignerGetID(t *testing.T) {
-	thresholdSigner := NewThresholdSignerSoft(CosignerKey{ID: 1, PubKey: tmCryptoEd25519.PubKey{}}, 2, 3)
+	thresholdSigner := NewThresholdSignerSoft(CosignerKey{ID: 1, PubKey: tmcryptoed25519.PubKey{}}, 2, 3)
 	cosigner := NewLocalCosigner("", nil, nil, thresholdSigner)
 	require.Equal(t, cosigner.GetID(), 1)
 }
@@ -44,7 +44,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		PublicKey: rsaKey2.PublicKey,
 	}}
 
-	privateKey := tmCryptoEd25519.GenPrivKey()
+	privateKey := tmcryptoed25519.GenPrivKey()
 
 	privKeyBytes := [64]byte{}
 	copy(privKeyBytes[:], privateKey[:])
@@ -111,10 +111,10 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	t.Logf("public keys: %x", publicKeys)
 	t.Logf("eph pub: %x", ephemeralPublic)
 	// pack a vote into sign bytes
-	var vote tmProto.Vote
+	var vote tmproto.Vote
 	vote.Height = 1
 	vote.Round = 0
-	vote.Type = tmProto.PrevoteType
+	vote.Type = tmproto.PrevoteType
 	vote.Timestamp = now
 
 	signBytes := tm.VoteSignBytes("chain-id", &vote)
