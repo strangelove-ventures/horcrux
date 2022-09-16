@@ -29,10 +29,7 @@ type ThresholdSignerSoft struct {
 
 // NewThresholdSignerSoft constructs a ThresholdSigner
 // that signs using the local key share file.
-func NewThresholdSignerSoft(
-	key CosignerKey,
-	threshold, total uint8,
-) ThresholdSigner {
+func NewThresholdSignerSoft(key CosignerKey, threshold, total uint8) ThresholdSigner {
 	softSigner := &ThresholdSignerSoft{
 		Key:       key,
 		HrsMeta:   make(map[HRSTKey]HrsMetadata),
@@ -40,14 +37,12 @@ func NewThresholdSignerSoft(
 		Threshold: threshold,
 	}
 
-	// cache the public key bytes for signing operations
-	switch ed25519Key := softSigner.Key.PubKey.(type) {
-	case tmcryptoed25519.PubKey:
-		softSigner.PubKeyBytes = make([]byte, len(ed25519Key))
-		copy(softSigner.PubKeyBytes, ed25519Key[:])
-	default:
-		panic("softSigner.Key.PubKey.(type) is not a tmcryptoed25519.PubKey! i.e not ed25519 public key")
-	}
+	// cache the public key bytes for signing operations.
+	// Ensures casting else it will naturally panic.
+	ed25519Key := softSigner.Key.PubKey.(tmcryptoed25519.PubKey)
+	softSigner.PubKeyBytes = make([]byte, len(ed25519Key))
+	copy(softSigner.PubKeyBytes, ed25519Key[:])
+
 	return softSigner
 }
 
