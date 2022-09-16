@@ -17,6 +17,15 @@ import (
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
+type LastSignStateStruct struct {
+	// Signing is thread safe - lastSignStateMutex is used for putting locks so only one goroutine can r/w to the function
+	LastSignStateMutex sync.Mutex
+
+	// lastSignState stores the last sign state for a share we have fully signed
+	// incremented whenever we are asked to sign a share
+	LastSignState *SignState
+}
+
 // return true if we are less than the other key
 func (hrst *HRSTKey) Less(other HRSTKey) bool {
 	if hrst.Height < other.Height {
@@ -69,18 +78,6 @@ type LocalCosignerConfig struct {
 	RaftAddress string
 	Total       uint8
 	Threshold   uint8
-}
-
-type PeerMetadata struct {
-	Share                    []byte
-	EphemeralSecretPublicKey []byte
-}
-
-type HrsMetadata struct {
-	// need to be _total_ entries per player
-	Secret      []byte
-	DealtShares []tsed25519.Scalar
-	Peers       []PeerMetadata
 }
 
 // LocalCosigner responds to sign requests using their share key
