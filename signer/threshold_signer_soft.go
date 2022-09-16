@@ -279,33 +279,31 @@ func (softSigner *ThresholdSignerSoft) SetEphemeralSecretPart(
 	req CosignerSetEphemeralSecretPartRequest, m *LastSignStateStruct, peers map[int]CosignerPeer) error {
 
 	// Verify the source signature
-	{
-		if req.SourceSig == nil {
-			return errors.New("SourceSig field is required")
-		}
+	if req.SourceSig == nil {
+		return errors.New("SourceSig field is required")
+	}
 
-		digestMsg := CosignerEphemeralSecretPart{}
-		digestMsg.SourceID = req.SourceID
-		digestMsg.SourceEphemeralSecretPublicKey = req.SourceEphemeralSecretPublicKey
-		digestMsg.EncryptedSharePart = req.EncryptedSharePart
+	digestMsg := CosignerEphemeralSecretPart{}
+	digestMsg.SourceID = req.SourceID
+	digestMsg.SourceEphemeralSecretPublicKey = req.SourceEphemeralSecretPublicKey
+	digestMsg.EncryptedSharePart = req.EncryptedSharePart
 
-		digestBytes, err := tmjson.Marshal(digestMsg)
-		if err != nil {
-			return err
-		}
+	digestBytes, err := tmjson.Marshal(digestMsg)
+	if err != nil {
+		return err
+	}
 
-		digest := sha256.Sum256(digestBytes)
-		peer, ok := peers[req.SourceID]
+	digest := sha256.Sum256(digestBytes)
+	peer, ok := peers[req.SourceID]
 
-		if !ok {
-			return fmt.Errorf("unknown cosigner: %d", req.SourceID)
-		}
+	if !ok {
+		return fmt.Errorf("unknown cosigner: %d", req.SourceID)
+	}
 
-		peerPub := peer.PublicKey
-		err = rsa.VerifyPSS(&peerPub, crypto.SHA256, digest[:], req.SourceSig, nil)
-		if err != nil {
-			return err
-		}
+	peerPub := peer.PublicKey
+	err = rsa.VerifyPSS(&peerPub, crypto.SHA256, digest[:], req.SourceSig, nil)
+	if err != nil {
+		return err
 	}
 
 	// protects the meta map
