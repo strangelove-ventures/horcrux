@@ -29,10 +29,7 @@ type ThresholdSignerSoft struct {
 
 // NewThresholdSignerSoft constructs a ThresholdSigner
 // that signs using the local key share file.
-func NewThresholdSignerSoft(
-	key CosignerKey,
-	threshold, total uint8,
-) ThresholdSigner {
+func NewThresholdSignerSoft(key CosignerKey, threshold, total uint8) ThresholdSigner {
 	softSigner := &ThresholdSignerSoft{
 		Key:       key,
 		HrsMeta:   make(map[HRSTKey]HrsMetadata),
@@ -40,14 +37,12 @@ func NewThresholdSignerSoft(
 		Threshold: threshold,
 	}
 
-	// cache the public key bytes for signing operations
-	switch ed25519Key := softSigner.Key.PubKey.(type) {
-	case tmcryptoed25519.PubKey:
-		softSigner.PubKeyBytes = make([]byte, len(ed25519Key))
-		copy(softSigner.PubKeyBytes, ed25519Key[:])
-	default:
-		panic("softSigner.Key.PubKey.(type) is not a tmcryptoed25519.PubKey! i.e not ed25519 public key")
-	}
+	// cache the public key bytes for signing operations.
+	// Ensures casting else it will naturally panic.
+	ed25519Key := softSigner.Key.PubKey.(tmcryptoed25519.PubKey)
+	softSigner.PubKeyBytes = make([]byte, len(ed25519Key))
+	copy(softSigner.PubKeyBytes, ed25519Key[:])
+
 	return softSigner
 }
 
@@ -284,33 +279,31 @@ func (softSigner *ThresholdSignerSoft) SetEphemeralSecretPart(
 	req CosignerSetEphemeralSecretPartRequest, m *LastSignStateStruct, peers map[int]CosignerPeer) error {
 
 	// Verify the source signature
-	{
-		if req.SourceSig == nil {
-			return errors.New("SourceSig field is required")
-		}
+	if req.SourceSig == nil {
+		return errors.New("SourceSig field is required")
+	}
 
-		digestMsg := CosignerEphemeralSecretPart{}
-		digestMsg.SourceID = req.SourceID
-		digestMsg.SourceEphemeralSecretPublicKey = req.SourceEphemeralSecretPublicKey
-		digestMsg.EncryptedSharePart = req.EncryptedSharePart
+	digestMsg := CosignerEphemeralSecretPart{}
+	digestMsg.SourceID = req.SourceID
+	digestMsg.SourceEphemeralSecretPublicKey = req.SourceEphemeralSecretPublicKey
+	digestMsg.EncryptedSharePart = req.EncryptedSharePart
 
-		digestBytes, err := tmjson.Marshal(digestMsg)
-		if err != nil {
-			return err
-		}
+	digestBytes, err := tmjson.Marshal(digestMsg)
+	if err != nil {
+		return err
+	}
 
-		digest := sha256.Sum256(digestBytes)
-		peer, ok := peers[req.SourceID]
+	digest := sha256.Sum256(digestBytes)
+	peer, ok := peers[req.SourceID]
 
-		if !ok {
-			return fmt.Errorf("unknown cosigner: %d", req.SourceID)
-		}
+	if !ok {
+		return fmt.Errorf("unknown cosigner: %d", req.SourceID)
+	}
 
-		peerPub := peer.PublicKey
-		err = rsa.VerifyPSS(&peerPub, crypto.SHA256, digest[:], req.SourceSig, nil)
-		if err != nil {
-			return err
-		}
+	peerPub := peer.PublicKey
+	err = rsa.VerifyPSS(&peerPub, crypto.SHA256, digest[:], req.SourceSig, nil)
+	if err != nil {
+		return err
 	}
 
 	// protects the meta map
