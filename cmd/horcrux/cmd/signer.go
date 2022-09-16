@@ -50,7 +50,7 @@ func StartSignerCmd() *cobra.Command {
 			nodes := config.Config.Nodes()
 
 			if _, err := os.Stat(privValKeyFile); os.IsNotExist(err) {
-				log.Fatalf("private key share doesn't exist at path(%s)", privValKeyFile)
+				return err
 			}
 
 			logger.Info("Tendermint Validator", "mode", "single",

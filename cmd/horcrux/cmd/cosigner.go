@@ -128,7 +128,7 @@ func StartCosignerCmd() *cobra.Command {
 			// Initialize the localsigner (ThresholdEdSignature) of choice.
 			key, thresholdSigner, err := config.Config.KeyAndThresholdSigner(logger)
 			if err != nil {
-				panic(err)
+				return (err)
 			}
 
 			logger.Info("Tendermint Validator",
