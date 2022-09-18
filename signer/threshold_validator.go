@@ -178,9 +178,16 @@ func (pv *ThresholdValidator) waitForPeerEphemeralShares(
 ) {
 	ephemeralSecretParts, err := peer.GetEphemeralSecretParts(hrst)
 	if err != nil {
+
+		// Significant missing shares may lead to signature failure
+		missedEphemeralShares.WithLabelValues(peer.GetAddress()).Add(float64(1))
+		totalMissedEphemeralShares.WithLabelValues(peer.GetAddress()).Inc()
 		pv.logger.Error("Error getting secret parts", "peer", peer.GetID(), "err", err)
 		return
 	}
+	// Significant missing shares may lead to signature failure
+	missedEphemeralShares.WithLabelValues(peer.GetAddress()).Set(0)
+
 	// Check so that getEphemeralWaitGroup.Done is not called more than (threshold - 1) times which causes hardlock
 	thresholdPeersMutex.Lock()
 	if len(*encryptedEphemeralSharesThresholdMap) < pv.threshold-1 {

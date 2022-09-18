@@ -46,6 +46,7 @@ func (s *RaftStore) getLeaderGRPCClient() (proto.CosignerGRPCClient, *grpc.Clien
 		time.Sleep(100 * time.Millisecond)
 	}
 	if leader == "" {
+		totalRaftLeaderElectiontimeout.Inc()
 		return nil, nil, errors.New("timed out waiting for leader election to complete")
 	}
 	conn, err := grpc.Dial(leader, grpc.WithTransportCredentials(insecure.NewCredentials()))

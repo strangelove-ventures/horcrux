@@ -101,6 +101,21 @@ var (
 		Help: "Total Prevote Missed",
 	})
 
+	missedEphemeralShares = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "signer_missed_ephemeral_shares",
+			Help: "Consecutive Threshold Signature Parts Missed",
+		},
+		[]string{"peerid"},
+	)
+	totalMissedEphemeralShares = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "signer_total_missed_ephemeral_shares",
+			Help: "Total Threshold Signature Parts Missed",
+		},
+		[]string{"peerid"},
+	)
+
 	totalSentryConnectTries = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "signer_total_sentry_connect_tries",
 		Help: "Total Number of times sentry TCP connect has been tried (High count may indicate validator restarts)",
@@ -122,6 +137,10 @@ var (
 	totalNotRaftLeader = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "signer_total_raft_not_leader",
 		Help: "Total Times Signer is NOT Raft Leader (Proxy signing to Raft Leader)",
+	})
+	totalRaftLeaderElectiontimeout = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "signer_total_raft_leader_election_timeout",
+		Help: "Total Times Raft Leader Failed Election (Lacking Peers)",
 	})
 
 	totalInvalidSignature = promauto.NewCounter(prometheus.CounterOpts{
@@ -164,11 +183,12 @@ var (
 
 func StartMetrics() {
 	for {
+		// Update elapsed times on an interval basis
 		secondsSinceLastPrecommit.Set(time.Since(previousPrecommitTime).Seconds())
 		secondsSinceLastPrevote.Set(time.Since(previousPrevoteTime).Seconds())
 		secondsSinceLastLocalSignStart.Set(time.Since(previousLocalSignStartTime).Seconds())
 		secondsSinceLastLocalSignFinish.Set(time.Since(previousLocalSignFinishTime).Seconds())
 		secondsSinceLastLocalEphemeralShareTime.Set(time.Since(previousLocalEphemeralShareTime).Seconds())
-		<-time.After(250 * time.Millisecond)
+		<-time.After(100 * time.Millisecond)
 	}
 }

@@ -174,6 +174,7 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(vote *tmProto.Vote) tmProtoP
 		totalPrecommitsSigned.Inc()
 	}
 	if vote.Type == tmProto.PrevoteType {
+		// Determine number of heights since the last Prevote
 		stepSize := vote.Height - previousPrevoteHeight
 		if previousPrevoteHeight != 0 && stepSize > 1 {
 			missedPrevotes.Add(float64(stepSize))
@@ -182,7 +183,7 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(vote *tmProto.Vote) tmProtoP
 			missedPrevotes.Set(0)
 		}
 
-		previousPrevoteHeight = vote.Height
+		previousPrevoteHeight = vote.Height // remember last PrevoteHeight
 		previousPrevoteTime = time.Now()
 
 		lastPrevoteHeight.Set(float64(vote.Height))
