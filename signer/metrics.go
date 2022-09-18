@@ -116,6 +116,10 @@ var (
 		[]string{"peerid"},
 	)
 
+	sentryConnectTries = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "signer_sentry_connect_tries",
+		Help: "Consecutive Number of times sentry TCP connect has been tried (High count may indicate validator restarts)",
+	})
 	totalSentryConnectTries = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "signer_total_sentry_connect_tries",
 		Help: "Total Number of times sentry TCP connect has been tried (High count may indicate validator restarts)",

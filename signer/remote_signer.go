@@ -77,12 +77,14 @@ func (rs *ReconnRemoteSigner) loop() {
 			proto, address := tmNet.ProtocolAndAddress(rs.address)
 			netConn, err := rs.dialer.Dial(proto, address)
 			if err != nil {
+				sentryConnectTries.Add(float64(1))
 				totalSentryConnectTries.Inc()
 				rs.Logger.Error("Dialing", "err", err)
 				rs.Logger.Info("Retrying", "sleep (s)", 3, "address", rs.address)
 				time.Sleep(time.Second * 3)
 				continue
 			}
+			sentryConnectTries.Set(0)
 
 			rs.Logger.Info("Connected to Sentry", "address", rs.address)
 			conn, err = tmP2pConn.MakeSecretConnection(netConn, rs.privKey)

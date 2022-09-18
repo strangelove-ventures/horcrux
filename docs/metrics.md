@@ -57,7 +57,9 @@ If there are skips in the block heights requested to be signed the following cou
 
 ## Watching Sentry Failure
 
-Watch 'signer_total_sentry_connect_tries' which reports retry connects to the specified sentry.  Any increase is an indicator of network or sentry process failure
+Watch 'signer_sentry_connect_tries' for any increase which indicates retry attempts to reach your sentry.  
+
+If 'signer_total_sentry_connect_tries' is significant, it can indicate network or server issues.
 
 ## Watching Cosigner With Grafana
 
