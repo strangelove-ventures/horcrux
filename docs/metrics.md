@@ -29,6 +29,18 @@ chain-nodes:
 prometheus-listen-address: 0.0.0.0:6001
 ```
 
+## Prometheus Cautions
+
+Prometheus scrapes data every minute by default which is not fast enough to log metrics which change on a fast interval.
+
+Set the scrape_interval between 1 and 3 seconds in prometheus.yml if you wish to log/monitor these metrics. Note this will take more disk space.
+
+```
+global:
+  scrape_interval: 3s
+```
+
+
 ## Watching Single Signers
 
 Single node signers don't execute any cosigner code, so the basic metrics are:
@@ -47,8 +59,15 @@ If there are skips in the block heights requested to be signed the following cou
 
 Watch 'signer_total_sentry_connect_tries' which reports retry connects to the specified sentry.  Any increase is an indicator of network or sentry process failure
 
+## Watching Cosigner With Grafana
+
+A sample Grapfana configration is available.  See [`horcrux.json`](https://github.com/chillyvee/horcrux-info/blob/master/grafana/horcrux.json)
+
+
 ## Watching For Cosigner Trouble
 Metrics may vary between Cosigner processes since there is only one leader.
+
+Watch 'signer_missed_ephemeral_shares' which will note when the leader is not able to get a signature from the peer.  If 'signer_total_missed_ephemeral_shares' increases to a high number, this may indicate a larger issue.
 
 Each block, Ephemeral Secrets are shared between Cosigners.  Monitoring 'signer_seconds_since_last_local_ephemeral_share_time' and ensuring it does not exceed the block time will allow you to know when a Cosigner was not contacted for a block.
 
