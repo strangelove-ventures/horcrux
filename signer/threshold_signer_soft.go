@@ -109,17 +109,16 @@ func (softSigner *ThresholdSignerSoft) Sign(
 	ephemeralShare := tsed25519.AddScalars(shareParts)
 	ephemeralPublic := tsed25519.AddElements(publicKeys)
 
-	// check bounds for ephemeral share to avoid passing out of bounds valids to SignWithShare
-	{
-		if len(ephemeralShare) != 32 {
-			return res, errors.New("ephemeral share is out of bounds")
-		}
+// check bounds for ephemeral share to avoid passing out of bounds valids to SignWithShare
+	
+	if len(ephemeralShare) != 32 {
+		return res, errors.New("ephemeral share is out of bounds")
+	}
 
-		var scalarBytes [32]byte
-		copy(scalarBytes[:], ephemeralShare)
-		if !edwards25519.ScMinimal(&scalarBytes) {
-			return res, errors.New("ephemeral share is out of bounds")
-		}
+	var scalarBytes [32]byte
+	copy(scalarBytes[:], ephemeralShare)
+	if !edwards25519.ScMinimal(&scalarBytes) {
+		return res, errors.New("ephemeral share is out of bounds")
 	}
 
 	sig := tsed25519.SignWithShare(
@@ -156,6 +155,7 @@ func (softSigner *ThresholdSignerSoft) Sign(
 // Implements ThresholdSigner
 func (softSigner *ThresholdSignerSoft) DealShares(
 	req CosignerGetEphemeralSecretPartRequest) (HrsMetadata, error) {
+	
 	hrsKey := HRSTKey{
 		Height:    req.Height,
 		Round:     req.Round,
@@ -250,23 +250,22 @@ func (softSigner *ThresholdSignerSoft) GetEphemeralSecretPart(
 	res.SourceEphemeralSecretPublicKey = ourEphPublicKey
 	res.EncryptedSharePart = encrypted
 
-	// sign the response payload with our private key
-	// cosigners can verify the signature to confirm sender validity
-	{
-		jsonBytes, err := tmjson.Marshal(res)
+// sign the response payload with our private key
+// cosigners can verify the signature to confirm sender validity
+	
+	jsonBytes, err := tmjson.Marshal(res)
 
-		if err != nil {
-			return res, err
-		}
-
-		digest := sha256.Sum256(jsonBytes)
-		signature, err := rsa.SignPSS(rand.Reader, &softSigner.Key.RSAKey, crypto.SHA256, digest[:], nil)
-		if err != nil {
-			return res, err
-		}
-
-		res.SourceSig = signature
+	if err != nil {
+		return res, err
 	}
+
+	digest := sha256.Sum256(jsonBytes)
+	signature, err := rsa.SignPSS(rand.Reader, &softSigner.Key.RSAKey, crypto.SHA256, digest[:], nil)
+	if err != nil {
+		return res, err
+	}
+
+	res.SourceSig = signature
 
 	res.DestinationID = req.ID
 
