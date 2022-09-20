@@ -71,7 +71,7 @@ func (softSigner *ThresholdSignerSoft) Sign(
 	}
 
 	sameHRS, err := lss.CheckHRS(hrst)
-	
+
 	if err != nil {
 		return res, err
 	}
@@ -252,7 +252,7 @@ func (softSigner *ThresholdSignerSoft) GetEphemeralSecretPart(
 
 	// sign the response payload with our private key
 	// cosigners can verify the signature to confirm sender validity
-	
+
 	jsonBytes, err := tmjson.Marshal(res)
 
 	if err != nil {
@@ -261,7 +261,7 @@ func (softSigner *ThresholdSignerSoft) GetEphemeralSecretPart(
 
 	digest := sha256.Sum256(jsonBytes)
 	signature, err := rsa.SignPSS(rand.Reader, &softSigner.Key.RSAKey, crypto.SHA256, digest[:], nil)
-	
+
 	if err != nil {
 		return res, err
 	}
