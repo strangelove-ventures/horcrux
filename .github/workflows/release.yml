@@ -20,7 +20,7 @@ jobs:
 
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.16'
+          go-version: '1.19'
 
       # TODO:figure out how to add the supported SDK and tendermint versions
       # here we need to run the following and save the results to ENV in the goreleaser action
