@@ -9,7 +9,7 @@ WorkingDirectory=/home/ubuntu
 ExecStart=/usr/bin/horcrux cosigner start
 Restart=on-failure
 RestartSec=3
-LimitNOFILE=4096
+LimitNOFILE=1048576
 
 [Install]
 WantedBy=multi-user.target
