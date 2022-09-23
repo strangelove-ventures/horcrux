@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.19.1-alpine3.16 AS build-env
+FROM --platform=$BUILDPLATFORM golang:1.19-alpine AS build-env
 
 ENV PACKAGES make git
 
