@@ -1,4 +1,4 @@
-FROM golang:alpine AS build-env
+FROM golang:1.19.1-alpine3.16 AS build-env
 
 ENV PACKAGES make git
 
