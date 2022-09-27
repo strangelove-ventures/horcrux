@@ -22,7 +22,7 @@ import (
 	gRPCTransport "github.com/Jille/raft-grpc-transport"
 	"github.com/Jille/raftadmin"
 	"github.com/hashicorp/raft"
-	boltdb "github.com/hashicorp/raft-boltdb"
+	boltdb "github.com/hashicorp/raft-boltdb/v2"
 	proto "github.com/strangelove-ventures/horcrux/signer/proto"
 	"github.com/tendermint/tendermint/libs/log"
 	"github.com/tendermint/tendermint/libs/service"
