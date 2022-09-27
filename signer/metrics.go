@@ -175,6 +175,14 @@ var (
 		Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 	})
 
+	timedCosignerEphemeralShareLag = promauto.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Name:       "signer_cosigner_ephemeral_share_lag_seconds",
+			Help:       "Time taken to get cosigner ephemeral share",
+			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+		},
+		[]string{"peerid"},
+	)
 	timedCosignerSignLag = promauto.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Name:       "signer_cosigner_sign_lag_seconds",

@@ -176,6 +176,7 @@ func (pv *ThresholdValidator) waitForPeerEphemeralShares(
 	encryptedEphemeralSharesThresholdMap *map[Cosigner][]CosignerEphemeralSecretPart,
 	thresholdPeersMutex *sync.Mutex,
 ) {
+	peerStartTime := time.Now()
 	ephemeralSecretParts, err := peer.GetEphemeralSecretParts(hrst)
 	if err != nil {
 
@@ -187,6 +188,7 @@ func (pv *ThresholdValidator) waitForPeerEphemeralShares(
 	}
 	// Significant missing shares may lead to signature failure
 	missedEphemeralShares.WithLabelValues(peer.GetAddress()).Set(0)
+	timedCosignerEphemeralShareLag.WithLabelValues(peer.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
 
 	// Check so that getEphemeralWaitGroup.Done is not called more than (threshold - 1) times which causes hardlock
 	thresholdPeersMutex.Lock()
