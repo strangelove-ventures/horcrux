@@ -113,9 +113,12 @@ func TestConcurrentStart(t *testing.T) {
 	wg.Add(concurrentAttempts)
 	doneCount := 0
 	panicCount := 0
+	var countMu sync.Mutex
 
 	recoverFromPanic := func() {
 		_ = recover()
+		countMu.Lock()
+		defer countMu.Unlock()
 		panicCount++
 		if panicCount == concurrentAttempts-1 {
 			for doneCount < concurrentAttempts {

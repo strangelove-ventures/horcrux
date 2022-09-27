@@ -12,7 +12,7 @@ require (
 	github.com/gogo/protobuf v1.3.3
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/hashicorp/raft v1.3.3
-	github.com/hashicorp/raft-boltdb v0.0.0-20211202195631-7d34b9fb3f42
+	github.com/hashicorp/raft-boltdb/v2 v2.2.2
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/ory/dockertest v3.3.5+incompatible
 	github.com/spf13/cobra v1.2.1
