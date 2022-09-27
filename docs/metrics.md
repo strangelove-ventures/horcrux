@@ -8,7 +8,7 @@ horcrux ..options.. -m 0.0.0.0:8001
 
 For earlier adopters, add the following key to your config.toml
 
-prometheus-listen-address: 0.0.0.0:6001
+debug-listen-address: 0.0.0.0:6001
 
 Resulting in a configuration like the following:
 
@@ -26,7 +26,7 @@ cosigner:
   rpc-timeout: 1500ms
 chain-nodes:
 - priv-val-addr: tcp://localhost:2300
-prometheus-listen-address: 0.0.0.0:6001
+debug-listen-address: 0.0.0.0:6001
 ```
 
 ## Prometheus Cautions
