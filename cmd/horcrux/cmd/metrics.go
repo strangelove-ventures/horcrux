@@ -30,7 +30,7 @@ func AddPrometheusMetrics(mux *http.ServeMux) {
 	}
 
 	mux.Handle("/metrics", promhttp.Handler())
-	logger.Info("Prometheus Metrics Listening", "address", config.Config.DebugListenAddress, "path", "/metrics")
+	logger.Info("Prometheus Metrics Listening", "address", config.Config.DebugAddr, "path", "/metrics")
 }
 
 // EnableDebugAndMetrics - Initialization errors are not fatal, only logged
@@ -38,11 +38,11 @@ func EnableDebugAndMetrics() {
 	logger := tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "debugserver")
 
 	// Configure Shared Debug HTTP Server for pprof and prometheus
-	if len(config.Config.DebugListenAddress) == 0 {
-		logger.Info("debug-listen-address not defined; debug server disabled")
+	if len(config.Config.DebugAddr) == 0 {
+		logger.Info("debug-addr not defined; debug server disabled")
 		return
 	}
-	logger.Info("Debug Server Listening", "address", config.Config.DebugListenAddress)
+	logger.Info("Debug Server Listening", "address", config.Config.DebugAddr)
 
 	// Set up new mux identical to the default mux configuration in net/http/pprof.
 	mux := http.NewServeMux()
@@ -64,7 +64,7 @@ func EnableDebugAndMetrics() {
 		Handler: mux,
 		//ErrorLog: &logger,
 
-		Addr:              config.Config.DebugListenAddress,
+		Addr:              config.Config.DebugAddr,
 		ReadTimeout:       1 * time.Second,
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       30 * time.Second,
