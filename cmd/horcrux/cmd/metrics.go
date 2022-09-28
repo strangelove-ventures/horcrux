@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/pprof"
@@ -34,7 +35,7 @@ func AddPrometheusMetrics(mux *http.ServeMux) {
 }
 
 // EnableDebugAndMetrics - Initialization errors are not fatal, only logged
-func EnableDebugAndMetrics() {
+func EnableDebugAndMetrics(ctx context.Context) {
 	logger := tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "debugserver")
 
 	// Configure Shared Debug HTTP Server for pprof and prometheus
@@ -72,8 +73,28 @@ func EnableDebugAndMetrics() {
 	}
 
 	// Start Debug Server.
-	if err := srv.ListenAndServe(); err != nil {
-		logger.Error(fmt.Sprintf("Debug Endpoint failed to start: %s", err))
-		return
-	}
+	go func() {
+		if err := srv.ListenAndServe(); err != nil {
+			if err.Error() == "http: Server closed" {
+				logger.Info(fmt.Sprintf("Debug Server Shutdown Complete"))
+				return
+			}
+			logger.Error(fmt.Sprintf("Debug Endpoint failed to start: %+v", err))
+			panic(err)
+		}
+	}()
+
+	// Shutdown Debug Server on ctx request
+	go func() {
+		<-ctx.Done()
+		logger.Info("Gracefully Stopping Debug Server")
+		if err := srv.Shutdown(context.Background()); err != nil {
+			logger.Error("Error in Stopping Debug Server", err)
+			logger.Info("Force Stopping Debug Server")
+			if err = srv.Close(); err != nil {
+				logger.Error("Error in Force Stopping Debug Server", err)
+			}
+		}
+	}()
+
 }
