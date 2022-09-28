@@ -102,7 +102,8 @@ func setStateCmd() *cobra.Command {
 				return err
 			}
 
-			fmt.Printf("Setting height %d\n", height)
+			fmt.Fprintf(cmd.OutOrStdout(), "Setting height %d\n", height)
+
 			pv.EphemeralPublic, share.EphemeralPublic = nil, nil
 			signState := signer.SignStateConsensus{
 				Height:    height,
