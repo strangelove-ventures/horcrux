@@ -171,9 +171,7 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(vote *tmProto.Vote) tmProtoP
 		}
 		previousPrecommitHeight = vote.Height // remember last PrecommitHeight
 
-		metricsPeriodicUpdateMutex.Lock()
-		previousPrecommitTime = time.Now()
-		metricsPeriodicUpdateMutex.Unlock()
+		metricsTimeKeeper.SetPreviousPrecommit(time.Now())
 
 		lastPrecommitHeight.Set(float64(vote.Height))
 		lastPrecommitRound.Set(float64(vote.Round))
@@ -191,9 +189,7 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(vote *tmProto.Vote) tmProtoP
 
 		previousPrevoteHeight = vote.Height // remember last PrevoteHeight
 
-		metricsPeriodicUpdateMutex.Lock()
-		previousPrevoteTime = time.Now()
-		metricsPeriodicUpdateMutex.Unlock()
+		metricsTimeKeeper.SetPreviousPrevote(time.Now())
 
 		lastPrevoteHeight.Set(float64(vote.Height))
 		lastPrevoteRound.Set(float64(vote.Round))

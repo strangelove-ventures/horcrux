@@ -8,16 +8,70 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
+type metricsTimer struct {
+	mu                                              sync.Mutex
+	previousPrecommit, previousPrevote              time.Time
+	previousLocalSignStart, previousLocalSignFinish time.Time
+	previousLocalEphemeralShare                     time.Time
+}
+
+func newMetricsTimer() *metricsTimer {
+	now := time.Now()
+	return &metricsTimer{
+		mu:                sync.Mutex{},
+		previousPrecommit: now, previousPrevote: now,
+		previousLocalSignStart: now, previousLocalSignFinish: now,
+		previousLocalEphemeralShare: now,
+	}
+}
+
+func (mt *metricsTimer) SetPreviousPrecommit(t time.Time) {
+	mt.mu.Lock()
+	defer mt.mu.Unlock()
+	mt.previousPrecommit = t
+}
+
+func (mt *metricsTimer) SetPreviousPrevote(t time.Time) {
+	mt.mu.Lock()
+	defer mt.mu.Unlock()
+	mt.previousPrevote = t
+}
+
+func (mt *metricsTimer) SetPreviousLocalSignStart(t time.Time) {
+	mt.mu.Lock()
+	defer mt.mu.Unlock()
+	mt.previousLocalSignStart = t
+}
+
+func (mt *metricsTimer) SetPreviousLocalSignFinish(t time.Time) {
+	mt.mu.Lock()
+	defer mt.mu.Unlock()
+	mt.previousLocalSignFinish = t
+}
+
+func (mt *metricsTimer) SetPreviousLocalEphemeralShare(t time.Time) {
+	mt.mu.Lock()
+	defer mt.mu.Unlock()
+	mt.previousLocalEphemeralShare = t
+}
+
+func (mt *metricsTimer) UpdatePrometheusMetrics(t time.Time) {
+	mt.mu.Lock()
+	defer mt.mu.Unlock()
+
+	// Update Prometheus Gauges
+	secondsSinceLastPrecommit.Set(time.Since(mt.previousPrecommit).Seconds())
+	secondsSinceLastPrevote.Set(time.Since(mt.previousPrevote).Seconds())
+	secondsSinceLastLocalSignStart.Set(time.Since(mt.previousLocalSignStart).Seconds())
+	secondsSinceLastLocalSignFinish.Set(time.Since(mt.previousLocalSignFinish).Seconds())
+	secondsSinceLastLocalEphemeralShareTime.Set(time.Since(mt.previousLocalEphemeralShare).Seconds())
+}
+
 var (
 	// Variables to calculate Prometheus Metrics
-	previousPrecommitHeight         = int64(0)
-	previousPrevoteHeight           = int64(0)
-	previousPrecommitTime           = time.Now()
-	previousPrevoteTime             = time.Now()
-	previousLocalSignStartTime      = time.Now()
-	previousLocalSignFinishTime     = time.Now()
-	previousLocalEphemeralShareTime = time.Now()
-	metricsPeriodicUpdateMutex      = sync.Mutex{}
+	previousPrecommitHeight = int64(0)
+	previousPrevoteHeight   = int64(0)
+	metricsTimeKeeper       = newMetricsTimer()
 
 	// Prometheus Metrics
 	totalPubKeyRequests = promauto.NewCounter(prometheus.CounterOpts{
@@ -198,14 +252,7 @@ var (
 func StartMetrics() {
 	// Update elapsed times on an interval basis
 	for {
-		// Use mutex to prevent race.  Stats aligned with loop iteration
-		metricsPeriodicUpdateMutex.Lock()
-		secondsSinceLastPrecommit.Set(time.Since(previousPrecommitTime).Seconds())
-		secondsSinceLastPrevote.Set(time.Since(previousPrevoteTime).Seconds())
-		secondsSinceLastLocalSignStart.Set(time.Since(previousLocalSignStartTime).Seconds())
-		secondsSinceLastLocalSignFinish.Set(time.Since(previousLocalSignFinishTime).Seconds())
-		secondsSinceLastLocalEphemeralShareTime.Set(time.Since(previousLocalEphemeralShareTime).Seconds())
-		metricsPeriodicUpdateMutex.Unlock()
+		metricsTimeKeeper.UpdatePrometheusMetrics(time.Now())
 
 		// Prometheus often only polls every 1 to every few seconds
 		// Frequent updates minimize reporting error.
