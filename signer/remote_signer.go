@@ -169,8 +169,12 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(vote *tmProto.Vote) tmProtoP
 		} else {
 			missedPrecommits.Set(0)
 		}
-		previousPrecommitHeight = vote.Height
+		previousPrecommitHeight = vote.Height // remember last PrecommitHeight
+
+		metricsPeriodicUpdateMutex.Lock()
 		previousPrecommitTime = time.Now()
+		metricsPeriodicUpdateMutex.Unlock()
+
 		lastPrecommitHeight.Set(float64(vote.Height))
 		lastPrecommitRound.Set(float64(vote.Round))
 		totalPrecommitsSigned.Inc()
@@ -186,7 +190,10 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(vote *tmProto.Vote) tmProtoP
 		}
 
 		previousPrevoteHeight = vote.Height // remember last PrevoteHeight
+
+		metricsPeriodicUpdateMutex.Lock()
 		previousPrevoteTime = time.Now()
+		metricsPeriodicUpdateMutex.Unlock()
 
 		lastPrevoteHeight.Set(float64(vote.Height))
 		lastPrevoteRound.Set(float64(vote.Round))

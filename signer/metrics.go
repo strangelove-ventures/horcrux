@@ -1,6 +1,7 @@
 package signer
 
 import (
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -16,6 +17,7 @@ var (
 	previousLocalSignStartTime      = time.Now()
 	previousLocalSignFinishTime     = time.Now()
 	previousLocalEphemeralShareTime = time.Now()
+	metricsPeriodicUpdateMutex      = sync.Mutex{}
 
 	// Prometheus Metrics
 	totalPubKeyRequests = promauto.NewCounter(prometheus.CounterOpts{
@@ -194,13 +196,20 @@ var (
 )
 
 func StartMetrics() {
+	// Update elapsed times on an interval basis
 	for {
-		// Update elapsed times on an interval basis
+		// Use mutex to prevent race.  Stats aligned with loop iteration
+		metricsPeriodicUpdateMutex.Lock()
 		secondsSinceLastPrecommit.Set(time.Since(previousPrecommitTime).Seconds())
 		secondsSinceLastPrevote.Set(time.Since(previousPrevoteTime).Seconds())
 		secondsSinceLastLocalSignStart.Set(time.Since(previousLocalSignStartTime).Seconds())
 		secondsSinceLastLocalSignFinish.Set(time.Since(previousLocalSignFinishTime).Seconds())
 		secondsSinceLastLocalEphemeralShareTime.Set(time.Since(previousLocalEphemeralShareTime).Seconds())
+		metricsPeriodicUpdateMutex.Unlock()
+
+		// Prometheus often only polls every 1 to every few seconds
+		// Frequent updates minimize reporting error.
+		// Accuracy of 100ms is probably sufficient
 		<-time.After(100 * time.Millisecond)
 	}
 }

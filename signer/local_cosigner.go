@@ -156,7 +156,9 @@ func (cosigner *LocalCosigner) GetAddress() string {
 // Return the signed bytes or an error
 // Implements Cosigner interface
 func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignResponse, error) {
+	metricsPeriodicUpdateMutex.Lock()
 	previousLocalSignStartTime = time.Now() // This function has multiple exit points.  Only start time can be guaranteed
+	metricsPeriodicUpdateMutex.Unlock()
 
 	cosigner.lastSignStateMutex.Lock()
 	defer cosigner.lastSignStateMutex.Unlock()
@@ -251,7 +253,10 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	res.Signature = sig
 
 	// Note - Function may return before this line so elapsed time for Finish may be multiple block times
+	metricsPeriodicUpdateMutex.Lock()
 	previousLocalSignFinishTime = time.Now()
+	metricsPeriodicUpdateMutex.Unlock()
+
 	return res, nil
 }
 
@@ -291,7 +296,10 @@ func (cosigner *LocalCosigner) dealShares(req CosignerGetEphemeralSecretPartRequ
 
 func (cosigner *LocalCosigner) GetEphemeralSecretParts(
 	hrst HRSTKey) (*CosignerEphemeralSecretPartsResponse, error) {
+	metricsPeriodicUpdateMutex.Lock()
 	previousLocalEphemeralShareTime = time.Now()
+	metricsPeriodicUpdateMutex.Unlock()
+
 	res := &CosignerEphemeralSecretPartsResponse{
 		EncryptedSecrets: make([]CosignerEphemeralSecretPart, 0, len(cosigner.peers)-1),
 	}
