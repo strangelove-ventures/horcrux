@@ -11,7 +11,7 @@ require (
 	github.com/cosmos/cosmos-sdk v0.44.5
 	github.com/gogo/protobuf v1.3.3
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
-	github.com/hashicorp/raft v1.3.3
+	github.com/hashicorp/raft v1.3.10
 	github.com/hashicorp/raft-boltdb/v2 v2.2.2
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/ory/dockertest v3.3.5+incompatible
