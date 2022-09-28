@@ -63,7 +63,7 @@ If 'signer_total_sentry_connect_tries' is significant, it can indicate network o
 
 ## Watching Cosigner With Grafana
 
-A sample Grapfana configration is available.  See [`horcrux.json`](https://github.com/chillyvee/horcrux-info/blob/master/grafana/horcrux.json)
+A sample Grafana configration is available.  See [`horcrux.json`](https://github.com/chillyvee/horcrux-info/blob/master/grafana/horcrux.json)
 
 
 ## Watching For Cosigner Trouble

@@ -9,7 +9,6 @@ import (
 
 	"github.com/armon/go-metrics"
 	gmprometheus "github.com/armon/go-metrics/prometheus"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 )
@@ -17,20 +16,17 @@ import (
 func AddPrometheusMetrics(mux *http.ServeMux) {
 	logger := tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "metrics")
 
-	// Add raft metrics to prometheus
-	enableRaftMetrics := true
-	if enableRaftMetrics {
-		// PrometheusSink config w/ definitions for each metric type
-		cfg := gmprometheus.DefaultPrometheusOpts
-		sink, err := gmprometheus.NewPrometheusSinkFrom(cfg)
-		if err != nil {
-			logger.Error("Could not configure Raft Metrics")
-		}
-		defer prometheus.Unregister(sink)
-		_, err = metrics.NewGlobal(metrics.DefaultConfig("horcrux"), sink)
-		if err != nil {
-			logger.Error("Could not add Raft Metrics")
-		}
+	// Add metrics from raft's implementation of go-metrics
+	cfg := gmprometheus.DefaultPrometheusOpts
+	sink, err := gmprometheus.NewPrometheusSinkFrom(cfg)
+	if err != nil {
+		logger.Error("Could not configure Raft Metrics")
+		panic(err)
+	}
+	_, err = metrics.NewGlobal(metrics.DefaultConfig("horcrux"), sink)
+	if err != nil {
+		logger.Error("Could not add Raft Metrics")
+		panic(err)
 	}
 
 	mux.Handle("/metrics", promhttp.Handler())
@@ -43,7 +39,7 @@ func EnableDebugAndMetrics() {
 
 	// Configure Shared Debug HTTP Server for pprof and prometheus
 	if len(config.Config.DebugListenAddress) == 0 {
-		logger.Error("debug-listen-address not defined")
+		logger.Info("debug-listen-address not defined; debug server disabled")
 		return
 	}
 	logger.Info("Debug Server Listening", "address", config.Config.DebugListenAddress)

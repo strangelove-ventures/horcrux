@@ -122,12 +122,12 @@ func initCmd() *cobra.Command {
 				if len(cn) == 0 {
 					return fmt.Errorf("must input at least one node")
 				}
-				prometheusListenAddress, _ := cmdFlags.GetString("metrics")
+				debugListenAddress, _ := cmdFlags.GetString("debuglisten")
 				cfg = DiskConfig{
 					PrivValKeyFile:     keyFile,
 					ChainID:            cid,
 					ChainNodes:         cn,
-					DebugListenAddress: prometheusListenAddress,
+					DebugListenAddress: debugListenAddress,
 				}
 				if err = validateSingleSignerConfig(cfg); err != nil {
 					return err
@@ -168,7 +168,7 @@ func initCmd() *cobra.Command {
 		"(i.e. \"tcp://node-1:2222|2,tcp://node-2:2222|3\")")
 	cmd.Flags().IntP("threshold", "t", 0, "indicate number of signatures required for threshold signature")
 	cmd.Flags().StringP("listen", "l", "", "listen address of the signer")
-	cmd.Flags().StringP("debuglisten", "d", "", "listen address for Debug and Prometheus metrics")
+	cmd.Flags().StringP("debuglisten", "d", "", "listen address for Debug and Prometheus metrics in format localhost:8543")
 	cmd.Flags().StringP("keyfile", "k", "",
 		"priv val key file path (full key for single signer, or key share for cosigner)")
 	cmd.Flags().String("timeout", "1500ms", "configure cosigner rpc server timeout value, \n"+
