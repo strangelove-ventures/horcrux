@@ -76,7 +76,7 @@ func EnableDebugAndMetrics(ctx context.Context) {
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
 			if err.Error() == "http: Server closed" {
-				logger.Info(fmt.Sprintf("Debug Server Shutdown Complete"))
+				logger.Info("Debug Server Shutdown Complete")
 				return
 			}
 			logger.Error(fmt.Sprintf("Debug Endpoint failed to start: %+v", err))

@@ -491,7 +491,7 @@ type DiskConfig struct {
 	ChainID        string          `json:"chain-id" yaml:"chain-id"`
 	CosignerConfig *CosignerConfig `json:"cosigner,omitempty" yaml:"cosigner,omitempty"`
 	ChainNodes     []ChainNode     `json:"chain-nodes,omitempty" yaml:"chain-nodes,omitempty"`
-	DebugAddr      string          `json:"debug-addr,omitempty" yaml:"debug-addr,omitempty"` //nolint
+	DebugAddr      string          `json:"debug-addr,omitempty" yaml:"debug-addr,omitempty"`
 }
 
 func (c *DiskConfig) Nodes() []signer.NodeConfig {
