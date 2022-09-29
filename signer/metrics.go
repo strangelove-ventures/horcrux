@@ -104,15 +104,15 @@ var (
 		Help: "Last Round Proposal Signed",
 	})
 
-	totalPrecommitsSigned = promauto.NewGauge(prometheus.GaugeOpts{
+	totalPrecommitsSigned = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "signer_total_precommits_signed",
 		Help: "Total Precommit Signed",
 	})
-	totalPrevotesSigned = promauto.NewGauge(prometheus.GaugeOpts{
+	totalPrevotesSigned = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "signer_total_prevotes_signed",
 		Help: "Total Prevote Signed",
 	})
-	totalProposalsSigned = promauto.NewGauge(prometheus.GaugeOpts{
+	totalProposalsSigned = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "signer_total_proposals_signed",
 		Help: "Total Proposal Signed",
 	})
@@ -148,11 +148,11 @@ var (
 		Name: "signer_missed_prevotes",
 		Help: "Consecutive Prevote Missed",
 	})
-	totalMissedPrecommits = promauto.NewGauge(prometheus.GaugeOpts{
+	totalMissedPrecommits = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "signer_total_missed_precommits",
 		Help: "Total Precommit Missed",
 	})
-	totalMissedPrevotes = promauto.NewGauge(prometheus.GaugeOpts{
+	totalMissedPrevotes = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "signer_total_missed_prevotes",
 		Help: "Total Prevote Missed",
 	})
