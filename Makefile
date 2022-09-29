@@ -6,7 +6,7 @@ all: install
 LD_FLAGS = -X github.com/strangelove-ventures/horcrux/cmd/horcrux/cmd.Version=$(VERSION) \
 	-X github.com/strangelove-ventures/horcrux/cmd/horcrux/cmd.Commit=$(COMMIT)
 
-BUILD_FLAGS := -ldflags '$(LD_FLAGS)'
+BUILD_FLAGS := -trimpath -ldflags '-s -w $(LD_FLAGS)'
 
 build:
 	@go build -mod readonly $(BUILD_FLAGS) -o build/ ./cmd/horcrux/...
