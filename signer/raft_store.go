@@ -90,6 +90,7 @@ func (s *RaftStore) init() error {
 	if err != nil {
 		return fmt.Errorf("failed to parse local address: %s, %v", host, err)
 	}
+	s.logger.Info("Local Raft Listening", "port", port)
 	sock, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
 	if err != nil {
 		return err
