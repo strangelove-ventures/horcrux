@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/pprof"
@@ -62,9 +63,7 @@ func EnableDebugAndMetrics(ctx context.Context) {
 
 	// Configure Debug Server Network Parameters
 	srv := &http.Server{
-		Handler: mux,
-		//ErrorLog: &logger,
-
+		Handler:           mux,
 		Addr:              config.Config.DebugAddr,
 		ReadTimeout:       1 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -75,7 +74,7 @@ func EnableDebugAndMetrics(ctx context.Context) {
 	// Start Debug Server.
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
-			if err.Error() == "http: Server closed" {
+			if errors.Is(err, http.ErrServerClosed) {
 				logger.Info("Debug Server Shutdown Complete")
 				return
 			}
