@@ -74,7 +74,9 @@ func initCmd() *cobra.Command {
 			if keyFileFlag != "" {
 				keyFile = &keyFileFlag
 			}
+			debugAddr, _ := cmdFlags.GetString("debug-addr")
 			if cs {
+				// Cosigner Config
 				p, _ := cmdFlags.GetString("peers")
 				threshold, _ := cmdFlags.GetInt("threshold")
 				timeout, _ := cmdFlags.GetString("timeout")
@@ -110,11 +112,13 @@ func initCmd() *cobra.Command {
 						Timeout:   timeout,
 					},
 					ChainNodes: cn,
+					DebugAddr:  debugAddr,
 				}
 				if err = validateCosignerConfig(cfg); err != nil {
 					return err
 				}
 			} else {
+				// Single Signer Config
 				if len(cn) == 0 {
 					return fmt.Errorf("must input at least one node")
 				}
@@ -122,6 +126,7 @@ func initCmd() *cobra.Command {
 					PrivValKeyFile: keyFile,
 					ChainID:        cid,
 					ChainNodes:     cn,
+					DebugAddr:      debugAddr,
 				}
 				if err = validateSingleSignerConfig(cfg); err != nil {
 					return err
@@ -162,6 +167,7 @@ func initCmd() *cobra.Command {
 		"(i.e. \"tcp://node-1:2222|2,tcp://node-2:2222|3\")")
 	cmd.Flags().IntP("threshold", "t", 0, "indicate number of signatures required for threshold signature")
 	cmd.Flags().StringP("listen", "l", "", "listen address of the signer")
+	cmd.Flags().StringP("debug-addr", "d", "", "listen address for Debug and Prometheus metrics in format localhost:8543")
 	cmd.Flags().StringP("keyfile", "k", "",
 		"priv val key file path (full key for single signer, or key share for cosigner)")
 	cmd.Flags().String("timeout", "1500ms", "configure cosigner rpc server timeout value, \n"+
@@ -485,6 +491,7 @@ type DiskConfig struct {
 	ChainID        string          `json:"chain-id" yaml:"chain-id"`
 	CosignerConfig *CosignerConfig `json:"cosigner,omitempty" yaml:"cosigner,omitempty"`
 	ChainNodes     []ChainNode     `json:"chain-nodes,omitempty" yaml:"chain-nodes,omitempty"`
+	DebugAddr      string          `json:"debug-addr,omitempty" yaml:"debug-addr,omitempty"`
 }
 
 func (c *DiskConfig) Nodes() []signer.NodeConfig {
