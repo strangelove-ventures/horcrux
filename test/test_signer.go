@@ -239,7 +239,14 @@ func (ts TestSigners) PeerString(skip int) string {
 }
 
 // MakeTestSigners creates the TestSigner objects required for bootstrapping tests
-func MakeTestSigners(validatorIndex, count int, home string, pool *dockertest.Pool, networkID string, tl TestLogger) (out TestSigners) {
+func MakeTestSigners(
+	validatorIndex int,
+	count int,
+	home string,
+	pool *dockertest.Pool,
+	networkID string,
+	tl TestLogger,
+) (out TestSigners) {
 	for i := 0; i < count; i++ {
 		ts := &TestSigner{
 			Home:           home,
