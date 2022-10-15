@@ -66,11 +66,20 @@ func validateCreateCosignerShares(cmd *cobra.Command, args []string) error {
 	if !os.FileExists(args[0]) {
 		return fmt.Errorf("priv_validator.json file(%s) doesn't exist", args[0])
 	}
-	if _, err := strconv.ParseInt(args[1], 10, 64); err != nil {
-		return fmt.Errorf("shards must be an integer got(%s)", args[1])
+	t, err := strconv.ParseInt(args[1], 10, 64)
+	if err != nil {
+		return fmt.Errorf("threshold must be an integer, got(%s)", args[1])
 	}
-	if _, err := strconv.ParseInt(args[2], 10, 64); err != nil {
-		return fmt.Errorf("threshold must be an integer got(%s)", args[2])
+	n, err := strconv.ParseInt(args[2], 10, 64)
+	if err != nil {
+		return fmt.Errorf("shares must be an integer, got(%s)", args[2])
+	}
+	if t > n {
+		return fmt.Errorf("threshold cannot be greater than total shares, got [threshold](%d) > [shares](%d)", t, n)
+	}
+	if t <= n/2 {
+		return fmt.Errorf("threshold must be greater than total shares "+
+			"divided by 2, got [threshold](%d) <= [shares](%d) / 2", t, n)
 	}
 	return nil
 }

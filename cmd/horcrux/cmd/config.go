@@ -196,9 +196,13 @@ func validateCosignerConfig(cfg DiskConfig) error {
 	if cfg.CosignerConfig == nil {
 		return fmt.Errorf("cosigner config can't be empty")
 	}
-	if len(cfg.CosignerConfig.Peers)+1 < cfg.CosignerConfig.Threshold {
-		return fmt.Errorf("number of peers + 1 (%d) must be greater than threshold (%d)",
-			len(cfg.CosignerConfig.Peers)+1, cfg.CosignerConfig.Threshold)
+	if cfg.CosignerConfig.Threshold <= cfg.CosignerConfig.Shares/2 {
+		return fmt.Errorf("threshold (%d) must be greater than number of shares (%d) / 2",
+			cfg.CosignerConfig.Threshold, cfg.CosignerConfig.Shares)
+	}
+	if cfg.CosignerConfig.Shares < cfg.CosignerConfig.Threshold {
+		return fmt.Errorf("number of shares (%d) must be greater than threshold (%d)",
+			cfg.CosignerConfig.Shares, cfg.CosignerConfig.Threshold)
 	}
 
 	_, err := time.ParseDuration(cfg.CosignerConfig.Timeout)
@@ -574,11 +578,11 @@ func validateCosignerPeers(peers []CosignerPeer, shares int) error {
 		}
 	}
 
-	// Check that no more than {num-shares}-1 peers are in the peer list, assuming
+	// Check that exactly {num-shares}-1 peers are in the peer list, assuming
 	// the remaining peer ID is the ID the local node is configured with.
-	if len(peers) == shares {
-		return fmt.Errorf("too many peers (%v+local node = %v) for the specified number of key shares (%v)",
-			len(peers), len(peers)+1, shares)
+	if len(peers) != shares-1 {
+		return fmt.Errorf("incorrect number of peers. expected (%d shares - local node = %d peers)",
+			shares, shares-1)
 	}
 	return nil
 }
