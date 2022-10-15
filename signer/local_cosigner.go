@@ -17,9 +17,9 @@ import (
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
-type LastSignStateStruct struct {
+type LastSignStateWrapper struct {
 	// Signing is thread safe - lastSignStateMutex is used for putting locks so only one goroutine can r/w to the function
-	LastSignStateMutex sync.Mutex
+	lastSignStateMutex sync.Mutex
 
 	// lastSignState stores the last sign state for a share we have fully signed
 	// incremented whenever we are asked to sign a share

@@ -41,14 +41,15 @@ func NewThresholdSignerSoft(key CosignerKey, threshold, total uint8) ThresholdSi
 	// Ensures casting else it will naturally panic.
 	ed25519Key := softSigner.Key.PubKey.(tmcryptoed25519.PubKey)
 	softSigner.PubKeyBytes = make([]byte, len(ed25519Key))
-	copy(softSigner.PubKeyBytes, ed25519Key[:])
+	softSigner.PubKeyBytes = ed25519Key[:]
+	// copy(softSigner.PubKeyBytes, ed25519Key[:])
 
 	return softSigner
 }
 
 // Implements ThresholdSigner
 func (softSigner *ThresholdSignerSoft) Type() string {
-	return "soft"
+	return SignerTypeSoftSign
 }
 
 // Implements ThresholdSigner
@@ -58,9 +59,9 @@ func (softSigner *ThresholdSignerSoft) GetID() (int, error) {
 
 // Implements ThresholdSigner
 func (softSigner *ThresholdSignerSoft) Sign(
-	req CosignerSignRequest, m *LastSignStateStruct) (CosignerSignResponse, error) {
-	m.LastSignStateMutex.Lock()
-	defer m.LastSignStateMutex.Unlock()
+	req CosignerSignRequest, m *LastSignStateWrapper) (CosignerSignResponse, error) {
+	m.lastSignStateMutex.Lock()
+	defer m.lastSignStateMutex.Unlock()
 
 	res := CosignerSignResponse{}
 	lss := m.LastSignState
@@ -71,7 +72,6 @@ func (softSigner *ThresholdSignerSoft) Sign(
 	}
 
 	sameHRS, err := lss.CheckHRS(hrst)
-
 	if err != nil {
 		return res, err
 	}
@@ -135,9 +135,14 @@ func (softSigner *ThresholdSignerSoft) Sign(
 	}, nil, true)
 
 	if err != nil {
-		if _, isSameHRSError := err.(*SameHRSError); !isSameHRSError {
+		var isSameHRSError *SameHRSError
+		// If error is
+		if !errors.As(err, &isSameHRSError) {
 			return res, err
 		}
+		// if _, isSameHRSError := err.(*SameHRSError); !isSameHRSError {
+		//		return res, err
+		//	}
 	}
 
 	for existingKey := range softSigner.HrsMeta {
@@ -164,7 +169,6 @@ func (softSigner *ThresholdSignerSoft) DealShares(
 	}
 
 	meta, ok := softSigner.HrsMeta[hrsKey]
-
 	if ok {
 		return meta, nil
 	}
@@ -192,14 +196,14 @@ func (softSigner *ThresholdSignerSoft) DealShares(
 // The ephemeral secret part is encrypted for the receiver
 // Implements ThresholdSigner
 func (softSigner *ThresholdSignerSoft) GetEphemeralSecretPart(
-	req CosignerGetEphemeralSecretPartRequest, m *LastSignStateStruct, peers map[int]CosignerPeer) (
+	req CosignerGetEphemeralSecretPartRequest, m *LastSignStateWrapper, peers map[int]CosignerPeer) (
 	CosignerEphemeralSecretPart, error) {
 
 	res := CosignerEphemeralSecretPart{}
 
 	// protects the meta map
-	m.LastSignStateMutex.Lock()
-	defer m.LastSignStateMutex.Unlock()
+	m.lastSignStateMutex.Lock()
+	defer m.lastSignStateMutex.Unlock()
 
 	hrst := HRSTKey{
 		Height:    req.Height,
@@ -276,17 +280,20 @@ func (softSigner *ThresholdSignerSoft) GetEphemeralSecretPart(
 // Store an ephemeral secret share part provided by another cosigner (signer)
 // Implements ThresholdSigner
 func (softSigner *ThresholdSignerSoft) SetEphemeralSecretPart(
-	req CosignerSetEphemeralSecretPartRequest, m *LastSignStateStruct, peers map[int]CosignerPeer) error {
+	req CosignerSetEphemeralSecretPartRequest, m *LastSignStateWrapper, peers map[int]CosignerPeer) error {
 
 	// Verify the source signature
 	if req.SourceSig == nil {
 		return errors.New("SourceSig field is required")
 	}
 
-	digestMsg := CosignerEphemeralSecretPart{}
-	digestMsg.SourceID = req.SourceID
-	digestMsg.SourceEphemeralSecretPublicKey = req.SourceEphemeralSecretPublicKey
-	digestMsg.EncryptedSharePart = req.EncryptedSharePart
+	digestMsg := CosignerEphemeralSecretPart{
+		SourceID: req.SourceID,
+		// DestinationID:                  0,// NOTE: I dont think digestMsg.SourceSig is used anywhere
+		SourceEphemeralSecretPublicKey: req.SourceEphemeralSecretPublicKey,
+		EncryptedSharePart:             req.EncryptedSharePart,
+		// SourceSig:                      []byte{}, \\ NOTE Would be good with comments when this is set.
+	}
 
 	digestBytes, err := tmjson.Marshal(digestMsg)
 	if err != nil {
@@ -307,8 +314,8 @@ func (softSigner *ThresholdSignerSoft) SetEphemeralSecretPart(
 	}
 
 	// protects the meta map
-	m.LastSignStateMutex.Lock()
-	defer m.LastSignStateMutex.Unlock()
+	m.lastSignStateMutex.Lock()
+	defer m.lastSignStateMutex.Unlock()
 
 	hrst := HRSTKey{
 		Height:    req.Height,
@@ -317,8 +324,8 @@ func (softSigner *ThresholdSignerSoft) SetEphemeralSecretPart(
 		Timestamp: req.Timestamp.UnixNano(),
 	}
 
-	meta, ok := softSigner.HrsMeta[hrst]
-	// generate metadata placeholder
+	meta, ok := softSigner.HrsMeta[hrst] // generate metadata placeholder
+
 	if !ok {
 		newMeta, err := softSigner.DealShares(CosignerGetEphemeralSecretPartRequest{
 			Height: req.Height,
@@ -331,7 +338,7 @@ func (softSigner *ThresholdSignerSoft) SetEphemeralSecretPart(
 		}
 
 		meta = newMeta
-		softSigner.HrsMeta[hrst] = meta
+		softSigner.HrsMeta[hrst] = meta // This sets the
 	}
 
 	// decrypt share
@@ -341,7 +348,11 @@ func (softSigner *ThresholdSignerSoft) SetEphemeralSecretPart(
 	}
 
 	// set slot
+	//TODO: Fix comment. Its also very very strange coding behaviour.
+	// Add test that meta.Peers[req.SourceID-1].Share == softSigner.HrsMeta[hrst].Peers[req.SourceID-1].Share == sharePart
+	// softSigner.HrsMeta[hrst] = meta
+	// Share & EphemeralSecretPublicKey is a SLICE so its a valid change of shared struct softSigner
 	meta.Peers[req.SourceID-1].Share = sharePart
-	meta.Peers[req.SourceID-1].EphemeralSecretPublicKey = req.SourceEphemeralSecretPublicKey
+	meta.Peers[req.SourceID-1].EphemeralSecretPublicKey = req.SourceEphemeralSecretPublicKey //
 	return nil
 }
