@@ -31,10 +31,10 @@ func SetupTestRun(t *testing.T) (context.Context, string, *dockertest.Pool, stri
 	require.NoError(t, err)
 
 	// set the test cleanup function
-	t.Cleanup(Cleanup(pool, t.Name(), home))
+	t.Cleanup(Cleanup(pool, t, home))
 
 	// run cleanup to cleanup stale resources from any killed tests
-	Cleanup(pool, t.Name(), home)()
+	Cleanup(pool, t, home)()
 
 	network, err := CreateTestNetwork(pool, fmt.Sprintf("horcrux-%s", RandLowerCaseLetterString(8)), t)
 	require.NoError(t, err)
@@ -243,16 +243,16 @@ func CreateTestNetwork(pool *dockertest.Pool, name string, t *testing.T) (*docke
 }
 
 // Cleanup will clean up Docker containers, networks, and the other various config files generated in testing
-func Cleanup(pool *dockertest.Pool, testName, testDir string) func() {
+func Cleanup(pool *dockertest.Pool, t *testing.T, testDir string) func() {
 	return func() {
 		cont, _ := pool.Client.ListContainers(docker.ListContainersOptions{All: true})
 		ctx := context.Background()
 		for _, c := range cont {
 			for k, v := range c.Labels {
-				if k == "horcrux-test" && v == testName {
+				if k == "horcrux-test" && v == t.Name() {
 					_ = pool.Client.StopContainer(c.ID, 10)
-					_, err := pool.Client.WaitContainerWithContext(c.ID, ctx)
-					if err != nil {
+					_, _ = pool.Client.WaitContainerWithContext(c.ID, ctx)
+					if t.Failed() {
 						stdout := new(bytes.Buffer)
 						stderr := new(bytes.Buffer)
 						_ = pool.Client.Logs(docker.LogsOptions{
@@ -275,7 +275,7 @@ func Cleanup(pool *dockertest.Pool, testName, testDir string) func() {
 		nets, _ := pool.Client.ListNetworks()
 		for _, n := range nets {
 			for k, v := range n.Labels {
-				if k == "horcrux-test" && v == testName {
+				if k == "horcrux-test" && v == t.Name() {
 					_ = pool.Client.RemoveNetwork(n.ID)
 				}
 			}
