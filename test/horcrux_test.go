@@ -181,11 +181,8 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 	t.Logf("{%s} -> Restarting Node...", ourValidatorAccountNode.Name())
 	t.Logf("{%s} -> Restarting Node...", sentries[0].Name())
 
-	require.NoError(t, ourValidatorAccountNode.CreateNodeContainer())
-	require.NoError(t, sentries[0].CreateNodeContainer())
-
-	require.NoError(t, ourValidatorAccountNode.StartContainer(ctx))
-	require.NoError(t, sentries[0].StartContainer(ctx))
+	require.NoError(t, ourValidatorAccountNode.Start(ctx, nil))
+	require.NoError(t, sentries[0].Start(ctx, nil))
 
 	// wait for our validator and all sentries to be reachable
 	hosts := ourValidatorAccountNode.GetHosts()
@@ -253,8 +250,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	require.NoError(t, ourValidatorUpgradedToHorcrux.StartHorcruxCluster(ctx, sentriesPerSigner))
 
 	t.Logf("{%s} -> Restarting Node...", ourValidatorNode.Name())
-	require.NoError(t, ourValidatorNode.CreateNodeContainer())
-	require.NoError(t, ourValidatorNode.StartContainer(ctx))
+	require.NoError(t, ourValidatorNode.Start(ctx, nil))
 
 	// wait for validator to be reachable
 	require.NoError(t, ourValidatorNode.GetHosts().WaitForAllToStart(t, 10))

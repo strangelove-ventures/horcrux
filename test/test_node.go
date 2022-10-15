@@ -623,7 +623,60 @@ func (tn *TestNode) CollectGentxs(ctx context.Context) error {
 	return err
 }
 
-func (tn *TestNode) CreateNodeContainer() error {
+func (tn *TestNode) Start(ctx context.Context, preStart func()) error {
+	// Retry loop for running container.
+	err := retry.Do(func() error {
+		// forcefully remove existing container, ignoring error
+		_ = tn.StopAndRemoveContainer(true)
+		if err := tn.createContainer(); err != nil {
+			return err
+		}
+		if preStart != nil {
+			preStart()
+		}
+		if err := tn.startContainer(ctx); err != nil {
+			return err
+		}
+
+		for i := 0; i < 10; i++ {
+			container, err := tn.Pool.Client.InspectContainer(tn.Container.ID)
+			if err != nil {
+				return err
+			}
+			if !container.State.Running {
+				return fmt.Errorf("container is not running")
+			}
+
+			ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
+			_, err = tn.Client.Status(ctx)
+			cancel()
+			if err == nil {
+				return nil
+			}
+			time.Sleep(1 * time.Second)
+		}
+
+		return fmt.Errorf("node is running but not responding with status")
+	}, retry.DelayType(retry.FixedDelay), retry.Attempts(5))
+	if err != nil {
+		return fmt.Errorf("error starting node container after max retries: %w", err)
+	}
+
+	// Retry loop for in sync with chain
+	return retry.Do(func() error {
+		stat, err := tn.Client.Status(ctx)
+		if err != nil {
+			return err
+		}
+		if stat != nil && stat.SyncInfo.CatchingUp {
+			return fmt.Errorf("still catching up: height(%d) catching-up(%t)",
+				stat.SyncInfo.LatestBlockHeight, stat.SyncInfo.CatchingUp)
+		}
+		return nil
+	}, retry.DelayType(retry.BackOffDelay))
+}
+
+func (tn *TestNode) createContainer() error {
 	cont, err := tn.Pool.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: tn.Name(),
 		Config: &docker.Config{
@@ -654,12 +707,14 @@ func (tn *TestNode) CreateNodeContainer() error {
 	return nil
 }
 
-func (tn *TestNode) StopContainer() error {
-	return tn.Pool.Client.StopContainer(tn.Container.ID, 60)
-}
-
+// StopAndRemoveContainer stops and removes a TestSigners docker container.
+// If force is true, error for stopping container will be ignored and container
+// will be forcefully removed.
 func (tn *TestNode) StopAndRemoveContainer(force bool) error {
-	if err := tn.StopContainer(); err != nil && !force {
+	if tn.Container == nil {
+		return nil
+	}
+	if err := tn.Pool.Client.StopContainer(tn.Container.ID, 60); err != nil && !force {
 		return err
 	}
 	return tn.Pool.Client.RemoveContainer(docker.RemoveContainerOptions{
@@ -668,7 +723,7 @@ func (tn *TestNode) StopAndRemoveContainer(force bool) error {
 	})
 }
 
-func (tn *TestNode) StartContainer(ctx context.Context) error {
+func (tn *TestNode) startContainer(ctx context.Context) error {
 	if err := tn.Pool.Client.StartContainer(tn.Container.ID, nil); err != nil {
 		return err
 	}
@@ -682,25 +737,7 @@ func (tn *TestNode) StartContainer(ctx context.Context) error {
 	port := GetHostPort(c, "26657/tcp")
 	tn.tl.Logf("{%s} RPC => %s", tn.Name(), port)
 
-	err = tn.NewClient(fmt.Sprintf("tcp://%s", port))
-	if err != nil {
-		return err
-	}
-
-	time.Sleep(5 * time.Second)
-	return retry.Do(func() error {
-		stat, err := tn.Client.Status(ctx)
-		if err != nil {
-			// tn.t.Log(err)
-			return err
-		}
-		// TODO: reenable this check, having trouble with it for some reason
-		if stat != nil && stat.SyncInfo.CatchingUp {
-			return fmt.Errorf("still catching up: height(%d) catching-up(%t)",
-				stat.SyncInfo.LatestBlockHeight, stat.SyncInfo.CatchingUp)
-		}
-		return nil
-	}, retry.DelayType(retry.BackOffDelay))
+	return tn.NewClient(fmt.Sprintf("tcp://%s", port))
 }
 
 func (tn *TestNode) Bech32AddressForKey(keyName string) (string, error) {

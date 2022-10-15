@@ -165,16 +165,6 @@ func Genesis(
 		return err
 	}
 
-	for _, n := range nodes {
-		n := n
-		eg.Go(func() error {
-			return n.CreateNodeContainer()
-		})
-	}
-	if err := eg.Wait(); err != nil {
-		return err
-	}
-
 	peers := nodes.PeerString()
 
 	// start horcrux sentries. privval listener enabled
@@ -183,8 +173,9 @@ func Genesis(
 			s := sentry
 			tl.Logf("{%s} => starting container...", s.Name())
 			eg.Go(func() error {
-				s.SetValidatorConfigAndPeers(peers, true)
-				return s.StartContainer(ctx)
+				return s.Start(ctx, func() {
+					s.SetValidatorConfigAndPeers(peers, true)
+				})
 			})
 		}
 	}
@@ -194,8 +185,9 @@ func Genesis(
 		v := v
 		tl.Logf("{%s} => starting container...", v.Name())
 		eg.Go(func() error {
-			v.SetValidatorConfigAndPeers(peers, false)
-			return v.StartContainer(ctx)
+			return v.Start(ctx, func() {
+				v.SetValidatorConfigAndPeers(peers, false)
+			})
 		})
 	}
 
@@ -204,8 +196,9 @@ func Genesis(
 		n := n
 		tl.Logf("{%s} => starting container...", n.Name())
 		eg.Go(func() error {
-			n.SetValidatorConfigAndPeers(peers, false)
-			return n.StartContainer(ctx)
+			return n.Start(ctx, func() {
+				n.SetValidatorConfigAndPeers(peers, false)
+			})
 		})
 	}
 

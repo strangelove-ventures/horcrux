@@ -409,13 +409,11 @@ func (ts *TestSigner) StartContainer() error {
 	return nil
 }
 
-// StopContainer stops a TestSigners docker container
-func (ts *TestSigner) StopContainer() error {
-	return ts.Pool.Client.StopContainer(ts.Container.ID, 60)
-}
-
+// StopAndRemoveContainer stops and removes a TestSigners docker container.
+// If force is true, error for stopping container will be ignored and container
+// will be forcefully removed.
 func (ts *TestSigner) StopAndRemoveContainer(force bool) error {
-	if err := ts.StopContainer(); err != nil && !force {
+	if err := ts.Pool.Client.StopContainer(ts.Container.ID, 60); err != nil && !force {
 		return err
 	}
 	return ts.Pool.Client.RemoveContainer(docker.RemoveContainerOptions{
