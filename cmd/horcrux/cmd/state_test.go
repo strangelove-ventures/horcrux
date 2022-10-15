@@ -13,13 +13,11 @@ import (
 )
 
 func TestStateSetCmd(t *testing.T) {
-	tmpHome := "/tmp/TestStateSetCmd"
+	tmpHome := t.TempDir()
 	tmpConfig := filepath.Join(tmpHome, ".horcrux")
 	chainid := "horcrux-1"
 
 	err := os.Setenv("HOME", tmpHome)
-	require.NoError(t, err)
-	err = os.MkdirAll(tmpHome, 0777)
 	require.NoError(t, err)
 
 	cmd := initCmd()
@@ -89,8 +87,4 @@ func TestStateSetCmd(t *testing.T) {
 			}
 		})
 	}
-
-	t.Cleanup(func() {
-		os.RemoveAll(tmpHome)
-	})
 }

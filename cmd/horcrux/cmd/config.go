@@ -338,6 +338,7 @@ func addPeersCmd() *cobra.Command {
 				return errors.New("no new peer nodes in args")
 			}
 			diff = append(config.Config.CosignerConfig.Peers, diff...)
+			config.Config.CosignerConfig.Shares = len(diff) + 1
 			if err := validateCosignerPeers(diff, config.Config.CosignerConfig.Shares); err != nil {
 				return err
 			}
@@ -381,6 +382,8 @@ func removePeersCmd() *cobra.Command {
 			if len(diff) == 0 {
 				return errors.New("cannot remove all peer nodes from config, please leave at least one")
 			}
+
+			config.Config.CosignerConfig.Shares = len(diff) + 1
 			// If none of the peer nodes in the args are listed in the config, just continue
 			// without throwing an error, as the peer nodes in the config remain untouched.
 			if err := validateCosignerPeers(diff, config.Config.CosignerConfig.Shares); err != nil {
