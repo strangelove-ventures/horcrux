@@ -20,42 +20,42 @@ import (
 
 func init() {
 	rootCmd.AddCommand(leaderElectionCmd)
+	rootCmd.AddCommand(getLeaderCmd)
+}
+
+func sanitizeAddress(address string) (string, error) {
+	u, err := url.Parse(address)
+	if err != nil {
+		return "", fmt.Errorf("error parsing peer URL: %w", err)
+	}
+
+	hostname, port, err := net.SplitHostPort(u.Host)
+	if err != nil {
+		return "", fmt.Errorf("error splitting host port from parsed URL: %w", err)
+	}
+
+	if strings.Contains(hostname, ":") {
+		// IPv6 Addreses need to be wrapped in brackets
+		return fmt.Sprintf("[%s]:%s", hostname, port), nil
+	} else {
+		return fmt.Sprintf("%s:%s", hostname, port), nil
+	}
 }
 
 func leaderElectMultiAddress(cosignerConfig *CosignerConfig) string {
 	var grpcAddresses []string
 
 	// Append local host:port
-	u, err := url.Parse(cosignerConfig.P2PListen)
-	if err != nil {
-		fmt.Printf("Error parsing peer URL: %v", err)
-	} else {
-		host, port, err := net.SplitHostPort(u.Host)
-		if err == nil {
-			if strings.Contains(host, ":") {
-				// IPv6 Addreses need to be wrapped in brackets
-				grpcAddresses = append(grpcAddresses, fmt.Sprintf("[%s]:%s", host, port))
-			} else {
-				grpcAddresses = append(grpcAddresses, fmt.Sprintf("%s:%s", host, port))
-			}
-		}
+	localAddr, err := sanitizeAddress(cosignerConfig.P2PListen)
+	if err == nil {
+		grpcAddresses = append(grpcAddresses, localAddr)
 	}
 
 	// Append peer host:port
 	for _, peer := range cosignerConfig.Peers {
-		u, err := url.Parse(peer.P2PAddr)
-		if err != nil {
-			fmt.Printf("Error parsing peer URL: %v", err)
-		} else {
-			host, port, err := net.SplitHostPort(u.Host)
-			if err == nil {
-				if strings.Contains(host, ":") {
-					// IPv6 Addreses need to be wrapped in brackets
-					grpcAddresses = append(grpcAddresses, fmt.Sprintf("[%s]:%s", host, port))
-				} else {
-					grpcAddresses = append(grpcAddresses, fmt.Sprintf("%s:%s", host, port))
-				}
-			}
+		peerAddr, err := sanitizeAddress(peer.P2PAddr)
+		if err == nil {
+			grpcAddresses = append(grpcAddresses, peerAddr)
 		}
 	}
 
@@ -123,6 +123,57 @@ horcrux elect 2 # elect specific leader`,
 		}
 
 		fmt.Printf("Leader election successful. New leader: %s\n", res.Leader)
+
+		return nil
+	},
+}
+
+var getLeaderCmd = &cobra.Command{
+	Use:          "leader",
+	Short:        "Get current raft leader",
+	Args:         cobra.NoArgs,
+	Example:      `horcrux leader`,
+	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, args []string) (err error) {
+		if config.Config.CosignerConfig == nil {
+			return fmt.Errorf("cosigner configuration is not present in config file")
+		}
+
+		if len(config.Config.CosignerConfig.Peers) == 0 {
+			return fmt.Errorf("cosigner configuration has no peers")
+		}
+
+		retryOpts := []grpc_retry.CallOption{
+			grpc_retry.WithBackoff(grpc_retry.BackoffExponential(100 * time.Millisecond)),
+			grpc_retry.WithMax(5),
+		}
+
+		grpcAddress, err := sanitizeAddress(config.Config.CosignerConfig.P2PListen)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("Request address: %s\n", grpcAddress)
+		conn, err := grpc.Dial(grpcAddress,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
+			grpc.WithUnaryInterceptor(grpc_retry.UnaryClientInterceptor(retryOpts...)))
+		if err != nil {
+			log.Fatalf("dialing failed: %v", err)
+		}
+		defer conn.Close()
+
+		ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancelFunc()
+
+		grpcClient := proto.NewCosignerGRPCClient(conn)
+
+		res, err := grpcClient.GetLeader(ctx, &proto.CosignerGRPCGetLeaderRequest{})
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("Current leader: %s\n", res.Leader)
 
 		return nil
 	},
