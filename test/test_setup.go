@@ -24,7 +24,7 @@ type TestLogger interface {
 	Logf(string, ...interface{})
 }
 
-func SetupTestRun(t *testing.T) (context.Context, string, *dockertest.Pool, *docker.Network) {
+func SetupTestRun(t *testing.T) (context.Context, string, *dockertest.Pool, string) {
 	home := t.TempDir()
 
 	pool, err := dockertest.NewPool("")
@@ -42,14 +42,13 @@ func SetupTestRun(t *testing.T) (context.Context, string, *dockertest.Pool, *doc
 	// build the horcrux image
 	require.NoError(t, BuildTestSignerImage(pool))
 
-	return context.Background(), home, pool, network
+	return context.Background(), home, pool, network.ID
 }
 
 // assemble gentx, build genesis file, configure peering, and start chain
 func Genesis(
 	tl TestLogger,
 	ctx context.Context,
-	net *docker.Network,
 	chain *ChainType,
 	nonHorcruxValidators,
 	fullnodes []*TestNode,
@@ -169,7 +168,7 @@ func Genesis(
 	for _, n := range nodes {
 		n := n
 		eg.Go(func() error {
-			return n.CreateNodeContainer(net.ID)
+			return n.CreateNodeContainer()
 		})
 	}
 	if err := eg.Wait(); err != nil {

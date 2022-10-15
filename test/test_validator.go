@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 
 	"github.com/ory/dockertest"
-	"github.com/ory/dockertest/docker"
 	"github.com/strangelove-ventures/horcrux/signer"
 	crypto "github.com/tendermint/tendermint/crypto"
 	ed25519 "github.com/tendermint/tendermint/crypto/ed25519"
@@ -28,6 +27,7 @@ type TestValidator struct {
 func NewHorcruxValidator(
 	tl TestLogger,
 	pool *dockertest.Pool,
+	networkID string,
 	home string,
 	chainID string,
 	index int,
@@ -38,8 +38,8 @@ func NewHorcruxValidator(
 ) (*TestValidator, error) {
 	testValidator := &TestValidator{
 		Index:     index,
-		Sentries:  MakeTestNodes(index, numSentries, home, chainID, chainType, pool, tl),
-		Signers:   MakeTestSigners(index, numSigners, home, pool, tl),
+		Sentries:  MakeTestNodes(index, numSentries, home, chainID, chainType, pool, networkID, tl),
+		Signers:   MakeTestSigners(index, numSigners, home, pool, networkID, tl),
 		tl:        tl,
 		Home:      home,
 		Threshold: threshold,
@@ -53,6 +53,7 @@ func NewHorcruxValidator(
 func NewHorcruxValidatorWithPrivValKey(
 	tl TestLogger,
 	pool *dockertest.Pool,
+	networkID string,
 	home string,
 	chainID string,
 	index int,
@@ -64,8 +65,8 @@ func NewHorcruxValidatorWithPrivValKey(
 ) (*TestValidator, error) {
 	testValidator := &TestValidator{
 		Index:     index,
-		Sentries:  MakeTestNodes(index, numSentries, home, chainID, chainType, pool, tl),
-		Signers:   MakeTestSigners(index, numSigners, home, pool, tl),
+		Sentries:  MakeTestNodes(index, numSentries, home, chainID, chainType, pool, networkID, tl),
+		Signers:   MakeTestSigners(index, numSigners, home, pool, networkID, tl),
 		tl:        tl,
 		Home:      home,
 		Threshold: threshold,
@@ -120,11 +121,10 @@ func (tv *TestValidator) generateShares(filePVKey privval.FilePVKey) error {
 
 func (tv *TestValidator) StartHorcruxCluster(
 	ctx context.Context,
-	network *docker.Network,
 	sentriesPerSigner int,
 ) error {
 	return StartCosignerContainers(tv.Signers, tv.Sentries,
-		tv.Threshold, len(tv.Signers), sentriesPerSigner, network)
+		tv.Threshold, len(tv.Signers), sentriesPerSigner)
 }
 
 func (tv *TestValidator) WaitForConsecutiveBlocks(blocks int64) error {

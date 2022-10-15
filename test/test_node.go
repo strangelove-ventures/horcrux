@@ -96,7 +96,8 @@ func getSentinelChain(ctx context.Context, version string) *ChainType {
 			return err
 		}
 		command := []string{"sed", "-i", fmt.Sprintf(`s/"approve_by": ""/"approve_by": "%s"/g`, address), genesisJSON}
-		return handleNodeJobError(tn.NodeJob(ctx, command))
+		_, _, err = tn.Exec(ctx, command)
+		return err
 	}
 
 	return getHeighlinerChain("sentinel", version, "sentinelhub", "sent", true, sentinelGenesisJSONModification)
@@ -127,6 +128,7 @@ type TestNode struct {
 	GenesisCoins   string
 	Validator      bool
 	Pool           *dockertest.Pool
+	networkID      string
 	Client         rpcclient.Client
 	Container      *docker.Container
 	tl             TestLogger
@@ -162,6 +164,7 @@ func MakeTestNodes(
 	chainID string,
 	chainType *ChainType,
 	pool *dockertest.Pool,
+	networkID string,
 	tl TestLogger,
 ) (out TestNodes) {
 	err := pool.Client.PullImage(docker.PullImageOptions{
@@ -173,7 +176,7 @@ func MakeTestNodes(
 	}
 	for i := 0; i < count; i++ {
 		tn := &TestNode{Home: home, Index: i, ValidatorIndex: validatorIndex, Chain: chainType, ChainID: chainID,
-			Pool: pool, tl: tl, ec: simapp.MakeTestEncodingConfig()}
+			Pool: pool, networkID: networkID, tl: tl, ec: simapp.MakeTestEncodingConfig()}
 		tn.MkDir()
 		out = append(out, tn)
 	}
@@ -189,10 +192,11 @@ func GetValidators(
 	chainID string,
 	chain *ChainType,
 	pool *dockertest.Pool,
+	networkID string,
 	t *testing.T,
 ) (out TestNodes) {
 	for i := startingValidatorIndex; i < startingValidatorIndex+count; i++ {
-		out = append(out, MakeTestNodes(i, sentriesPerValidator, home, chainID, chain, pool, t)...)
+		out = append(out, MakeTestNodes(i, sentriesPerValidator, home, chainID, chain, pool, networkID, t)...)
 	}
 	return
 }
@@ -516,9 +520,9 @@ func stdconfigchanges(cfg *tmconfig.Config, peers string, enablePrivVal bool) {
 	cfg.P2P.PersistentPeers = peers
 }
 
-// NodeJob run a container for a specific job and block until the container exits
+// Exec runs a container for a specific job and block until the container exits
 // NOTE: on job containers generate random name
-func (tn *TestNode) NodeJob(ctx context.Context, cmd []string) (string, int, string, string, error) {
+func (tn *TestNode) Exec(ctx context.Context, cmd []string) (string, string, error) {
 	container := RandLowerCaseLetterString(10)
 	tn.tl.Logf("{%s}[%s] -> '%s'", tn.Name(), container, strings.Join(cmd, " "))
 	cont, err := tn.Pool.Client.CreateContainer(docker.CreateContainerOptions{
@@ -543,76 +547,83 @@ func (tn *TestNode) NodeJob(ctx context.Context, cmd []string) (string, int, str
 		Context: nil,
 	})
 	if err != nil {
-		return container, 1, "", "", err
+		return "", "", err
 	}
 	if err := tn.Pool.Client.StartContainer(cont.ID, nil); err != nil {
-		return container, 1, "", "", err
+		return "", "", err
 	}
 	exitCode, err := tn.Pool.Client.WaitContainerWithContext(cont.ID, ctx)
-	stdout := new(bytes.Buffer)
-	stderr := new(bytes.Buffer)
+	outputStream := new(bytes.Buffer)
+	errorStream := new(bytes.Buffer)
 	_ = tn.Pool.Client.Logs(docker.LogsOptions{
 		Context:      ctx,
 		Container:    cont.ID,
-		OutputStream: stdout,
-		ErrorStream:  stderr,
+		OutputStream: outputStream,
+		ErrorStream:  errorStream,
 		Stdout:       true,
 		Stderr:       true,
 		Tail:         "100",
 		Follow:       false,
 		Timestamps:   false,
 	})
+	stdout := outputStream.String()
+	stderr := errorStream.String()
 	_ = tn.Pool.Client.RemoveContainer(docker.RemoveContainerOptions{ID: cont.ID})
-	return container, exitCode, stdout.String(), stderr.String(), err
+	return stdout, stderr, containerExitError(container, exitCode, stdout, stderr, err)
 }
 
 // InitHomeFolder initializes a home folder for the given node
 func (tn *TestNode) InitHomeFolder(ctx context.Context) error {
-	command := []string{tn.Chain.Bin, "init", tn.Name(),
+	cmd := []string{tn.Chain.Bin, "init", tn.Name(),
 		"--chain-id", tn.ChainID,
 		"--home", tn.NodeHome(),
 	}
-	return handleNodeJobError(tn.NodeJob(ctx, command))
+	_, _, err := tn.Exec(ctx, cmd)
+	return err
 }
 
 // CreateKey creates a key in the keyring backend test for the given node
 func (tn *TestNode) CreateKey(ctx context.Context, name string) error {
-	command := []string{tn.Chain.Bin, "keys", "add", name,
+	cmd := []string{tn.Chain.Bin, "keys", "add", name,
 		"--keyring-backend", "test",
 		"--output", "json",
 		"--home", tn.NodeHome(),
 	}
-	return handleNodeJobError(tn.NodeJob(ctx, command))
+	_, _, err := tn.Exec(ctx, cmd)
+	return err
 }
 
 // AddGenesisAccount adds a genesis account for each key
 func (tn *TestNode) AddGenesisAccount(ctx context.Context, address string) error {
-	command := []string{tn.Chain.Bin, "add-genesis-account", address, "1000000000000stake",
+	cmd := []string{tn.Chain.Bin, "add-genesis-account", address, "1000000000000stake",
 		"--home", tn.NodeHome(),
 	}
-	return handleNodeJobError(tn.NodeJob(ctx, command))
+	_, _, err := tn.Exec(ctx, cmd)
+	return err
 }
 
 // Gentx generates the gentx for a given node
 func (tn *TestNode) Gentx(ctx context.Context, name, pubKey string) error {
-	command := []string{tn.Chain.Bin, "gentx", valKey, "100000000000stake",
+	cmd := []string{tn.Chain.Bin, "gentx", valKey, "100000000000stake",
 		"--pubkey", pubKey,
 		"--keyring-backend", "test",
 		"--home", tn.NodeHome(),
 		"--chain-id", tn.ChainID,
 	}
-	return handleNodeJobError(tn.NodeJob(ctx, command))
+	_, _, err := tn.Exec(ctx, cmd)
+	return err
 }
 
 // CollectGentxs runs collect gentxs on the node's home folders
 func (tn *TestNode) CollectGentxs(ctx context.Context) error {
-	command := []string{tn.Chain.Bin, "collect-gentxs",
+	cmd := []string{tn.Chain.Bin, "collect-gentxs",
 		"--home", tn.NodeHome(),
 	}
-	return handleNodeJobError(tn.NodeJob(ctx, command))
+	_, _, err := tn.Exec(ctx, cmd)
+	return err
 }
 
-func (tn *TestNode) CreateNodeContainer(networkID string) error {
+func (tn *TestNode) CreateNodeContainer() error {
 	cont, err := tn.Pool.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: tn.Name(),
 		Config: &docker.Config{
@@ -631,7 +642,7 @@ func (tn *TestNode) CreateNodeContainer(networkID string) error {
 		},
 		NetworkingConfig: &docker.NetworkingConfig{
 			EndpointsConfig: map[string]*docker.EndpointConfig{
-				networkID: {},
+				tn.networkID: {},
 			},
 		},
 		Context: nil,
@@ -747,7 +758,7 @@ func (tn *TestNode) InitFullNodeFiles(ctx context.Context) error {
 	return tn.InitHomeFolder(ctx)
 }
 
-func handleNodeJobError(container string, i int, stdout string, stderr string, err error) error {
+func containerExitError(container string, i int, stdout string, stderr string, err error) error {
 	if err != nil {
 		return fmt.Errorf("%v\n%s\n%s", err, stdout, stderr)
 	}

@@ -8,18 +8,25 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
 	"github.com/strangelove-ventures/horcrux/signer"
+	"github.com/strangelove-ventures/horcrux/signer/proto"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
-var (
-	signerPort  = "2222"
-	signerImage = "horcrux-test"
+const (
+	signerPort       = "2222"
+	signerImage      = "horcrux-test"
+	binary           = "horcrux"
+	signerPortDocker = signerPort + "/tcp"
 )
 
 // TestSigner represents a remote signer instance
@@ -28,6 +35,7 @@ type TestSigner struct {
 	Index          int
 	ValidatorIndex int
 	Pool           *dockertest.Pool
+	networkID      string
 	Container      *docker.Container
 	Key            signer.CosignerKey
 	tl             TestLogger
@@ -62,7 +70,6 @@ func StartSingleSignerContainers(
 	testSigners TestSigners,
 	validator *TestNode,
 	sentryNodes TestNodes,
-	network *docker.Network,
 ) error {
 	eg := new(errgroup.Group)
 	ctx := context.Background()
@@ -96,7 +103,7 @@ func StartSingleSignerContainers(
 	for _, s := range testSigners {
 		s := s
 		eg.Go(func() error {
-			return s.CreateSingleSignerContainer(network.ID)
+			return s.CreateSingleSignerContainer()
 		})
 	}
 	if err := eg.Wait(); err != nil {
@@ -123,7 +130,6 @@ func StartCosignerContainers(
 	sentries TestNodes,
 	threshold, total,
 	sentriesPerSigner int,
-	network *docker.Network,
 ) error {
 	eg := new(errgroup.Group)
 	ctx := context.Background()
@@ -201,7 +207,7 @@ func StartCosignerContainers(
 	for _, s := range signers {
 		s := s
 		eg.Go(func() error {
-			return s.CreateCosignerContainer(network.ID)
+			return s.CreateCosignerContainer()
 		})
 	}
 	err = eg.Wait()
@@ -233,13 +239,14 @@ func (ts TestSigners) PeerString(skip int) string {
 }
 
 // MakeTestSigners creates the TestSigner objects required for bootstrapping tests
-func MakeTestSigners(validatorIndex, count int, home string, pool *dockertest.Pool, tl TestLogger) (out TestSigners) {
+func MakeTestSigners(validatorIndex, count int, home string, pool *dockertest.Pool, networkID string, tl TestLogger) (out TestSigners) {
 	for i := 0; i < count; i++ {
 		ts := &TestSigner{
 			Home:           home,
 			Index:          i + 1, // +1 is to ensure all Cosigner IDs end up being >0 as required in cosigner.go
 			ValidatorIndex: validatorIndex,
 			Pool:           pool,
+			networkID:      networkID,
 			Container:      nil,
 			Key:            signer.CosignerKey{},
 			tl:             tl,
@@ -253,7 +260,7 @@ func (ts *TestSigner) GetHosts() (out Hosts) {
 	host := ContainerPort{
 		Name:      ts.Name(),
 		Container: ts.Container,
-		Port:      docker.Port(fmt.Sprintf("%s/tcp", signerPort)),
+		Port:      docker.Port(signerPortDocker),
 	}
 	out = append(out, host)
 	return
@@ -288,15 +295,17 @@ func (ts *TestSigner) Name() string {
 	return fmt.Sprintf("val-%d-sgn-%d-%s", ts.ValidatorIndex, ts.Index, ts.tl.Name())
 }
 
-// InitSingleSignerConfig creates and runs a container to init a single signers config files
-// blocks until the container exits
-func (ts *TestSigner) InitSingleSignerConfig(ctx context.Context, listenNodes TestNodes) error {
+// GRPCAddress returns the TCP address of the GRPC server,
+// reachable from within the docker network.
+func (ts *TestSigner) GRPCAddress() string {
+	return fmt.Sprintf("tcp://%s:%s", ts.Name(), signerPort)
+}
+
+// ExecHorcruxCmd executes a CLI subcommand for the horcrux binary for the specific cosigner.
+// The config home directory will be appended as a flag.
+func (ts *TestSigner) ExecHorcruxCmd(ctx context.Context, cmd ...string) error {
+	cmd = ts.horcruxCmd(cmd)
 	container := RandLowerCaseLetterString(10)
-	cmd := []string{
-		"horcrux", "config", "init",
-		listenNodes[0].ChainID, listenNodes.ListenAddrs(),
-		fmt.Sprintf("--home=%s", ts.Dir()),
-	}
 	ts.tl.Logf("{%s}[%s] -> '%s'", ts.Name(), container, strings.Join(cmd, " "))
 	cont, err := ts.Pool.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: container,
@@ -304,7 +313,7 @@ func (ts *TestSigner) InitSingleSignerConfig(ctx context.Context, listenNodes Te
 			User:     getDockerUserString(),
 			Hostname: container,
 			ExposedPorts: map[docker.Port]struct{}{
-				docker.Port(fmt.Sprintf("%s/tcp", signerPort)): {},
+				docker.Port(signerPortDocker): {},
 			},
 			Image:  signerImage,
 			Cmd:    cmd,
@@ -324,7 +333,9 @@ func (ts *TestSigner) InitSingleSignerConfig(ctx context.Context, listenNodes Te
 			},
 		},
 		NetworkingConfig: &docker.NetworkingConfig{
-			EndpointsConfig: map[string]*docker.EndpointConfig{},
+			EndpointsConfig: map[string]*docker.EndpointConfig{
+				ts.networkID: {},
+			},
 		},
 		Context: nil,
 	})
@@ -335,13 +346,13 @@ func (ts *TestSigner) InitSingleSignerConfig(ctx context.Context, listenNodes Te
 		return err
 	}
 	exitCode, err := ts.Pool.Client.WaitContainerWithContext(cont.ID, ctx)
-	stdout := new(bytes.Buffer)
-	stderr := new(bytes.Buffer)
+	outputStream := new(bytes.Buffer)
+	errorStream := new(bytes.Buffer)
 	_ = ts.Pool.Client.Logs(docker.LogsOptions{
 		Context:      ctx,
 		Container:    cont.ID,
-		OutputStream: stdout,
-		ErrorStream:  stderr,
+		OutputStream: outputStream,
+		ErrorStream:  errorStream,
 		Stdout:       true,
 		Stderr:       true,
 		Tail:         "100",
@@ -349,77 +360,31 @@ func (ts *TestSigner) InitSingleSignerConfig(ctx context.Context, listenNodes Te
 		Timestamps:   false,
 	})
 	_ = ts.Pool.Client.RemoveContainer(docker.RemoveContainerOptions{ID: cont.ID})
-	return handleNodeJobError(container, exitCode, stdout.String(), stderr.String(), err)
+	stdout := outputStream.String()
+	stderr := errorStream.String()
+	return containerExitError(container, exitCode, stdout, stderr, err)
+}
+
+// InitSingleSignerConfig creates and runs a container to init a single signers config files
+// blocks until the container exits
+func (ts *TestSigner) InitSingleSignerConfig(ctx context.Context, listenNodes TestNodes) error {
+	return ts.ExecHorcruxCmd(ctx,
+		"config", "init",
+		listenNodes[0].ChainID, listenNodes.ListenAddrs())
 }
 
 // InitCosignerConfig creates and runs a container to init a signer nodes config files
 // blocks until the container exits
 func (ts *TestSigner) InitCosignerConfig(
 	ctx context.Context, listenNodes TestNodes, peers TestSigners, skip, threshold int) error {
-	container := RandLowerCaseLetterString(10)
-	cmd := []string{
-		"horcrux", "config", "init",
+	return ts.ExecHorcruxCmd(ctx,
+		"config", "init",
 		listenNodes[0].ChainID, listenNodes.ListenAddrs(),
 		"--cosigner",
 		fmt.Sprintf("--peers=%s", peers.PeerString(skip)),
 		fmt.Sprintf("--threshold=%d", threshold),
-		fmt.Sprintf("--home=%s", ts.Dir()),
-		fmt.Sprintf("--listen=tcp://%s:%s", ts.Name(), signerPort),
-	}
-	ts.tl.Logf("{%s}[%s] -> '%s'", ts.Name(), container, strings.Join(cmd, " "))
-	cont, err := ts.Pool.Client.CreateContainer(docker.CreateContainerOptions{
-		Name: container,
-		Config: &docker.Config{
-			User:     getDockerUserString(),
-			Hostname: container,
-			ExposedPorts: map[docker.Port]struct{}{
-				docker.Port(fmt.Sprintf("%s/tcp", signerPort)): {},
-			},
-			Image:  signerImage,
-			Cmd:    cmd,
-			Labels: map[string]string{"horcrux-test": ts.tl.Name()},
-		},
-		HostConfig: &docker.HostConfig{
-			PublishAllPorts: true,
-			AutoRemove:      false,
-			Mounts: []docker.HostMount{
-				{
-					Type:        "bind",
-					Source:      ts.Home,
-					Target:      ts.Home,
-					ReadOnly:    false,
-					BindOptions: nil,
-				},
-			},
-		},
-		NetworkingConfig: &docker.NetworkingConfig{
-			EndpointsConfig: map[string]*docker.EndpointConfig{},
-		},
-		Context: nil,
-	})
-	if err != nil {
-		return err
-	}
-	if err := ts.Pool.Client.StartContainer(cont.ID, nil); err != nil {
-		return err
-	}
-
-	exitCode, err := ts.Pool.Client.WaitContainerWithContext(cont.ID, ctx)
-	stdout := new(bytes.Buffer)
-	stderr := new(bytes.Buffer)
-	_ = ts.Pool.Client.Logs(docker.LogsOptions{
-		Context:      ctx,
-		Container:    cont.ID,
-		OutputStream: stdout,
-		ErrorStream:  stderr,
-		Stdout:       true,
-		Stderr:       true,
-		Tail:         "100",
-		Follow:       false,
-		Timestamps:   false,
-	})
-	_ = ts.Pool.Client.RemoveContainer(docker.RemoveContainerOptions{ID: cont.ID})
-	return handleNodeJobError(container, exitCode, stdout.String(), stderr.String(), err)
+		fmt.Sprintf("--listen=%s", ts.GRPCAddress()),
+	)
 }
 
 // StartContainer starts a TestSigners container and assigns the new running container to replace the old one
@@ -461,15 +426,15 @@ func (ts *TestSigner) UnpauseContainer() error {
 }
 
 // CreateSingleSignerContainer creates a docker container to run a single signer
-func (ts *TestSigner) CreateSingleSignerContainer(networkID string) error {
+func (ts *TestSigner) CreateSingleSignerContainer() error {
 	cont, err := ts.Pool.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: ts.Name(),
 		Config: &docker.Config{
 			User:     getDockerUserString(),
-			Cmd:      []string{"horcrux", "signer", "start", fmt.Sprintf("--home=%s", ts.Dir())},
+			Cmd:      []string{binary, "signer", "start", fmt.Sprintf("--home=%s", ts.Dir())},
 			Hostname: ts.Name(),
 			ExposedPorts: map[docker.Port]struct{}{
-				docker.Port(fmt.Sprintf("%s/tcp", signerPort)): {},
+				docker.Port(signerPortDocker): {},
 			},
 			DNS:    []string{},
 			Image:  signerImage,
@@ -490,7 +455,7 @@ func (ts *TestSigner) CreateSingleSignerContainer(networkID string) error {
 		},
 		NetworkingConfig: &docker.NetworkingConfig{
 			EndpointsConfig: map[string]*docker.EndpointConfig{
-				networkID: {},
+				ts.networkID: {},
 			},
 		},
 		Context: nil,
@@ -503,15 +468,15 @@ func (ts *TestSigner) CreateSingleSignerContainer(networkID string) error {
 }
 
 // CreateCosignerContainer creates a docker container to run a mpc validator node
-func (ts *TestSigner) CreateCosignerContainer(networkID string) error {
+func (ts *TestSigner) CreateCosignerContainer() error {
 	cont, err := ts.Pool.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: ts.Name(),
 		Config: &docker.Config{
 			User:     getDockerUserString(),
-			Cmd:      []string{"horcrux", "cosigner", "start", fmt.Sprintf("--home=%s", ts.Dir())},
+			Cmd:      []string{binary, "cosigner", "start", fmt.Sprintf("--home=%s", ts.Dir())},
 			Hostname: ts.Name(),
 			ExposedPorts: map[docker.Port]struct{}{
-				docker.Port(fmt.Sprintf("%s/tcp", signerPort)): {},
+				docker.Port(signerPortDocker): {},
 			},
 			DNS:    []string{},
 			Image:  signerImage,
@@ -532,7 +497,7 @@ func (ts *TestSigner) CreateCosignerContainer(networkID string) error {
 		},
 		NetworkingConfig: &docker.NetworkingConfig{
 			EndpointsConfig: map[string]*docker.EndpointConfig{
-				networkID: {},
+				ts.networkID: {},
 			},
 		},
 		Context: nil,
@@ -542,4 +507,42 @@ func (ts *TestSigner) CreateCosignerContainer(networkID string) error {
 	}
 	ts.Container = cont
 	return nil
+}
+
+// TransferLeadership elects a new raft leader.
+func (ts *TestSigner) TransferLeadership(ctx context.Context, newLeaderID int) error {
+	return ts.ExecHorcruxCmd(ctx,
+		"elect", strconv.FormatInt(int64(newLeaderID), 10),
+	)
+}
+
+// GetLeader returns the current raft leader.
+func (ts *TestSigner) GetLeader(ctx context.Context) (string, error) {
+	grpcAddress := GetHostPort(ts.Container, signerPortDocker)
+	conn, err := grpc.Dial(grpcAddress,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
+	)
+	if err != nil {
+		return "", fmt.Errorf("dialing failed: %w", err)
+	}
+	defer conn.Close()
+
+	ctx, cancelFunc := context.WithTimeout(ctx, 10*time.Second)
+	defer cancelFunc()
+
+	grpcClient := proto.NewCosignerGRPCClient(conn)
+
+	res, err := grpcClient.GetLeader(ctx, &proto.CosignerGRPCGetLeaderRequest{})
+	if err != nil {
+		return "", err
+	}
+	return res.GetLeader(), nil
+}
+
+func (ts *TestSigner) horcruxCmd(cmd []string) (out []string) {
+	out = append(out, binary)
+	out = append(out, cmd...)
+	out = append(out, fmt.Sprintf("--home=%s", ts.Dir()))
+	return out
 }

@@ -22,6 +22,46 @@ func init() {
 	rootCmd.AddCommand(leaderElectionCmd)
 }
 
+func leaderElectMultiAddress(cosignerConfig *CosignerConfig) string {
+	var grpcAddresses []string
+
+	// Append local host:port
+	u, err := url.Parse(cosignerConfig.P2PListen)
+	if err != nil {
+		fmt.Printf("Error parsing peer URL: %v", err)
+	} else {
+		host, port, err := net.SplitHostPort(u.Host)
+		if err == nil {
+			if strings.Contains(host, ":") {
+				// IPv6 Addreses need to be wrapped in brackets
+				grpcAddresses = append(grpcAddresses, fmt.Sprintf("[%s]:%s", host, port))
+			} else {
+				grpcAddresses = append(grpcAddresses, fmt.Sprintf("%s:%s", host, port))
+			}
+		}
+	}
+
+	// Append peer host:port
+	for _, peer := range cosignerConfig.Peers {
+		u, err := url.Parse(peer.P2PAddr)
+		if err != nil {
+			fmt.Printf("Error parsing peer URL: %v", err)
+		} else {
+			host, port, err := net.SplitHostPort(u.Host)
+			if err == nil {
+				if strings.Contains(host, ":") {
+					// IPv6 Addreses need to be wrapped in brackets
+					grpcAddresses = append(grpcAddresses, fmt.Sprintf("[%s]:%s", host, port))
+				} else {
+					grpcAddresses = append(grpcAddresses, fmt.Sprintf("%s:%s", host, port))
+				}
+			}
+		}
+	}
+
+	return fmt.Sprintf("multi:///%s", strings.Join(grpcAddresses, ","))
+}
+
 var leaderElectionCmd = &cobra.Command{
 	Use:   "elect [node_id]",
 	Short: "Elect new raft leader",
@@ -47,45 +87,9 @@ horcrux elect 2 # elect specific leader`,
 			grpc_retry.WithMax(5),
 		}
 
-		var grpcAddresses []string
+		grpcAddress := leaderElectMultiAddress(config.Config.CosignerConfig)
 
-		// Append local host:port
-		u, err := url.Parse(config.Config.CosignerConfig.P2PListen)
-		if err != nil {
-			fmt.Printf("Error parsing peer URL: %v", err)
-		} else {
-			host, port, err := net.SplitHostPort(u.Host)
-			if err == nil {
-				if strings.Contains(host, ":") {
-					// IPv6 Addreses need to be wrapped in brackets
-					grpcAddresses = append(grpcAddresses, fmt.Sprintf("[%s]:%s", host, port))
-				} else {
-					grpcAddresses = append(grpcAddresses, fmt.Sprintf("%s:%s", host, port))
-				}
-			}
-		}
-
-		// Append peer host:port
-		for _, peer := range config.Config.CosignerConfig.Peers {
-			u, err := url.Parse(peer.P2PAddr)
-			if err != nil {
-				fmt.Printf("Error parsing peer URL: %v", err)
-			} else {
-				host, port, err := net.SplitHostPort(u.Host)
-				if err == nil {
-					if strings.Contains(host, ":") {
-						// IPv6 Addreses need to be wrapped in brackets
-						grpcAddresses = append(grpcAddresses, fmt.Sprintf("[%s]:%s", host, port))
-					} else {
-						grpcAddresses = append(grpcAddresses, fmt.Sprintf("%s:%s", host, port))
-					}
-				}
-			}
-		}
-
-		grpcAddress := fmt.Sprintf("multi:///%s", strings.Join(grpcAddresses, ","))
-
-		fmt.Println(grpcAddress)
+		fmt.Printf("Broadcasting to address: %s\n", grpcAddress)
 		conn, err := grpc.Dial(grpcAddress,
 			grpc.WithDefaultServiceConfig(serviceConfig), grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
@@ -101,17 +105,24 @@ horcrux elect 2 # elect specific leader`,
 			leaderID = args[0]
 		}
 
-		context, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancelFunc()
 
 		grpcClient := proto.NewCosignerGRPCClient(conn)
 		_, err = grpcClient.TransferLeadership(
-			context,
+			ctx,
 			&proto.CosignerGRPCTransferLeadershipRequest{LeaderID: leaderID},
 		)
 		if err != nil {
 			return err
 		}
+
+		res, err := grpcClient.GetLeader(ctx, &proto.CosignerGRPCGetLeaderRequest{})
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("Leader election successful. New leader: %s\n", res.Leader)
 
 		return nil
 	},
