@@ -339,6 +339,9 @@ func TestLeaderElection2of3(t *testing.T) {
 		err := signer.TransferLeadership(ctx, signer.Index)
 		require.NoError(t, err, "failed to transfer leadership to %d", signer.Index)
 
+		t.Logf("{%s} -> Waiting for signed blocks with signer as leader {%s}", ourValidator.Name(), signer.Name())
+		require.NoError(t, ourValidator.WaitForConsecutiveBlocks(2))
+
 		// Make sure all cosigners have the same leader
 		for _, s := range ourValidator.Signers {
 			leader, err := s.GetLeader(ctx)
@@ -346,8 +349,7 @@ func TestLeaderElection2of3(t *testing.T) {
 			require.Equal(t, signer.Name()+":"+signerPort, leader)
 		}
 
-		t.Logf("{%s} -> Waiting for signed blocks with signer as leader {%s}", ourValidator.Name(), signer.Name())
-		require.NoError(t, ourValidator.WaitForConsecutiveBlocks(10))
+		require.NoError(t, ourValidator.WaitForConsecutiveBlocks(8))
 	}
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
 	require.NoError(t, ourValidator.EnsureNotSlashed())
