@@ -153,6 +153,9 @@ func (cosigner *LocalCosigner) GetAddress() string {
 // Return the signed bytes or an error
 // Implements Cosigner interface
 func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignResponse, error) {
+	// This function has multiple exit points.  Only start time can be guaranteed
+	metricsTimeKeeper.SetPreviousLocalSignStart(time.Now())
+
 	cosigner.lastSignStateMutex.Lock()
 	defer cosigner.lastSignStateMutex.Unlock()
 
@@ -244,6 +247,10 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 
 	res.EphemeralPublic = ephemeralPublic
 	res.Signature = sig
+
+	// Note - Function may return before this line so elapsed time for Finish may be multiple block times
+	metricsTimeKeeper.SetPreviousLocalSignFinish(time.Now())
+
 	return res, nil
 }
 
@@ -283,6 +290,8 @@ func (cosigner *LocalCosigner) dealShares(req CosignerGetEphemeralSecretPartRequ
 
 func (cosigner *LocalCosigner) GetEphemeralSecretParts(
 	hrst HRSTKey) (*CosignerEphemeralSecretPartsResponse, error) {
+	metricsTimeKeeper.SetPreviousLocalEphemeralShare(time.Now())
+
 	res := &CosignerEphemeralSecretPartsResponse{
 		EncryptedSecrets: make([]CosignerEphemeralSecretPart, 0, len(cosigner.peers)-1),
 	}
@@ -391,7 +400,6 @@ func (cosigner *LocalCosigner) getEphemeralSecretPart(
 
 // Store an ephemeral secret share part provided by another cosigner
 func (cosigner *LocalCosigner) setEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest) error {
-
 	// Verify the source signature
 	{
 		if req.SourceSig == nil {

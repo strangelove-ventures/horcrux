@@ -176,11 +176,20 @@ func (pv *ThresholdValidator) waitForPeerEphemeralShares(
 	encryptedEphemeralSharesThresholdMap *map[Cosigner][]CosignerEphemeralSecretPart,
 	thresholdPeersMutex *sync.Mutex,
 ) {
+	peerStartTime := time.Now()
 	ephemeralSecretParts, err := peer.GetEphemeralSecretParts(hrst)
 	if err != nil {
+
+		// Significant missing shares may lead to signature failure
+		missedEphemeralShares.WithLabelValues(peer.GetAddress()).Add(float64(1))
+		totalMissedEphemeralShares.WithLabelValues(peer.GetAddress()).Inc()
 		pv.logger.Error("Error getting secret parts", "peer", peer.GetID(), "err", err)
 		return
 	}
+	// Significant missing shares may lead to signature failure
+	missedEphemeralShares.WithLabelValues(peer.GetAddress()).Set(0)
+	timedCosignerEphemeralShareLag.WithLabelValues(peer.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
+
 	// Check so that getEphemeralWaitGroup.Done is not called more than (threshold - 1) times which causes hardlock
 	thresholdPeersMutex.Lock()
 	if len(*encryptedEphemeralSharesThresholdMap) < pv.threshold-1 {
@@ -201,6 +210,7 @@ func (pv *ThresholdValidator) waitForPeerSetEphemeralSharesAndSign(
 	ephemeralPublic *[]byte,
 	wg *sync.WaitGroup,
 ) {
+	peerStartTime := time.Now()
 	defer wg.Done()
 	peerEphemeralSecretParts := make([]CosignerEphemeralSecretPart, 0, pv.threshold-1)
 	for _, EncryptedSecrets := range *encryptedEphemeralSharesThresholdMap {
@@ -233,6 +243,7 @@ func (pv *ThresholdValidator) waitForPeerSetEphemeralSharesAndSign(
 		return
 	}
 
+	timedCosignerSignLag.WithLabelValues(peer.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
 	pv.logger.Debug(fmt.Sprintf("Received signature from %d", peerID))
 
 	shareSignaturesMutex.Lock()
@@ -290,6 +301,8 @@ func (pv *ThresholdValidator) getExistingBlockSignature(block *Block) ([]byte, t
 func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, time.Time, error) {
 	height, round, step, stamp, signBytes := block.Height, block.Round, block.Step, block.Timestamp, block.SignBytes
 
+	timeStartSignBlock := time.Now()
+
 	// Only the leader can execute this function. Followers can handle the requests,
 	// but they just need to proxy the request to the raft leader
 	if pv.raftStore.raft == nil {
@@ -297,6 +310,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	}
 	if pv.raftStore.raft.State() != raft.Leader {
 		pv.logger.Debug("I am not the raft leader. Proxying request to the leader")
+		totalNotRaftLeader.Inc()
 		signRes, err := pv.raftStore.LeaderSignBlock(CosignerSignBlockRequest{chainID, block})
 		if err != nil {
 			if _, ok := err.(*rpcTypes.RPCError); ok {
@@ -311,6 +325,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 		return signRes.Signature, stamp, nil
 	}
 
+	totalRaftLeader.Inc()
 	pv.logger.Debug("I am the raft leader. Managing the sign process for this block")
 
 	hrst := HRSTKey{
@@ -394,6 +409,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	encryptedEphemeralSharesThresholdMap[pv.cosigner] = ourEphemeralSecretParts.EncryptedSecrets
 	thresholdPeersMutex.Unlock()
 
+	timedSignBlockThresholdLag.Observe(time.Since(timeStartSignBlock).Seconds())
 	pv.logger.Debug("Have threshold peers")
 
 	setEphemeralAndSignWaitGroup := sync.WaitGroup{}
@@ -421,6 +437,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 		return nil, stamp, errors.New("timed out waiting for peers to sign")
 	}
 
+	timedSignBlockCosignerLag.Observe(time.Since(timeStartSignBlock).Seconds())
 	pv.logger.Debug("Done waiting for cosigners, assembling signatures")
 
 	// collect all valid responses into array of ids and signatures for the threshold lib
@@ -438,6 +455,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	}
 
 	if len(sigIds) < pv.threshold {
+		totalInsufficientCosigners.Inc()
 		return nil, stamp, errors.New("not enough co-signers")
 	}
 
@@ -449,6 +467,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 
 	// verify the combined signature before saving to watermark
 	if !pv.pubkey.VerifySignature(signBytes, signature) {
+		totalInvalidSignature.Inc()
 		return nil, stamp, errors.New("combined signature is not valid")
 	}
 
@@ -472,6 +491,9 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	if err != nil {
 		pv.logger.Error("Error emitting LSS", err.Error())
 	}
+
+	timeSignBlock := time.Since(timeStartSignBlock).Seconds()
+	timedSignBlockLag.Observe(timeSignBlock)
 
 	return signature, stamp, nil
 }

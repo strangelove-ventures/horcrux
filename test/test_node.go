@@ -383,7 +383,7 @@ func (tn *TestNode) GetMostRecentConsecutiveSignedBlocks(
 	var status *ctypes.ResultStatus
 	status, err = tn.Client.Status(context.Background())
 	if err != nil {
-		return
+		return 0, 0, err
 	}
 
 	latestHeight = status.SyncInfo.LatestBlockHeight
@@ -392,16 +392,21 @@ func (tn *TestNode) GetMostRecentConsecutiveSignedBlocks(
 		var block *ctypes.ResultBlock
 		block, err = tn.Client.Block(context.Background(), &i)
 		if err != nil {
-			return
+			return 0, 0, err
 		}
+		found := false
 		for _, voter := range block.Block.LastCommit.Signatures {
 			if reflect.DeepEqual(voter.ValidatorAddress, address) {
 				count++
+				found = true
 				break
 			}
 		}
+		if !found {
+			return count, latestHeight, nil
+		}
 	}
-	return
+	return count, latestHeight, nil
 }
 
 func (tn *TestNode) getMissingBlocks(address tmBytes.HexBytes) (int64, error) {
@@ -470,6 +475,10 @@ func (tn *TestNode) WaitForConsecutiveBlocks(blocks int64, address tmBytes.HexBy
 		recentSignedBlocksCount, checkingBlock, err := tn.GetMostRecentConsecutiveSignedBlocks(blocks, address)
 		if err != nil {
 			continue
+		}
+		if recentSignedBlocksCount > 0 {
+			// we signed a block within window, so restart counter
+			i = -1
 		}
 		deltaMissed := min(blocks, checkingBlock-1) - recentSignedBlocksCount
 		deltaBlocks := checkingBlock - startingBlock
