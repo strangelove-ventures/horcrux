@@ -324,35 +324,30 @@ func (softSigner *ThresholdSignerSoft) SetEphemeralSecretPart(
 		Timestamp: req.Timestamp.UnixNano(),
 	}
 
-	meta, ok := softSigner.HrsMeta[hrst] // generate metadata placeholder
-
-	if !ok {
-		newMeta, err := softSigner.DealShares(CosignerGetEphemeralSecretPartRequest{
-			Height: req.Height,
-			Round:  req.Round,
-			Step:   req.Step,
-		})
-
-		if err != nil {
-			return err
-		}
-
-		meta = newMeta
-		softSigner.HrsMeta[hrst] = meta // This sets the
-	}
-
 	// decrypt share
 	sharePart, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, &softSigner.Key.RSAKey, req.EncryptedSharePart, nil)
 	if err != nil {
 		return err
 	}
 
+	meta, ok := softSigner.HrsMeta[hrst] // generate metadata placeholder, softSigner.HrsMeta[hrst] is non-addressable
+	if !ok {
+		newMeta, err := softSigner.DealShares(CosignerGetEphemeralSecretPartRequest{
+			Height: req.Height,
+			Round:  req.Round,
+			Step:   req.Step,
+		})
+		if err != nil {
+			return err
+		}
+
+		meta = newMeta
+		softSigner.HrsMeta[hrst] = meta // updates the metadata placeholder
+	}
 	// set slot
-	//TODO: Fix comment. Its also very very strange coding behaviour.
-	// Add test that meta.Peers[req.SourceID-1].Share == softSigner.HrsMeta[hrst].Peers[req.SourceID-1].Share == sharePart
-	// softSigner.HrsMeta[hrst] = meta
-	// Share & EphemeralSecretPublicKey is a SLICE so its a valid change of shared struct softSigner
+	// Share & EphemeralSecretPublicKey is a SLICE so its a valid change of the shared struct softSigne!
 	meta.Peers[req.SourceID-1].Share = sharePart
-	meta.Peers[req.SourceID-1].EphemeralSecretPublicKey = req.SourceEphemeralSecretPublicKey //
+	meta.Peers[req.SourceID-1].EphemeralSecretPublicKey = req.SourceEphemeralSecretPublicKey
+
 	return nil
 }
