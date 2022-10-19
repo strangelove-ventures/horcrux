@@ -289,10 +289,10 @@ func (softSigner *ThresholdSignerSoft) SetEphemeralSecretPart(
 
 	digestMsg := CosignerEphemeralSecretPart{
 		SourceID: req.SourceID,
-		// DestinationID:                  0,// NOTE: I dont think digestMsg.SourceSig is used anywhere
+		// DestinationID:                  0,
 		SourceEphemeralSecretPublicKey: req.SourceEphemeralSecretPublicKey,
 		EncryptedSharePart:             req.EncryptedSharePart,
-		// SourceSig:                      []byte{}, \\ NOTE Would be good with comments when this is set.
+		// SourceSig:                      []byte{},
 	}
 
 	digestBytes, err := tmjson.Marshal(digestMsg)
@@ -323,13 +323,6 @@ func (softSigner *ThresholdSignerSoft) SetEphemeralSecretPart(
 		Step:      req.Step,
 		Timestamp: req.Timestamp.UnixNano(),
 	}
-
-	// decrypt share
-	sharePart, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, &softSigner.Key.RSAKey, req.EncryptedSharePart, nil)
-	if err != nil {
-		return err
-	}
-
 	meta, ok := softSigner.HrsMeta[hrst] // generate metadata placeholder, softSigner.HrsMeta[hrst] is non-addressable
 	if !ok {
 		newMeta, err := softSigner.DealShares(CosignerGetEphemeralSecretPartRequest{
@@ -344,8 +337,13 @@ func (softSigner *ThresholdSignerSoft) SetEphemeralSecretPart(
 		meta = newMeta
 		softSigner.HrsMeta[hrst] = meta // updates the metadata placeholder
 	}
+	// decrypt share 
+	sharePart, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, &softSigner.Key.RSAKey, req.EncryptedSharePart, nil)
+	if err != nil {
+		return err
+	}
 	// set slot
-	// Share & EphemeralSecretPublicKey is a SLICE so its a valid change of the shared struct softSigne!
+	// Share & EphemeralSecretPublicKey is a SLICE so its a valid change of the shared struct softSigner!
 	meta.Peers[req.SourceID-1].Share = sharePart
 	meta.Peers[req.SourceID-1].EphemeralSecretPublicKey = req.SourceEphemeralSecretPublicKey
 
