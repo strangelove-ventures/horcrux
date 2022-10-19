@@ -48,16 +48,24 @@ horcrux elect 2 # elect specific leader`,
 		}
 
 		var grpcAddresses []string
+
+		// Append local host:port
 		u, err := url.Parse(config.Config.CosignerConfig.P2PListen)
 		if err != nil {
 			fmt.Printf("Error parsing peer URL: %v", err)
 		} else {
 			host, port, err := net.SplitHostPort(u.Host)
 			if err == nil {
-				grpcAddresses = append(grpcAddresses, fmt.Sprintf("%s:%s", host, port))
+				if strings.Contains(host, ":") {
+					// IPv6 Addreses need to be wrapped in brackets
+					grpcAddresses = append(grpcAddresses, fmt.Sprintf("[%s]:%s", host, port))
+				} else {
+					grpcAddresses = append(grpcAddresses, fmt.Sprintf("%s:%s", host, port))
+				}
 			}
 		}
 
+		// Append peer host:port
 		for _, peer := range config.Config.CosignerConfig.Peers {
 			u, err := url.Parse(peer.P2PAddr)
 			if err != nil {
@@ -65,7 +73,12 @@ horcrux elect 2 # elect specific leader`,
 			} else {
 				host, port, err := net.SplitHostPort(u.Host)
 				if err == nil {
-					grpcAddresses = append(grpcAddresses, fmt.Sprintf("%s:%s", host, port))
+					if strings.Contains(host, ":") {
+						// IPv6 Addreses need to be wrapped in brackets
+						grpcAddresses = append(grpcAddresses, fmt.Sprintf("[%s]:%s", host, port))
+					} else {
+						grpcAddresses = append(grpcAddresses, fmt.Sprintf("%s:%s", host, port))
+					}
 				}
 			}
 		}

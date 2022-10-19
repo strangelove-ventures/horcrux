@@ -77,13 +77,16 @@ func (rs *ReconnRemoteSigner) loop() {
 			proto, address := tmNet.ProtocolAndAddress(rs.address)
 			netConn, err := rs.dialer.Dial(proto, address)
 			if err != nil {
+				sentryConnectTries.Add(float64(1))
+				totalSentryConnectTries.Inc()
 				rs.Logger.Error("Dialing", "err", err)
 				rs.Logger.Info("Retrying", "sleep (s)", 3, "address", rs.address)
 				time.Sleep(time.Second * 3)
 				continue
 			}
+			sentryConnectTries.Set(0)
 
-			rs.Logger.Info("Connected", "address", rs.address)
+			rs.Logger.Info("Connected to Sentry", "address", rs.address)
 			conn, err = tmP2pConn.MakeSecretConnection(netConn, rs.privKey)
 			if err != nil {
 				conn = nil
@@ -147,14 +150,52 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(vote *tmProto.Vote) tmProtoP
 		switch typedErr := err.(type) {
 		case *BeyondBlockError:
 			rs.Logger.Debug("Rejecting sign vote request", "reason", typedErr.msg)
+			beyondBlockErrors.Inc()
 		default:
 			rs.Logger.Error("Failed to sign vote", "address", rs.address, "error", err, "vote_type", vote.Type,
 				"height", vote.Height, "round", vote.Round, "validator", fmt.Sprintf("%X", vote.ValidatorAddress))
+			failedSignVote.Inc()
 		}
 		msgSum.SignedVoteResponse.Error = getRemoteSignerError(err)
 		return tmProtoPrivval.Message{Sum: msgSum}
 	}
 	rs.Logger.Info("Signed vote", "node", rs.address, "height", vote.Height, "round", vote.Round, "type", vote.Type)
+
+	if vote.Type == tmProto.PrecommitType {
+		stepSize := vote.Height - previousPrecommitHeight
+		if previousPrecommitHeight != 0 && stepSize > 1 {
+			missedPrecommits.Add(float64(stepSize))
+			totalMissedPrecommits.Add(float64(stepSize))
+		} else {
+			missedPrecommits.Set(0)
+		}
+		previousPrecommitHeight = vote.Height // remember last PrecommitHeight
+
+		metricsTimeKeeper.SetPreviousPrecommit(time.Now())
+
+		lastPrecommitHeight.Set(float64(vote.Height))
+		lastPrecommitRound.Set(float64(vote.Round))
+		totalPrecommitsSigned.Inc()
+	}
+	if vote.Type == tmProto.PrevoteType {
+		// Determine number of heights since the last Prevote
+		stepSize := vote.Height - previousPrevoteHeight
+		if previousPrevoteHeight != 0 && stepSize > 1 {
+			missedPrevotes.Add(float64(stepSize))
+			totalMissedPrevotes.Add(float64(stepSize))
+		} else {
+			missedPrevotes.Set(0)
+		}
+
+		previousPrevoteHeight = vote.Height // remember last PrevoteHeight
+
+		metricsTimeKeeper.SetPreviousPrevote(time.Now())
+
+		lastPrevoteHeight.Set(float64(vote.Height))
+		lastPrevoteRound.Set(float64(vote.Round))
+		totalPrevotesSigned.Inc()
+	}
+
 	msgSum.SignedVoteResponse.Vote = *vote
 	return tmProtoPrivval.Message{Sum: msgSum}
 }
@@ -169,6 +210,7 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(proposal *tmProto.Propos
 		switch typedErr := err.(type) {
 		case *BeyondBlockError:
 			rs.Logger.Debug("Rejecting proposal sign request", "reason", typedErr.msg)
+			beyondBlockErrors.Inc()
 		default:
 			rs.Logger.Error("Failed to sign proposal", "address", rs.address, "error", err, "proposal", proposal)
 		}
@@ -177,11 +219,15 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(proposal *tmProto.Propos
 	}
 	rs.Logger.Info("Signed proposal", "node", rs.address,
 		"height", proposal.Height, "round", proposal.Round, "type", proposal.Type)
+	lastProposalHeight.Set(float64(proposal.Height))
+	lastProposalRound.Set(float64(proposal.Round))
+	totalProposalsSigned.Inc()
 	msgSum.SignedProposalResponse.Proposal = *proposal
 	return tmProtoPrivval.Message{Sum: msgSum}
 }
 
 func (rs *ReconnRemoteSigner) handlePubKeyRequest() tmProtoPrivval.Message {
+	totalPubKeyRequests.Inc()
 	msgSum := &tmProtoPrivval.Message_PubKeyResponse{PubKeyResponse: &tmProtoPrivval.PubKeyResponse{
 		PubKey: tmProtoCrypto.PublicKey{},
 		Error:  nil,
@@ -219,8 +265,12 @@ func getRemoteSignerError(err error) *tmProtoPrivval.RemoteSignerError {
 func StartRemoteSigners(services []tmService.Service, logger tmLog.Logger, chainID string,
 	privVal tm.PrivValidator, nodes []NodeConfig) ([]tmService.Service, error) {
 	var err error
+	go StartMetrics()
 	for _, node := range nodes {
-		dialer := net.Dialer{Timeout: 30 * time.Second}
+		// Tendermint requires a connection within 3 seconds of start or crashes
+		// A long timeout such as 30 seconds would cause the sentry to fail in loops
+		// Use a short timeout and dial often to connect within 3 second window
+		dialer := net.Dialer{Timeout: 2 * time.Second}
 		s := NewReconnRemoteSigner(node.Address, logger, chainID, privVal, dialer)
 
 		err = s.Start()
