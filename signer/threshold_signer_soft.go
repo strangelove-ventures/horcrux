@@ -337,7 +337,7 @@ func (softSigner *ThresholdSignerSoft) SetEphemeralSecretPart(
 		meta = newMeta
 		softSigner.HrsMeta[hrst] = meta // updates the metadata placeholder
 	}
-	// decrypt share 
+	// decrypt share
 	sharePart, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, &softSigner.Key.RSAKey, req.EncryptedSharePart, nil)
 	if err != nil {
 		return err
