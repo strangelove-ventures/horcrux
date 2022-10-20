@@ -4,7 +4,7 @@
 
 Before starting, \***\*please make sure to have a clear understanding of node and validator operational requirements\*\***. This guide is medium to high difficulty. Operation of `horcrux` assumes significant prior knowledge of these systems. Debugging problems that may arise will entail a significant amount financial risk (double sign) if you are running on mainnet so a clear understanding of the systems you are working with is important. Please attempt this operation on a testnet before you do so on a mainnet validator.
 
-> **CAUTION:** This operation will require you to take your validator down for some time. If you work quickly and follow the guide, this downtime shouldn't be more than 5-10 minutes. But reguardless, be aware of the downtime slashing on your chain and be careful not to exceed that limit.
+> **CAUTION:** This operation will require you to take your validator down for some time. If you work quickly and follow the guide, this downtime shouldn't be more than 5-10 minutes. But regardless, be aware of the downtime slashing on your chain and be careful not to exceed that limit.
 
 ## Validator System Migration
 
@@ -14,7 +14,7 @@ This document will describe a migration from a "starting system" to a 2-of-3 mul
 
 - VM: 4 CPU, 16 GB RAM, 500GB SSD storage running fully synced chain daemon also acting as a validator
 
-### Example Migration Infrastrcuture
+### Example Migration Infrastructure
 
 - Sentries: 3x VM w/ 4 CPU, 16GB RAM, 500GB SSD storage running fully synced chain daemon
   - These chain daemons should only expose the `:26656` (p2p) port to the open internet
@@ -45,7 +45,7 @@ signer-2: 10.168.1.2
 signer-3: 10.168.1.3
 ```
 
-When installing `horcrux` we recommend using the prebuilt binaries from the [releases page](https://github.com/strangelove-ventures/horcrux/releases). Pick the release cooresponding to the `tendermint` dependancy for the `go.mod` of your chain binary. You should be able to get this with `{binary} version --long`. Install like so:
+When installing `horcrux` we recommend using the prebuilt binaries from the [releases page](https://github.com/strangelove-ventures/horcrux/releases). Pick the release corresponding to the `tendermint` dependency for the `go.mod` of your chain binary. You should be able to get this with `{binary} version --long`. Install like so:
 
 ```bash
 # On each signer VM
@@ -89,11 +89,11 @@ $ horcrux config init {my_chain_id} "tcp://10.168.0.3:1234" -c -p "tcp://10.168.
 
 > **NOTE:** The `-k` or `--keyfile` flag lets you set the file path for the private key share file if you would like to use a different path than `~/.horcrux/share.json`.
 
-> **NOTE:** The `--timeout` value defaults to `1000ms`. If you are running in disconnected data centers (i.e. accross amazon AZs or gcp zones) increasing the timeout slightly helps to avoid missed blocks especially around proposals.
+> **NOTE:** The `--timeout` value defaults to `1000ms`. If you are running in disconnected data centers (i.e. across amazon AZs or gcp zones) increasing the timeout slightly helps to avoid missed blocks especially around proposals.
 
 ### 3. Split `priv_validator_key.json` and distribute key material
 
-> **CAUTION:** **The security of any key material is outside the scope of this guide. The suggested proceedure here is not necessarily the one you will use. We aim to make this guide easy to understand, not necessarily the most secure. The tooling here is all written in go and can be compiled and used in an airgapped setup if needed. Please open issues if you have questions around how to fit `horcrux` into your infra.**
+> **CAUTION:** **The security of any key material is outside the scope of this guide. The suggested procedure here is not necessarily the one you will use. We aim to make this guide easy to understand, not necessarily the most secure. The tooling here is all written in go and can be compiled and used in an airgapped setup if needed. Please open issues if you have questions about how to fit `horcrux` into your infra.**
 
 On some computer that contains your `priv_validator_key.json` create a folder to split the key through the following command. This may take a moment o complete:
 
