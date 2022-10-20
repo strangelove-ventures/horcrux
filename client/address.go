@@ -2,7 +2,6 @@ package client
 
 import (
 	"fmt"
-	"net"
 	"net/url"
 	"strings"
 )
@@ -13,17 +12,7 @@ func SanitizeAddress(address string) (string, error) {
 		return "", fmt.Errorf("error parsing peer URL: %w", err)
 	}
 
-	hostname, port, err := net.SplitHostPort(u.Host)
-	if err != nil {
-		return "", fmt.Errorf("error splitting host port from parsed URL: %w", err)
-	}
-
-	if strings.Contains(hostname, ":") {
-		// IPv6 Addreses need to be wrapped in brackets
-		return fmt.Sprintf("[%s]:%s", hostname, port), nil
-	} else {
-		return fmt.Sprintf("%s:%s", hostname, port), nil
-	}
+	return u.Host, nil
 }
 
 func MultiAddress(addresses []string) (string, error) {
