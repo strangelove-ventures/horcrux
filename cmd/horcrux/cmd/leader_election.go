@@ -4,16 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net"
-	"net/url"
-	"strings"
 	"time"
 
 	_ "github.com/Jille/grpc-multi-resolver"
-	"github.com/strangelove-ventures/horcrux/signer/proto"
-
 	grpc_retry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"github.com/spf13/cobra"
+	"github.com/strangelove-ventures/horcrux/client"
+	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -21,45 +18,6 @@ import (
 func init() {
 	rootCmd.AddCommand(leaderElectionCmd)
 	rootCmd.AddCommand(getLeaderCmd)
-}
-
-func sanitizeAddress(address string) (string, error) {
-	u, err := url.Parse(address)
-	if err != nil {
-		return "", fmt.Errorf("error parsing peer URL: %w", err)
-	}
-
-	hostname, port, err := net.SplitHostPort(u.Host)
-	if err != nil {
-		return "", fmt.Errorf("error splitting host port from parsed URL: %w", err)
-	}
-
-	if strings.Contains(hostname, ":") {
-		// IPv6 Addreses need to be wrapped in brackets
-		return fmt.Sprintf("[%s]:%s", hostname, port), nil
-	} else {
-		return fmt.Sprintf("%s:%s", hostname, port), nil
-	}
-}
-
-func leaderElectMultiAddress(cosignerConfig *CosignerConfig) string {
-	var grpcAddresses []string
-
-	// Append local host:port
-	localAddr, err := sanitizeAddress(cosignerConfig.P2PListen)
-	if err == nil {
-		grpcAddresses = append(grpcAddresses, localAddr)
-	}
-
-	// Append peer host:port
-	for _, peer := range cosignerConfig.Peers {
-		peerAddr, err := sanitizeAddress(peer.P2PAddr)
-		if err == nil {
-			grpcAddresses = append(grpcAddresses, peerAddr)
-		}
-	}
-
-	return fmt.Sprintf("multi:///%s", strings.Join(grpcAddresses, ","))
 }
 
 var leaderElectionCmd = &cobra.Command{
@@ -87,7 +45,10 @@ horcrux elect 2 # elect specific leader`,
 			grpc_retry.WithMax(5),
 		}
 
-		grpcAddress := leaderElectMultiAddress(config.Config.CosignerConfig)
+		grpcAddress, err := config.Config.CosignerConfig.LeaderElectMultiAddress()
+		if err != nil {
+			return err
+		}
 
 		fmt.Printf("Broadcasting to address: %s\n", grpcAddress)
 		conn, err := grpc.Dial(grpcAddress,
@@ -148,7 +109,7 @@ var getLeaderCmd = &cobra.Command{
 			grpc_retry.WithMax(5),
 		}
 
-		grpcAddress, err := sanitizeAddress(config.Config.CosignerConfig.P2PListen)
+		grpcAddress, err := client.SanitizeAddress(config.Config.CosignerConfig.P2PListen)
 		if err != nil {
 			return err
 		}
