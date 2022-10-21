@@ -202,7 +202,7 @@ func validateCosignerConfig(cfg DiskConfig) error {
 			cfg.CosignerConfig.Threshold, cfg.CosignerConfig.Shares)
 	}
 	if cfg.CosignerConfig.Shares < cfg.CosignerConfig.Threshold {
-		return fmt.Errorf("number of shares (%d) must be greater than threshold (%d)",
+		return fmt.Errorf("number of shares (%d) must be greater or equal to threshold (%d)",
 			cfg.CosignerConfig.Shares, cfg.CosignerConfig.Threshold)
 	}
 

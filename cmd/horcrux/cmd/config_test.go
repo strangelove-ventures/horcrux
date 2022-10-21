@@ -71,9 +71,8 @@ func TestConfigInitCmd(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tmpConfig := filepath.Join(tc.home, ".horcrux")
 
-			err := os.Setenv("HOME", tc.home)
-			require.NoError(t, err)
-			err = os.MkdirAll(tc.home, 0777)
+			t.Setenv("HOME", tc.home)
+			err := os.MkdirAll(tc.home, 0777)
 			require.NoError(t, err)
 
 			cmd := initCmd()
@@ -109,8 +108,7 @@ func TestConfigInitCmd(t *testing.T) {
 }
 
 func TestConfigChainIDSetCmd(t *testing.T) {
-	err := os.Setenv("HOME", t.TempDir())
-	require.NoError(t, err)
+	t.Setenv("HOME", t.TempDir())
 
 	cmd := initCmd()
 	cmd.SetOutput(io.Discard)
@@ -123,7 +121,7 @@ func TestConfigChainIDSetCmd(t *testing.T) {
 		"-l", "tcp://10.168.1.1:2222",
 		"--timeout", "1500ms",
 	})
-	err = cmd.Execute()
+	err := cmd.Execute()
 	require.NoError(t, err)
 
 	tcs := []struct {
@@ -161,8 +159,7 @@ func TestConfigChainIDSetCmd(t *testing.T) {
 }
 
 func TestConfigNodesAddAndRemove(t *testing.T) {
-	err := os.Setenv("HOME", t.TempDir())
-	require.NoError(t, err)
+	t.Setenv("HOME", t.TempDir())
 
 	cmd := initCmd()
 	cmd.SetOutput(io.Discard)
@@ -175,7 +172,7 @@ func TestConfigNodesAddAndRemove(t *testing.T) {
 		"-l", "tcp://10.168.1.1:2222",
 		"--timeout", "1500ms",
 	})
-	err = cmd.Execute()
+	err := cmd.Execute()
 	require.NoError(t, err)
 
 	tcs := []struct {
@@ -299,8 +296,7 @@ func TestConfigNodesAddAndRemove(t *testing.T) {
 }
 
 func TestConfigPeersAddAndRemove(t *testing.T) {
-	err := os.Setenv("HOME", t.TempDir())
-	require.NoError(t, err)
+	t.Setenv("HOME", t.TempDir())
 
 	cmd := initCmd()
 	cmd.SetOutput(io.Discard)
@@ -313,7 +309,7 @@ func TestConfigPeersAddAndRemove(t *testing.T) {
 		"-l", "tcp://10.168.1.1:2222",
 		"--timeout", "1500ms",
 	})
-	err = cmd.Execute()
+	err := cmd.Execute()
 	require.NoError(t, err)
 
 	tcs := []struct {
@@ -570,8 +566,7 @@ func TestDiffSetCosignerPeer(t *testing.T) {
 }
 
 func TestSetShares(t *testing.T) {
-	err := os.Setenv("HOME", t.TempDir())
-	require.NoError(t, err)
+	t.Setenv("HOME", t.TempDir())
 
 	cmd := initCmd()
 	cmd.SetOutput(io.Discard)
@@ -584,7 +579,7 @@ func TestSetShares(t *testing.T) {
 		"-l", "tcp://10.168.1.1:2222",
 		"--timeout", "1500ms",
 	})
-	err = cmd.Execute()
+	err := cmd.Execute()
 	require.NoError(t, err)
 
 	tcs := []struct {

@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"io"
-	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -17,8 +16,7 @@ func TestStateSetCmd(t *testing.T) {
 	tmpConfig := filepath.Join(tmpHome, ".horcrux")
 	chainid := "horcrux-1"
 
-	err := os.Setenv("HOME", tmpHome)
-	require.NoError(t, err)
+	t.Setenv("HOME", tmpHome)
 
 	cmd := initCmd()
 	cmd.SetOutput(io.Discard)
@@ -31,7 +29,7 @@ func TestStateSetCmd(t *testing.T) {
 		"-l", "tcp://10.168.1.1:2222",
 		"--timeout", "1500ms",
 	})
-	err = cmd.Execute()
+	err := cmd.Execute()
 	require.NoError(t, err)
 
 	tcs := []struct {
