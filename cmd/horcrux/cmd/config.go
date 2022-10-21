@@ -197,9 +197,13 @@ func validateCosignerConfig(cfg DiskConfig) error {
 	if cfg.CosignerConfig == nil {
 		return fmt.Errorf("cosigner config can't be empty")
 	}
-	if len(cfg.CosignerConfig.Peers)+1 < cfg.CosignerConfig.Threshold {
-		return fmt.Errorf("number of peers + 1 (%d) must be greater than threshold (%d)",
-			len(cfg.CosignerConfig.Peers)+1, cfg.CosignerConfig.Threshold)
+	if cfg.CosignerConfig.Threshold <= cfg.CosignerConfig.Shares/2 {
+		return fmt.Errorf("threshold (%d) must be greater than number of shares (%d) / 2",
+			cfg.CosignerConfig.Threshold, cfg.CosignerConfig.Shares)
+	}
+	if cfg.CosignerConfig.Shares < cfg.CosignerConfig.Threshold {
+		return fmt.Errorf("number of shares (%d) must be greater or equal to threshold (%d)",
+			cfg.CosignerConfig.Shares, cfg.CosignerConfig.Threshold)
 	}
 
 	_, err := time.ParseDuration(cfg.CosignerConfig.Timeout)
@@ -335,6 +339,7 @@ func addPeersCmd() *cobra.Command {
 				return errors.New("no new peer nodes in args")
 			}
 			diff = append(config.Config.CosignerConfig.Peers, diff...)
+			config.Config.CosignerConfig.Shares = len(diff) + 1
 			if err := validateCosignerPeers(diff, config.Config.CosignerConfig.Shares); err != nil {
 				return err
 			}
@@ -378,6 +383,8 @@ func removePeersCmd() *cobra.Command {
 			if len(diff) == 0 {
 				return errors.New("cannot remove all peer nodes from config, please leave at least one")
 			}
+
+			config.Config.CosignerConfig.Shares = len(diff) + 1
 			// If none of the peer nodes in the args are listed in the config, just continue
 			// without throwing an error, as the peer nodes in the config remain untouched.
 			if err := validateCosignerPeers(diff, config.Config.CosignerConfig.Shares); err != nil {
@@ -584,11 +591,11 @@ func validateCosignerPeers(peers []CosignerPeer, shares int) error {
 		}
 	}
 
-	// Check that no more than {num-shares}-1 peers are in the peer list, assuming
+	// Check that exactly {num-shares}-1 peers are in the peer list, assuming
 	// the remaining peer ID is the ID the local node is configured with.
-	if len(peers) == shares {
-		return fmt.Errorf("too many peers (%v+local node = %v) for the specified number of key shares (%v)",
-			len(peers), len(peers)+1, shares)
+	if len(peers) != shares-1 {
+		return fmt.Errorf("incorrect number of peers. expected (%d shares - local node = %d peers)",
+			shares, shares-1)
 	}
 	return nil
 }
