@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/strangelove-ventures/horcrux/client"
 	"github.com/strangelove-ventures/horcrux/signer"
 	"gopkg.in/yaml.v2"
 )
@@ -553,6 +554,15 @@ type CosignerConfig struct {
 	P2PListen string         `json:"p2p-listen"  yaml:"p2p-listen"`
 	Peers     []CosignerPeer `json:"peers"       yaml:"peers"`
 	Timeout   string         `json:"rpc-timeout" yaml:"rpc-timeout"`
+}
+
+func (cfg *CosignerConfig) LeaderElectMultiAddress() (string, error) {
+	addresses := make([]string, 1+len(cfg.Peers))
+	addresses[0] = cfg.P2PListen
+	for i, peer := range cfg.Peers {
+		addresses[i+1] = peer.P2PAddr
+	}
+	return client.MultiAddress(addresses)
 }
 
 func (c *DiskConfig) CosignerPeers() (out []signer.CosignerConfig) {
