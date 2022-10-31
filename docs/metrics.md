@@ -1,14 +1,14 @@
 # Prometheus Metrics
 
 ## Enabling Prometheus 
-Specify the port for incoming prometheus connections during 'config init' by using the -m flag.
+Specify the port for incoming prometheus connections during 'config init' by using the -d flag.
 ```
-horcrux ..options.. -m 0.0.0.0:8001
+horcrux ..options.. -d 0.0.0.0:6001
 ```
 
-For earlier adopters, add the following key to your config.toml
+For earlier adopters, add the following key to your config.yaml
 
-debug-listen-address: 0.0.0.0:6001
+debug-addr: 0.0.0.0:6001
 
 Resulting in a configuration like the following:
 
@@ -26,7 +26,7 @@ cosigner:
   rpc-timeout: 1500ms
 chain-nodes:
 - priv-val-addr: tcp://localhost:2300
-debug-listen-address: 0.0.0.0:6001
+debug-addr: 0.0.0.0:6001
 ```
 
 ## Prometheus Cautions
