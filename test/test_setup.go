@@ -24,17 +24,17 @@ type TestLogger interface {
 	Logf(string, ...interface{})
 }
 
-func SetupTestRun(t *testing.T) (context.Context, string, *dockertest.Pool, *docker.Network) {
+func SetupTestRun(t *testing.T) (context.Context, string, *dockertest.Pool, string) {
 	home := t.TempDir()
 
 	pool, err := dockertest.NewPool("")
 	require.NoError(t, err)
 
 	// set the test cleanup function
-	t.Cleanup(Cleanup(pool, t.Name(), home))
+	t.Cleanup(Cleanup(pool, t, home))
 
 	// run cleanup to cleanup stale resources from any killed tests
-	Cleanup(pool, t.Name(), home)()
+	Cleanup(pool, t, home)()
 
 	network, err := CreateTestNetwork(pool, fmt.Sprintf("horcrux-%s", RandLowerCaseLetterString(8)), t)
 	require.NoError(t, err)
@@ -42,14 +42,13 @@ func SetupTestRun(t *testing.T) (context.Context, string, *dockertest.Pool, *doc
 	// build the horcrux image
 	require.NoError(t, BuildTestSignerImage(pool))
 
-	return context.Background(), home, pool, network
+	return context.Background(), home, pool, network.ID
 }
 
 // assemble gentx, build genesis file, configure peering, and start chain
 func Genesis(
 	tl TestLogger,
 	ctx context.Context,
-	net *docker.Network,
 	chain *ChainType,
 	nonHorcruxValidators,
 	fullnodes []*TestNode,
@@ -166,16 +165,6 @@ func Genesis(
 		return err
 	}
 
-	for _, n := range nodes {
-		n := n
-		eg.Go(func() error {
-			return n.CreateNodeContainer(net.ID)
-		})
-	}
-	if err := eg.Wait(); err != nil {
-		return err
-	}
-
 	peers := nodes.PeerString()
 
 	// start horcrux sentries. privval listener enabled
@@ -184,8 +173,9 @@ func Genesis(
 			s := sentry
 			tl.Logf("{%s} => starting container...", s.Name())
 			eg.Go(func() error {
-				s.SetValidatorConfigAndPeers(peers, true)
-				return s.StartContainer(ctx)
+				return s.Start(ctx, func() {
+					s.SetValidatorConfigAndPeers(peers, true)
+				})
 			})
 		}
 	}
@@ -195,8 +185,9 @@ func Genesis(
 		v := v
 		tl.Logf("{%s} => starting container...", v.Name())
 		eg.Go(func() error {
-			v.SetValidatorConfigAndPeers(peers, false)
-			return v.StartContainer(ctx)
+			return v.Start(ctx, func() {
+				v.SetValidatorConfigAndPeers(peers, false)
+			})
 		})
 	}
 
@@ -205,8 +196,9 @@ func Genesis(
 		n := n
 		tl.Logf("{%s} => starting container...", n.Name())
 		eg.Go(func() error {
-			n.SetValidatorConfigAndPeers(peers, false)
-			return n.StartContainer(ctx)
+			return n.Start(ctx, func() {
+				n.SetValidatorConfigAndPeers(peers, false)
+			})
 		})
 	}
 
@@ -244,16 +236,16 @@ func CreateTestNetwork(pool *dockertest.Pool, name string, t *testing.T) (*docke
 }
 
 // Cleanup will clean up Docker containers, networks, and the other various config files generated in testing
-func Cleanup(pool *dockertest.Pool, testName, testDir string) func() {
+func Cleanup(pool *dockertest.Pool, t *testing.T, testDir string) func() {
 	return func() {
 		cont, _ := pool.Client.ListContainers(docker.ListContainersOptions{All: true})
 		ctx := context.Background()
 		for _, c := range cont {
 			for k, v := range c.Labels {
-				if k == "horcrux-test" && v == testName {
+				if k == "horcrux-test" && v == t.Name() {
 					_ = pool.Client.StopContainer(c.ID, 10)
-					_, err := pool.Client.WaitContainerWithContext(c.ID, ctx)
-					if err != nil {
+					_, _ = pool.Client.WaitContainerWithContext(c.ID, ctx)
+					if t.Failed() {
 						stdout := new(bytes.Buffer)
 						stderr := new(bytes.Buffer)
 						_ = pool.Client.Logs(docker.LogsOptions{
@@ -276,7 +268,7 @@ func Cleanup(pool *dockertest.Pool, testName, testDir string) func() {
 		nets, _ := pool.Client.ListNetworks()
 		for _, n := range nets {
 			for k, v := range n.Labels {
-				if k == "horcrux-test" && v == testName {
+				if k == "horcrux-test" && v == t.Name() {
 					_ = pool.Client.RemoveNetwork(n.ID)
 				}
 			}

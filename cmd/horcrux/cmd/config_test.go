@@ -16,7 +16,7 @@ const (
 )
 
 func TestConfigInitCmd(t *testing.T) {
-	tmpHome := "/tmp/TestConfigInitCmd"
+	tmpHome := t.TempDir()
 	tcs := []struct {
 		name      string
 		home      string
@@ -71,9 +71,8 @@ func TestConfigInitCmd(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tmpConfig := filepath.Join(tc.home, ".horcrux")
 
-			err := os.Setenv("HOME", tc.home)
-			require.NoError(t, err)
-			err = os.MkdirAll(tc.home, 0777)
+			t.Setenv("HOME", tc.home)
+			err := os.MkdirAll(tc.home, 0777)
 			require.NoError(t, err)
 
 			cmd := initCmd()
@@ -106,24 +105,10 @@ func TestConfigInitCmd(t *testing.T) {
 			}
 		})
 	}
-
-	t.Cleanup(func() {
-		files, err := filepath.Glob(tmpHome + "*")
-		require.NoError(t, err)
-
-		for _, file := range files {
-			os.RemoveAll(file)
-		}
-	})
 }
 
 func TestConfigChainIDSetCmd(t *testing.T) {
-	tmpHome := "/tmp/TestConfigChainIDSetCmd"
-
-	err := os.Setenv("HOME", tmpHome)
-	require.NoError(t, err)
-	err = os.MkdirAll(tmpHome, 0777)
-	require.NoError(t, err)
+	t.Setenv("HOME", t.TempDir())
 
 	cmd := initCmd()
 	cmd.SetOutput(io.Discard)
@@ -136,7 +121,7 @@ func TestConfigChainIDSetCmd(t *testing.T) {
 		"-l", "tcp://10.168.1.1:2222",
 		"--timeout", "1500ms",
 	})
-	err = cmd.Execute()
+	err := cmd.Execute()
 	require.NoError(t, err)
 
 	tcs := []struct {
@@ -171,19 +156,10 @@ func TestConfigChainIDSetCmd(t *testing.T) {
 			}
 		})
 	}
-
-	t.Cleanup(func() {
-		os.RemoveAll(tmpHome)
-	})
 }
 
 func TestConfigNodesAddAndRemove(t *testing.T) {
-	tmpHome := "/tmp/TestConfigNodesAddAndRemove"
-
-	err := os.Setenv("HOME", tmpHome)
-	require.NoError(t, err)
-	err = os.MkdirAll(tmpHome, 0777)
-	require.NoError(t, err)
+	t.Setenv("HOME", t.TempDir())
 
 	cmd := initCmd()
 	cmd.SetOutput(io.Discard)
@@ -196,7 +172,7 @@ func TestConfigNodesAddAndRemove(t *testing.T) {
 		"-l", "tcp://10.168.1.1:2222",
 		"--timeout", "1500ms",
 	})
-	err = cmd.Execute()
+	err := cmd.Execute()
 	require.NoError(t, err)
 
 	tcs := []struct {
@@ -317,19 +293,10 @@ func TestConfigNodesAddAndRemove(t *testing.T) {
 			require.Equal(t, tc.expectNodes, config.Config.ChainNodes)
 		})
 	}
-
-	t.Cleanup(func() {
-		os.RemoveAll(tmpHome)
-	})
 }
 
 func TestConfigPeersAddAndRemove(t *testing.T) {
-	tmpHome := "/tmp/TestConfigPeersAddAndRemove"
-
-	err := os.Setenv("HOME", tmpHome)
-	require.NoError(t, err)
-	err = os.MkdirAll(tmpHome, 0777)
-	require.NoError(t, err)
+	t.Setenv("HOME", t.TempDir())
 
 	cmd := initCmd()
 	cmd.SetOutput(io.Discard)
@@ -338,11 +305,11 @@ func TestConfigPeersAddAndRemove(t *testing.T) {
 		"tcp://10.168.0.1:1234",
 		"-c",
 		"-p", "tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3,tcp://10.168.1.4:2222|4",
-		"-t", "2",
+		"-t", "3",
 		"-l", "tcp://10.168.1.1:2222",
 		"--timeout", "1500ms",
 	})
-	err = cmd.Execute()
+	err := cmd.Execute()
 	require.NoError(t, err)
 
 	tcs := []struct {
@@ -439,7 +406,7 @@ func TestConfigPeersAddAndRemove(t *testing.T) {
 		{
 			name: "add peer with ID out of range",
 			cmd:  addPeersCmd(),
-			args: []string{"tcp://10.168.1.5:2222|5"},
+			args: []string{"tcp://10.168.1.5:2222|6"},
 			expectPeers: []CosignerPeer{
 				{ShareID: 2, P2PAddr: "tcp://10.168.1.2:2222"},
 				{ShareID: 3, P2PAddr: "tcp://10.168.1.3:2222"},
@@ -464,10 +431,6 @@ func TestConfigPeersAddAndRemove(t *testing.T) {
 			require.Equal(t, tc.expectPeers, config.Config.CosignerConfig.Peers)
 		})
 	}
-
-	t.Cleanup(func() {
-		os.RemoveAll(tmpHome)
-	})
 }
 
 func TestDiffSetChainNode(t *testing.T) {
@@ -603,12 +566,7 @@ func TestDiffSetCosignerPeer(t *testing.T) {
 }
 
 func TestSetShares(t *testing.T) {
-	tmpHome := "/tmp/TestSetShares"
-
-	err := os.Setenv("HOME", tmpHome)
-	require.NoError(t, err)
-	err = os.MkdirAll(tmpHome, 0777)
-	require.NoError(t, err)
+	t.Setenv("HOME", t.TempDir())
 
 	cmd := initCmd()
 	cmd.SetOutput(io.Discard)
@@ -621,7 +579,7 @@ func TestSetShares(t *testing.T) {
 		"-l", "tcp://10.168.1.1:2222",
 		"--timeout", "1500ms",
 	})
-	err = cmd.Execute()
+	err := cmd.Execute()
 	require.NoError(t, err)
 
 	tcs := []struct {
@@ -632,20 +590,20 @@ func TestSetShares(t *testing.T) {
 	}{ // Do NOT change the order of the test cases!
 		{
 			name:         "valid number of shares",
-			args:         []string{"4"},
-			expectShares: 4,
+			args:         []string{"3"},
+			expectShares: 3,
 			expectErr:    false,
 		},
 		{
 			name:         "too few shares for number of peers",
 			args:         []string{"1"},
-			expectShares: 4,
+			expectShares: 3,
 			expectErr:    true,
 		},
 		{
 			name:         "invalid number of shares",
 			args:         []string{"-1"},
-			expectShares: 4,
+			expectShares: 3,
 			expectErr:    true,
 		},
 	}
@@ -666,8 +624,4 @@ func TestSetShares(t *testing.T) {
 			}
 		})
 	}
-
-	t.Cleanup(func() {
-		os.RemoveAll(tmpHome)
-	})
 }
