@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// RemoteCosigner uses tendermint rpc to request signing from a remote cosigner
+// RemoteCosigner uses CosignerGRPC to request signing from a remote cosigner
 type RemoteCosigner struct {
 	id      int
 	address string
