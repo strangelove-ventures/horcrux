@@ -160,8 +160,12 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(vote *tmProto.Vote) tmProtoP
 		return tmProtoPrivval.Message{Sum: msgSum}
 	}
 	// Show signatures provided to each node have the same signature and timestamps
+	sigLen := 6
+	if len(vote.Signature) < sigLen {
+		sigLen = len(vote.Signature)
+	}
 	rs.Logger.Info("Signed vote", "height", vote.Height, "round", vote.Round, "type", vote.Type,
-		"sig", vote.Signature[:6], "ts", vote.Timestamp.Unix(), "node", rs.address)
+		"sig", vote.Signature[:sigLen], "ts", vote.Timestamp.Unix(), "node", rs.address)
 
 	if vote.Type == tmProto.PrecommitType {
 		stepSize := vote.Height - previousPrecommitHeight
