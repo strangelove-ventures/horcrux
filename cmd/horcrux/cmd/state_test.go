@@ -13,15 +13,15 @@ import (
 
 func TestStateSetCmd(t *testing.T) {
 	tmpHome := t.TempDir()
-	tmpConfig := filepath.Join(tmpHome, ".horcrux")
-	chainid := "horcrux-1"
+	stateDir := filepath.Join(tmpHome, ".horcrux", "state")
+
+	chainID := "horcrux-1"
 
 	t.Setenv("HOME", tmpHome)
 
 	cmd := initCmd()
 	cmd.SetOutput(io.Discard)
 	cmd.SetArgs([]string{
-		chainid,
 		"tcp://10.168.0.1:1234",
 		"-c",
 		"-t", "2",
@@ -39,12 +39,12 @@ func TestStateSetCmd(t *testing.T) {
 	}{
 		{
 			name:      "valid height",
-			args:      []string{"123456789"},
+			args:      []string{chainID, "123456789"},
 			expectErr: false,
 		},
 		{
 			name:      "invalid height",
-			args:      []string{"-123456789"},
+			args:      []string{chainID, "-123456789"},
 			expectErr: true,
 		},
 	}
@@ -63,10 +63,10 @@ func TestStateSetCmd(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 
-				height, err := strconv.ParseInt(tc.args[0], 10, 64)
+				height, err := strconv.ParseInt(tc.args[1], 10, 64)
 				require.NoError(t, err)
 
-				ss, err := signer.LoadSignState(filepath.Join(tmpConfig, "state", chainid+"_priv_validator_state.json"))
+				ss, err := signer.LoadSignState(filepath.Join(stateDir, chainID+"_priv_validator_state.json"))
 				require.NoError(t, err)
 				require.Equal(t, height, ss.Height)
 				require.Equal(t, int64(0), ss.Round)
@@ -75,7 +75,7 @@ func TestStateSetCmd(t *testing.T) {
 				require.Nil(t, ss.Signature)
 				require.Nil(t, ss.SignBytes)
 
-				ss, err = signer.LoadSignState(filepath.Join(tmpConfig, "state", chainid+"_share_sign_state.json"))
+				ss, err = signer.LoadSignState(filepath.Join(stateDir, chainID+"_share_sign_state.json"))
 				require.NoError(t, err)
 				require.Equal(t, height, ss.Height)
 				require.Equal(t, int64(0), ss.Round)

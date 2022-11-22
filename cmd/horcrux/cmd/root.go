@@ -8,12 +8,13 @@ import (
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/strangelove-ventures/horcrux/signer"
 	"gopkg.in/yaml.v2"
 )
 
 var (
 	homeDir string
-	config  RuntimeConfig
+	config  signer.RuntimeConfig
 )
 
 var rootCmd = &cobra.Command{
@@ -45,7 +46,7 @@ func initConfig() {
 	} else {
 		home = homeDir
 	}
-	config = RuntimeConfig{
+	config = signer.RuntimeConfig{
 		HomeDir:    home,
 		ConfigFile: filepath.Join(home, "config.yaml"),
 		StateDir:   filepath.Join(home, "state"),

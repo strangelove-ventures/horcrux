@@ -38,30 +38,33 @@ var stateCmd = &cobra.Command{
 
 func showStateCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:          "show",
+		Use:          "show [chain-id]",
 		Aliases:      []string{"s"},
-		Short:        "Show the priv validator and share sign state",
-		Args:         cobra.ExactArgs(0),
+		Short:        "Show the priv validator and share sign state for a specific chain-id",
+		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+
+			chainID := args[0]
+
 			if _, err := os.Stat(config.HomeDir); os.IsNotExist(err) {
 				return fmt.Errorf("%s does not exist, initialize config with horcrux config init and try again", config.HomeDir)
 			}
 
-			pv, err := signer.LoadSignState(config.privValStateFile(config.Config.ChainID))
+			pv, err := signer.LoadSignState(config.PrivValStateFile(chainID))
 			if err != nil {
 				return err
 			}
 
-			share, err := signer.LoadSignState(config.shareStateFile(config.Config.ChainID))
+			share, err := signer.LoadSignState(config.ShareStateFile(chainID))
 			if err != nil {
 				return err
 			}
 
 			fmt.Println("Private Validator State:")
-			printSignState(pv)
+			printSignState(*pv)
 			fmt.Println("Share Sign State:")
-			printSignState(share)
+			printSignState(*share)
 			return nil
 		},
 	}
@@ -69,12 +72,14 @@ func showStateCmd() *cobra.Command {
 
 func setStateCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:          "set [height]",
+		Use:          "set [chain-id] [height]",
 		Aliases:      []string{"s"},
 		Short:        "Set the height for both the priv validator and the share sign state",
-		Args:         cobra.ExactArgs(1),
+		Args:         cobra.ExactArgs(2),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			chainID := args[0]
+
 			if _, err := os.Stat(config.HomeDir); os.IsNotExist(err) {
 				cmd.SilenceUsage = false
 				return fmt.Errorf("%s does not exist, initialize config with horcrux config init and try again", config.HomeDir)
@@ -86,17 +91,17 @@ func setStateCmd() *cobra.Command {
 				return err
 			}
 
-			pv, err := signer.LoadSignState(config.privValStateFile(config.Config.ChainID))
+			pv, err := signer.LoadOrCreateSignState(config.PrivValStateFile(chainID))
 			if err != nil {
 				return err
 			}
 
-			share, err := signer.LoadSignState(config.shareStateFile(config.Config.ChainID))
+			share, err := signer.LoadOrCreateSignState(config.ShareStateFile(chainID))
 			if err != nil {
 				return err
 			}
 
-			height, err := strconv.ParseInt(args[0], 10, 64)
+			height, err := strconv.ParseInt(args[1], 10, 64)
 			if err != nil {
 				cmd.SilenceUsage = false
 				return err
@@ -129,13 +134,15 @@ func setStateCmd() *cobra.Command {
 
 func importStateCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:     "import [height]",
+		Use:     "import [chain-id]",
 		Aliases: []string{"i"},
 		Short: "Read the old priv_validator_state.json and set the height, round and step" +
 			"(good for migrations but NOT shared state update)",
-		Args:         cobra.ExactArgs(0),
+		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			chainID := args[0]
+
 			if _, err := os.Stat(config.HomeDir); os.IsNotExist(err) {
 				cmd.SilenceUsage = false
 				return fmt.Errorf("%s does not exist, initialize config with horcrux config init and try again", config.HomeDir)
@@ -147,14 +154,14 @@ func importStateCmd() *cobra.Command {
 				return err
 			}
 
-			// Recreate privValStateFile if necessary
-			pv, err := signer.LoadOrCreateSignState(config.privValStateFile(config.Config.ChainID))
+			// Recreate PrivValStateFile if necessary
+			pv, err := signer.LoadOrCreateSignState(config.PrivValStateFile(chainID))
 			if err != nil {
 				return err
 			}
 
-			// shareStateFile does not exist during default config init, so create if necessary
-			share, err := signer.LoadOrCreateSignState(config.shareStateFile(config.Config.ChainID))
+			// ShareStateFile does not exist during default config init, so create if necessary
+			share, err := signer.LoadOrCreateSignState(config.ShareStateFile(chainID))
 			if err != nil {
 				return err
 			}

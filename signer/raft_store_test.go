@@ -28,23 +28,18 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 		ShareKey: []byte{},
 		ID:       1,
 	}
-	signState := SignState{
-		Height: 0,
-		Round:  0,
-		Step:   0,
-	}
 
-	config := LocalCosignerConfig{
-		CosignerKey: key,
-		SignState:   &signState,
-		RsaKey:      *rsaKey,
-		Peers: []CosignerPeer{{
+	cosigner := NewLocalCosigner(
+		&RuntimeConfig{},
+		key,
+		*rsaKey,
+		[]CosignerPeer{{
 			ID:        1,
 			PublicKey: rsaKey.PublicKey,
 		}},
-	}
-
-	cosigner := NewLocalCosigner(config)
+		"",
+		0, 0,
+	)
 
 	s := &RaftStore{
 		NodeID:      "1",

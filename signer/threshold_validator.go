@@ -18,18 +18,13 @@ import (
 )
 
 type ThresholdValidator struct {
+	config *RuntimeConfig
+
 	threshold int
 
-	pubkey crypto.PubKey
+	pubKey crypto.PubKey
 
-	// stores the last sign state for a block we have fully signed
-	// Cached to respond to SignVote requests if we already have a signature
-	lastSignState      SignState
-	lastSignStateMutex sync.Mutex
-
-	// stores the last sign state that we've started progress on
-	lastSignStateInitiated      SignState
-	lastSignStateInitiatedMutex sync.Mutex
+	chainState map[string]ChainSignState
 
 	// our own cosigner
 	cosigner Cosigner
@@ -42,50 +37,59 @@ type ThresholdValidator struct {
 	logger log.Logger
 }
 
-type ThresholdValidatorOpt struct {
-	Pubkey    crypto.PubKey
-	Threshold int
-	SignState SignState
-	Cosigner  Cosigner
-	Peers     []Cosigner
-	RaftStore *RaftStore
-	Logger    log.Logger
+type ChainSignState struct {
+	// stores the last sign state for a block we have fully signed
+	// Cached to respond to SignVote requests if we already have a signature
+	lastSignState      *SignState
+	lastSignStateMutex *sync.Mutex
+
+	// stores the last sign state that we've started progress on
+	lastSignStateInitiated      *SignState
+	lastSignStateInitiatedMutex *sync.Mutex
 }
 
 // NewThresholdValidator creates and returns a new ThresholdValidator
-func NewThresholdValidator(opt *ThresholdValidatorOpt) *ThresholdValidator {
-	validator := &ThresholdValidator{}
-	validator.cosigner = opt.Cosigner
-	validator.peers = opt.Peers
-	validator.threshold = opt.Threshold
-	validator.pubkey = opt.Pubkey
-	validator.lastSignState = opt.SignState
-	validator.lastSignStateMutex = sync.Mutex{}
-	validator.lastSignStateInitiated = SignState{
-		Height:   opt.SignState.Height,
-		Round:    opt.SignState.Round,
-		Step:     opt.SignState.Step,
-		filePath: "none",
-		cache:    make(map[HRSKey]SignStateConsensus),
+func NewThresholdValidator(
+	config *RuntimeConfig,
+	pubKey crypto.PubKey,
+	threshold int,
+	cosigner Cosigner,
+	peers []Cosigner,
+	raftStore *RaftStore,
+	logger log.Logger,
+) *ThresholdValidator {
+	return &ThresholdValidator{
+		config:     config,
+		cosigner:   cosigner,
+		peers:      peers,
+		threshold:  threshold,
+		pubKey:     pubKey,
+		raftStore:  raftStore,
+		logger:     logger,
+		chainState: make(map[string]ChainSignState),
 	}
-	validator.lastSignStateInitiatedMutex = sync.Mutex{}
-	validator.raftStore = opt.RaftStore
-	validator.logger = opt.Logger
-	return validator
 }
 
-func (pv *ThresholdValidator) SaveLastSignedState(signState SignStateConsensus) error {
-	return pv.lastSignState.Save(signState, &pv.lastSignStateMutex, true)
+func (pv *ThresholdValidator) SaveLastSignedState(chainID string, signState SignStateConsensus) error {
+	return pv.chainState[chainID].lastSignState.Save(
+		signState,
+		pv.chainState[chainID].lastSignStateMutex,
+		true,
+	)
 }
 
-func (pv *ThresholdValidator) SaveLastSignedStateInitiated(signState SignStateConsensus) error {
-	return pv.lastSignStateInitiated.Save(signState, &pv.lastSignStateInitiatedMutex, true)
+func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, signState SignStateConsensus) error {
+	return pv.chainState[chainID].lastSignStateInitiated.Save(
+		signState,
+		pv.chainState[chainID].lastSignStateInitiatedMutex,
+		true,
+	)
 }
 
 // GetPubKey returns the public key of the validator.
 // Implements PrivValidator.
 func (pv *ThresholdValidator) GetPubKey() (crypto.PubKey, error) {
-	return pv.pubkey, nil
+	return pv.pubKey, nil
 }
 
 // SignVote signs a canonical representation of the vote, along with the
@@ -148,11 +152,14 @@ type BeyondBlockError struct {
 
 func (e *BeyondBlockError) Error() string { return e.msg }
 
-func (pv *ThresholdValidator) newBeyondBlockError(hrs HRSKey) *BeyondBlockError {
+func (pv *ThresholdValidator) newBeyondBlockError(chainID string, hrs HRSKey) *BeyondBlockError {
+	lss := pv.chainState[chainID].lastSignStateInitiated
 	return &BeyondBlockError{
-		msg: fmt.Sprintf("Progress already started on block %d.%d.%d, skipping %d.%d.%d",
-			pv.lastSignStateInitiated.Height, pv.lastSignStateInitiated.Round, pv.lastSignStateInitiated.Step,
-			hrs.Height, hrs.Round, hrs.Step),
+		msg: fmt.Sprintf("[%s] Progress already started on block %d.%d.%d, skipping %d.%d.%d",
+			chainID,
+			lss.Height, lss.Round, lss.Step,
+			hrs.Height, hrs.Round, hrs.Step,
+		),
 	}
 }
 
@@ -162,14 +169,15 @@ type StillWaitingForBlockError struct {
 
 func (e *StillWaitingForBlockError) Error() string { return e.msg }
 
-func newStillWaitingForBlockError(hrs HRSKey) *StillWaitingForBlockError {
+func newStillWaitingForBlockError(chainID string, hrs HRSKey) *StillWaitingForBlockError {
 	return &StillWaitingForBlockError{
-		msg: fmt.Sprintf("Still waiting for block %d.%d.%d",
-			hrs.Height, hrs.Round, hrs.Step),
+		msg: fmt.Sprintf("[%s] Still waiting for block %d.%d.%d",
+			chainID, hrs.Height, hrs.Round, hrs.Step),
 	}
 }
 
 func (pv *ThresholdValidator) waitForPeerEphemeralShares(
+	chainID string,
 	peer Cosigner,
 	hrst HRSTKey,
 	wg *sync.WaitGroup,
@@ -177,7 +185,7 @@ func (pv *ThresholdValidator) waitForPeerEphemeralShares(
 	thresholdPeersMutex *sync.Mutex,
 ) {
 	peerStartTime := time.Now()
-	ephemeralSecretParts, err := peer.GetEphemeralSecretParts(hrst)
+	ephemeralSecretParts, err := peer.GetEphemeralSecretParts(chainID, hrst)
 	if err != nil {
 
 		// Significant missing shares may lead to signature failure
@@ -200,6 +208,7 @@ func (pv *ThresholdValidator) waitForPeerEphemeralShares(
 }
 
 func (pv *ThresholdValidator) waitForPeerSetEphemeralSharesAndSign(
+	chainID string,
 	ourID int,
 	peer Cosigner,
 	hrst HRSTKey,
@@ -233,6 +242,7 @@ func (pv *ThresholdValidator) waitForPeerSetEphemeralSharesAndSign(
 
 	peerID := peer.GetID()
 	sigRes, err := peer.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
+		ChainID:          chainID,
 		EncryptedSecrets: peerEphemeralSecretParts,
 		HRST:             hrst,
 		SignBytes:        signBytes,
@@ -271,14 +281,43 @@ func waitUntilCompleteOrTimeout(wg *sync.WaitGroup, timeout time.Duration) bool 
 	}
 }
 
-func (pv *ThresholdValidator) getExistingBlockSignature(block *Block) ([]byte, time.Time, error) {
+func (pv *ThresholdValidator) LoadSignStateIfNecessary(chainID string) error {
+	if _, ok := pv.chainState[chainID]; ok {
+		return nil
+	}
+
+	signState, err := LoadOrCreateSignState(pv.config.PrivValStateFile(chainID))
+	if err != nil {
+		return err
+	}
+
+	pv.chainState[chainID] = ChainSignState{
+		lastSignState:          signState,
+		lastSignStateInitiated: signState.FreshCache(),
+
+		lastSignStateMutex:          &sync.Mutex{},
+		lastSignStateInitiatedMutex: &sync.Mutex{},
+	}
+
+	switch cosigner := pv.cosigner.(type) {
+	case *LocalCosigner:
+		return cosigner.LoadSignStateIfNecessary(chainID)
+	default:
+		return fmt.Errorf("unknown cosigner type: %T", cosigner)
+	}
+}
+
+func (pv *ThresholdValidator) getExistingBlockSignature(chainID string, block *Block) ([]byte, time.Time, error) {
 	height, round, step, stamp, signBytes := block.Height, block.Round, block.Step, block.Timestamp, block.SignBytes
 	hrs := HRSKey{
 		height,
 		round,
 		step,
 	}
-	latestBlock, existingSignature := pv.lastSignState.GetFromCache(hrs, &pv.lastSignStateMutex)
+	latestBlock, existingSignature := pv.chainState[chainID].lastSignState.GetFromCache(
+		hrs,
+		pv.chainState[chainID].lastSignStateMutex,
+	)
 	if existingSignature != nil {
 		// If a proposal has already been signed for this HRS, return that
 		if block.Step == stepPropose || bytes.Equal(signBytes, existingSignature.SignBytes) {
@@ -293,13 +332,17 @@ func (pv *ThresholdValidator) getExistingBlockSignature(block *Block) ([]byte, t
 	} else if latestBlock.Height > height ||
 		(latestBlock.Height == height && latestBlock.Round > round) ||
 		(latestBlock.Height == height && latestBlock.Round == round && latestBlock.Step > step) {
-		return nil, stamp, pv.newBeyondBlockError(hrs)
+		return nil, stamp, pv.newBeyondBlockError(chainID, hrs)
 	}
-	return nil, stamp, newStillWaitingForBlockError(hrs)
+	return nil, stamp, newStillWaitingForBlockError(chainID, hrs)
 }
 
 func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, time.Time, error) {
 	height, round, step, stamp, signBytes := block.Height, block.Round, block.Step, block.Timestamp, block.SignBytes
+
+	if err := pv.LoadSignStateIfNecessary(chainID); err != nil {
+		return nil, stamp, err
+	}
 
 	timeStartSignBlock := time.Now()
 
@@ -311,7 +354,10 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	if pv.raftStore.raft.State() != raft.Leader {
 		pv.logger.Debug("I am not the raft leader. Proxying request to the leader")
 		totalNotRaftLeader.Inc()
-		signRes, err := pv.raftStore.LeaderSignBlock(CosignerSignBlockRequest{chainID, block})
+		signRes, err := pv.raftStore.LeaderSignBlock(CosignerSignBlockRequest{
+			ChainID: chainID,
+			Block:   block,
+		})
 		if err != nil {
 			if _, ok := err.(*rpcTypes.RPCError); ok {
 				rpcErrUnwrapped := err.(*rpcTypes.RPCError).Data
@@ -336,13 +382,13 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	}
 
 	// Keep track of the last block that we began the signing process for. Only allow one attempt per block
-	if err := pv.SaveLastSignedStateInitiated(NewSignStateConsensus(height, round, step)); err != nil {
+	if err := pv.SaveLastSignedStateInitiated(chainID, NewSignStateConsensus(height, round, step)); err != nil {
 		switch err.(type) {
 		case *SameHRSError:
 			// Wait for last sign state signature to be the same block
 			signAgain := false
 			for i := 0; i < 100; i++ {
-				existingSignature, existingTimestamp, sameBlockErr := pv.getExistingBlockSignature(block)
+				existingSignature, existingTimestamp, sameBlockErr := pv.getExistingBlockSignature(chainID, block)
 				if sameBlockErr == nil {
 					if existingSignature == nil {
 						signAgain = true
@@ -363,15 +409,16 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 				return nil, stamp, errors.New("timed out waiting for block signature from cluster")
 			}
 		default:
-			existingSignature, existingTimestamp, sameBlockErr := pv.getExistingBlockSignature(block)
+			existingSignature, existingTimestamp, sameBlockErr := pv.getExistingBlockSignature(chainID, block)
 			if sameBlockErr == nil {
 				return existingSignature, stamp, nil
 			}
-			return nil, existingTimestamp, pv.newBeyondBlockError(HRSKey{
+			hrs := HRSKey{
 				Height: height,
 				Round:  round,
 				Step:   step,
-			})
+			}
+			return nil, existingTimestamp, pv.newBeyondBlockError(chainID, hrs)
 		}
 	}
 
@@ -389,11 +436,11 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	thresholdPeersMutex := sync.Mutex{}
 
 	for _, peer := range pv.peers {
-		go pv.waitForPeerEphemeralShares(peer, hrst, &getEphemeralWaitGroup,
+		go pv.waitForPeerEphemeralShares(chainID, peer, hrst, &getEphemeralWaitGroup,
 			&encryptedEphemeralSharesThresholdMap, &thresholdPeersMutex)
 	}
 
-	ourEphemeralSecretParts, err := pv.cosigner.GetEphemeralSecretParts(hrst)
+	ourEphemeralSecretParts, err := pv.cosigner.GetEphemeralSecretParts(chainID, hrst)
 	if err != nil {
 		// Our ephemeral secret parts are required, cannot proceed
 		return nil, stamp, err
@@ -427,7 +474,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 
 	for peer := range encryptedEphemeralSharesThresholdMap {
 		// set peerEphemeralSecretParts and sign in single rpc call.
-		go pv.waitForPeerSetEphemeralSharesAndSign(ourID, peer, hrst, &encryptedEphemeralSharesThresholdMap,
+		go pv.waitForPeerSetEphemeralSharesAndSign(chainID, ourID, peer, hrst, &encryptedEphemeralSharesThresholdMap,
 			signBytes, &shareSignatures, &shareSignaturesMutex, &ephemeralPublic, &setEphemeralAndSignWaitGroup)
 	}
 
@@ -466,20 +513,27 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	signature = append(signature, combinedSig...)
 
 	// verify the combined signature before saving to watermark
-	if !pv.pubkey.VerifySignature(signBytes, signature) {
+	if !pv.pubKey.VerifySignature(signBytes, signature) {
 		totalInvalidSignature.Inc()
 		return nil, stamp, errors.New("combined signature is not valid")
 	}
 
-	newLss := SignStateConsensus{
-		Height:    height,
-		Round:     round,
-		Step:      step,
-		Signature: signature,
-		SignBytes: signBytes,
+	newLss := ChainSignStateConsensus{
+		ChainID: chainID,
+		SignStateConsensus: SignStateConsensus{
+			Height:    height,
+			Round:     round,
+			Step:      step,
+			Signature: signature,
+			SignBytes: signBytes,
+		},
 	}
 	// Err will be present if newLss is not above high watermark
-	err = pv.lastSignState.Save(newLss, &pv.lastSignStateMutex, true)
+	err = pv.chainState[chainID].lastSignState.Save(
+		newLss.SignStateConsensus,
+		pv.chainState[chainID].lastSignStateMutex,
+		true,
+	)
 	if err != nil {
 		if _, isSameHRSError := err.(*SameHRSError); !isSameHRSError {
 			return nil, stamp, err

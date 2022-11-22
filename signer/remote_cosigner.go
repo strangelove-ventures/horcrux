@@ -63,7 +63,9 @@ func (cosigner *RemoteCosigner) getGRPCClient() (proto.CosignerGRPCClient, *grpc
 
 // Implements the cosigner interface
 func (cosigner *RemoteCosigner) GetEphemeralSecretParts(
-	req HRSTKey) (*CosignerEphemeralSecretPartsResponse, error) {
+	chainID string,
+	req HRSTKey,
+) (*CosignerEphemeralSecretPartsResponse, error) {
 	client, conn, err := cosigner.getGRPCClient()
 	if err != nil {
 		return nil, err
@@ -72,7 +74,8 @@ func (cosigner *RemoteCosigner) GetEphemeralSecretParts(
 	context, cancelFunc := getContext()
 	defer cancelFunc()
 	res, err := client.GetEphemeralSecretParts(context, &proto.CosignerGRPCGetEphemeralSecretPartsRequest{
-		Hrst: req.toProto(),
+		ChainID: chainID,
+		Hrst:    req.toProto(),
 	})
 	if err != nil {
 		return nil, err
@@ -93,6 +96,7 @@ func (cosigner *RemoteCosigner) SetEphemeralSecretPartsAndSign(
 	context, cancelFunc := getContext()
 	defer cancelFunc()
 	res, err := client.SetEphemeralSecretPartsAndSign(context, &proto.CosignerGRPCSetEphemeralSecretPartsAndSignRequest{
+		ChainID:          req.ChainID,
 		EncryptedSecrets: CosignerEphemeralSecretParts(req.EncryptedSecrets).toProto(),
 		Hrst:             req.HRST.toProto(),
 		SignBytes:        req.SignBytes,

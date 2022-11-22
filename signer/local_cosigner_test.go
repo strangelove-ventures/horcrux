@@ -3,7 +3,6 @@ package signer
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"os"
 	"testing"
 	"time"
 
@@ -26,28 +25,26 @@ func TestLocalCosignerGetID(t *testing.T) {
 		ShareKey: []byte{},
 		ID:       1,
 	}
-	signState := SignState{
-		Height: 0,
-		Round:  0,
-		Step:   0,
-	}
 
-	config := LocalCosignerConfig{
-		CosignerKey: key,
-		SignState:   &signState,
-		RsaKey:      *rsaKey,
-		Peers: []CosignerPeer{{
+	cosigner := NewLocalCosigner(
+		&RuntimeConfig{},
+		key,
+		*rsaKey,
+		[]CosignerPeer{{
 			ID:        1,
 			PublicKey: rsaKey.PublicKey,
 		}},
-	}
-
-	cosigner := NewLocalCosigner(config)
+		"",
+		0,
+		0,
+	)
 	require.Equal(t, cosigner.GetID(), 1)
 }
 
 func TestLocalCosignerSign2of2(t *testing.T) {
 	// Test signing with a 2 of 2
+
+	chainID := "test"
 
 	total := uint8(2)
 	threshold := uint8(2)
@@ -79,48 +76,38 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		ID:       1,
 	}
 
-	stateFile1, err := os.CreateTemp("", "state1.json")
-	require.NoError(t, err)
-	defer os.Remove(stateFile1.Name())
-
-	signState1, err := LoadOrCreateSignState(stateFile1.Name())
-	require.NoError(t, err)
-
 	key2 := CosignerKey{
 		PubKey:   privateKey.PubKey(),
 		ShareKey: secretShares[1],
 		ID:       2,
 	}
 
-	stateFile2, err := os.CreateTemp("", "state2.json")
+	var cosigner1, cosigner2 *LocalCosigner
+
+	cosigner1 = NewLocalCosigner(
+		&RuntimeConfig{},
+		key1,
+		*rsaKey1,
+		peers,
+		"",
+		total,
+		threshold,
+	)
+	cosigner2 = NewLocalCosigner(
+		&RuntimeConfig{},
+		key2,
+		*rsaKey2,
+		peers,
+		"",
+		total,
+		threshold,
+	)
+
+	err = cosigner1.LoadSignStateIfNecessary(chainID)
 	require.NoError(t, err)
-	defer os.Remove(stateFile2.Name())
-	signState2, err := LoadOrCreateSignState(stateFile2.Name())
+
+	err = cosigner2.LoadSignStateIfNecessary(chainID)
 	require.NoError(t, err)
-
-	config1 := LocalCosignerConfig{
-		CosignerKey: key1,
-		SignState:   &signState1,
-		RsaKey:      *rsaKey1,
-		Peers:       peers,
-		Total:       total,
-		Threshold:   threshold,
-	}
-
-	config2 := LocalCosignerConfig{
-		CosignerKey: key2,
-		SignState:   &signState2,
-		RsaKey:      *rsaKey2,
-		Peers:       peers,
-		Total:       total,
-		Threshold:   threshold,
-	}
-
-	var cosigner1 Cosigner
-	var cosigner2 Cosigner
-
-	cosigner1 = NewLocalCosigner(config1)
-	cosigner2 = NewLocalCosigner(config2)
 
 	require.Equal(t, cosigner1.GetID(), 1)
 	require.Equal(t, cosigner2.GetID(), 2)
@@ -136,12 +123,12 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		Timestamp: now.UnixNano(),
 	}
 
-	ephemeralSharesFor2, err := cosigner1.GetEphemeralSecretParts(hrst)
+	ephemeralSharesFor2, err := cosigner1.GetEphemeralSecretParts(chainID, hrst)
 	require.NoError(t, err)
 
 	publicKeys = append(publicKeys, ephemeralSharesFor2.EncryptedSecrets[0].SourceEphemeralSecretPublicKey)
 
-	ephemeralSharesFor1, err := cosigner2.GetEphemeralSecretParts(hrst)
+	ephemeralSharesFor1, err := cosigner2.GetEphemeralSecretParts(chainID, hrst)
 	require.NoError(t, err)
 
 	t.Logf("Shares from 2: %d", len(ephemeralSharesFor1.EncryptedSecrets))
@@ -162,6 +149,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	signBytes := tm.VoteSignBytes("chain-id", &vote)
 
 	sigRes1, err := cosigner1.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
+		ChainID:          chainID,
 		EncryptedSecrets: ephemeralSharesFor1.EncryptedSecrets,
 		HRST:             hrst,
 		SignBytes:        signBytes,
@@ -169,6 +157,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	require.NoError(t, err)
 
 	sigRes2, err := cosigner2.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
+		ChainID:          chainID,
 		EncryptedSecrets: ephemeralSharesFor2.EncryptedSecrets,
 		HRST:             hrst,
 		SignBytes:        signBytes,

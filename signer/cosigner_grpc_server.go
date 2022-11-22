@@ -17,7 +17,9 @@ type CosignerGRPCServer struct {
 }
 
 func (rpc *CosignerGRPCServer) SignBlock(
-	ctx context.Context, req *proto.CosignerGRPCSignBlockRequest) (*proto.CosignerGRPCSignBlockResponse, error) {
+	ctx context.Context,
+	req *proto.CosignerGRPCSignBlockRequest,
+) (*proto.CosignerGRPCSignBlockResponse, error) {
 	block := &Block{
 		Height:    req.Block.GetHeight(),
 		Round:     req.Block.GetRound(),
@@ -39,6 +41,7 @@ func (rpc *CosignerGRPCServer) SetEphemeralSecretPartsAndSign(
 	req *proto.CosignerGRPCSetEphemeralSecretPartsAndSignRequest,
 ) (*proto.CosignerGRPCSetEphemeralSecretPartsAndSignResponse, error) {
 	res, err := rpc.cosigner.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
+		ChainID:          req.ChainID,
 		EncryptedSecrets: CosignerEphemeralSecretPartsFromProto(req.GetEncryptedSecrets()),
 		HRST:             HRSTKeyFromProto(req.GetHrst()),
 		SignBytes:        req.GetSignBytes(),
@@ -57,7 +60,10 @@ func (rpc *CosignerGRPCServer) GetEphemeralSecretParts(
 	ctx context.Context,
 	req *proto.CosignerGRPCGetEphemeralSecretPartsRequest,
 ) (*proto.CosignerGRPCGetEphemeralSecretPartsResponse, error) {
-	res, err := rpc.cosigner.GetEphemeralSecretParts(HRSTKeyFromProto(req.GetHrst()))
+	res, err := rpc.cosigner.GetEphemeralSecretParts(
+		req.ChainID,
+		HRSTKeyFromProto(req.GetHrst()),
+	)
 	if err != nil {
 		return nil, err
 	}
