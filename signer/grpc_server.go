@@ -51,6 +51,7 @@ func (rpc *GRPCServer) SetEphemeralSecretPartsAndSign(
 		return nil, err
 	}
 	rpc.raftStore.logger.Info("Signed with share",
+		"chain_id", req.ChainID,
 		"height", req.Hrst.Height,
 		"round", req.Hrst.Round,
 		"step", req.Hrst.Step,
