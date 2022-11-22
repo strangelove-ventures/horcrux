@@ -238,7 +238,15 @@ func (pv *ThresholdValidator) waitForPeerSetEphemeralSharesAndSign(
 		}
 	}
 
-	pv.logger.Debug("Number of eph parts for peer", "peer", peer.GetID(), "count", len(peerEphemeralSecretParts))
+	pv.logger.Debug(
+		"Number of ephemeral parts for peer",
+		"peer", peer.GetID(),
+		"count", len(peerEphemeralSecretParts),
+		"chain_id", chainID,
+		"height", hrst.Height,
+		"round", hrst.Round,
+		"step", hrst.Step,
+	)
 
 	peerID := peer.GetID()
 	sigRes, err := peer.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
@@ -254,7 +262,14 @@ func (pv *ThresholdValidator) waitForPeerSetEphemeralSharesAndSign(
 	}
 
 	timedCosignerSignLag.WithLabelValues(peer.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
-	pv.logger.Debug(fmt.Sprintf("Received signature from %d", peerID))
+	pv.logger.Debug(
+		"Received signature from peer",
+		"peer", peerID,
+		"chain_id", chainID,
+		"height", hrst.Height,
+		"round", hrst.Round,
+		"step", hrst.Step,
+	)
 
 	shareSignaturesMutex.Lock()
 	defer shareSignaturesMutex.Unlock()
@@ -352,7 +367,12 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 		return nil, stamp, errors.New("raft not yet initialized")
 	}
 	if pv.raftStore.raft.State() != raft.Leader {
-		pv.logger.Debug("I am not the raft leader. Proxying request to the leader")
+		pv.logger.Debug("I am not the raft leader. Proxying request to the leader",
+			"chain_id", chainID,
+			"height", height,
+			"round", round,
+			"step", step,
+		)
 		totalNotRaftLeader.Inc()
 		signRes, err := pv.raftStore.LeaderSignBlock(CosignerSignBlockRequest{
 			ChainID: chainID,
@@ -372,7 +392,13 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	}
 
 	totalRaftLeader.Inc()
-	pv.logger.Debug("I am the raft leader. Managing the sign process for this block")
+	pv.logger.Debug(
+		"I am the raft leader. Managing the sign process for this block",
+		"chain_id", chainID,
+		"height", height,
+		"round", round,
+		"step", step,
+	)
 
 	hrst := HRSTKey{
 		Height:    height,
@@ -457,7 +483,13 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	thresholdPeersMutex.Unlock()
 
 	timedSignBlockThresholdLag.Observe(time.Since(timeStartSignBlock).Seconds())
-	pv.logger.Debug("Have threshold peers")
+	pv.logger.Debug(
+		"Have threshold peers",
+		"chain_id", chainID,
+		"height", hrst.Height,
+		"round", hrst.Round,
+		"step", hrst.Step,
+	)
 
 	setEphemeralAndSignWaitGroup := sync.WaitGroup{}
 
@@ -485,7 +517,13 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	}
 
 	timedSignBlockCosignerLag.Observe(time.Since(timeStartSignBlock).Seconds())
-	pv.logger.Debug("Done waiting for cosigners, assembling signatures")
+	pv.logger.Debug(
+		"Done waiting for cosigners, assembling signatures",
+		"chain_id", chainID,
+		"height", hrst.Height,
+		"round", hrst.Round,
+		"step", hrst.Step,
+	)
 
 	// collect all valid responses into array of ids and signatures for the threshold lib
 	sigIds := make([]int, 0)

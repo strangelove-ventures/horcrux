@@ -167,8 +167,15 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *tmProt
 	if len(vote.Signature) < sigLen {
 		sigLen = len(vote.Signature)
 	}
-	rs.Logger.Info("Signed vote", "height", vote.Height, "round", vote.Round, "type", vote.Type,
-		"sig", vote.Signature[:sigLen], "ts", vote.Timestamp.Unix(), "node", rs.address)
+	rs.Logger.Info("Signed vote",
+		"chain_id", chainID,
+		"height", vote.Height,
+		"round", vote.Round,
+		"type", vote.Type,
+		"sig", vote.Signature[:sigLen],
+		"ts", vote.Timestamp.Unix(),
+		"node", rs.address,
+	)
 
 	if vote.Type == tmProto.PrecommitType {
 		stepSize := vote.Height - previousPrecommitHeight
@@ -230,8 +237,20 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(
 		msgSum.SignedProposalResponse.Error = getRemoteSignerError(err)
 		return tmProtoPrivval.Message{Sum: msgSum}
 	}
-	rs.Logger.Info("Signed proposal", "node", rs.address,
-		"height", proposal.Height, "round", proposal.Round, "type", proposal.Type)
+	// Show signatures provided to each node have the same signature and timestamps
+	sigLen := 6
+	if len(proposal.Signature) < sigLen {
+		sigLen = len(proposal.Signature)
+	}
+	rs.Logger.Info("Signed proposal",
+		"chain_id", chainID,
+		"height", proposal.Height,
+		"round", proposal.Round,
+		"type", proposal.Type,
+		"sig", proposal.Signature[:sigLen],
+		"ts", proposal.Timestamp.Unix(),
+		"node", rs.address,
+	)
 	lastProposalHeight.Set(float64(proposal.Height))
 	lastProposalRound.Set(float64(proposal.Round))
 	totalProposalsSigned.Inc()
