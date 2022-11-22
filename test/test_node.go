@@ -87,7 +87,16 @@ func getHeighlinerChain(
 }
 
 func getSimdChain(chainID string, numSentries int) *ChainType {
-	return getHeighlinerChain("sim", chainID, numSentries, getGoModuleVersion("github.com/cosmos/cosmos-sdk"), "simd", "cosmos", false, nil)
+	return getHeighlinerChain(
+		"sim",
+		chainID,
+		numSentries,
+		getGoModuleVersion("github.com/cosmos/cosmos-sdk"),
+		"simd",
+		"cosmos",
+		false,
+		nil,
+	)
 }
 
 func getSentinelChain(
@@ -109,7 +118,16 @@ func getSentinelChain(
 		return err
 	}
 
-	return getHeighlinerChain("sentinel", chainID, numSentries, version, "sentinelhub", "sent", true, sentinelGenesisJSONModification)
+	return getHeighlinerChain(
+		"sentinel",
+		chainID,
+		numSentries,
+		version,
+		"sentinelhub",
+		"sent",
+		true,
+		sentinelGenesisJSONModification,
+	)
 }
 
 // ChainType represents the type of chain to instantiate

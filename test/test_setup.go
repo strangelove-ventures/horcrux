@@ -98,7 +98,7 @@ func Genesis(
 		eg.Go(func() error {
 			return firstSentry.InitValidatorFiles(ctx, pubKey)
 		})
-		for i = i + 1; i < len(v.Sentries); i++ {
+		for i++; i < len(v.Sentries); i++ {
 			s := v.Sentries[i]
 			if s.ChainID != chain.ChainID {
 				continue
