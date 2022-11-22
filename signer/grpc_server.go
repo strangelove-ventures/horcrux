@@ -47,10 +47,18 @@ func (rpc *GRPCServer) SetEphemeralSecretPartsAndSign(
 		SignBytes:        req.GetSignBytes(),
 	})
 	if err != nil {
-		rpc.raftStore.logger.Error("Failed to sign with share", "error", err)
+		rpc.raftStore.logger.Error(
+			"Failed to sign with share",
+			"chain_id", req.ChainID,
+			"height", req.Hrst.Height,
+			"round", req.Hrst.Round,
+			"step", req.Hrst.Step,
+			"error", err,
+		)
 		return nil, err
 	}
-	rpc.raftStore.logger.Info("Signed with share",
+	rpc.raftStore.logger.Info(
+		"Signed with share",
 		"chain_id", req.ChainID,
 		"height", req.Hrst.Height,
 		"round", req.Hrst.Round,

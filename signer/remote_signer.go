@@ -152,11 +152,28 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *tmProt
 	if err := rs.privVal.SignVote(chainID, vote); err != nil {
 		switch typedErr := err.(type) {
 		case *BeyondBlockError:
-			rs.Logger.Debug("Rejecting sign vote request", "reason", typedErr.msg)
+			rs.Logger.Debug(
+				"Rejecting sign vote request",
+				"chain_id", chainID,
+				"height", vote.Height,
+				"round", vote.Round,
+				"type", vote.Type,
+				"node", rs.address,
+				"validator", fmt.Sprintf("%X", vote.ValidatorAddress),
+				"reason", typedErr.msg,
+			)
 			beyondBlockErrors.Inc()
 		default:
-			rs.Logger.Error("Failed to sign vote", "address", rs.address, "error", err, "vote_type", vote.Type,
-				"height", vote.Height, "round", vote.Round, "validator", fmt.Sprintf("%X", vote.ValidatorAddress))
+			rs.Logger.Error(
+				"Failed to sign vote",
+				"chain_id", chainID,
+				"height", vote.Height,
+				"round", vote.Round,
+				"type", vote.Type,
+				"node", rs.address,
+				"validator", fmt.Sprintf("%X", vote.ValidatorAddress),
+				"error", err,
+			)
 			failedSignVote.Inc()
 		}
 		msgSum.SignedVoteResponse.Error = getRemoteSignerError(err)
@@ -167,7 +184,8 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *tmProt
 	if len(vote.Signature) < sigLen {
 		sigLen = len(vote.Signature)
 	}
-	rs.Logger.Info("Signed vote",
+	rs.Logger.Info(
+		"Signed vote",
 		"chain_id", chainID,
 		"height", vote.Height,
 		"round", vote.Round,
@@ -229,10 +247,26 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(
 	if err := rs.privVal.SignProposal(chainID, proposal); err != nil {
 		switch typedErr := err.(type) {
 		case *BeyondBlockError:
-			rs.Logger.Debug("Rejecting proposal sign request", "reason", typedErr.msg)
+			rs.Logger.Debug(
+				"Rejecting proposal sign request",
+				"chain_id", chainID,
+				"height", proposal.Height,
+				"round", proposal.Round,
+				"type", proposal.Type,
+				"node", rs.address,
+				"reason", typedErr.msg,
+			)
 			beyondBlockErrors.Inc()
 		default:
-			rs.Logger.Error("Failed to sign proposal", "address", rs.address, "error", err, "proposal", proposal)
+			rs.Logger.Error(
+				"Failed to sign proposal",
+				"chain_id", chainID,
+				"height", proposal.Height,
+				"round", proposal.Round,
+				"type", proposal.Type,
+				"node", rs.address,
+				"error", err,
+			)
 		}
 		msgSum.SignedProposalResponse.Error = getRemoteSignerError(err)
 		return tmProtoPrivval.Message{Sum: msgSum}
@@ -242,7 +276,8 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(
 	if len(proposal.Signature) < sigLen {
 		sigLen = len(proposal.Signature)
 	}
-	rs.Logger.Info("Signed proposal",
+	rs.Logger.Info(
+		"Signed proposal",
 		"chain_id", chainID,
 		"height", proposal.Height,
 		"round", proposal.Round,
@@ -278,13 +313,23 @@ func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) tmProtoPrivval
 
 	pubKey, err := rs.privVal.GetPubKey()
 	if err != nil {
-		rs.Logger.Error("Failed to get Pub Key", "address", rs.address, "error", err)
+		rs.Logger.Error(
+			"Failed to get Pub Key",
+			"chain_id", chainID,
+			"node", rs.address,
+			"error", err,
+		)
 		msgSum.PubKeyResponse.Error = getRemoteSignerError(err)
 		return tmProtoPrivval.Message{Sum: msgSum}
 	}
 	pk, err := tmCryptoEncoding.PubKeyToProto(pubKey)
 	if err != nil {
-		rs.Logger.Error("Failed to get Pub Key", "address", rs.address, "error", err)
+		rs.Logger.Error(
+			"Failed to get Pub Key",
+			"chain_id", chainID,
+			"node", rs.address,
+			"error", err,
+		)
 		msgSum.PubKeyResponse.Error = getRemoteSignerError(err)
 		return tmProtoPrivval.Message{Sum: msgSum}
 	}
