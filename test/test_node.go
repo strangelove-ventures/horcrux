@@ -64,14 +64,17 @@ func getGoModuleVersion(pkg string) string {
 }
 
 func getHeighlinerChain(
-	chain,
-	version,
-	binary,
+	chain string,
+	chainID string,
+	numSentries int,
+	version string,
+	binary string,
 	bech32Prefix string,
 	pubKeyAsBech32 bool,
 	preGenTx func(tn *TestNode) error,
 ) *ChainType {
 	return &ChainType{
+		ChainID:        chainID,
 		Repository:     fmt.Sprintf("ghcr.io/strangelove-ventures/heighliner/%s", chain),
 		Version:        version,
 		Bin:            binary,
@@ -79,14 +82,20 @@ func getHeighlinerChain(
 		PubKeyAsBech32: pubKeyAsBech32,
 		Ports:          cosmosNodePorts,
 		PreGenTx:       preGenTx,
+		NumSentries:    numSentries,
 	}
 }
 
-func getSimdChain() *ChainType {
-	return getHeighlinerChain("sim", getGoModuleVersion("github.com/cosmos/cosmos-sdk"), "simd", "cosmos", false, nil)
+func getSimdChain(chainID string, numSentries int) *ChainType {
+	return getHeighlinerChain("sim", chainID, numSentries, getGoModuleVersion("github.com/cosmos/cosmos-sdk"), "simd", "cosmos", false, nil)
 }
 
-func getSentinelChain(ctx context.Context, version string) *ChainType {
+func getSentinelChain(
+	ctx context.Context,
+	chainID string,
+	numSentries int,
+	version string,
+) *ChainType {
 	// sets "approve_by" in the genesis.json
 	// this is required for sentinel, genesis validation fails without it.
 	sentinelGenesisJSONModification := func(tn *TestNode) error {
@@ -100,11 +109,14 @@ func getSentinelChain(ctx context.Context, version string) *ChainType {
 		return err
 	}
 
-	return getHeighlinerChain("sentinel", version, "sentinelhub", "sent", true, sentinelGenesisJSONModification)
+	return getHeighlinerChain("sentinel", chainID, numSentries, version, "sentinelhub", "sent", true, sentinelGenesisJSONModification)
 }
 
 // ChainType represents the type of chain to instantiate
 type ChainType struct {
+	ChainID     string
+	NumSentries int
+
 	Repository string
 	Version    string
 	Bin        string
@@ -185,18 +197,16 @@ func MakeTestNodes(
 
 // Creates indexed validator test nodes
 func GetValidators(
-	startingValidatorIndex,
-	count,
-	sentriesPerValidator int,
-	home,
-	chainID string,
+	startingValidatorIndex int,
+	count int,
+	home string,
 	chain *ChainType,
 	pool *dockertest.Pool,
 	networkID string,
 	t *testing.T,
 ) (out TestNodes) {
 	for i := startingValidatorIndex; i < startingValidatorIndex+count; i++ {
-		out = append(out, MakeTestNodes(i, sentriesPerValidator, home, chainID, chain, pool, networkID, t)...)
+		out = append(out, MakeTestNodes(i, chain.NumSentries, home, chain.ChainID, chain, pool, networkID, t)...)
 	}
 	return
 }
@@ -303,7 +313,7 @@ ReachableCheckLoop:
 
 // Name is the hostname of the test node container
 func (tn *TestNode) Name() string {
-	return fmt.Sprintf("val-%d-node-%d-%s", tn.ValidatorIndex, tn.Index, tn.tl.Name())
+	return fmt.Sprintf("%s-val-%d-node-%d-%s", tn.ChainID, tn.ValidatorIndex, tn.Index, tn.tl.Name())
 }
 
 // Dir is the directory where the test node files are stored
@@ -430,8 +440,12 @@ func (tn *TestNode) EnsureNotSlashed(address tmBytes.HexBytes) error {
 		}
 
 		if i == 0 {
-			tn.tl.Logf("{EnsureNotSlashed} val-%d Initial Missed blocks: %d", tn.ValidatorIndex,
-				slashInfo.ValSigningInfo.MissedBlocksCounter)
+			tn.tl.Logf(
+				"{EnsureNotSlashed} %s-val-%d Initial Missed blocks: %d",
+				tn.ChainID,
+				tn.ValidatorIndex,
+				slashInfo.ValSigningInfo.MissedBlocksCounter,
+			)
 			continue
 		}
 		if i%2 == 0 {
@@ -441,8 +455,13 @@ func (tn *TestNode) EnsureNotSlashed(address tmBytes.HexBytes) error {
 				return err
 			}
 
-			tn.tl.Logf("{EnsureNotSlashed} val-%d Missed blocks: %d block: %d", tn.ValidatorIndex,
-				slashInfo.ValSigningInfo.MissedBlocksCounter, stat.SyncInfo.LatestBlockHeight)
+			tn.tl.Logf(
+				"{EnsureNotSlashed} %s-val-%d Missed blocks: %d block: %d",
+				tn.ChainID,
+				tn.ValidatorIndex,
+				slashInfo.ValSigningInfo.MissedBlocksCounter,
+				stat.SyncInfo.LatestBlockHeight,
+			)
 		}
 		if slashInfo.ValSigningInfo.Tombstoned {
 			return errors.New("validator is tombstoned")
@@ -464,7 +483,12 @@ func (tn *TestNode) WaitForConsecutiveBlocks(blocks int64, address tmBytes.HexBy
 	if err != nil {
 		return err
 	}
-	tn.tl.Logf("{WaitForConsecutiveBlocks} val-%d Initial Missed blocks: %d", tn.ValidatorIndex, initialMissed)
+	tn.tl.Logf(
+		"{WaitForConsecutiveBlocks} %s-val-%d Initial Missed blocks: %d",
+		tn.ChainID,
+		tn.ValidatorIndex,
+		initialMissed,
+	)
 	stat, err := tn.Client.Status(context.Background())
 	if err != nil {
 		return err
@@ -487,8 +511,13 @@ func (tn *TestNode) WaitForConsecutiveBlocks(blocks int64, address tmBytes.HexBy
 		deltaMissed := min(blocks, checkingBlock-1) - recentSignedBlocksCount
 		deltaBlocks := checkingBlock - startingBlock
 
-		tn.tl.Logf("{WaitForConsecutiveBlocks} val-%d Missed blocks: %d block: %d",
-			tn.ValidatorIndex, deltaMissed, checkingBlock)
+		tn.tl.Logf(
+			"{WaitForConsecutiveBlocks} %s-val-%d Missed blocks: %d block: %d",
+			tn.ChainID,
+			tn.ValidatorIndex,
+			deltaMissed,
+			checkingBlock,
+		)
 		if deltaMissed == 0 && deltaBlocks >= blocks {
 			tn.tl.Logf("Time (sec) to sign %d consecutive blocks: %d", blocks, i+1)
 			return nil // done waiting for consecutive signed blocks

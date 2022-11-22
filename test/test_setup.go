@@ -58,6 +58,9 @@ func Genesis(
 
 	// sign gentx for each validator
 	for _, v := range nonHorcruxValidators {
+		if v.ChainID != chain.ChainID {
+			continue
+		}
 		v := v
 		// passing empty pubkey to use the one from the validator after it is initialized
 		eg.Go(func() error { return v.InitValidatorFiles(ctx, "") })
@@ -76,14 +79,30 @@ func Genesis(
 			return err
 		}
 
+		i := 0
+		var firstSentry *TestNode
+
+		for ; i < len(v.Sentries); i++ {
+			if v.Sentries[i].ChainID == chain.ChainID {
+				firstSentry = v.Sentries[i]
+				break
+			}
+		}
+
+		if firstSentry == nil {
+			return fmt.Errorf("no sentry found for chain id: %s", chain.ChainID)
+		}
+
 		// using the first sentry for each horcrux validator as the keyring for the account key (not consensus key)
 		// to sign gentx
 		eg.Go(func() error {
-			return v.Sentries[0].InitValidatorFiles(ctx, pubKey)
+			return firstSentry.InitValidatorFiles(ctx, pubKey)
 		})
-		sentries := v.Sentries[1:]
-		for _, sentry := range sentries {
-			s := sentry
+		for i = i + 1; i < len(v.Sentries); i++ {
+			s := v.Sentries[i]
+			if s.ChainID != chain.ChainID {
+				continue
+			}
 			eg.Go(func() error { return s.InitFullNodeFiles(ctx) })
 		}
 	}
@@ -91,6 +110,9 @@ func Genesis(
 	// just initialize folder for any full nodes
 	for _, n := range fullnodes {
 		n := n
+		if n.ChainID != chain.ChainID {
+			continue
+		}
 		eg.Go(func() error { return n.InitFullNodeFiles(ctx) })
 	}
 
@@ -102,18 +124,42 @@ func Genesis(
 	var validators TestNodes
 	var nodes TestNodes
 
-	validators = append(validators, nonHorcruxValidators...)
-	nodes = append(nodes, nonHorcruxValidators...)
+	for _, v := range nonHorcruxValidators {
+		if v.ChainID != chain.ChainID {
+			continue
+		}
+		validators = append(validators, v)
+		nodes = append(nodes, v)
+	}
 
 	for _, horcruxValidator := range horcruxValidators {
 		if len(horcruxValidator.Sentries) > 0 {
+			var firstSentry *TestNode
+			for _, n := range horcruxValidator.Sentries {
+				if n.ChainID == chain.ChainID {
+					firstSentry = n
+					break
+				}
+			}
+			if firstSentry == nil {
+				return fmt.Errorf("no sentry found for chain id: %s", chain.ChainID)
+			}
 			// for test purposes, account key (not consensus key) will come from first sentry
-			validators = append(validators, horcruxValidator.Sentries[0])
+			validators = append(validators, firstSentry)
 		}
-		nodes = append(nodes, horcruxValidator.Sentries...)
+
+		for _, n := range horcruxValidator.Sentries {
+			if n.ChainID == chain.ChainID {
+				nodes = append(nodes, n)
+			}
+		}
 	}
 
-	nodes = append(nodes, fullnodes...)
+	for _, n := range fullnodes {
+		if n.ChainID == chain.ChainID {
+			nodes = append(nodes, n)
+		}
+	}
 
 	// for the validators we need to collect the gentxs and the accounts
 	// to a single node's genesis file. We will use the first validator
@@ -170,6 +216,9 @@ func Genesis(
 	// start horcrux sentries. privval listener enabled
 	for _, v := range horcruxValidators {
 		for _, sentry := range v.Sentries {
+			if sentry.ChainID != chain.ChainID {
+				continue
+			}
 			s := sentry
 			tl.Logf("{%s} => starting container...", s.Name())
 			eg.Go(func() error {
@@ -182,6 +231,9 @@ func Genesis(
 
 	// start non-horcrux validators. privval listener disabled
 	for _, v := range nonHorcruxValidators {
+		if v.ChainID != chain.ChainID {
+			continue
+		}
 		v := v
 		tl.Logf("{%s} => starting container...", v.Name())
 		eg.Go(func() error {
@@ -193,6 +245,9 @@ func Genesis(
 
 	// start full nodes. privval listener disabled
 	for _, n := range fullnodes {
+		if n.ChainID != chain.ChainID {
+			continue
+		}
 		n := n
 		tl.Logf("{%s} => starting container...", n.Name())
 		eg.Go(func() error {
