@@ -44,26 +44,20 @@ func StartSignerCmd() *cobra.Command {
 				pv       types.PrivValidator
 				chainID  = config.Config.ChainID
 				logger   = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator")
-				cfg      signer.Config
 			)
 
-			cfg = signer.Config{
-				Mode:            "single",
-				PrivValKeyFile:  config.keyFilePath(false),
-				PrivValStateDir: config.StateDir,
-				ChainID:         config.Config.ChainID,
-				Nodes:           config.Config.Nodes(),
-			}
+			privValKeyFile := config.keyFilePath(false)
+			nodes := config.Config.Nodes()
 
-			if err = cfg.KeyFileExists(); err != nil {
+			if _, err := os.Stat(privValKeyFile); os.IsNotExist(err) {
 				return err
 			}
 
-			logger.Info("Tendermint Validator", "mode", cfg.Mode,
-				"priv-key", cfg.PrivValKeyFile, "priv-state-dir", cfg.PrivValStateDir)
+			logger.Info("Tendermint Validator", "mode", "single",
+				"priv-key", privValKeyFile, "priv-state-dir", config.StateDir)
 
 			pv = &signer.PvGuard{
-				PrivValidator: privval.LoadFilePVEmptyState(cfg.PrivValKeyFile, config.privValStateFile(chainID)),
+				PrivValidator: privval.LoadFilePVEmptyState(privValKeyFile, config.privValStateFile(chainID)),
 			}
 
 			pubkey, err := pv.GetPubKey()
@@ -72,9 +66,7 @@ func StartSignerCmd() *cobra.Command {
 			}
 			logger.Info("Signer", "pubkey", pubkey)
 
-			go EnableDebugAndMetrics(cmd.Context())
-
-			services, err = signer.StartRemoteSigners(services, logger, cfg.ChainID, pv, cfg.Nodes)
+			services, err = signer.StartRemoteSigners(services, logger, config.Config.ChainID, pv, nodes)
 			if err != nil {
 				panic(err)
 			}

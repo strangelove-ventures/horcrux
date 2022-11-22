@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/client"
 	"github.com/strangelove-ventures/horcrux/signer"
+	tmlog "github.com/tendermint/tendermint/libs/log"
 	"gopkg.in/yaml.v2"
 )
 
@@ -79,7 +80,7 @@ func initCmd() *cobra.Command {
 			if cs {
 				// Cosigner Config
 				p, _ := cmdFlags.GetString("peers")
-				threshold, _ := cmdFlags.GetInt("threshold")
+				threshold, _ := cmdFlags.GetUint8("threshold")
 				timeout, _ := cmdFlags.GetString("timeout")
 				peers, err := peersFromFlag(p)
 				if err != nil {
@@ -107,7 +108,7 @@ func initCmd() *cobra.Command {
 					ChainID:        cid,
 					CosignerConfig: &CosignerConfig{
 						Threshold: threshold,
-						Shares:    len(peers) + 1,
+						Shares:    uint8(len(peers)) + 1,
 						P2PListen: listen,
 						Peers:     peers,
 						Timeout:   timeout,
@@ -166,7 +167,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().BoolP("cosigner", "c", false, "set to initialize a cosigner node, requires --peers and --threshold")
 	cmd.Flags().StringP("peers", "p", "", "cosigner peer addresses in format tcp://{addr}:{port}|{share-id} \n"+
 		"(i.e. \"tcp://node-1:2222|2,tcp://node-2:2222|3\")")
-	cmd.Flags().IntP("threshold", "t", 0, "indicate number of signatures required for threshold signature")
+	cmd.Flags().Uint8P("threshold", "t", 0, "indicate number of signatures required for threshold signature")
 	cmd.Flags().StringP("listen", "l", "", "listen address of the signer")
 	cmd.Flags().StringP("debug-addr", "d", "", "listen address for Debug and Prometheus metrics in format localhost:8543")
 	cmd.Flags().StringP("keyfile", "k", "",
@@ -197,6 +198,7 @@ func validateCosignerConfig(cfg DiskConfig) error {
 	if cfg.CosignerConfig == nil {
 		return fmt.Errorf("cosigner config can't be empty")
 	}
+
 	if cfg.CosignerConfig.Threshold <= cfg.CosignerConfig.Shares/2 {
 		return fmt.Errorf("threshold (%d) must be greater than number of shares (%d) / 2",
 			cfg.CosignerConfig.Threshold, cfg.CosignerConfig.Shares)
@@ -413,10 +415,11 @@ func setSharesCmd() *cobra.Command {
 			"3",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			numShares, err := strconv.Atoi(args[0])
+			numSharesParsed, err := strconv.ParseUint(args[0], 10, 8)
 			if err != nil {
 				return err
 			}
+			numShares := uint8(numSharesParsed)
 			if err := validateCosignerPeers(config.Config.CosignerConfig.Peers, numShares); err != nil {
 				return err
 			}
@@ -549,11 +552,12 @@ func (c RuntimeConfig) writeConfigFile() error {
 }
 
 type CosignerConfig struct {
-	Threshold int            `json:"threshold"   yaml:"threshold"`
-	Shares    int            `json:"shares" yaml:"shares"`
-	P2PListen string         `json:"p2p-listen"  yaml:"p2p-listen"`
-	Peers     []CosignerPeer `json:"peers"       yaml:"peers"`
-	Timeout   string         `json:"rpc-timeout" yaml:"rpc-timeout"`
+	Threshold  uint8          `json:"threshold"   yaml:"threshold"`
+	Shares     uint8          `json:"shares" yaml:"shares"`
+	P2PListen  string         `json:"p2p-listen"  yaml:"p2p-listen"`
+	Peers      []CosignerPeer `json:"peers"       yaml:"peers"`
+	Timeout    string         `json:"rpc-timeout" yaml:"rpc-timeout"`
+	SignerType string         `json:"signer-type" yaml:"signer-type"`
 }
 
 func (cfg *CosignerConfig) LeaderElectMultiAddress() (string, error) {
@@ -572,12 +576,41 @@ func (c *DiskConfig) CosignerPeers() (out []signer.CosignerConfig) {
 	return
 }
 
+func (c *DiskConfig) KeyAndThresholdSigner(logger tmlog.Logger) (signer.CosignerKey, signer.ThresholdSigner, error) {
+	switch c.CosignerConfig.SignerType {
+	case "hsm", "HSM":
+		logger.Info("Cosigning with HSM")
+		return signer.CosignerKey{}, signer.NewThresholdSignerHSM(), nil
+	default:
+
+		keyFilePath := config.keyFilePath(true)
+		if _, err := os.Stat(keyFilePath); os.IsNotExist(err) {
+			return signer.CosignerKey{}, nil, fmt.Errorf("private key share doesn't exist at path(%s)", keyFilePath)
+		}
+		key, err := signer.LoadCosignerKey(keyFilePath)
+		if err != nil {
+			return signer.CosignerKey{}, nil, fmt.Errorf("error reading cosigner key: %w", err)
+		}
+		logger.Info("Cosigning with soft key",
+			"file", keyFilePath,
+			"id", key.ID,
+			"threshold", c.CosignerConfig.Threshold,
+			"total", c.CosignerConfig.Shares,
+		)
+		return key, signer.NewThresholdSignerSoft(
+			key,
+			c.CosignerConfig.Threshold,
+			c.CosignerConfig.Shares,
+		), nil
+	}
+}
+
 type CosignerPeer struct {
 	ShareID int    `json:"share-id" yaml:"share-id"`
 	P2PAddr string `json:"p2p-addr" yaml:"p2p-addr"`
 }
 
-func validateCosignerPeers(peers []CosignerPeer, shares int) error {
+func validateCosignerPeers(peers []CosignerPeer, shares uint8) error {
 	// Check IDs to make sure none are duplicated
 	if dupl := duplicatePeers(peers); len(dupl) != 0 {
 		return fmt.Errorf("found duplicate share IDs in args: %v", dupl)
@@ -585,7 +618,7 @@ func validateCosignerPeers(peers []CosignerPeer, shares int) error {
 
 	// Make sure that the peers' IDs match the number of shares.
 	for _, peer := range peers {
-		if peer.ShareID < 1 || peer.ShareID > shares {
+		if peer.ShareID < 1 || peer.ShareID > int(shares) {
 			return fmt.Errorf("peer ID %v in args is out of range, must be between 1 and %v",
 				peer.ShareID, shares)
 		}
@@ -593,6 +626,7 @@ func validateCosignerPeers(peers []CosignerPeer, shares int) error {
 
 	// Check that exactly {num-shares}-1 peers are in the peer list, assuming
 	// the remaining peer ID is the ID the local node is configured with.
+
 	if len(peers) != shares-1 {
 		return fmt.Errorf("incorrect number of peers. expected (%d shares - local node = %d peers)",
 			shares, shares-1)

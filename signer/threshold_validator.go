@@ -400,7 +400,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	}
 
 	// Wait for threshold cosigners to be complete
-	// A Cosigner will either respond in time, or be cancelled with timeout
+	// A cosigner will either respond in time, or be cancelled with timeout
 	if waitUntilCompleteOrTimeout(&getEphemeralWaitGroup, 4*time.Second) {
 		return nil, stamp, errors.New("timed out waiting for ephemeral shares")
 	}
@@ -432,7 +432,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	}
 
 	// Wait for threshold cosigners to be complete
-	// A Cosigner will either respond in time, or be cancelled with timeout
+	// A cosigner will either respond in time, or be cancelled with timeout
 	if waitUntilCompleteOrTimeout(&setEphemeralAndSignWaitGroup, 4*time.Second) {
 		return nil, stamp, errors.New("timed out waiting for peers to sign")
 	}

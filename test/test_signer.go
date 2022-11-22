@@ -250,7 +250,7 @@ func MakeTestSigners(
 	for i := 0; i < count; i++ {
 		ts := &TestSigner{
 			Home:           home,
-			Index:          i + 1, // +1 is to ensure all Cosigner IDs end up being >0 as required in cosigner.go
+			Index:          i + 1, // +1 is to ensure all cosigner IDs end up being >0 as required in cosigner.go
 			ValidatorIndex: validatorIndex,
 			Pool:           pool,
 			networkID:      networkID,

@@ -1,9 +1,6 @@
 package signer
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/codec/legacy"
 	"github.com/cosmos/cosmos-sdk/codec/types"
@@ -21,24 +18,6 @@ type NodeConfig struct {
 type CosignerConfig struct {
 	ID      int
 	Address string
-}
-
-type Config struct {
-	Mode              string
-	PrivValKeyFile    string
-	PrivValStateDir   string
-	ChainID           string
-	CosignerThreshold int
-	ListenAddress     string
-	Nodes             []NodeConfig
-	Cosigners         []CosignerConfig
-}
-
-func (cfg *Config) KeyFileExists() error {
-	if _, err := os.Stat(cfg.PrivValKeyFile); os.IsNotExist(err) {
-		return fmt.Errorf("private key share doesn't exist at path(%s)", cfg.PrivValKeyFile)
-	}
-	return nil
 }
 
 func PubKey(bech32BasePrefix string, pubKey crypto.PubKey) (string, error) {

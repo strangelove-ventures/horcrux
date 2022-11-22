@@ -6,12 +6,14 @@ import (
 	proto "github.com/strangelove-ventures/horcrux/signer/proto"
 )
 
+// HRSKey Height Round Step Key to keep track of ...?
 type HRSKey struct {
 	Height int64
 	Round  int64
 	Step   int8
 }
 
+// HRSTKey Height Round Step Time to keep track of ....?
 type HRSTKey struct {
 	Height    int64
 	Round     int64
@@ -19,6 +21,7 @@ type HRSTKey struct {
 	Timestamp int64
 }
 
+// HRSTKeyFromProto Gets TODO: Explain more
 func HRSTKeyFromProto(hrs *proto.HRST) HRSTKey {
 	return HRSTKey{
 		Height:    hrs.GetHeight(),
@@ -28,6 +31,7 @@ func HRSTKeyFromProto(hrs *proto.HRST) HRSTKey {
 	}
 }
 
+// toProto is a HRSTKey method that returns proto.HRST
 func (hrst HRSTKey) toProto() *proto.HRST {
 	return &proto.HRST{
 		Height:    hrst.Height,
@@ -37,8 +41,38 @@ func (hrst HRSTKey) toProto() *proto.HRST {
 	}
 }
 
+// Less is a HRSTKey method that return true if we are less than the other key
+func (hrst *HRSTKey) Less(other HRSTKey) bool {
+	if hrst.Height < other.Height {
+		return true
+	}
+
+	if hrst.Height > other.Height {
+		return false
+	}
+
+	// height is equal, check round
+
+	if hrst.Round < other.Round {
+		return true
+	}
+
+	if hrst.Round > other.Round {
+		return false
+	}
+
+	// round is equal, check step
+
+	if hrst.Step < other.Step {
+		return true
+	}
+
+	// HRS is greater or equal
+	return false
+}
+
 // CosignerSignRequest is sent to a co-signer to obtain their signature for the SignBytes
-// The SignBytes should be a serialized block
+// SignBytes should be a serialized block
 type CosignerSignRequest struct {
 	SignBytes []byte
 }
@@ -127,16 +161,16 @@ type CosignerSetEphemeralSecretPartsAndSignRequest struct {
 // Cosigner interface is a set of methods for an m-of-n threshold signature.
 // This interface abstracts the underlying key storage and management
 type Cosigner interface {
-	// Get the ID of the cosigner
+	// GetID gets the ID of the cosigner
 	// The ID is the shamir index: 1, 2, etc...
 	GetID() int
 
-	// Get the P2P URL (GRPC and Raft)
+	// GetAddress gets the P2P URL (GRPC and Raft)
 	GetAddress() string
 
-	// Get ephemeral secret part for all peers
+	// GetEphemeralSecretParts gets ephemeral secret part for all peers
 	GetEphemeralSecretParts(hrst HRSTKey) (*CosignerEphemeralSecretPartsResponse, error)
 
-	// Sign the requested bytes
+	// SetEphemeralSecretPartsAndSign sign the requested bytes
 	SetEphemeralSecretPartsAndSign(req CosignerSetEphemeralSecretPartsAndSignRequest) (*CosignerSignResponse, error)
 }

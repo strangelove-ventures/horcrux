@@ -74,6 +74,7 @@ func (softSigner *ThresholdSignerSoft) Sign(
 	if err != nil {
 		return res, err
 	}
+  
 	// If the HRS is the same the sign bytes may still differ by timestamp
 	// It is ok to re-sign a different timestamp if that is the only difference in the sign bytes
 	// same HRS, and only differ by timestamp  its ok to sign again
@@ -108,7 +109,6 @@ func (softSigner *ThresholdSignerSoft) Sign(
 	ephemeralPublic := tsed25519.AddElements(publicKeys)
 
 	// check bounds for ephemeral share to avoid passing out of bounds valids to SignWithShare
-
 	if len(ephemeralShare) != 32 {
 		return res, errors.New("ephemeral share is out of bounds")
 	}
@@ -129,14 +129,14 @@ func (softSigner *ThresholdSignerSoft) Sign(
 		Step:      hrst.Step,
 		Signature: sig,
 		SignBytes: req.SignBytes,
-	}, nil, true)
+	  }, nil, true)
 	if err != nil {
 		var isSameHRSError *SameHRSError
 		if !errors.As(err, &isSameHRSError) {
 			return res, err
 		}
 	}
-
+  
 	for existingKey := range softSigner.hrsMeta {
 		// delete any HRS lower than our signed level
 		// we will not be providing parts for any lower HRS
@@ -160,6 +160,7 @@ func (softSigner *ThresholdSignerSoft) DealShares(
 		Timestamp: req.Timestamp.UnixNano(),
 	}
 
+
 	meta, ok := softSigner.hrsMeta[hrsKey]
 	if ok {
 		return meta, nil
@@ -177,6 +178,7 @@ func (softSigner *ThresholdSignerSoft) DealShares(
 
 	// split this secret with shamirs
 	// !! dealt shares need to be saved because dealing produces different shares each time!
+
 	meta.DealtShares = tsed25519.DealShares(meta.Secret, softSigner.threshold, softSigner.total)
 
 	softSigner.hrsMeta[hrsKey] = meta
@@ -189,6 +191,7 @@ func (softSigner *ThresholdSignerSoft) DealShares(
 // Implements ThresholdSigner
 func (softSigner *ThresholdSignerSoft) GetEphemeralSecretPart(
 	req CosignerGetEphemeralSecretPartRequest, m *LastSignStateWrapper, peers map[int]CosignerPeer) (
+
 	CosignerEphemeralSecretPart, error) {
 
 	res := CosignerEphemeralSecretPart{}
@@ -205,6 +208,7 @@ func (softSigner *ThresholdSignerSoft) GetEphemeralSecretPart(
 	}
 
 	meta, ok := softSigner.hrsMeta[hrst]
+
 	// generate metadata placeholder
 	if !ok {
 		newMeta, err := softSigner.DealShares(CosignerGetEphemeralSecretPartRequest{
@@ -248,7 +252,7 @@ func (softSigner *ThresholdSignerSoft) GetEphemeralSecretPart(
 
 	// sign the response payload with our private key
 	// cosigners can verify the signature to confirm sender validity
-
+  
 	jsonBytes, err := tmjson.Marshal(res)
 
 	if err != nil {
@@ -257,7 +261,6 @@ func (softSigner *ThresholdSignerSoft) GetEphemeralSecretPart(
 
 	digest := sha256.Sum256(jsonBytes)
 	signature, err := rsa.SignPSS(rand.Reader, &softSigner.key.RSAKey, crypto.SHA256, digest[:], nil)
-
 	if err != nil {
 		return res, err
 	}
@@ -323,6 +326,7 @@ func (softSigner *ThresholdSignerSoft) SetEphemeralSecretPart(
 			Round:  req.Round,
 			Step:   req.Step,
 		})
+
 		if err != nil {
 			return err
 		}
@@ -339,6 +343,6 @@ func (softSigner *ThresholdSignerSoft) SetEphemeralSecretPart(
 	// Share & EphemeralSecretPublicKey is a SLICE so its a valid change of the shared struct softSigner!
 	meta.Peers[req.SourceID-1].Share = sharePart
 	meta.Peers[req.SourceID-1].EphemeralSecretPublicKey = req.SourceEphemeralSecretPublicKey
-
+  
 	return nil
 }
