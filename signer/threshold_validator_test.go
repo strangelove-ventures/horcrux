@@ -31,7 +31,6 @@ func getMockRaftStore(cosigner Cosigner, tmpDir string) *RaftStore {
 }
 
 func TestThresholdValidator2of2(t *testing.T) {
-	chainID := "test"
 	total := uint8(2)
 	threshold := uint8(2)
 
@@ -121,16 +120,15 @@ func TestThresholdValidator2of2(t *testing.T) {
 	proposal.Round = 0
 	proposal.Type = tmProto.ProposalType
 
-	signBytes := tm.ProposalSignBytes(chainID, &proposal)
+	signBytes := tm.ProposalSignBytes(testChainID, &proposal)
 
-	err = validator.SignProposal(chainID, &proposal)
+	err = validator.SignProposal(testChainID, &proposal)
 	require.NoError(t, err)
 
 	require.True(t, privateKey.PubKey().VerifySignature(signBytes, proposal.Signature))
 }
 
 func TestThresholdValidator3of3(t *testing.T) {
-	chainID := "test"
 	total := uint8(3)
 	threshold := uint8(3)
 
@@ -239,9 +237,9 @@ func TestThresholdValidator3of3(t *testing.T) {
 	proposal.Round = 0
 	proposal.Type = tmProto.ProposalType
 
-	signBytes := tm.ProposalSignBytes(chainID, &proposal)
+	signBytes := tm.ProposalSignBytes(testChainID, &proposal)
 
-	err = validator.SignProposal(chainID, &proposal)
+	err = validator.SignProposal(testChainID, &proposal)
 	if err != nil {
 		t.Logf("%v", err)
 	}
@@ -251,7 +249,6 @@ func TestThresholdValidator3of3(t *testing.T) {
 }
 
 func TestThresholdValidator2of3(t *testing.T) {
-	chainID := "test"
 	total := uint8(3)
 	threshold := uint8(2)
 
@@ -348,7 +345,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 		tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
 	)
 
-	err = validator.LoadSignStateIfNecessary(chainID)
+	err = validator.LoadSignStateIfNecessary(testChainID)
 	require.NoError(t, err)
 
 	raftStore.SetThresholdValidator(validator)
@@ -363,9 +360,9 @@ func TestThresholdValidator2of3(t *testing.T) {
 	proposal.Round = 0
 	proposal.Type = tmProto.ProposalType
 
-	signBytes := tm.ProposalSignBytes(chainID, &proposal)
+	signBytes := tm.ProposalSignBytes(testChainID, &proposal)
 
-	err = validator.SignProposal(chainID, &proposal)
+	err = validator.SignProposal(testChainID, &proposal)
 	if err != nil {
 		t.Logf("%v", err)
 	}

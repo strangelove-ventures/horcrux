@@ -209,7 +209,10 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *tmProt
 	return tmProtoPrivval.Message{Sum: msgSum}
 }
 
-func (rs *ReconnRemoteSigner) handleSignProposalRequest(chainID string, proposal *tmProto.Proposal) tmProtoPrivval.Message {
+func (rs *ReconnRemoteSigner) handleSignProposalRequest(
+	chainID string,
+	proposal *tmProto.Proposal,
+) tmProtoPrivval.Message {
 	msgSum := &tmProtoPrivval.Message_SignedProposalResponse{
 		SignedProposalResponse: &tmProtoPrivval.SignedProposalResponse{
 			Proposal: tmProto.Proposal{},

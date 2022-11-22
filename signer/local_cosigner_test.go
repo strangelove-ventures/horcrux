@@ -13,6 +13,8 @@ import (
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
+const testChainID = "test"
+
 func TestLocalCosignerGetID(t *testing.T) {
 	dummyPub := tmCryptoEd25519.PubKey{}
 
@@ -43,8 +45,6 @@ func TestLocalCosignerGetID(t *testing.T) {
 
 func TestLocalCosignerSign2of2(t *testing.T) {
 	// Test signing with a 2 of 2
-
-	chainID := "test"
 
 	total := uint8(2)
 	threshold := uint8(2)
@@ -103,10 +103,10 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		threshold,
 	)
 
-	err = cosigner1.LoadSignStateIfNecessary(chainID)
+	err = cosigner1.LoadSignStateIfNecessary(testChainID)
 	require.NoError(t, err)
 
-	err = cosigner2.LoadSignStateIfNecessary(chainID)
+	err = cosigner2.LoadSignStateIfNecessary(testChainID)
 	require.NoError(t, err)
 
 	require.Equal(t, cosigner1.GetID(), 1)
@@ -123,12 +123,12 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		Timestamp: now.UnixNano(),
 	}
 
-	ephemeralSharesFor2, err := cosigner1.GetEphemeralSecretParts(chainID, hrst)
+	ephemeralSharesFor2, err := cosigner1.GetEphemeralSecretParts(testChainID, hrst)
 	require.NoError(t, err)
 
 	publicKeys = append(publicKeys, ephemeralSharesFor2.EncryptedSecrets[0].SourceEphemeralSecretPublicKey)
 
-	ephemeralSharesFor1, err := cosigner2.GetEphemeralSecretParts(chainID, hrst)
+	ephemeralSharesFor1, err := cosigner2.GetEphemeralSecretParts(testChainID, hrst)
 	require.NoError(t, err)
 
 	t.Logf("Shares from 2: %d", len(ephemeralSharesFor1.EncryptedSecrets))
@@ -149,7 +149,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	signBytes := tm.VoteSignBytes("chain-id", &vote)
 
 	sigRes1, err := cosigner1.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
-		ChainID:          chainID,
+		ChainID:          testChainID,
 		EncryptedSecrets: ephemeralSharesFor1.EncryptedSecrets,
 		HRST:             hrst,
 		SignBytes:        signBytes,
@@ -157,7 +157,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	require.NoError(t, err)
 
 	sigRes2, err := cosigner2.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
-		ChainID:          chainID,
+		ChainID:          testChainID,
 		EncryptedSecrets: ephemeralSharesFor2.EncryptedSecrets,
 		HRST:             hrst,
 		SignBytes:        signBytes,
