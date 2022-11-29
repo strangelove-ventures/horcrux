@@ -15,13 +15,13 @@ type ThresholdSigner interface {
 
 	DealShares(req CosignerGetEphemeralSecretPartRequest) (HrsMetadata, error)
 
-	GetEphemeralSecretPart(req CosignerGetEphemeralSecretPartRequest, m *LastSignStateStruct,
+	GetEphemeralSecretPart(req CosignerGetEphemeralSecretPartRequest, m *LastSignStateWrapper,
 		peers map[int]CosignerPeer) (CosignerEphemeralSecretPart, error)
 
-	SetEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest, m *LastSignStateStruct,
+	SetEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest, m *LastSignStateWrapper,
 		peers map[int]CosignerPeer) error
 
-	Sign(req CosignerSignRequest, m *LastSignStateStruct) (CosignerSignResponse, error)
+	Sign(req CosignerSignRequest, m *LastSignStateWrapper) (CosignerSignResponse, error)
 
 	GetID() (int, error)
 }

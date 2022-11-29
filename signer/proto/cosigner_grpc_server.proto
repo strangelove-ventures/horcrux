@@ -9,6 +9,7 @@ service CosignerGRPC {
 	rpc SetEphemeralSecretPartsAndSign (CosignerGRPCSetEphemeralSecretPartsAndSignRequest) returns (CosignerGRPCSetEphemeralSecretPartsAndSignResponse) {}
   rpc GetEphemeralSecretParts (CosignerGRPCGetEphemeralSecretPartsRequest) returns (CosignerGRPCGetEphemeralSecretPartsResponse) {}
   rpc TransferLeadership (CosignerGRPCTransferLeadershipRequest) returns (CosignerGRPCTransferLeadershipResponse) {}
+  rpc GetLeader (CosignerGRPCGetLeaderRequest) returns (CosignerGRPCGetLeaderResponse) {}
 }
 
 message Block {
@@ -70,4 +71,10 @@ message CosignerGRPCTransferLeadershipRequest {
 message CosignerGRPCTransferLeadershipResponse {
   string leaderID = 1;
   string leaderAddress = 2;
+}
+
+message CosignerGRPCGetLeaderRequest {}
+
+message CosignerGRPCGetLeaderResponse {
+  string leader = 1;
 }

@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"io"
-	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -13,14 +12,11 @@ import (
 )
 
 func TestStateSetCmd(t *testing.T) {
-	tmpHome := "/tmp/TestStateSetCmd"
+	tmpHome := t.TempDir()
 	tmpConfig := filepath.Join(tmpHome, ".horcrux")
 	chainid := "horcrux-1"
 
-	err := os.Setenv("HOME", tmpHome)
-	require.NoError(t, err)
-	err = os.MkdirAll(tmpHome, 0777)
-	require.NoError(t, err)
+	t.Setenv("HOME", tmpHome)
 
 	cmd := initCmd()
 	cmd.SetOutput(io.Discard)
@@ -28,12 +24,13 @@ func TestStateSetCmd(t *testing.T) {
 		chainid,
 		"tcp://10.168.0.1:1234",
 		"-c",
+		"-t", "2",
 		"-p", "tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3",
 		"-l", "tcp://10.168.1.1:2222",
 		"-t", "2",
 		"--timeout", "1500ms",
 	})
-	err = cmd.Execute()
+	err := cmd.Execute()
 	require.NoError(t, err)
 
 	tcs := []struct {
@@ -90,8 +87,4 @@ func TestStateSetCmd(t *testing.T) {
 			}
 		})
 	}
-
-	t.Cleanup(func() {
-		os.RemoveAll(tmpHome)
-	})
 }

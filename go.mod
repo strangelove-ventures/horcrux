@@ -5,14 +5,14 @@ go 1.19
 require (
 	github.com/Jille/grpc-multi-resolver v1.1.0
 	github.com/Jille/raft-grpc-leader-rpc v1.1.0
-	github.com/Jille/raft-grpc-transport v1.2.0
+	github.com/Jille/raft-grpc-transport v1.2.1-0.20220914172309-2f253856eefc
 	github.com/Jille/raftadmin v1.2.0
 	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/cosmos/cosmos-sdk v0.44.5
 	github.com/gogo/protobuf v1.3.3
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
-	github.com/hashicorp/raft v1.3.3
-	github.com/hashicorp/raft-boltdb v0.0.0-20211202195631-7d34b9fb3f42
+	github.com/hashicorp/raft v1.3.10
+	github.com/hashicorp/raft-boltdb/v2 v2.2.2
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/ory/dockertest v3.3.5+incompatible
 	github.com/spf13/cobra v1.2.1
@@ -77,9 +77,11 @@ require (
 	github.com/gsterjov/go-libsecret v0.0.0-20161001094733-a6f4afe4910c // indirect
 	github.com/gtank/merlin v0.1.1 // indirect
 	github.com/gtank/ristretto255 v0.1.2 // indirect
+	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-hclog v0.16.2 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
 	github.com/hashicorp/go-msgpack v1.1.5 // indirect
+	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hdevalence/ed25519consensus v0.0.0-20210204194344-59a8610d2b87 // indirect

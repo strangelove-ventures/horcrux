@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/strangelove-ventures/horcrux/client"
 	"github.com/strangelove-ventures/horcrux/signer"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	"gopkg.in/yaml.v2"
@@ -75,7 +76,9 @@ func initCmd() *cobra.Command {
 			if keyFileFlag != "" {
 				keyFile = &keyFileFlag
 			}
+			debugAddr, _ := cmdFlags.GetString("debug-addr")
 			if cs {
+				// Cosigner Config
 				p, _ := cmdFlags.GetString("peers")
 				threshold, _ := cmdFlags.GetUint8("threshold")
 				timeout, _ := cmdFlags.GetString("timeout")
@@ -111,11 +114,13 @@ func initCmd() *cobra.Command {
 						Timeout:   timeout,
 					},
 					ChainNodes: cn,
+					DebugAddr:  debugAddr,
 				}
 				if err = validateCosignerConfig(cfg); err != nil {
 					return err
 				}
 			} else {
+				// Single Signer Config
 				if len(cn) == 0 {
 					return fmt.Errorf("must input at least one node")
 				}
@@ -123,6 +128,7 @@ func initCmd() *cobra.Command {
 					PrivValKeyFile: keyFile,
 					ChainID:        cid,
 					ChainNodes:     cn,
+					DebugAddr:      debugAddr,
 				}
 				if err = validateSingleSignerConfig(cfg); err != nil {
 					return err
@@ -163,6 +169,7 @@ func initCmd() *cobra.Command {
 		"(i.e. \"tcp://node-1:2222|2,tcp://node-2:2222|3\")")
 	cmd.Flags().Uint8P("threshold", "t", 0, "indicate number of signatures required for threshold signature")
 	cmd.Flags().StringP("listen", "l", "", "listen address of the signer")
+	cmd.Flags().StringP("debug-addr", "d", "", "listen address for Debug and Prometheus metrics in format localhost:8543")
 	cmd.Flags().StringP("keyfile", "k", "",
 		"priv val key file path (full key for single signer, or key share for cosigner)")
 	cmd.Flags().String("timeout", "1500ms", "configure cosigner rpc server timeout value, \n"+
@@ -191,9 +198,14 @@ func validateCosignerConfig(cfg DiskConfig) error {
 	if cfg.CosignerConfig == nil {
 		return fmt.Errorf("cosigner config can't be empty")
 	}
-	if float32(len(cfg.CosignerConfig.Peers))/float32(2) >= float32(cfg.CosignerConfig.Threshold) {
-		return fmt.Errorf("the threshold, t = (%d) must be greater than, 'peers/2' = (%.1f)",
-			cfg.CosignerConfig.Threshold, float32(len(cfg.CosignerConfig.Peers))/2)
+
+	if cfg.CosignerConfig.Threshold <= cfg.CosignerConfig.Shares/2 {
+		return fmt.Errorf("threshold (%d) must be greater than number of shares (%d) / 2",
+			cfg.CosignerConfig.Threshold, cfg.CosignerConfig.Shares)
+	}
+	if cfg.CosignerConfig.Shares < cfg.CosignerConfig.Threshold {
+		return fmt.Errorf("number of shares (%d) must be greater or equal to threshold (%d)",
+			cfg.CosignerConfig.Shares, cfg.CosignerConfig.Threshold)
 	}
 
 	_, err := time.ParseDuration(cfg.CosignerConfig.Timeout)
@@ -329,6 +341,7 @@ func addPeersCmd() *cobra.Command {
 				return errors.New("no new peer nodes in args")
 			}
 			diff = append(config.Config.CosignerConfig.Peers, diff...)
+			config.Config.CosignerConfig.Shares = len(diff) + 1
 			if err := validateCosignerPeers(diff, config.Config.CosignerConfig.Shares); err != nil {
 				return err
 			}
@@ -372,6 +385,8 @@ func removePeersCmd() *cobra.Command {
 			if len(diff) == 0 {
 				return errors.New("cannot remove all peer nodes from config, please leave at least one")
 			}
+
+			config.Config.CosignerConfig.Shares = len(diff) + 1
 			// If none of the peer nodes in the args are listed in the config, just continue
 			// without throwing an error, as the peer nodes in the config remain untouched.
 			if err := validateCosignerPeers(diff, config.Config.CosignerConfig.Shares); err != nil {
@@ -487,6 +502,7 @@ type DiskConfig struct {
 	ChainID        string          `json:"chain-id" yaml:"chain-id"`
 	CosignerConfig *CosignerConfig `json:"cosigner,omitempty" yaml:"cosigner,omitempty"`
 	ChainNodes     []ChainNode     `json:"chain-nodes,omitempty" yaml:"chain-nodes,omitempty"`
+	DebugAddr      string          `json:"debug-addr,omitempty" yaml:"debug-addr,omitempty"`
 }
 
 func (c *DiskConfig) Nodes() []signer.NodeConfig {
@@ -544,6 +560,15 @@ type CosignerConfig struct {
 	SignerType string         `json:"signer-type" yaml:"signer-type"`
 }
 
+func (cfg *CosignerConfig) LeaderElectMultiAddress() (string, error) {
+	addresses := make([]string, 1+len(cfg.Peers))
+	addresses[0] = cfg.P2PListen
+	for i, peer := range cfg.Peers {
+		addresses[i+1] = peer.P2PAddr
+	}
+	return client.MultiAddress(addresses)
+}
+
 func (c *DiskConfig) CosignerPeers() (out []signer.CosignerConfig) {
 	for _, p := range c.CosignerConfig.Peers {
 		out = append(out, signer.CosignerConfig{ID: p.ShareID, Address: p.P2PAddr})
@@ -599,11 +624,12 @@ func validateCosignerPeers(peers []CosignerPeer, shares uint8) error {
 		}
 	}
 
-	// Check that no more than {num-shares}-1 peers are in the peer list, assuming
+	// Check that exactly {num-shares}-1 peers are in the peer list, assuming
 	// the remaining peer ID is the ID the local node is configured with.
-	if len(peers) == int(shares) {
-		return fmt.Errorf("too many peers (%v+local node = %v) for the specified number of key shares (%v)",
-			len(peers), len(peers)+1, shares)
+
+	if len(peers) != shares-1 {
+		return fmt.Errorf("incorrect number of peers. expected (%d shares - local node = %d peers)",
+			shares, shares-1)
 	}
 	return nil
 }
