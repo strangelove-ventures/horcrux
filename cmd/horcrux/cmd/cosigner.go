@@ -120,20 +120,35 @@ func StartCosignerCmd() *cobra.Command {
 				pv       types.PrivValidator
 				chainID  = config.Config.ChainID
 				logger   = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator")
+				cfg      signer.Config
 			)
 
-			nodes := config.Config.Nodes()
-			cfgCosigners := config.Config.CosignerPeers()
+			// TODO: This should be abandon. Just complicates things
+			cfg = signer.Config{
+				Mode:              "mpc",
+				PrivValKeyFile:    config.keyFilePath(true),
+				PrivValStateDir:   config.StateDir,
+				ChainID:           config.Config.ChainID,
+				CosignerThreshold: config.Config.CosignerConfig.Threshold,
+				ListenAddress:     config.Config.CosignerConfig.P2PListen,
+				Nodes:             config.Config.Nodes(),
+				Cosigners:         config.Config.CosignerPeers(),
+			}
+
+			if err = cfg.KeyFileExists(); err != nil {
+				return err
+			}
 
 			// Initialize the localsigner (ThresholdEdSignature) of choice.
 			key, thresholdSigner, err := config.Config.KeyAndThresholdSigner(logger)
 			if err != nil {
-				return (err)
+				return fmt.Errorf("error reading cosigner key and or the ThresholdSigner: %s", err)
 			}
 
 			logger.Info("Tendermint Validator",
-				"mode", "mpc",
-				"priv-state-dir", config.StateDir,
+				"mode", cfg.Mode,
+				"priv-key", cfg.PrivValKeyFile,
+				"priv-state-dir", cfg.PrivValStateDir,
 				"threshold-signer", thresholdSigner.Type())
 
 			var val types.PrivValidator
@@ -142,7 +157,7 @@ func StartCosignerCmd() *cobra.Command {
 			// protects against double sign - this exists as a cache for the final signature
 			signState, err := signer.LoadOrCreateSignState(config.privValStateFile(chainID))
 			if err != nil {
-				return err
+				panic(err)
 			}
 
 			// state for our cosigner share
@@ -152,7 +167,7 @@ func StartCosignerCmd() *cobra.Command {
 				panic(err)
 			}
 
-			var cosigners []signer.Cosigner
+			cosigners := []signer.Cosigner{}
 
 			// add ourselves as a peer so localcosigner can handle GetEphSecPart requests
 			peers := []signer.CosignerPeer{{
@@ -160,7 +175,7 @@ func StartCosignerCmd() *cobra.Command {
 				PublicKey: key.RSAKey.PublicKey,
 			}}
 
-			for _, cosignerConfig := range cfgCosigners {
+			for _, cosignerConfig := range cfg.Cosigners {
 				cosigner := signer.NewRemoteCosigner(cosignerConfig.ID, cosignerConfig.Address)
 				cosigners = append(cosigners, cosigner)
 
@@ -175,12 +190,18 @@ func StartCosignerCmd() *cobra.Command {
 				})
 			}
 
-			// Initialize the localCosigner. The localCosigner "embeds" the local signer
-			localCosigner := signer.NewLocalCosigner(
-				config.Config.CosignerConfig.P2PListen,
-				peers, &shareSignState,
-				thresholdSigner,
-			)
+			total := len(cfg.Cosigners) + 1
+			localCosignerConfig := signer.LocalCosignerConfig{
+				CosignerKey: key,
+				SignState:   &shareSignState,
+				RsaKey:      key.RSAKey,
+				Address:     cfg.ListenAddress,
+				Peers:       peers,
+				Total:       uint8(total),
+				Threshold:   uint8(cfg.CosignerThreshold),
+			}
+
+			localCosigner := signer.NewLocalCosigner(localCosignerConfig.Address, localCosignerConfig.Peers, localCosignerConfig.SignState, thresholdSigner)
 
 			timeout, err := time.ParseDuration(config.Config.CosignerConfig.Timeout)
 			if err != nil {
@@ -197,7 +218,7 @@ func StartCosignerCmd() *cobra.Command {
 
 			// Start RAFT store listener
 			raftStore := signer.NewRaftStore(nodeID,
-				raftDir, config.Config.CosignerConfig.P2PListen, timeout, logger, localCosigner, cosigners)
+				raftDir, cfg.ListenAddress, timeout, logger, localCosigner, cosigners)
 			if err := raftStore.Start(); err != nil {
 				log.Fatalf("Error starting raft store: %v\n", err)
 			}
@@ -206,7 +227,7 @@ func StartCosignerCmd() *cobra.Command {
 			// Initialize the Threshold validator. The Threshold validator "embeds" the local cosigner
 			val = signer.NewThresholdValidator(&signer.ThresholdValidatorOpt{
 				Pubkey:    key.PubKey,
-				Threshold: int(config.Config.CosignerConfig.Threshold),
+				Threshold: int(cfg.CosignerThreshold),
 				SignState: signState,
 				Cosigner:  localCosigner,
 				Peers:     cosigners,

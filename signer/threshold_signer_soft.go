@@ -74,7 +74,7 @@ func (softSigner *ThresholdSignerSoft) Sign(
 	if err != nil {
 		return res, err
 	}
-  
+
 	// If the HRS is the same the sign bytes may still differ by timestamp
 	// It is ok to re-sign a different timestamp if that is the only difference in the sign bytes
 	// same HRS, and only differ by timestamp  its ok to sign again
@@ -129,14 +129,14 @@ func (softSigner *ThresholdSignerSoft) Sign(
 		Step:      hrst.Step,
 		Signature: sig,
 		SignBytes: req.SignBytes,
-	  }, nil, true)
+	}, nil, true)
 	if err != nil {
 		var isSameHRSError *SameHRSError
 		if !errors.As(err, &isSameHRSError) {
 			return res, err
 		}
 	}
-  
+
 	for existingKey := range softSigner.hrsMeta {
 		// delete any HRS lower than our signed level
 		// we will not be providing parts for any lower HRS
@@ -159,7 +159,6 @@ func (softSigner *ThresholdSignerSoft) DealShares(
 		Step:      req.Step,
 		Timestamp: req.Timestamp.UnixNano(),
 	}
-
 
 	meta, ok := softSigner.hrsMeta[hrsKey]
 	if ok {
@@ -252,7 +251,7 @@ func (softSigner *ThresholdSignerSoft) GetEphemeralSecretPart(
 
 	// sign the response payload with our private key
 	// cosigners can verify the signature to confirm sender validity
-  
+
 	jsonBytes, err := tmjson.Marshal(res)
 
 	if err != nil {
@@ -343,6 +342,6 @@ func (softSigner *ThresholdSignerSoft) SetEphemeralSecretPart(
 	// Share & EphemeralSecretPublicKey is a SLICE so its a valid change of the shared struct softSigner!
 	meta.Peers[req.SourceID-1].Share = sharePart
 	meta.Peers[req.SourceID-1].EphemeralSecretPublicKey = req.SourceEphemeralSecretPublicKey
-  
+
 	return nil
 }

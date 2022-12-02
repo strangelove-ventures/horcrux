@@ -21,20 +21,20 @@ func (hsmSigner *ThresholdSignerHSM) DealShares(
 
 // Implements ThresholdSigner
 func (hsmSigner *ThresholdSignerHSM) SetEphemeralSecretPart(
-	req CosignerSetEphemeralSecretPartRequest, m *LastSignStateStruct, peers map[int]CosignerPeer) error {
+	req CosignerSetEphemeralSecretPartRequest, m *LastSignStateWrapper, peers map[int]CosignerPeer) error {
 	panic("Not Implemented")
 }
 
 // Implements ThresholdSigner
 func (hsmSigner *ThresholdSignerHSM) GetEphemeralSecretPart(
-	req CosignerGetEphemeralSecretPartRequest, m *LastSignStateStruct, peers map[int]CosignerPeer) (
+	req CosignerGetEphemeralSecretPartRequest, m *LastSignStateWrapper, peers map[int]CosignerPeer) (
 	CosignerEphemeralSecretPart, error) {
 	panic("Not Implemented")
 }
 
 // Implements ThresholdSigner
 func (hsmSigner *ThresholdSignerHSM) Sign(
-	req CosignerSignRequest, m *LastSignStateStruct) (CosignerSignResponse, error) {
+	req CosignerSignRequest, m *LastSignStateWrapper) (CosignerSignResponse, error) {
 	panic("Not Implemented")
 }
 
