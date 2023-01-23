@@ -15,7 +15,7 @@ jobs:
       github.event_name == 'issues' && (github.event.action == 'opened' || github.event.action == 'reopened')
     steps:
       - name: Add Issue to "Motherboard" Project Board
-        uses: leonsteinhaeuser/project-beta-automations@v1.2.1
+        uses: leonsteinhaeuser/project-beta-automations@v2.0.1
         with:
           gh_app_secret_key: ${{ secrets.MB_SECRET_KEY }}
           gh_app_ID: ${{ secrets.MB_APP_ID }}
