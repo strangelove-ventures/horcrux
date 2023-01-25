@@ -153,8 +153,10 @@ func (signState *SignState) save() {
 	if outFile == "" {
 		panic("cannot save SignState: filePath not set")
 	}
+	fmt.Println("signState:", signState)
 	jsonBytes, err := tmjson.MarshalIndent(signState, "", "  ")
 	if err != nil {
+		fmt.Println("Panic", err)
 		panic(err)
 	}
 	err = tempfile.WriteFileAtomic(outFile, jsonBytes, 0600)
