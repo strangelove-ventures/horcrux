@@ -69,22 +69,13 @@ type CosignerGetEphemeralSecretPartRequest struct {
 	Timestamp time.Time
 }
 
-type LocalCosignerConfig struct {
-	CosignerKey CosignerKey
-	SignState   *SignState
-	RsaKey      rsa.PrivateKey
-	Peers       []CosignerPeer
-	Address     string
-	RaftAddress string
-	Total       uint8
-	Threshold   uint8
-}
-
 // LocalCosigner responds to sign requests using their share key
 // The cosigner maintains a watermark to avoid double-signing
 //
 // LocalCosigner signing is thread saafe
 type LocalCosigner struct {
+	config *RuntimeConfig
+
 	pubKeyBytes []byte
 	key         CosignerKey
 	rsaKey      rsa.PrivateKey
@@ -109,30 +100,34 @@ func (cosigner *LocalCosigner) SaveLastSignedState(signState SignStateConsensus)
 	return cosigner.lastSignState.Save(signState, &cosigner.lastSignStateMutex, true)
 }
 
-func NewLocalCosigner(cfg LocalCosignerConfig) *LocalCosigner {
+func NewLocalCosigner(
+	config *RuntimeConfig,
+	cosignerKey CosignerKey,
+	signState *SignState,
+	rsaKey rsa.PrivateKey,
+	peers []CosignerPeer,
+	address string,
+	total uint8,
+	threshold uint8,
+) *LocalCosigner {
 	cosigner := &LocalCosigner{
-		key:           cfg.CosignerKey,
-		lastSignState: cfg.SignState,
-		rsaKey:        cfg.RsaKey,
+		config:        config,
+		key:           cosignerKey,
+		lastSignState: signState,
+		rsaKey:        rsaKey,
 		hrsMeta:       make(map[HRSTKey]HrsMetadata),
 		peers:         make(map[int]CosignerPeer),
-		total:         cfg.Total,
-		threshold:     cfg.Threshold,
-		address:       cfg.Address,
+		total:         total,
+		threshold:     threshold,
+		address:       address,
 	}
 
-	for _, peer := range cfg.Peers {
+	for _, peer := range peers {
 		cosigner.peers[peer.ID] = peer
 	}
 
 	// cache the public key bytes for signing operations
-	switch ed25519Key := cosigner.key.PubKey.(type) {
-	case tmcryptoed25519.PubKey:
-		cosigner.pubKeyBytes = make([]byte, len(ed25519Key))
-		copy(cosigner.pubKeyBytes, ed25519Key[:])
-	default:
-		panic("Not an ed25519 public key")
-	}
+	cosigner.pubKeyBytes = cosigner.key.PubKey.(tmcryptoed25519.PubKey)[:]
 
 	return cosigner
 }

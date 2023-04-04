@@ -45,12 +45,12 @@ func addressCmd() *cobra.Command {
 		SilenceUsage: true,
 		Args:         cobra.RangeArgs(0, 1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			err = validateCosignerConfig(config.Config)
+			err = config.Config.ValidateCosignerConfig()
 			if err != nil {
 				return
 			}
 
-			key, err := signer.LoadCosignerKey(config.keyFilePath(true))
+			key, err := signer.LoadCosignerKey(config.KeyFilePath(true))
 			if err != nil {
 				return fmt.Errorf("error reading cosigner key: %s", err)
 			}
@@ -105,13 +105,12 @@ func startCosignerCmd() *cobra.Command {
 		Short:        "Start cosigner process",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			if err = signer.RequireNotRunning(config.PidFile); err != nil {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := signer.RequireNotRunning(config.PidFile); err != nil {
 				return err
 			}
 
-			err = validateCosignerConfig(config.Config)
-			if err != nil {
+			if err := config.Config.ValidateCosignerConfig(); err != nil {
 				return err
 			}
 
@@ -119,46 +118,33 @@ func startCosignerCmd() *cobra.Command {
 				// services to stop on shutdown
 				services []tmService.Service
 				pv       types.PrivValidator
-				chainID  = config.Config.ChainID
 				logger   = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator")
-				cfg      signer.Config
 			)
 
-			cfg = signer.Config{
-				Mode:              "mpc",
-				PrivValKeyFile:    config.keyFilePath(true),
-				PrivValStateDir:   config.StateDir,
-				ChainID:           config.Config.ChainID,
-				CosignerThreshold: config.Config.CosignerConfig.Threshold,
-				ListenAddress:     config.Config.CosignerConfig.P2PListen,
-				Nodes:             config.Config.Nodes(),
-				Cosigners:         config.Config.CosignerPeers(),
-			}
-
-			if err = cfg.KeyFileExists(); err != nil {
+			if err := config.KeyFileExists(true); err != nil {
 				return err
 			}
 
-			logger.Info("Tendermint Validator", "mode", cfg.Mode,
-				"priv-key", cfg.PrivValKeyFile, "priv-state-dir", cfg.PrivValStateDir)
+			logger.Info("Tendermint Validator", "mode", "threshold",
+				"priv-key", config.Config.PrivValKeyFile, "priv-state-dir", config.StateDir)
 
 			var val types.PrivValidator
 
-			key, err := signer.LoadCosignerKey(cfg.PrivValKeyFile)
+			key, err := signer.LoadCosignerKey(config.KeyFilePath(true))
 			if err != nil {
 				return fmt.Errorf("error reading cosigner key: %s", err)
 			}
 
 			// ok to auto initialize on disk since the cosigner share is the one that actually
 			// protects against double sign - this exists as a cache for the final signature
-			signState, err := signer.LoadOrCreateSignState(config.privValStateFile(chainID))
+			signState, err := signer.LoadOrCreateSignState(config.PrivValStateFile(config.Config.ChainID))
 			if err != nil {
 				panic(err)
 			}
 
 			// state for our cosigner share
 			// Not automatically initialized on disk to avoid double sign risk
-			shareSignState, err := signer.LoadSignState(config.shareStateFile(chainID))
+			shareSignState, err := signer.LoadSignState(config.ShareStateFile(config.Config.ChainID))
 			if err != nil {
 				panic(err)
 			}
@@ -171,37 +157,39 @@ func startCosignerCmd() *cobra.Command {
 				PublicKey: key.RSAKey.PublicKey,
 			}}
 
-			for _, cosignerConfig := range cfg.Cosigners {
-				cosigner := signer.NewRemoteCosigner(cosignerConfig.ID, cosignerConfig.Address)
+			for _, cosignerParams := range config.Config.CosignerPeers() {
+				cosigner := signer.NewRemoteCosigner(cosignerParams.ID, cosignerParams.Address)
 				cosigners = append(cosigners, cosigner)
 
-				if cosignerConfig.ID < 1 || cosignerConfig.ID > len(key.CosignerKeys) {
-					log.Fatalf("Unexpected cosigner ID %d", cosignerConfig.ID)
+				if cosignerParams.ID < 1 || cosignerParams.ID > len(key.CosignerKeys) {
+					log.Fatalf("Unexpected cosigner ID %d", cosignerParams.ID)
 				}
 
-				pubKey := key.CosignerKeys[cosignerConfig.ID-1]
+				pubKey := key.CosignerKeys[cosignerParams.ID-1]
 				peers = append(peers, signer.CosignerPeer{
 					ID:        cosigner.GetID(),
 					PublicKey: *pubKey,
 				})
 			}
 
-			total := len(cfg.Cosigners) + 1
-			localCosignerConfig := signer.LocalCosignerConfig{
-				CosignerKey: key,
-				SignState:   &shareSignState,
-				RsaKey:      key.RSAKey,
-				Address:     cfg.ListenAddress,
-				Peers:       peers,
-				Total:       uint8(total),
-				Threshold:   uint8(cfg.CosignerThreshold),
-			}
+			cosignerConfig := config.Config.CosignerConfig
 
-			localCosigner := signer.NewLocalCosigner(localCosignerConfig)
+			total := len(cosignerConfig.Peers) + 1
 
-			timeout, err := time.ParseDuration(config.Config.CosignerConfig.Timeout)
+			localCosigner := signer.NewLocalCosigner(
+				&config,
+				key,
+				&shareSignState,
+				key.RSAKey,
+				peers,
+				cosignerConfig.P2PListen,
+				uint8(total),
+				uint8(cosignerConfig.Threshold),
+			)
+
+			timeout, err := time.ParseDuration(cosignerConfig.Timeout)
 			if err != nil {
-				log.Fatalf("Error parsing configured timeout: %s. %v\n", config.Config.CosignerConfig.Timeout, err)
+				log.Fatalf("Error parsing configured timeout: %s. %v\n", cosignerConfig.Timeout, err)
 			}
 
 			raftDir := filepath.Join(config.HomeDir, "raft")
@@ -214,21 +202,22 @@ func startCosignerCmd() *cobra.Command {
 
 			// Start RAFT store listener
 			raftStore := signer.NewRaftStore(nodeID,
-				raftDir, cfg.ListenAddress, timeout, logger, localCosigner, cosigners)
+				raftDir, cosignerConfig.P2PListen, timeout, logger, localCosigner, cosigners)
 			if err := raftStore.Start(); err != nil {
 				log.Fatalf("Error starting raft store: %v\n", err)
 			}
 			services = append(services, raftStore)
 
-			val = signer.NewThresholdValidator(&signer.ThresholdValidatorOpt{
-				Pubkey:    key.PubKey,
-				Threshold: cfg.CosignerThreshold,
-				SignState: signState,
-				Cosigner:  localCosigner,
-				Peers:     cosigners,
-				RaftStore: raftStore,
-				Logger:    logger,
-			})
+			val = signer.NewThresholdValidator(
+				&config,
+				key.PubKey,
+				signState,
+				cosignerConfig.Threshold,
+				localCosigner,
+				cosigners,
+				raftStore,
+				logger,
+			)
 
 			raftStore.SetThresholdValidator(val.(*signer.ThresholdValidator))
 
@@ -242,7 +231,7 @@ func startCosignerCmd() *cobra.Command {
 
 			go EnableDebugAndMetrics(cmd.Context())
 
-			services, err = signer.StartRemoteSigners(services, logger, cfg.ChainID, pv, cfg.Nodes)
+			services, err = signer.StartRemoteSigners(&config, services, logger, pv, config.Config.Nodes())
 			if err != nil {
 				panic(err)
 			}

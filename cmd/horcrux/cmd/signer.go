@@ -54,36 +54,25 @@ func startSignerCmd() *cobra.Command {
 				return err
 			}
 
-			err = validateSingleSignerConfig(config.Config)
-			if err != nil {
+			if err := config.Config.ValidateSingleSignerConfig(); err != nil {
 				return err
 			}
 
 			var (
 				// services to stop on shutdown
 				services []tmService.Service
-				pv       types.PrivValidator
-				chainID  = config.Config.ChainID
 				logger   = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator")
-				cfg      signer.Config
 			)
 
-			cfg = signer.Config{
-				Mode:            "single",
-				PrivValKeyFile:  config.keyFilePath(false),
-				PrivValStateDir: config.StateDir,
-				ChainID:         config.Config.ChainID,
-				Nodes:           config.Config.Nodes(),
-			}
-
-			if err = cfg.KeyFileExists(); err != nil {
+			if err := config.KeyFileExists(false); err != nil {
 				return err
 			}
 
-			logger.Info("Tendermint Validator", "mode", cfg.Mode,
-				"priv-key", cfg.PrivValKeyFile, "priv-state-dir", cfg.PrivValStateDir)
+			logger.Info("Tendermint Validator", "mode", "single-signer",
+				"priv-key", config.Config.PrivValKeyFile, "priv-state-dir", config.StateDir)
 
-			stateFile := config.privValStateFile(chainID)
+			keyFile := config.KeyFilePath(false)
+			stateFile := config.PrivValStateFile(config.Config.ChainID)
 
 			var val types.PrivValidator
 
@@ -93,12 +82,12 @@ func startSignerCmd() *cobra.Command {
 				}
 				// The only scenario in which we want to initialize a new state file
 				// is when the state file does not exist.
-				val = privval.LoadFilePVEmptyState(cfg.PrivValKeyFile, stateFile)
+				val = privval.LoadFilePVEmptyState(keyFile, stateFile)
 			} else {
-				val = privval.LoadFilePV(cfg.PrivValKeyFile, stateFile)
+				val = privval.LoadFilePV(keyFile, stateFile)
 			}
 
-			pv = &signer.PvGuard{
+			pv := &signer.PvGuard{
 				PrivValidator: val,
 			}
 
@@ -110,7 +99,7 @@ func startSignerCmd() *cobra.Command {
 
 			go EnableDebugAndMetrics(cmd.Context())
 
-			services, err = signer.StartRemoteSigners(services, logger, cfg.ChainID, pv, cfg.Nodes)
+			services, err = signer.StartRemoteSigners(&config, services, logger, pv, config.Config.Nodes())
 			if err != nil {
 				panic(err)
 			}

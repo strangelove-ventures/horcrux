@@ -22,8 +22,9 @@ import (
 type ReconnRemoteSigner struct {
 	tmService.BaseService
 
+	config *RuntimeConfig
+
 	address string
-	chainID string
 	privKey tmCryptoEd2219.PrivKey
 	privVal tm.PrivValidator
 
@@ -36,15 +37,15 @@ type ReconnRemoteSigner struct {
 //
 // If the connection is broken, the ReconnRemoteSigner will attempt to reconnect.
 func NewReconnRemoteSigner(
+	config *RuntimeConfig,
 	address string,
 	logger tmLog.Logger,
-	chainID string,
 	privVal tm.PrivValidator,
 	dialer net.Dialer,
 ) *ReconnRemoteSigner {
 	rs := &ReconnRemoteSigner{
+		config:  config,
 		address: address,
-		chainID: chainID,
 		privVal: privVal,
 		dialer:  dialer,
 		privKey: tmCryptoEd2219.GenPrivKey(),
@@ -146,7 +147,7 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(vote *tmProto.Vote) tmProtoP
 		Vote:  tmProto.Vote{},
 		Error: nil,
 	}}
-	if err := rs.privVal.SignVote(rs.chainID, vote); err != nil {
+	if err := rs.privVal.SignVote(rs.config.Config.ChainID, vote); err != nil {
 		switch typedErr := err.(type) {
 		case *BeyondBlockError:
 			rs.Logger.Debug("Rejecting sign vote request", "reason", typedErr.msg)
@@ -212,7 +213,7 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(proposal *tmProto.Propos
 			Proposal: tmProto.Proposal{},
 			Error:    nil,
 		}}
-	if err := rs.privVal.SignProposal(rs.chainID, proposal); err != nil {
+	if err := rs.privVal.SignProposal(rs.config.Config.ChainID, proposal); err != nil {
 		switch typedErr := err.(type) {
 		case *BeyondBlockError:
 			rs.Logger.Debug("Rejecting proposal sign request", "reason", typedErr.msg)
@@ -268,8 +269,8 @@ func getRemoteSignerError(err error) *tmProtoPrivval.RemoteSignerError {
 	}
 }
 
-func StartRemoteSigners(services []tmService.Service, logger tmLog.Logger, chainID string,
-	privVal tm.PrivValidator, nodes []NodeConfig) ([]tmService.Service, error) {
+func StartRemoteSigners(config *RuntimeConfig, services []tmService.Service, logger tmLog.Logger,
+	privVal tm.PrivValidator, nodes []string) ([]tmService.Service, error) {
 	var err error
 	go StartMetrics()
 	for _, node := range nodes {
@@ -277,7 +278,7 @@ func StartRemoteSigners(services []tmService.Service, logger tmLog.Logger, chain
 		// A long timeout such as 30 seconds would cause the sentry to fail in loops
 		// Use a short timeout and dial often to connect within 3 second window
 		dialer := net.Dialer{Timeout: 2 * time.Second}
-		s := NewReconnRemoteSigner(node.Address, logger, chainID, privVal, dialer)
+		s := NewReconnRemoteSigner(config, node, logger, privVal, dialer)
 
 		err = s.Start()
 		if err != nil {

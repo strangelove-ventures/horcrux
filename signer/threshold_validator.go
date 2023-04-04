@@ -18,9 +18,11 @@ import (
 )
 
 type ThresholdValidator struct {
+	config *RuntimeConfig
+
 	threshold int
 
-	pubkey crypto.PubKey
+	pubKey crypto.PubKey
 
 	// stores the last sign state for a block we have fully signed
 	// Cached to respond to SignVote requests if we already have a signature
@@ -42,36 +44,34 @@ type ThresholdValidator struct {
 	logger log.Logger
 }
 
-type ThresholdValidatorOpt struct {
-	Pubkey    crypto.PubKey
-	Threshold int
-	SignState SignState
-	Cosigner  Cosigner
-	Peers     []Cosigner
-	RaftStore *RaftStore
-	Logger    log.Logger
-}
-
 // NewThresholdValidator creates and returns a new ThresholdValidator
-func NewThresholdValidator(opt *ThresholdValidatorOpt) *ThresholdValidator {
-	validator := &ThresholdValidator{}
-	validator.cosigner = opt.Cosigner
-	validator.peers = opt.Peers
-	validator.threshold = opt.Threshold
-	validator.pubkey = opt.Pubkey
-	validator.lastSignState = opt.SignState
-	validator.lastSignStateMutex = sync.Mutex{}
-	validator.lastSignStateInitiated = SignState{
-		Height:   opt.SignState.Height,
-		Round:    opt.SignState.Round,
-		Step:     opt.SignState.Step,
-		filePath: "none",
-		cache:    make(map[HRSKey]SignStateConsensus),
+func NewThresholdValidator(
+	config *RuntimeConfig,
+	pubKey crypto.PubKey,
+	signState SignState,
+	threshold int,
+	cosigner Cosigner,
+	peers []Cosigner,
+	raftStore *RaftStore,
+	logger log.Logger,
+) *ThresholdValidator {
+	return &ThresholdValidator{
+		config:        config,
+		cosigner:      cosigner,
+		peers:         peers,
+		threshold:     threshold,
+		pubKey:        pubKey,
+		raftStore:     raftStore,
+		logger:        logger,
+		lastSignState: signState,
+		lastSignStateInitiated: SignState{
+			Height:   signState.Height,
+			Round:    signState.Round,
+			Step:     signState.Step,
+			filePath: "none",
+			cache:    make(map[HRSKey]SignStateConsensus),
+		},
 	}
-	validator.lastSignStateInitiatedMutex = sync.Mutex{}
-	validator.raftStore = opt.RaftStore
-	validator.logger = opt.Logger
-	return validator
 }
 
 func (pv *ThresholdValidator) SaveLastSignedState(signState SignStateConsensus) error {
@@ -85,7 +85,7 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(signState SignStateCo
 // GetPubKey returns the public key of the validator.
 // Implements PrivValidator.
 func (pv *ThresholdValidator) GetPubKey() (crypto.PubKey, error) {
-	return pv.pubkey, nil
+	return pv.pubKey, nil
 }
 
 // SignVote signs a canonical representation of the vote, along with the
@@ -466,7 +466,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	signature = append(signature, combinedSig...)
 
 	// verify the combined signature before saving to watermark
-	if !pv.pubkey.VerifySignature(signBytes, signature) {
+	if !pv.pubKey.VerifySignature(signBytes, signature) {
 		totalInvalidSignature.Inc()
 		return nil, stamp, errors.New("combined signature is not valid")
 	}
