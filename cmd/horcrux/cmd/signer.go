@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -62,8 +63,23 @@ func startSignerCmd() *cobra.Command {
 			logger.Info("Tendermint Validator", "mode", cfg.Mode,
 				"priv-key", cfg.PrivValKeyFile, "priv-state-dir", cfg.PrivValStateDir)
 
+			stateFile := config.privValStateFile(chainID)
+
+			var val types.PrivValidator
+
+			if _, err := os.Stat(stateFile); err != nil {
+				if os.IsNotExist(err) {
+					// This is the only scenario in which we want to initialize a new state file.
+					val = privval.LoadFilePVEmptyState(cfg.PrivValKeyFile, stateFile)
+				} else {
+					panic(fmt.Errorf("failed to load state file: %s", stateFile))
+				}
+			} else {
+				val = privval.LoadFilePV(cfg.PrivValKeyFile, stateFile)
+			}
+
 			pv = &signer.PvGuard{
-				PrivValidator: privval.LoadFilePVEmptyState(cfg.PrivValKeyFile, config.privValStateFile(chainID)),
+				PrivValidator: val,
 			}
 
 			pubkey, err := pv.GetPubKey()
