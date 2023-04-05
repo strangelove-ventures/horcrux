@@ -139,13 +139,11 @@ func initCmd() *cobra.Command {
 				return err
 			}
 
-			// initialize state/{chainid}_priv_validator_state.json file
-			if _, err = signer.LoadOrCreateSignState(config.privValStateFile(cid)); err != nil {
-				return err
-			}
-
-			// if node is a cosigner initialize state/{chainid}_priv_validator_state.json file
+			// if node is a cosigner initialize state files
 			if cs {
+				if _, err = signer.LoadOrCreateSignState(config.privValStateFile(cid)); err != nil {
+					return err
+				}
 				if _, err = signer.LoadOrCreateSignState(config.shareStateFile(cid)); err != nil {
 					return err
 				}
