@@ -69,7 +69,7 @@ func startSignerCmd() *cobra.Command {
 				return err
 			}
 
-			fmt.Println(singleSignerWarning)
+			fmt.Fprintln(cmd.OutOrStdout(), singleSignerWarning)
 
 			logger.Info("Tendermint Validator", "mode", cfg.Mode,
 				"priv-key", cfg.PrivValKeyFile, "priv-state-dir", cfg.PrivValStateDir)
