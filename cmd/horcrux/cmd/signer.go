@@ -13,6 +13,15 @@ import (
 	"github.com/tendermint/tendermint/types"
 )
 
+const singleSignerWarning = `@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@ WARNING: SINGLE-SIGNER MODE SHOULD NOT BE USED FOR MAINNET! @
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+Horcrux single-signer mode does not give the level of improved 
+key security and fault tolerance that Horcrux MPC/cosigner mode
+provides. While it is a simpler deployment configuration, 
+single-signer should only be used for experimentation
+as it is not officially supported by Strangelove.`
+
 func signerCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "signer",
@@ -60,6 +69,8 @@ func startSignerCmd() *cobra.Command {
 				return err
 			}
 
+			fmt.Println(singleSignerWarning)
+
 			logger.Info("Tendermint Validator", "mode", cfg.Mode,
 				"priv-key", cfg.PrivValKeyFile, "priv-state-dir", cfg.PrivValStateDir)
 
@@ -68,12 +79,12 @@ func startSignerCmd() *cobra.Command {
 			var val types.PrivValidator
 
 			if _, err := os.Stat(stateFile); err != nil {
-				if os.IsNotExist(err) {
-					// This is the only scenario in which we want to initialize a new state file.
-					val = privval.LoadFilePVEmptyState(cfg.PrivValKeyFile, stateFile)
-				} else {
+				if !os.IsNotExist(err) {
 					panic(fmt.Errorf("failed to load state file: %s", stateFile))
 				}
+				// The only scenario in which we want to initialize a new state file
+				// is when the state file does not exist.
+				val = privval.LoadFilePVEmptyState(cfg.PrivValKeyFile, stateFile)
 			} else {
 				val = privval.LoadFilePV(cfg.PrivValKeyFile, stateFile)
 			}
