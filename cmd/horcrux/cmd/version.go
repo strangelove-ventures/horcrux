@@ -35,10 +35,6 @@ var (
 	TMVersion = ""
 )
 
-func init() {
-	rootCmd.AddCommand(versionCmd)
-}
-
 // Info defines the application version information.
 type Info struct {
 	Version           string `json:"version" yaml:"version"`
@@ -67,16 +63,18 @@ func NewInfo() Info {
 }
 
 // versionCmd represents the version command
-var versionCmd = &cobra.Command{
-	Use:          "version",
-	Short:        "Version information for horcrux",
-	SilenceUsage: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		bz, err := json.MarshalIndent(NewInfo(), "", "  ")
-		if err != nil {
-			return err
-		}
-		cmd.Println(string(bz))
-		return nil
-	},
+func versionCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:          "version",
+		Short:        "Version information for horcrux",
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			bz, err := json.MarshalIndent(NewInfo(), "", "  ")
+			if err != nil {
+				return err
+			}
+			cmd.Println(string(bz))
+			return nil
+		},
+	}
 }
