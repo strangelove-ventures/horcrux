@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -10,6 +11,19 @@ import (
 	tmService "github.com/tendermint/tendermint/libs/service"
 	"github.com/tendermint/tendermint/privval"
 	"github.com/tendermint/tendermint/types"
+)
+
+const (
+	flagAcceptRisk = "accept-risk"
+
+	singleSignerWarning = `@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@ WARNING: SINGLE-SIGNER MODE SHOULD NOT BE USED FOR MAINNET! @
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+Horcrux single-signer mode does not give the level of improved 
+key security and fault tolerance that Horcrux MPC/cosigner mode
+provides. While it is a simpler deployment configuration, 
+single-signer should only be used for experimentation
+as it is not officially supported by Strangelove.`
 )
 
 func signerCmd() *cobra.Command {
@@ -29,6 +43,13 @@ func startSignerCmd() *cobra.Command {
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
+			fmt.Fprintln(cmd.OutOrStdout(), singleSignerWarning)
+
+			acceptRisk, _ := cmd.Flags().GetBool(flagAcceptRisk)
+			if !acceptRisk {
+				panic(fmt.Errorf("risk not accepted. --accept-risk flag required to run single signer mode"))
+			}
+
 			if err = signer.RequireNotRunning(config.PidFile); err != nil {
 				return err
 			}
@@ -62,8 +83,23 @@ func startSignerCmd() *cobra.Command {
 			logger.Info("Tendermint Validator", "mode", cfg.Mode,
 				"priv-key", cfg.PrivValKeyFile, "priv-state-dir", cfg.PrivValStateDir)
 
+			stateFile := config.privValStateFile(chainID)
+
+			var val types.PrivValidator
+
+			if _, err := os.Stat(stateFile); err != nil {
+				if !os.IsNotExist(err) {
+					panic(fmt.Errorf("failed to load state file: %s", stateFile))
+				}
+				// The only scenario in which we want to initialize a new state file
+				// is when the state file does not exist.
+				val = privval.LoadFilePVEmptyState(cfg.PrivValKeyFile, stateFile)
+			} else {
+				val = privval.LoadFilePV(cfg.PrivValKeyFile, stateFile)
+			}
+
 			pv = &signer.PvGuard{
-				PrivValidator: privval.LoadFilePVEmptyState(cfg.PrivValKeyFile, config.privValStateFile(chainID)),
+				PrivValidator: val,
 			}
 
 			pubkey, err := pv.GetPubKey()
@@ -84,6 +120,8 @@ func startSignerCmd() *cobra.Command {
 			return nil
 		},
 	}
+
+	cmd.Flags().Bool(flagAcceptRisk, false, "Single-signer-mode unsupported. Required to accept risk and proceed.")
 
 	return cmd
 }
