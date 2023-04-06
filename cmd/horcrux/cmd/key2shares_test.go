@@ -57,7 +57,7 @@ func TestKey2Shares(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			cmd := CreateCosignerSharesCmd()
+			cmd := createCosignerSharesCmd()
 			cmd.SetOutput(io.Discard)
 			cmd.SetArgs(tc.args)
 			err := cmd.Execute()

@@ -12,17 +12,17 @@ import (
 	"github.com/tendermint/tendermint/types"
 )
 
-func init() {
-	signerCmd.AddCommand(StartSignerCmd())
-	rootCmd.AddCommand(signerCmd)
+func signerCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "signer",
+		Short: "Remote tx signer for TM based nodes.",
+	}
+	cmd.AddCommand(startSignerCmd())
+
+	return cmd
 }
 
-var signerCmd = &cobra.Command{
-	Use:   "signer",
-	Short: "Remote tx signer for TM based nodes.",
-}
-
-func StartSignerCmd() *cobra.Command {
+func startSignerCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "start",
 		Short:        "Start single signer process",
