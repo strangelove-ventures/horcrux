@@ -17,26 +17,18 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func init() {
-	nodesCmd.AddCommand(addNodesCmd())
-	nodesCmd.AddCommand(removeNodesCmd())
-	configCmd.AddCommand(nodesCmd)
+func configCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "config",
+		Short: "Commands to configure the horcrux signer",
+	}
 
-	peersCmd.AddCommand(addPeersCmd())
-	peersCmd.AddCommand(removePeersCmd())
-	peersCmd.AddCommand(setSharesCmd())
-	configCmd.AddCommand(peersCmd)
+	cmd.AddCommand(nodesCmd())
+	cmd.AddCommand(peersCmd())
+	cmd.AddCommand(chainIDCmd())
+	cmd.AddCommand(initCmd())
 
-	chainIDCmd.AddCommand(setChainIDCmd())
-	configCmd.AddCommand(chainIDCmd)
-
-	configCmd.AddCommand(initCmd())
-	rootCmd.AddCommand(configCmd)
-}
-
-var configCmd = &cobra.Command{
-	Use:   "config",
-	Short: "Commands to configure the horcrux signer",
+	return cmd
 }
 
 func initCmd() *cobra.Command {
@@ -147,13 +139,11 @@ func initCmd() *cobra.Command {
 				return err
 			}
 
-			// initialize state/{chainid}_priv_validator_state.json file
-			if _, err = signer.LoadOrCreateSignState(config.privValStateFile(cid)); err != nil {
-				return err
-			}
-
-			// if node is a cosigner initialize state/{chainid}_priv_validator_state.json file
+			// if node is a cosigner initialize state files
 			if cs {
+				if _, err = signer.LoadOrCreateSignState(config.privValStateFile(cid)); err != nil {
+					return err
+				}
 				if _, err = signer.LoadOrCreateSignState(config.shareStateFile(cid)); err != nil {
 					return err
 				}
@@ -222,9 +212,16 @@ func validateCosignerConfig(cfg DiskConfig) error {
 	return nil
 }
 
-var nodesCmd = &cobra.Command{
-	Use:   "nodes",
-	Short: "Commands to configure the chain nodes",
+func nodesCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "nodes",
+		Short: "Commands to configure the chain nodes",
+	}
+
+	cmd.AddCommand(addNodesCmd())
+	cmd.AddCommand(removeNodesCmd())
+
+	return cmd
 }
 
 func addNodesCmd() *cobra.Command {
@@ -315,9 +312,17 @@ func diffSetChainNode(setA, setB []ChainNode) (diff []ChainNode) {
 	return
 }
 
-var peersCmd = &cobra.Command{
-	Use:   "peers",
-	Short: "Commands to configure the peer nodes",
+func peersCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "peers",
+		Short: "Commands to configure the peer nodes",
+	}
+
+	cmd.AddCommand(addPeersCmd())
+	cmd.AddCommand(removePeersCmd())
+	cmd.AddCommand(setSharesCmd())
+
+	return cmd
 }
 
 func addPeersCmd() *cobra.Command {
@@ -450,9 +455,15 @@ func diffSetCosignerPeer(setA, setB []CosignerPeer) (diff []CosignerPeer) {
 	return
 }
 
-var chainIDCmd = &cobra.Command{
-	Use:   "chain-id",
-	Short: "Commands to configure the chain ID",
+func chainIDCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "chain-id",
+		Short: "Commands to configure the chain ID",
+	}
+
+	cmd.AddCommand(setChainIDCmd())
+
+	return cmd
 }
 
 func setChainIDCmd() *cobra.Command {

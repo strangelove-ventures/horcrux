@@ -24,12 +24,8 @@ import (
 	"github.com/tendermint/tendermint/libs/os"
 )
 
-func init() {
-	rootCmd.AddCommand(CreateCosignerSharesCmd())
-}
-
 // CreateCosignerSharesCmd is a cobra command for creating cosigner shares from a priv validator
-func CreateCosignerSharesCmd() *cobra.Command {
+func createCosignerSharesCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create-shares [priv_validator.json] [threshold] [shares]",
 		Aliases: []string{"shard", "shares"},
