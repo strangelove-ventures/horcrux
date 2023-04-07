@@ -23,17 +23,17 @@ type FilePVLastSignState struct {
 	Step   int8  `json:"step"`
 }
 
-func init() {
-	stateCmd.AddCommand(showStateCmd())
-	stateCmd.AddCommand(setStateCmd())
-	stateCmd.AddCommand(importStateCmd())
+func stateCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "state",
+		Short: "Commands to configure the horcrux signer's state",
+	}
 
-	rootCmd.AddCommand(stateCmd)
-}
+	cmd.AddCommand(showStateCmd())
+	cmd.AddCommand(setStateCmd())
+	cmd.AddCommand(importStateCmd())
 
-var stateCmd = &cobra.Command{
-	Use:   "state",
-	Short: "Commands to configure the horcrux signer's state",
+	return cmd
 }
 
 func showStateCmd() *cobra.Command {

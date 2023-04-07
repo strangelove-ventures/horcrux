@@ -71,13 +71,14 @@ func TestConfigInitCmd(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tmpConfig := filepath.Join(tc.home, ".horcrux")
 
-			t.Setenv("HOME", tc.home)
 			err := os.MkdirAll(tc.home, 0777)
 			require.NoError(t, err)
 
-			cmd := initCmd()
+			cmd := rootCmd()
 			cmd.SetOutput(io.Discard)
-			cmd.SetArgs(tc.args)
+			args := []string{"--home", tmpConfig, "config", "init"}
+			args = append(args, tc.args...)
+			cmd.SetArgs(args)
 			err = cmd.Execute()
 
 			if tc.expectErr {
@@ -108,11 +109,13 @@ func TestConfigInitCmd(t *testing.T) {
 }
 
 func TestConfigChainIDSetCmd(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	tmpConfig := filepath.Join(t.TempDir(), ".horcrux")
 
-	cmd := initCmd()
+	cmd := rootCmd()
 	cmd.SetOutput(io.Discard)
 	cmd.SetArgs([]string{
+		"--home", tmpConfig,
+		"config", "init",
 		chainID,
 		"tcp://10.168.0.1:1234",
 		"-c",
@@ -159,11 +162,13 @@ func TestConfigChainIDSetCmd(t *testing.T) {
 }
 
 func TestConfigNodesAddAndRemove(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	tmpConfig := filepath.Join(t.TempDir(), ".horcrux")
 
-	cmd := initCmd()
+	cmd := rootCmd()
 	cmd.SetOutput(io.Discard)
 	cmd.SetArgs([]string{
+		"--home", tmpConfig,
+		"config", "init",
 		chainID,
 		"tcp://10.168.0.1:1234",
 		"-c",
@@ -296,11 +301,13 @@ func TestConfigNodesAddAndRemove(t *testing.T) {
 }
 
 func TestConfigPeersAddAndRemove(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	tmpConfig := filepath.Join(t.TempDir(), ".horcrux")
 
-	cmd := initCmd()
+	cmd := rootCmd()
 	cmd.SetOutput(io.Discard)
 	cmd.SetArgs([]string{
+		"--home", tmpConfig,
+		"config", "init",
 		chainID,
 		"tcp://10.168.0.1:1234",
 		"-c",
@@ -566,11 +573,13 @@ func TestDiffSetCosignerPeer(t *testing.T) {
 }
 
 func TestSetShares(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	tmpConfig := filepath.Join(t.TempDir(), ".horcrux")
 
-	cmd := initCmd()
+	cmd := rootCmd()
 	cmd.SetOutput(io.Discard)
 	cmd.SetArgs([]string{
+		"--home", tmpConfig,
+		"config", "init",
 		chainID,
 		"tcp://10.168.0.1:1234",
 		"-c",

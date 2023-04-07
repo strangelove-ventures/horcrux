@@ -18,15 +18,16 @@ import (
 	"github.com/tendermint/tendermint/types"
 )
 
-func init() {
-	cosignerCmd.AddCommand(StartCosignerCmd())
-	cosignerCmd.AddCommand(AddressCmd())
-	rootCmd.AddCommand(cosignerCmd)
-}
+func cosignerCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "cosigner",
+		Short: "Threshold mpc signer for TM based nodes",
+	}
 
-var cosignerCmd = &cobra.Command{
-	Use:   "cosigner",
-	Short: "Threshold mpc signer for TM based nodes",
+	cmd.AddCommand(startCosignerCmd())
+	cmd.AddCommand(addressCmd())
+
+	return cmd
 }
 
 type AddressCmdOutput struct {
@@ -36,7 +37,7 @@ type AddressCmdOutput struct {
 	ValConsPubAddress string
 }
 
-func AddressCmd() *cobra.Command {
+func addressCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "address [bech32]",
 		Short:        "Get public key hex address and valcons address",
@@ -98,7 +99,7 @@ func AddressCmd() *cobra.Command {
 	return cmd
 }
 
-func StartCosignerCmd() *cobra.Command {
+func startCosignerCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "start",
 		Short:        "Start cosigner process",
