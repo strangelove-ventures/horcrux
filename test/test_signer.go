@@ -545,6 +545,30 @@ func (ts *TestSigner) GetLeader(ctx context.Context) (string, error) {
 	return res.GetLeader(), nil
 }
 
+func (ts *TestSigner) PollForLeader(ctx context.Context, expectedLeader string) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			leader, err := ts.GetLeader(ctx)
+			ts.tl.Logf("{%s} => current leader: {%s}, expected leader: {%s}", ts.Name(), leader, expectedLeader)
+			if err != nil {
+				return fmt.Errorf("failed to get leader from signer: %s - %w", ts.Name(), err)
+			}
+			if leader == expectedLeader {
+				return nil
+			}
+		case <-ctx.Done():
+			return fmt.Errorf("leader did not match before timeout for signer: %s - %w", ts.Name(), ctx.Err())
+		}
+	}
+}
+
 func (ts *TestSigner) horcruxCmd(cmd []string) (out []string) {
 	out = append(out, binary)
 	out = append(out, cmd...)
