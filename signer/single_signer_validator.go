@@ -24,7 +24,8 @@ type SingleSignerChainState struct {
 
 func NewSingleSignerValidator(config *RuntimeConfig) *SingleSignerValidator {
 	return &SingleSignerValidator{
-		config: config,
+		config:     config,
+		chainState: make(map[string]*SingleSignerChainState),
 	}
 }
 
