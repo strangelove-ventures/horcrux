@@ -50,22 +50,22 @@ type ChainSignState struct {
 
 // NewThresholdValidator creates and returns a new ThresholdValidator
 func NewThresholdValidator(
+	logger log.Logger,
 	config *RuntimeConfig,
 	pubKey crypto.PubKey,
 	threshold int,
 	cosigner Cosigner,
 	peers []Cosigner,
 	raftStore *RaftStore,
-	logger log.Logger,
 ) *ThresholdValidator {
 	return &ThresholdValidator{
+		logger:     logger,
 		config:     config,
+		pubKey:     pubKey,
+		threshold:  threshold,
 		cosigner:   cosigner,
 		peers:      peers,
-		threshold:  threshold,
-		pubKey:     pubKey,
 		raftStore:  raftStore,
-		logger:     logger,
 		chainState: make(map[string]ChainSignState),
 	}
 }

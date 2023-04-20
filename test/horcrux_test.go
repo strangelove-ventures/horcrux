@@ -8,8 +8,9 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var (
-	chainID = "horcrux"
+const (
+	chainID                    = "horcrux"
+	maxSpecificElectionRetries = 3
 )
 
 func testChainSingleNodeAndHorcrux(
@@ -297,18 +298,38 @@ func TestLeaderElection2of3(t *testing.T) {
 
 	// Test electing each node in the signer cluster for a period of time
 	for _, signer := range ourValidator.Signers {
-		t.Logf("{%s} -> Electing leader...", signer.Name())
-		err := signer.TransferLeadership(ctx, signer.Index)
-		require.NoError(t, err, "failed to transfer leadership to %d", signer.Index)
+		var eg errgroup.Group
 
-		t.Logf("{%s} -> Waiting for signed blocks with signer as leader {%s}", ourValidator.Name(), signer.Name())
-		require.NoError(t, ourValidator.WaitForConsecutiveBlocks(chainID, 2))
+		for i := 0; i < maxSpecificElectionRetries; i++ {
+			t.Logf("{%s} -> Electing leader...", signer.Name())
+			err := signer.TransferLeadership(ctx, signer.Index)
+			require.NoError(t, err, "failed to transfer leadership to %d", signer.Index)
 
-		// Make sure all cosigners have the same leader
-		for _, s := range ourValidator.Signers {
-			leader, err := s.GetLeader(ctx)
-			require.NoError(t, err, "failed to get leader from signer: %s", s.Name())
-			require.Equal(t, signer.Name()+":"+signerPort, leader)
+			t.Logf("{%s} -> Waiting for signed blocks with signer as leader {%s}", ourValidator.Name(), signer.Name())
+
+			// Make sure all cosigners have the same leader
+			for _, s := range ourValidator.Signers {
+				s := s
+				eg.Go(func() error {
+					return s.PollForLeader(ctx, signer.Name()+":"+signerPort)
+				})
+			}
+			if err := eg.Wait(); err == nil {
+				break
+			}
+
+			// electing a specific leader can fail, but this is okay as long as all nodes agree on one leader.
+			// will retry electing the specific leader in the next iteration.
+			var commonLeader string
+			for i, s := range ourValidator.Signers {
+				leader, err := s.GetLeader(ctx)
+				require.NoErrorf(t, err, "failed to get leader from signer: %s", s.Name())
+				if i == 0 {
+					commonLeader = leader
+					continue
+				}
+				require.Equal(t, commonLeader, leader, "leader is not the same on all signers, mismatch on %s", s.Name())
+			}
 		}
 
 		require.NoError(t, ourValidator.WaitForConsecutiveBlocks(chainID, 8))

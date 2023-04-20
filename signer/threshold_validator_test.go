@@ -77,8 +77,7 @@ func TestThresholdValidator2of2(t *testing.T) {
 		ID:       2,
 	}
 
-	var cosigner1 Cosigner
-	var cosigner2 Cosigner
+	var cosigner1, cosigner2 Cosigner
 
 	cosigner1 = NewLocalCosigner(
 		runtimeConfig,
@@ -99,13 +98,13 @@ func TestThresholdValidator2of2(t *testing.T) {
 	raftStore := getMockRaftStore(cosigner1, tmpDir)
 
 	validator := NewThresholdValidator(
+		tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
 		runtimeConfig,
 		privateKey.PubKey(),
 		int(threshold),
 		cosigner1,
 		thresholdPeers,
 		raftStore,
-		tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
 	)
 
 	raftStore.SetThresholdValidator(validator)
@@ -187,9 +186,7 @@ func TestThresholdValidator3of3(t *testing.T) {
 		ID:       3,
 	}
 
-	var cosigner1 Cosigner
-	var cosigner2 Cosigner
-	var cosigner3 Cosigner
+	var cosigner1, cosigner2, cosigner3 Cosigner
 
 	cosigner1 = NewLocalCosigner(
 		runtimeConfig,
@@ -216,13 +213,13 @@ func TestThresholdValidator3of3(t *testing.T) {
 	raftStore := getMockRaftStore(cosigner1, tmpDir)
 
 	validator := NewThresholdValidator(
+		tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
 		runtimeConfig,
 		privateKey.PubKey(),
 		int(threshold),
 		cosigner1,
 		thresholdPeers,
 		raftStore,
-		tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
 	)
 
 	raftStore.SetThresholdValidator(validator)
@@ -307,9 +304,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 		ID:       3,
 	}
 
-	var cosigner1 Cosigner
-	var cosigner2 Cosigner
-	var cosigner3 Cosigner
+	var cosigner1, cosigner2, cosigner3 Cosigner
 
 	cosigner1 = NewLocalCosigner(
 		runtimeConfig,
@@ -336,13 +331,13 @@ func TestThresholdValidator2of3(t *testing.T) {
 	raftStore := getMockRaftStore(cosigner1, tmpDir)
 
 	validator := NewThresholdValidator(
+		tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
 		runtimeConfig,
 		privateKey.PubKey(),
 		int(threshold),
 		cosigner1,
 		thresholdPeers,
 		raftStore,
-		tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
 	)
 
 	err = validator.LoadSignStateIfNecessary(testChainID)

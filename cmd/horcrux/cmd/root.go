@@ -12,20 +12,37 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var (
-	homeDir string
-	config  signer.RuntimeConfig
-)
+var config signer.RuntimeConfig
 
-var rootCmd = &cobra.Command{
-	Use:   "horcrux",
-	Short: "A tendermint remote signer with both single signer and threshold signer modes",
+func rootCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "horcrux",
+		Short: "A tendermint remote signer with both single signer and threshold signer modes",
+	}
+
+	cmd.AddCommand(configCmd())
+	cmd.AddCommand(cosignerCmd())
+	cmd.AddCommand(createCosignerSharesCmd())
+	cmd.AddCommand(leaderElectionCmd())
+	cmd.AddCommand(getLeaderCmd())
+	cmd.AddCommand(signerCmd())
+	cmd.AddCommand(stateCmd())
+	cmd.AddCommand(versionCmd())
+
+	cmd.PersistentFlags().StringVar(
+		&config.HomeDir,
+		"home",
+		"",
+		"Directory for config and data (default is $HOME/.horcrux)",
+	)
+
+	return cmd
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	if err := rootCmd.Execute(); err != nil {
+	if err := rootCmd().Execute(); err != nil {
 		// Cobra will print the error
 		os.Exit(1)
 	}
@@ -33,18 +50,17 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(initConfig)
-	rootCmd.PersistentFlags().StringVar(&homeDir, "home", "", "Directory for config and data (default is $HOME/.horcrux)")
 }
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
 	var home string
-	if homeDir == "" {
+	if config.HomeDir == "" {
 		userHome, err := homedir.Dir()
 		handleInitError(err)
 		home = filepath.Join(userHome, ".horcrux")
 	} else {
-		home = homeDir
+		home = config.HomeDir
 	}
 	config = signer.RuntimeConfig{
 		HomeDir:    home,

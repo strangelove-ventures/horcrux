@@ -82,9 +82,6 @@ type CosignerGetEphemeralSecretPartRequest struct {
 	Timestamp time.Time
 }
 
-type LocalCosignerConfig struct {
-}
-
 // LocalCosigner responds to sign requests using their share key
 // The cosigner maintains a watermark to avoid double-signing
 //
@@ -125,8 +122,8 @@ func NewLocalCosigner(
 	cosigner := &LocalCosigner{
 		config:     config,
 		key:        cosignerKey,
-		chainState: make(map[string]ChainState),
 		rsaKey:     rsaKey,
+		chainState: make(map[string]ChainState),
 		peers:      make(map[int]CosignerPeer),
 		total:      total,
 		threshold:  threshold,

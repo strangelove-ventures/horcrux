@@ -49,9 +49,9 @@ When installing `horcrux` we recommend using the prebuilt binaries from the [rel
 
 ```bash
 # On each signer VM
-$ wget https://github.com/strangelove-ventures/horcrux/releases/download/v2.0.0/horcrux_2.0.0_linux_amd64.tar.gz
-$ tar -xzf horcrux_2.0.0_linux_amd64.tar.gz
-$ sudo mv horcrux /usr/bin/horcrux && rm horcrux_2.0.0_linux_amd64.tar.gz README.md LICENSE.md
+$ wget https://github.com/strangelove-ventures/horcrux/releases/download/v2.1.0/horcrux_2.1.0_linux_amd64.tar.gz
+$ tar -xzf horcrux_2.1.0_linux_amd64.tar.gz
+$ sudo mv horcrux /usr/bin/horcrux && rm horcrux_2.1.0_linux_amd64.tar.gz README.md LICENSE.md
 ```
 
 Once the binary is installed in `/usr/bin`, install the `systemd` unit file. You can find an [example here](./horcrux.service):
@@ -79,17 +79,19 @@ $ horcrux config init {my_chain_id} "tcp://10.168.0.2:1234" -c -p "tcp://10.168.
 $ horcrux config init {my_chain_id} "tcp://10.168.0.3:1234" -c -p "tcp://10.168.1.1:2222|1,tcp://10.168.1.2:2222|2" -l "tcp://10.168.1.3:2222" -t 2 --timeout 1500ms
 ```
 
-> **NOTE:** Note the node address (e.g. "tcp://10.168.0.1:1234") of each command. In this example, each horcrux node is communicating with a corresponding sentry. It is also possible to include a comma separated list of node addresses (e.g. "tcp://chain-node-1:1234,tcp://chain-node-2:1234", etc), allowing all horcrux nodes to communicate with all sentries.
+> **Note** 
+> Note the node address (e.g. "tcp://10.168.0.1:1234") of each command. In this example, each horcrux node is communicating with a corresponding sentry. It is also possible to include a comma separated list of node addresses (e.g. "tcp://chain-node-1:1234,tcp://chain-node-2:1234", etc), allowing all horcrux nodes to communicate with all sentries.
 
-> **NOTE:** The `-c` or `--cosigner` flag here says to configure the signer for cosigner operations. The signer can also be run in single signer configuration, if you want to do that don't pass `-c`, `-p` or `-t` or `--timeout`.
+> **Warning**
+> SINGLE-SIGNER MODE SHOULD NOT BE USED FOR MAINNET! Horcrux single-signer mode does not give the level of improved key security and fault tolerance that Horcrux MPC/cosigner mode provides. While it is a simpler deployment configuration, single-signer should only be used for experimentation as it is not officially supported by Strangelove.
 
-> **NOTE:** The `-p` or `--peers` flag lets you set the addresses of the other signer nodes in the config. Two ports are required, the P2P port for RCP traffic, and the Raft port for key-value sharing. Note that each signer also has an index. This index corresponds to the shard of the private key it will sign with. Keeping the node names and the indexes the same helps avoid errors and allows you to work more quickly
+#### Flags
 
-> **NOTE:** The `-l` or `--listen` flag lets you set the listen address for the cosigner, which is used for communication between cosigners, Raft and GRPC. The DNS/IP used for this must be reachable by the other peers, i.e. do not use 0.0.0.0 for the hostname.
-
-> **NOTE:** The `-k` or `--keyfile` flag lets you set the file path for the private key share file if you would like to use a different path than `~/.horcrux/share.json`.
-
-> **NOTE:** The `--timeout` value defaults to `1000ms`. If you are running in disconnected data centers (i.e. across amazon AZs or gcp zones) increasing the timeout slightly helps to avoid missed blocks especially around proposals.
+- `-c`/`--cosigner`: this flag instructs horcrux to configure the signer for MPC cosigner operations. This is the officially-supported configuration. The signer can also be run in single signer configuration for experimental, non-mainnet deployments. To enable single-signer mode, exclude the `-c`, `-p`, `-t`, and `--timeout` flags.
+- `-p`/`--peers`: configures the addresses of the other signer nodes in the config. Two ports are required, the P2P port for RCP traffic, and the Raft port for key-value sharing. Note that each signer also has an index. This index corresponds to the shard of the private key it will sign with. Keeping the node names and the indexes the same helps avoid errors and allows you to work more quickly
+- `-l`/`--listen`: configures the listen address for the cosigner, which is used for communication between cosigners, Raft and GRPC. The DNS/IP used for this must be reachable by the other peers, i.e. do not use 0.0.0.0 for the hostname.
+- `-k`/`--keyfile`: configures the file path for the private key share file if you would like to use a different path than the default, `~/.horcrux/share.json`.
+- `--timeout`: configures the timeout for cosigner-to-cosigner GRPC communication. This value defaults to `1000ms`. If you are running in disconnected data centers (i.e. across amazon AZs or gcp zones) increasing the timeout slightly helps to avoid missed blocks especially around proposals.
 
 ### 3. Split `priv_validator_key.json` and distribute key material
 

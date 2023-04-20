@@ -13,15 +13,16 @@ import (
 
 func TestStateSetCmd(t *testing.T) {
 	tmpHome := t.TempDir()
+	tmpConfig := filepath.Join(tmpHome, ".horcrux")
 	stateDir := filepath.Join(tmpHome, ".horcrux", "state")
 
 	chainID := "horcrux-1"
 
-	t.Setenv("HOME", tmpHome)
-
-	cmd := initCmd()
+	cmd := rootCmd()
 	cmd.SetOutput(io.Discard)
 	cmd.SetArgs([]string{
+		"--home", tmpConfig,
+		"config", "init",
 		"tcp://10.168.0.1:1234",
 		"-c",
 		"-t", "2",

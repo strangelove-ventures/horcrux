@@ -11,7 +11,6 @@ import (
 	tmNet "github.com/tendermint/tendermint/libs/net"
 	tmService "github.com/tendermint/tendermint/libs/service"
 	tmP2pConn "github.com/tendermint/tendermint/p2p/conn"
-	"github.com/tendermint/tendermint/privval"
 	tmProtoCrypto "github.com/tendermint/tendermint/proto/tendermint/crypto"
 	tmProtoPrivval "github.com/tendermint/tendermint/proto/tendermint/privval"
 	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
@@ -22,8 +21,6 @@ import (
 // signature requests using its privVal.
 type ReconnRemoteSigner struct {
 	tmService.BaseService
-
-	config *RuntimeConfig
 
 	address string
 	privKey tmCryptoEd2219.PrivKey
@@ -38,14 +35,12 @@ type ReconnRemoteSigner struct {
 //
 // If the connection is broken, the ReconnRemoteSigner will attempt to reconnect.
 func NewReconnRemoteSigner(
-	config *RuntimeConfig,
 	address string,
 	logger tmLog.Logger,
 	privVal tm.PrivValidator,
 	dialer net.Dialer,
 ) *ReconnRemoteSigner {
 	rs := &ReconnRemoteSigner{
-		config:  config,
 		address: address,
 		privVal: privVal,
 		dialer:  dialer,
@@ -300,17 +295,6 @@ func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) tmProtoPrivval
 		Error:  nil,
 	}}
 
-	if pvGuard, ok := rs.privVal.(*PvGuard); ok {
-		if filePv, ok := pvGuard.PrivValidator.(*privval.FilePV); ok {
-			if filePv.LastSignState.Height == 0 {
-				pvGuard.PrivValidator = privval.LoadFilePVEmptyState(
-					rs.config.KeyFilePath(false),
-					rs.config.PrivValStateFile(chainID),
-				)
-			}
-		}
-	}
-
 	pubKey, err := rs.privVal.GetPubKey()
 	if err != nil {
 		rs.Logger.Error(
@@ -351,7 +335,7 @@ func getRemoteSignerError(err error) *tmProtoPrivval.RemoteSignerError {
 	}
 }
 
-func StartRemoteSigners(config *RuntimeConfig, services []tmService.Service, logger tmLog.Logger,
+func StartRemoteSigners(services []tmService.Service, logger tmLog.Logger,
 	privVal tm.PrivValidator, nodes []string) ([]tmService.Service, error) {
 	var err error
 	go StartMetrics()
@@ -360,7 +344,7 @@ func StartRemoteSigners(config *RuntimeConfig, services []tmService.Service, log
 		// A long timeout such as 30 seconds would cause the sentry to fail in loops
 		// Use a short timeout and dial often to connect within 3 second window
 		dialer := net.Dialer{Timeout: 2 * time.Second}
-		s := NewReconnRemoteSigner(config, node, logger, privVal, dialer)
+		s := NewReconnRemoteSigner(node, logger, privVal, dialer)
 
 		err = s.Start()
 		if err != nil {

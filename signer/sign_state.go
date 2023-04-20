@@ -281,17 +281,20 @@ func (signState *SignState) FreshCache() *SignState {
 
 // LoadSignState loads a sign state from disk.
 func LoadSignState(filepath string) (*SignState, error) {
-	state := &SignState{}
 	stateJSONBytes, err := os.ReadFile(filepath)
 	if err != nil {
-		return state, err
+		return nil, err
 	}
+
+	state := new(SignState)
 
 	err = tmJson.Unmarshal(stateJSONBytes, &state)
 	if err != nil {
-		return state, err
+		return nil, err
 	}
+
 	state.filePath = filepath
+
 	return state.FreshCache(), nil
 }
 
@@ -299,18 +302,21 @@ func LoadSignState(filepath string) (*SignState, error) {
 // If the sign state could not be loaded, an empty sign state is initialized
 // and saved to filepath.
 func LoadOrCreateSignState(filepath string) (*SignState, error) {
-	existing, err := LoadSignState(filepath)
-	if err == nil {
-		return existing, nil
+	if _, err := os.Stat(filepath); err != nil {
+		if !os.IsNotExist(err) {
+			return nil, fmt.Errorf("unexpected error checking file existence (%s): %w", filepath, err)
+		}
+		// the only scenario where we want to create a new sign state file is when the file does not exist.
+		// Make an empty sign state and save it.
+		state := &SignState{
+			filePath: filepath,
+			cache:    make(map[HRSKey]SignStateConsensus),
+		}
+		state.save()
+		return state, nil
 	}
 
-	// There was an error loading the sign state
-	// Make an empty sign state and save it
-	state := &SignState{}
-	state.filePath = filepath
-	state.cache = make(map[HRSKey]SignStateConsensus)
-	state.save()
-	return state, nil
+	return LoadSignState(filepath)
 }
 
 // OnlyDifferByTimestamp returns true if the sign bytes of the sign state

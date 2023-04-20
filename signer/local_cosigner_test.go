@@ -82,9 +82,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		ID:       2,
 	}
 
-	var cosigner1, cosigner2 *LocalCosigner
-
-	cosigner1 = NewLocalCosigner(
+	cosigner1 := NewLocalCosigner(
 		&RuntimeConfig{},
 		key1,
 		*rsaKey1,
@@ -93,7 +91,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		total,
 		threshold,
 	)
-	cosigner2 = NewLocalCosigner(
+	cosigner2 := NewLocalCosigner(
 		&RuntimeConfig{},
 		key2,
 		*rsaKey2,

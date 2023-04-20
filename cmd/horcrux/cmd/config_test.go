@@ -3,6 +3,7 @@ package cmd
 import (
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -59,13 +60,16 @@ func TestConfigInitCmd(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Setenv("HOME", tc.home)
+			tmpConfig := filepath.Join(tc.home, ".horcrux")
+
 			err := os.MkdirAll(tc.home, 0777)
 			require.NoError(t, err)
 
-			cmd := initCmd()
+			cmd := rootCmd()
 			cmd.SetOutput(io.Discard)
-			cmd.SetArgs(tc.args)
+			args := []string{"--home", tmpConfig, "config", "init"}
+			args = append(args, tc.args...)
+			cmd.SetArgs(args)
 			err = cmd.Execute()
 
 			if tc.expectErr {
