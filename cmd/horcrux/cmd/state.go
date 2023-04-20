@@ -48,12 +48,12 @@ func showStateCmd() *cobra.Command {
 				return fmt.Errorf("%s does not exist, initialize config with horcrux config init and try again", config.HomeDir)
 			}
 
-			pv, err := signer.LoadSignState(config.privValStateFile(config.Config.ChainID))
+			pv, err := signer.LoadSignState(config.PrivValStateFile(config.Config.ChainID))
 			if err != nil {
 				return err
 			}
 
-			share, err := signer.LoadSignState(config.shareStateFile(config.Config.ChainID))
+			share, err := signer.LoadSignState(config.ShareStateFile(config.Config.ChainID))
 			if err != nil {
 				return err
 			}
@@ -86,12 +86,12 @@ func setStateCmd() *cobra.Command {
 				return err
 			}
 
-			pv, err := signer.LoadSignState(config.privValStateFile(config.Config.ChainID))
+			pv, err := signer.LoadSignState(config.PrivValStateFile(config.Config.ChainID))
 			if err != nil {
 				return err
 			}
 
-			share, err := signer.LoadSignState(config.shareStateFile(config.Config.ChainID))
+			share, err := signer.LoadSignState(config.ShareStateFile(config.Config.ChainID))
 			if err != nil {
 				return err
 			}
@@ -129,7 +129,7 @@ func setStateCmd() *cobra.Command {
 
 func importStateCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:     "import [height]",
+		Use:     "import",
 		Aliases: []string{"i"},
 		Short: "Read the old priv_validator_state.json and set the height, round and step" +
 			"(good for migrations but NOT shared state update)",
@@ -148,13 +148,13 @@ func importStateCmd() *cobra.Command {
 			}
 
 			// Recreate privValStateFile if necessary
-			pv, err := signer.LoadOrCreateSignState(config.privValStateFile(config.Config.ChainID))
+			pv, err := signer.LoadOrCreateSignState(config.PrivValStateFile(config.Config.ChainID))
 			if err != nil {
 				return err
 			}
 
 			// shareStateFile does not exist during default config init, so create if necessary
-			share, err := signer.LoadOrCreateSignState(config.shareStateFile(config.Config.ChainID))
+			share, err := signer.LoadOrCreateSignState(config.ShareStateFile(config.Config.ChainID))
 			if err != nil {
 				return err
 			}

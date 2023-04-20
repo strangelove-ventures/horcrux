@@ -14,6 +14,8 @@ import (
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
+const testChainID = "test"
+
 func TestLocalCosignerGetID(t *testing.T) {
 	dummyPub := tmCryptoEd25519.PubKey{}
 
@@ -32,17 +34,19 @@ func TestLocalCosignerGetID(t *testing.T) {
 		Step:   0,
 	}
 
-	config := LocalCosignerConfig{
-		CosignerKey: key,
-		SignState:   &signState,
-		RsaKey:      *rsaKey,
-		Peers: []CosignerPeer{{
+	cosigner := NewLocalCosigner(
+		&RuntimeConfig{},
+		key,
+		&signState,
+		*rsaKey,
+		[]CosignerPeer{{
 			ID:        1,
 			PublicKey: rsaKey.PublicKey,
 		}},
-	}
-
-	cosigner := NewLocalCosigner(config)
+		"",
+		0,
+		0,
+	)
 	require.Equal(t, cosigner.GetID(), 1)
 }
 
@@ -95,32 +99,30 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	stateFile2, err := os.CreateTemp("", "state2.json")
 	require.NoError(t, err)
 	defer os.Remove(stateFile2.Name())
+
 	signState2, err := LoadOrCreateSignState(stateFile2.Name())
 	require.NoError(t, err)
 
-	config1 := LocalCosignerConfig{
-		CosignerKey: key1,
-		SignState:   &signState1,
-		RsaKey:      *rsaKey1,
-		Peers:       peers,
-		Total:       total,
-		Threshold:   threshold,
-	}
-
-	config2 := LocalCosignerConfig{
-		CosignerKey: key2,
-		SignState:   &signState2,
-		RsaKey:      *rsaKey2,
-		Peers:       peers,
-		Total:       total,
-		Threshold:   threshold,
-	}
-
-	var cosigner1 Cosigner
-	var cosigner2 Cosigner
-
-	cosigner1 = NewLocalCosigner(config1)
-	cosigner2 = NewLocalCosigner(config2)
+	cosigner1 := NewLocalCosigner(
+		&RuntimeConfig{},
+		key1,
+		&signState1,
+		*rsaKey1,
+		peers,
+		"",
+		total,
+		threshold,
+	)
+	cosigner2 := NewLocalCosigner(
+		&RuntimeConfig{},
+		key2,
+		&signState2,
+		*rsaKey2,
+		peers,
+		"",
+		total,
+		threshold,
+	)
 
 	require.Equal(t, cosigner1.GetID(), 1)
 	require.Equal(t, cosigner2.GetID(), 2)

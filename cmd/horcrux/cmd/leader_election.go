@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	_ "github.com/Jille/grpc-multi-resolver"
@@ -52,7 +51,7 @@ horcrux elect 2 # elect specific leader`,
 				grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
 				grpc.WithUnaryInterceptor(grpc_retry.UnaryClientInterceptor(retryOpts...)))
 			if err != nil {
-				log.Fatalf("dialing failed: %v", err)
+				return fmt.Errorf("dialing failed: %v", err)
 			}
 			defer conn.Close()
 
@@ -118,7 +117,7 @@ func getLeaderCmd() *cobra.Command {
 				grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
 				grpc.WithUnaryInterceptor(grpc_retry.UnaryClientInterceptor(retryOpts...)))
 			if err != nil {
-				log.Fatalf("dialing failed: %v", err)
+				return fmt.Errorf("dialing failed: %v", err)
 			}
 			defer conn.Close()
 
