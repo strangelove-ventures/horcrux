@@ -103,9 +103,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	signState2, err := LoadOrCreateSignState(stateFile2.Name())
 	require.NoError(t, err)
 
-	var cosigner1, cosigner2 *LocalCosigner
-
-	cosigner1 = NewLocalCosigner(
+	cosigner1 := NewLocalCosigner(
 		&RuntimeConfig{},
 		key1,
 		&signState1,
@@ -115,7 +113,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		total,
 		threshold,
 	)
-	cosigner2 = NewLocalCosigner(
+	cosigner2 := NewLocalCosigner(
 		&RuntimeConfig{},
 		key2,
 		&signState2,

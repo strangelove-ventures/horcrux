@@ -96,14 +96,25 @@ type RuntimeConfig struct {
 	Config     Config
 }
 
-func (c RuntimeConfig) KeyFilePath(cosigner bool) string {
-	if c.Config.PrivValKeyFile != nil && *c.Config.PrivValKeyFile != "" {
+func (c RuntimeConfig) cachedKeyFile() string {
+	if c.Config.PrivValKeyFile != nil {
 		return *c.Config.PrivValKeyFile
 	}
-	if cosigner {
-		return filepath.Join(c.HomeDir, "share.json")
+	return ""
+}
+
+func (c RuntimeConfig) KeyFilePathSingleSigner() string {
+	if kf := c.cachedKeyFile(); kf != "" {
+		return kf
 	}
 	return filepath.Join(c.HomeDir, "priv_validator_key.json")
+}
+
+func (c RuntimeConfig) KeyFilePathCosigner() string {
+	if kf := c.cachedKeyFile(); kf != "" {
+		return kf
+	}
+	return filepath.Join(c.HomeDir, "share.json")
 }
 
 func (c RuntimeConfig) PrivValStateFile(chainID string) string {
@@ -118,20 +129,29 @@ func (c RuntimeConfig) WriteConfigFile() error {
 	return os.WriteFile(c.ConfigFile, c.Config.MustMarshalYaml(), 0600)
 }
 
-func (c RuntimeConfig) KeyFileExists(cosigner bool) error {
-	keyFile := c.KeyFilePath(cosigner)
-	stat, err := os.Stat(keyFile)
+func fileExists(file string) error {
+	stat, err := os.Stat(file)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("private key share doesn't exist at path (%s): %w", keyFile, err)
+			return fmt.Errorf("file doesn't exist at path (%s): %w", file, err)
 		}
-		return fmt.Errorf("unexpected error checking key share file existence (%s): %w", keyFile, err)
+		return fmt.Errorf("unexpected error checking file existence (%s): %w", file, err)
 	}
 	if stat.IsDir() {
-		return fmt.Errorf("private key share path is not a file (%s)", keyFile)
+		return fmt.Errorf("path is not a file (%s)", file)
 	}
 
 	return nil
+}
+
+func (c RuntimeConfig) KeyFileExistsSingleSigner() (string, error) {
+	keyFile := c.KeyFilePathSingleSigner()
+	return keyFile, fileExists(keyFile)
+}
+
+func (c RuntimeConfig) KeyFileExistsCosigner() (string, error) {
+	keyFile := c.KeyFilePathCosigner()
+	return keyFile, fileExists(keyFile)
 }
 
 type CosignerConfig struct {

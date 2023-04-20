@@ -304,8 +304,8 @@ func TestRuntimeConfigKeyFilePath(t *testing.T) {
 		HomeDir: dir,
 	}
 
-	require.Equal(t, filepath.Join(dir, "share.json"), c.KeyFilePath(true))
-	require.Equal(t, filepath.Join(dir, "priv_validator_key.json"), c.KeyFilePath(false))
+	require.Equal(t, filepath.Join(dir, "share.json"), c.KeyFilePathCosigner())
+	require.Equal(t, filepath.Join(dir, "priv_validator_key.json"), c.KeyFilePathSingleSigner())
 }
 
 func TestRuntimeConfigPrivValStateFile(t *testing.T) {
@@ -390,11 +390,11 @@ func TestRuntimeConfigKeyFileExists(t *testing.T) {
 	}
 
 	// Test cosigner
-	keyFile := c.KeyFilePath(true)
-	err := c.KeyFileExists(true)
+	keyFile, err := c.KeyFileExistsCosigner()
 	require.Error(t, err)
+
 	require.Equal(t, fmt.Errorf(
-		"private key share doesn't exist at path (%s): %w",
+		"file doesn't exist at path (%s): %w",
 		keyFile,
 		&fs.PathError{
 			Op:   "stat",
@@ -402,15 +402,19 @@ func TestRuntimeConfigKeyFileExists(t *testing.T) {
 			Err:  fmt.Errorf("no such file or directory"),
 		},
 	).Error(), err.Error())
-	require.NoError(t, os.WriteFile(keyFile, []byte{}, 0600))
-	require.NoError(t, c.KeyFileExists(true))
+
+	err = os.WriteFile(keyFile, []byte{}, 0600)
+	require.NoError(t, err)
+
+	_, err = c.KeyFileExistsCosigner()
+	require.NoError(t, err)
 
 	// Test single signer
-	keyFile = c.KeyFilePath(false)
-	err = c.KeyFileExists(false)
+	keyFile, err = c.KeyFileExistsSingleSigner()
 	require.Error(t, err)
+
 	require.Equal(t, fmt.Errorf(
-		"private key share doesn't exist at path (%s): %w",
+		"file doesn't exist at path (%s): %w",
 		keyFile,
 		&fs.PathError{
 			Op:   "stat",
@@ -418,8 +422,12 @@ func TestRuntimeConfigKeyFileExists(t *testing.T) {
 			Err:  fmt.Errorf("no such file or directory"),
 		},
 	).Error(), err.Error())
-	require.NoError(t, os.WriteFile(c.KeyFilePath(false), []byte{}, 0600))
-	require.NoError(t, c.KeyFileExists(false))
+
+	err = os.WriteFile(keyFile, []byte{}, 0600)
+	require.NoError(t, err)
+
+	_, err = c.KeyFileExistsSingleSigner()
+	require.NoError(t, err)
 }
 
 func TestCosignerConfigLeaderElectMultiAddress(t *testing.T) {

@@ -49,7 +49,12 @@ func addressCmd() *cobra.Command {
 				return err
 			}
 
-			key, err := signer.LoadCosignerKey(config.KeyFilePath(true))
+			keyFile, err := config.KeyFileExistsCosigner()
+			if err != nil {
+				return err
+			}
+
+			key, err := signer.LoadCosignerKey(keyFile)
 			if err != nil {
 				return fmt.Errorf("error reading cosigner key: %s", err)
 			}
@@ -120,7 +125,8 @@ func startCosignerCmd() *cobra.Command {
 				logger   = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator")
 			)
 
-			if err := config.KeyFileExists(true); err != nil {
+			keyFile, err := config.KeyFileExistsCosigner()
+			if err != nil {
 				return err
 			}
 
@@ -129,7 +135,6 @@ func startCosignerCmd() *cobra.Command {
 
 			var val types.PrivValidator
 
-			keyFile := config.KeyFilePath(true)
 			key, err := signer.LoadCosignerKey(keyFile)
 			if err != nil {
 				return fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)

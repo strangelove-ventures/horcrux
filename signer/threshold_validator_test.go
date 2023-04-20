@@ -91,8 +91,7 @@ func TestThresholdValidator2of2(t *testing.T) {
 	signState2, err := LoadOrCreateSignState(stateFile2.Name())
 	require.NoError(t, err)
 
-	var cosigner1 Cosigner
-	var cosigner2 Cosigner
+	var cosigner1, cosigner2 Cosigner
 
 	cosigner1 = NewLocalCosigner(
 		runtimeConfig,
@@ -223,9 +222,7 @@ func TestThresholdValidator3of3(t *testing.T) {
 	signState3, err := LoadOrCreateSignState(stateFile3.Name())
 	require.NoError(t, err)
 
-	var cosigner1 Cosigner
-	var cosigner2 Cosigner
-	var cosigner3 Cosigner
+	var cosigner1, cosigner2, cosigner3 Cosigner
 
 	cosigner1 = NewLocalCosigner(
 		runtimeConfig,
@@ -365,9 +362,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 	signState3, err := LoadOrCreateSignState(stateFile3.Name())
 	require.NoError(t, err)
 
-	var cosigner1 Cosigner
-	var cosigner2 Cosigner
-	var cosigner3 Cosigner
+	var cosigner1, cosigner2, cosigner3 Cosigner
 
 	cosigner1 = NewLocalCosigner(
 		runtimeConfig,
