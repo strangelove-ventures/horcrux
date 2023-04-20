@@ -145,8 +145,9 @@ func initCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolP("cosigner", "c", false, "set to initialize a cosigner node, requires --peers and --threshold")
-	cmd.Flags().StringSliceP("peers", "p", []string{}, "cosigner peer addresses in format tcp://{addr}:{port}|{share-id} \n"+
-		"(i.e. \"tcp://node-1:2222|2,tcp://node-2:2222|3\")")
+	cmd.Flags().StringSliceP("peers", "p", []string{},
+		"cosigner peer addresses in format tcp://{addr}:{port}|{share-id} \n"+
+			"(i.e. \"tcp://node-1:2222|2,tcp://node-2:2222|3\")")
 	cmd.Flags().IntP("threshold", "t", 0, "indicate number of signatures required for threshold signature")
 	cmd.Flags().StringP("listen", "l", "", "listen address of the signer")
 	cmd.Flags().StringP("debug-addr", "d", "", "listen address for Debug and Prometheus metrics in format localhost:8543")
