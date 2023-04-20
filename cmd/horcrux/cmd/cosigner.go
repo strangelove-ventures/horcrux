@@ -44,10 +44,10 @@ func addressCmd() *cobra.Command {
 		Example:      `horcrux cosigner address cosmos`,
 		SilenceUsage: true,
 		Args:         cobra.RangeArgs(0, 1),
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			err = config.Config.ValidateCosignerConfig()
+		RunE: func(cmd *cobra.Command, args []string) error {
+			err := config.Config.ValidateCosignerConfig()
 			if err != nil {
-				return
+				return err
 			}
 
 			key, err := signer.LoadCosignerKey(config.KeyFilePath(true))
@@ -130,9 +130,10 @@ func startCosignerCmd() *cobra.Command {
 
 			var val types.PrivValidator
 
-			key, err := signer.LoadCosignerKey(config.KeyFilePath(true))
+			keyFile := config.KeyFilePath(true)
+			key, err := signer.LoadCosignerKey(keyFile)
 			if err != nil {
-				return fmt.Errorf("error reading cosigner key: %s", err)
+				return fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
 			}
 
 			// ok to auto initialize on disk since the cosigner share is the one that actually
@@ -157,22 +158,18 @@ func startCosignerCmd() *cobra.Command {
 				PublicKey: key.RSAKey.PublicKey,
 			}}
 
-			for _, cosignerParams := range config.Config.CosignerPeers() {
-				cosigner := signer.NewRemoteCosigner(cosignerParams.ID, cosignerParams.Address)
+			cosignerConfig := config.Config.CosignerConfig
+
+			for _, cosignerParams := range cosignerConfig.Peers {
+				cosigner := signer.NewRemoteCosigner(cosignerParams.ShareID, cosignerParams.P2PAddr)
 				cosigners = append(cosigners, cosigner)
 
-				if cosignerParams.ID < 1 || cosignerParams.ID > len(key.CosignerKeys) {
-					log.Fatalf("Unexpected cosigner ID %d", cosignerParams.ID)
-				}
-
-				pubKey := key.CosignerKeys[cosignerParams.ID-1]
+				pubKey := key.CosignerKeys[cosignerParams.ShareID-1]
 				peers = append(peers, signer.CosignerPeer{
 					ID:        cosigner.GetID(),
 					PublicKey: *pubKey,
 				})
 			}
-
-			cosignerConfig := config.Config.CosignerConfig
 
 			total := len(cosignerConfig.Peers) + 1
 
@@ -189,12 +186,12 @@ func startCosignerCmd() *cobra.Command {
 
 			timeout, err := time.ParseDuration(cosignerConfig.Timeout)
 			if err != nil {
-				log.Fatalf("Error parsing configured timeout: %s. %v\n", cosignerConfig.Timeout, err)
+				return fmt.Errorf("error parsing configured timeout: %s. %w", cosignerConfig.Timeout, err)
 			}
 
 			raftDir := filepath.Join(config.HomeDir, "raft")
 			if err := os.MkdirAll(raftDir, 0700); err != nil {
-				log.Fatalf("Error creating raft directory: %v\n", err)
+				return fmt.Errorf("error creating raft directory: %w", err)
 			}
 
 			// RAFT node ID is the cosigner ID
@@ -204,11 +201,12 @@ func startCosignerCmd() *cobra.Command {
 			raftStore := signer.NewRaftStore(nodeID,
 				raftDir, cosignerConfig.P2PListen, timeout, logger, localCosigner, cosigners)
 			if err := raftStore.Start(); err != nil {
-				log.Fatalf("Error starting raft store: %v\n", err)
+				return fmt.Errorf("error starting raft store: %w", err)
 			}
 			services = append(services, raftStore)
 
 			val = signer.NewThresholdValidator(
+				logger,
 				&config,
 				key.PubKey,
 				signState,
@@ -216,7 +214,6 @@ func startCosignerCmd() *cobra.Command {
 				localCosigner,
 				cosigners,
 				raftStore,
-				logger,
 			)
 
 			raftStore.SetThresholdValidator(val.(*signer.ThresholdValidator))

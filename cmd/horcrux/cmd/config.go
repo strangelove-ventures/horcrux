@@ -50,7 +50,7 @@ func initCmd() *cobra.Command {
 					config.ConfigFile)
 			}
 
-			var cfg signer.DiskConfig
+			var cfg signer.Config
 
 			cs, _ := cmdFlags.GetBool("cosigner")
 			keyFileFlag, _ := cmdFlags.GetString("keyfile")
@@ -61,7 +61,7 @@ func initCmd() *cobra.Command {
 			debugAddr, _ := cmdFlags.GetString("debug-addr")
 			if cs {
 				// Cosigner Config
-				p, _ := cmdFlags.GetString("peers")
+				p, _ := cmdFlags.GetStringSlice("peers")
 				threshold, _ := cmdFlags.GetInt("threshold")
 				timeout, _ := cmdFlags.GetString("timeout")
 				peers, err := signer.PeersFromFlag(p)
@@ -85,7 +85,7 @@ func initCmd() *cobra.Command {
 					return errors.New("host cannot be 0.0.0.0, must be reachable from other peers")
 				}
 
-				cfg = signer.DiskConfig{
+				cfg = signer.Config{
 					PrivValKeyFile: keyFile,
 					ChainID:        cid,
 					CosignerConfig: &signer.CosignerConfig{
@@ -106,7 +106,7 @@ func initCmd() *cobra.Command {
 				if len(cn) == 0 {
 					return fmt.Errorf("must input at least one node")
 				}
-				cfg = signer.DiskConfig{
+				cfg = signer.Config{
 					PrivValKeyFile: keyFile,
 					ChainID:        cid,
 					ChainNodes:     cn,
@@ -145,7 +145,7 @@ func initCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolP("cosigner", "c", false, "set to initialize a cosigner node, requires --peers and --threshold")
-	cmd.Flags().StringP("peers", "p", "", "cosigner peer addresses in format tcp://{addr}:{port}|{share-id} \n"+
+	cmd.Flags().StringSliceP("peers", "p", []string{}, "cosigner peer addresses in format tcp://{addr}:{port}|{share-id} \n"+
 		"(i.e. \"tcp://node-1:2222|2,tcp://node-2:2222|3\")")
 	cmd.Flags().IntP("threshold", "t", 0, "indicate number of signatures required for threshold signature")
 	cmd.Flags().StringP("listen", "l", "", "listen address of the signer")

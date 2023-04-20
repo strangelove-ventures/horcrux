@@ -46,6 +46,7 @@ type ThresholdValidator struct {
 
 // NewThresholdValidator creates and returns a new ThresholdValidator
 func NewThresholdValidator(
+	logger log.Logger,
 	config *RuntimeConfig,
 	pubKey crypto.PubKey,
 	signState SignState,
@@ -53,16 +54,15 @@ func NewThresholdValidator(
 	cosigner Cosigner,
 	peers []Cosigner,
 	raftStore *RaftStore,
-	logger log.Logger,
 ) *ThresholdValidator {
 	return &ThresholdValidator{
+		logger:        logger,
 		config:        config,
 		cosigner:      cosigner,
 		peers:         peers,
 		threshold:     threshold,
 		pubKey:        pubKey,
 		raftStore:     raftStore,
-		logger:        logger,
 		lastSignState: signState,
 		lastSignStateInitiated: SignState{
 			Height:   signState.Height,
