@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -222,7 +221,7 @@ func startCosignerCmd() *cobra.Command {
 
 			pubkey, err := pv.GetPubKey()
 			if err != nil {
-				log.Fatal(err)
+				return fmt.Errorf("failed to get public key: %w", err)
 			}
 			logger.Info("Signer", "address", pubkey.Address())
 
@@ -230,7 +229,7 @@ func startCosignerCmd() *cobra.Command {
 
 			services, err = signer.StartRemoteSigners(&config, services, logger, pv, config.Config.Nodes())
 			if err != nil {
-				panic(err)
+				return fmt.Errorf("failed to start remote signer(s): %w", err)
 			}
 
 			signer.WaitAndTerminate(logger, services, config.PidFile)

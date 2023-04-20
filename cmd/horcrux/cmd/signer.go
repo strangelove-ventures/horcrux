@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -93,7 +92,7 @@ func startSignerCmd() *cobra.Command {
 
 			pubkey, err := pv.GetPubKey()
 			if err != nil {
-				log.Fatal(err)
+				return fmt.Errorf("failed to get public key: %w", err)
 			}
 			logger.Info("Signer", "pubkey", pubkey)
 
@@ -101,7 +100,7 @@ func startSignerCmd() *cobra.Command {
 
 			services, err = signer.StartRemoteSigners(&config, services, logger, pv, config.Config.Nodes())
 			if err != nil {
-				panic(err)
+				return fmt.Errorf("failed to start remote signer(s): %w", err)
 			}
 
 			signer.WaitAndTerminate(logger, services, config.PidFile)
