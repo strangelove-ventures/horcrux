@@ -27,7 +27,7 @@ type ThresholdSignerSoft struct {
 	// Height, Round, Step, Timestamp --> metadata
 	hrsMeta map[HRSTKey]HrsMetadata
 
-	asyncWaitGroup sync.WaitGroup
+	pendingDiskWG sync.WaitGroup
 }
 
 // NewThresholdSignerSoft constructs a ThresholdSigner
@@ -54,7 +54,7 @@ func (softSigner *ThresholdSignerSoft) Stop() {
 }
 
 func (softSigner *ThresholdSignerSoft) waitForSignStatesToFlushToDisk() {
-	softSigner.asyncWaitGroup.Wait()
+	softSigner.pendingDiskWG.Wait()
 }
 
 // Implements ThresholdSigner
@@ -140,7 +140,7 @@ func (softSigner *ThresholdSignerSoft) Sign(
 		Step:      hrst.Step,
 		Signature: sig,
 		SignBytes: req.SignBytes,
-	}, nil, &softSigner.asyncWaitGroup)
+	}, &softSigner.pendingDiskWG)
 	if err != nil {
 		var isSameHRSError *SameHRSError
 		if !errors.As(err, &isSameHRSError) {

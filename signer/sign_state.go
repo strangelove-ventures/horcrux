@@ -107,18 +107,14 @@ func (signState *SignState) GetFromCache(hrs HRSKey, lock *sync.Mutex) (HRSKey, 
 	return latestBlock, nil
 }
 
+// Save will update the high watermark height/round/step (HRS) if it is greater
+// than the current high watermark. If pendingDiskWG is provided, the write operation
+// will be a separate goroutine (async). This allows pendingDiskWG to be used to .Wait()
+// for all pending SignState disk writes.
 func (signState *SignState) Save(
 	ssc SignStateConsensus,
-	lock *sync.Mutex,
-	asyncWaitGroup *sync.WaitGroup,
+	pendingDiskWG *sync.WaitGroup,
 ) error {
-	// One lock/unlock for less/equal check and mutation.
-	// Setting nil for lock for getErrorIfLessOrEqual to avoid recursive lock
-	if lock != nil {
-		lock.Lock()
-		defer lock.Unlock()
-	}
-
 	err := signState.GetErrorIfLessOrEqual(ssc.Height, ssc.Round, ssc.Step, nil)
 	if err != nil {
 		return err
@@ -137,10 +133,10 @@ func (signState *SignState) Save(
 	signState.Step = ssc.Step
 	signState.Signature = ssc.Signature
 	signState.SignBytes = ssc.SignBytes
-	if asyncWaitGroup != nil {
-		asyncWaitGroup.Add(1)
+	if pendingDiskWG != nil {
+		pendingDiskWG.Add(1)
 		go func() {
-			defer asyncWaitGroup.Done()
+			defer pendingDiskWG.Done()
 			signState.save()
 		}()
 	} else {
