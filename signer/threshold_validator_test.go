@@ -11,11 +11,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	tmcryptoed25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	"github.com/tendermint/tendermint/crypto/tmhash"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmrand "github.com/tendermint/tendermint/libs/rand"
-	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tm "github.com/tendermint/tendermint/types"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
@@ -64,7 +63,7 @@ func TestThresholdValidator2of2(t *testing.T) {
 		PublicKey: rsaKey2.PublicKey,
 	}}
 
-	privateKey := tmCryptoEd25519.GenPrivKey()
+	privateKey := tmcryptoed25519.GenPrivKey()
 
 	privKeyBytes := privateKey[:]
 	secretShares := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
@@ -118,10 +117,11 @@ func TestThresholdValidator2of2(t *testing.T) {
 
 	time.Sleep(3 * time.Second) // Ensure there is a leader
 
-	var proposal tmProto.Proposal
-	proposal.Height = 1
-	proposal.Round = 0
-	proposal.Type = tmProto.ProposalType
+	proposal := tmproto.Proposal{
+		Height: 1,
+		Round:  0,
+		Type:   tmproto.ProposalType,
+	}
 
 	signBytes := tm.ProposalSignBytes(testChainID, &proposal)
 
@@ -167,7 +167,7 @@ func TestThresholdValidator3of3(t *testing.T) {
 		PublicKey: rsaKey3.PublicKey,
 	}}
 
-	privateKey := tmCryptoEd25519.GenPrivKey()
+	privateKey := tmcryptoed25519.GenPrivKey()
 
 	privKeyBytes := privateKey[:]
 	secretShares := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
@@ -233,10 +233,11 @@ func TestThresholdValidator3of3(t *testing.T) {
 
 	time.Sleep(3 * time.Second) // Ensure there is a leader
 
-	var proposal tmProto.Proposal
-	proposal.Height = 1
-	proposal.Round = 0
-	proposal.Type = tmProto.ProposalType
+	proposal := tmproto.Proposal{
+		Height: 1,
+		Round:  0,
+		Type:   tmproto.ProposalType,
+	}
 
 	signBytes := tm.ProposalSignBytes(testChainID, &proposal)
 
@@ -285,7 +286,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 		PublicKey: rsaKey3.PublicKey,
 	}}
 
-	privateKey := tmCryptoEd25519.GenPrivKey()
+	privateKey := tmcryptoed25519.GenPrivKey()
 
 	privKeyBytes := privateKey[:]
 	secretShares := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
@@ -354,10 +355,10 @@ func TestThresholdValidator2of3(t *testing.T) {
 
 	time.Sleep(3 * time.Second) // Ensure there is a leader
 
-	proposal := tmProto.Proposal{
+	proposal := tmproto.Proposal{
 		Height: 1,
 		Round:  20,
-		Type:   tmProto.ProposalType,
+		Type:   tmproto.ProposalType,
 	}
 
 	signBytes := tm.ProposalSignBytes(testChainID, &proposal)
@@ -371,10 +372,10 @@ func TestThresholdValidator2of3(t *testing.T) {
 
 	require.Len(t, firstSignature, 64)
 
-	proposal = tmProto.Proposal{
+	proposal = tmproto.Proposal{
 		Height:    1,
 		Round:     20,
-		Type:      tmProto.ProposalType,
+		Type:      tmproto.ProposalType,
 		Timestamp: time.Now(),
 	}
 
@@ -387,23 +388,24 @@ func TestThresholdValidator2of3(t *testing.T) {
 	blockID := tmproto.BlockID{Hash: randHash,
 		PartSetHeader: tmproto.PartSetHeader{Total: 5, Hash: randHash}}
 
-	proposal = tmProto.Proposal{
+	proposal = tmproto.Proposal{
 		Height:  1,
 		Round:   20,
-		Type:    tmProto.ProposalType,
+		Type:    tmproto.ProposalType,
 		BlockID: blockID,
 	}
 
-	// different than single-signer mode, threshold mode will be successful for this, but it will return the same signature as before
+	// different than single-signer mode, threshold mode will be successful for this,
+	// but it will return the same signature as before.
 	err = validator.SignProposal(testChainID, &proposal)
 	require.NoError(t, err)
 
 	require.True(t, bytes.Equal(firstSignature, proposal.Signature))
 
-	proposal = tmProto.Proposal{
+	proposal = tmproto.Proposal{
 		Height: 1,
 		Round:  19,
-		Type:   tmProto.ProposalType,
+		Type:   tmproto.ProposalType,
 	}
 
 	// should not be able to sign lower than highest signed
@@ -428,10 +430,10 @@ func TestThresholdValidator2of3(t *testing.T) {
 	err = validator.SignProposal(testChainID, &proposal)
 	require.Error(t, err, "double sign!")
 
-	proposal = tmProto.Proposal{
+	proposal = tmproto.Proposal{
 		Height: 1,
 		Round:  21,
-		Type:   tmProto.ProposalType,
+		Type:   tmproto.ProposalType,
 	}
 
 	// signing higher block now should succeed

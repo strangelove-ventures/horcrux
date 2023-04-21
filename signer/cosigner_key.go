@@ -7,15 +7,15 @@ import (
 	"os"
 
 	amino "github.com/tendermint/go-amino"
-	tmCrypto "github.com/tendermint/tendermint/crypto"
-	tmEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
-	tmCryptoEncoding "github.com/tendermint/tendermint/crypto/encoding"
-	tmProtoCrypto "github.com/tendermint/tendermint/proto/tendermint/crypto"
+	tmcrypto "github.com/tendermint/tendermint/crypto"
+	tmed25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	tmcryptoencoding "github.com/tendermint/tendermint/crypto/encoding"
+	tmprotocrypto "github.com/tendermint/tendermint/proto/tendermint/crypto"
 )
 
 // CosignerKey is a single key for an m-of-n threshold signer.
 type CosignerKey struct {
-	PubKey       tmCrypto.PubKey  `json:"pub_key"`
+	PubKey       tmcrypto.PubKey  `json:"pub_key"`
 	ShareKey     []byte           `json:"secret_share"`
 	RSAKey       rsa.PrivateKey   `json:"rsa_key"`
 	ID           int              `json:"id"`
@@ -33,7 +33,7 @@ func (cosignerKey *CosignerKey) MarshalJSON() ([]byte, error) {
 		rsaPubKeysBytes = append(rsaPubKeysBytes, publicBytes)
 	}
 
-	protoPubkey, err := tmCryptoEncoding.PubKeyToProto(cosignerKey.PubKey)
+	protoPubkey, err := tmcryptoencoding.PubKeyToProto(cosignerKey.PubKey)
 	if err != nil {
 		return nil, err
 	}
@@ -75,8 +75,8 @@ func (cosignerKey *CosignerKey) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	var pubkey tmCrypto.PubKey
-	var protoPubkey tmProtoCrypto.PublicKey
+	var pubkey tmcrypto.PubKey
+	var protoPubkey tmprotocrypto.PublicKey
 	err = protoPubkey.Unmarshal(aux.PubkeyBytes)
 
 	// Prior to the tendermint protobuf migration, the public key bytes in key files
@@ -86,17 +86,17 @@ func (cosignerKey *CosignerKey) UnmarshalJSON(data []byte) error {
 	// To support reading the public key bytes from these key files, we fallback to
 	// amino unmarshalling if the protobuf unmarshalling fails
 	if err != nil {
-		var pub tmEd25519.PubKey
+		var pub tmed25519.PubKey
 		codec := amino.NewCodec()
-		codec.RegisterInterface((*tmCrypto.PubKey)(nil), nil)
-		codec.RegisterConcrete(tmEd25519.PubKey{}, "tendermint/PubKeyEd25519", nil)
+		codec.RegisterInterface((*tmcrypto.PubKey)(nil), nil)
+		codec.RegisterConcrete(tmed25519.PubKey{}, "tendermint/PubKeyEd25519", nil)
 		errInner := codec.UnmarshalBinaryBare(aux.PubkeyBytes, &pub)
 		if errInner != nil {
 			return err
 		}
 		pubkey = pub
 	} else {
-		pubkey, err = tmCryptoEncoding.PubKeyFromProto(protoPubkey)
+		pubkey, err = tmcryptoencoding.PubKeyFromProto(protoPubkey)
 		if err != nil {
 			return err
 		}

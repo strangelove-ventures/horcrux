@@ -13,7 +13,6 @@ import (
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmrand "github.com/tendermint/tendermint/libs/rand"
 	tmprivval "github.com/tendermint/tendermint/privval"
-	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tm "github.com/tendermint/tendermint/types"
 )
@@ -33,7 +32,11 @@ func TestSingleSignerValidator(t *testing.T) {
 
 	privateKey := tmcryptoed25519.GenPrivKey()
 
-	marshaled, err := tmjson.Marshal(tmprivval.FilePVKey{Address: privateKey.PubKey().Address(), PubKey: privateKey.PubKey(), PrivKey: privateKey})
+	marshaled, err := tmjson.Marshal(tmprivval.FilePVKey{
+		Address: privateKey.PubKey().Address(),
+		PubKey:  privateKey.PubKey(),
+		PrivKey: privateKey,
+	})
 	require.NoError(t, err)
 
 	err = os.WriteFile(runtimeConfig.KeyFilePathSingleSigner(), marshaled, 0600)
@@ -41,10 +44,10 @@ func TestSingleSignerValidator(t *testing.T) {
 
 	validator := NewSingleSignerValidator(runtimeConfig)
 
-	proposal := tmProto.Proposal{
+	proposal := tmproto.Proposal{
 		Height: 1,
 		Round:  20,
-		Type:   tmProto.ProposalType,
+		Type:   tmproto.ProposalType,
 	}
 
 	signBytes := tm.ProposalSignBytes(testChainID, &proposal)
@@ -54,10 +57,10 @@ func TestSingleSignerValidator(t *testing.T) {
 
 	require.True(t, privateKey.PubKey().VerifySignature(signBytes, proposal.Signature))
 
-	proposal = tmProto.Proposal{
+	proposal = tmproto.Proposal{
 		Height:    1,
 		Round:     20,
-		Type:      tmProto.ProposalType,
+		Type:      tmproto.ProposalType,
 		Timestamp: time.Now(),
 	}
 
@@ -70,10 +73,10 @@ func TestSingleSignerValidator(t *testing.T) {
 	blockID := tmproto.BlockID{Hash: randHash,
 		PartSetHeader: tmproto.PartSetHeader{Total: 5, Hash: randHash}}
 
-	proposal = tmProto.Proposal{
+	proposal = tmproto.Proposal{
 		Height:  1,
 		Round:   20,
-		Type:    tmProto.ProposalType,
+		Type:    tmproto.ProposalType,
 		BlockID: blockID,
 	}
 
@@ -81,10 +84,10 @@ func TestSingleSignerValidator(t *testing.T) {
 	err = validator.SignProposal(testChainID, &proposal)
 	require.Error(t, err, "double sign!")
 
-	proposal = tmProto.Proposal{
+	proposal = tmproto.Proposal{
 		Height: 1,
 		Round:  19,
-		Type:   tmProto.ProposalType,
+		Type:   tmproto.ProposalType,
 	}
 
 	// should not be able to sign lower than highest signed
@@ -101,10 +104,10 @@ func TestSingleSignerValidator(t *testing.T) {
 	err = validator.SignProposal(testChainID, &proposal)
 	require.Error(t, err, "double sign!")
 
-	proposal = tmProto.Proposal{
+	proposal = tmproto.Proposal{
 		Height: 1,
 		Round:  21,
-		Type:   tmProto.ProposalType,
+		Type:   tmproto.ProposalType,
 	}
 
 	// signing higher block now should succeed
