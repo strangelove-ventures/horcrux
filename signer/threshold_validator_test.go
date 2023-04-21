@@ -10,9 +10,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	tmcryptoed25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
+	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tm "github.com/tendermint/tendermint/types"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
@@ -60,7 +60,7 @@ func TestThresholdValidator2of2(t *testing.T) {
 		PublicKey: rsaKey2.PublicKey,
 	}}
 
-	privateKey := tmCryptoEd25519.GenPrivKey()
+	privateKey := tmcryptoed25519.GenPrivKey()
 
 	privKeyBytes := privateKey[:]
 	secretShares := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
@@ -130,10 +130,10 @@ func TestThresholdValidator2of2(t *testing.T) {
 
 	time.Sleep(3 * time.Second) // Ensure there is a leader
 
-	var proposal tmProto.Proposal
+	var proposal tmproto.Proposal
 	proposal.Height = 1
 	proposal.Round = 0
-	proposal.Type = tmProto.ProposalType
+	proposal.Type = tmproto.ProposalType
 
 	signBytes := tm.ProposalSignBytes(testChainID, &proposal)
 
@@ -179,7 +179,7 @@ func TestThresholdValidator3of3(t *testing.T) {
 		PublicKey: rsaKey3.PublicKey,
 	}}
 
-	privateKey := tmCryptoEd25519.GenPrivKey()
+	privateKey := tmcryptoed25519.GenPrivKey()
 
 	privKeyBytes := privateKey[:]
 	secretShares := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
@@ -268,10 +268,10 @@ func TestThresholdValidator3of3(t *testing.T) {
 
 	time.Sleep(3 * time.Second) // Ensure there is a leader
 
-	var proposal tmProto.Proposal
+	var proposal tmproto.Proposal
 	proposal.Height = 1
 	proposal.Round = 0
-	proposal.Type = tmProto.ProposalType
+	proposal.Type = tmproto.ProposalType
 
 	signBytes := tm.ProposalSignBytes(testChainID, &proposal)
 
@@ -320,7 +320,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 		PublicKey: rsaKey3.PublicKey,
 	}}
 
-	privateKey := tmCryptoEd25519.GenPrivKey()
+	privateKey := tmcryptoed25519.GenPrivKey()
 
 	privKeyBytes := privateKey[:]
 	secretShares := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
@@ -409,10 +409,10 @@ func TestThresholdValidator2of3(t *testing.T) {
 
 	time.Sleep(3 * time.Second) // Ensure there is a leader
 
-	var proposal tmProto.Proposal
+	var proposal tmproto.Proposal
 	proposal.Height = 1
 	proposal.Round = 0
-	proposal.Type = tmProto.ProposalType
+	proposal.Type = tmproto.ProposalType
 
 	signBytes := tm.ProposalSignBytes(testChainID, &proposal)
 

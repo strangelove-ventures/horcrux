@@ -19,11 +19,11 @@ import (
 	"time"
 
 	"github.com/Jille/raft-grpc-leader-rpc/leaderhealth"
-	gRPCTransport "github.com/Jille/raft-grpc-transport"
+	raftgrpctransport "github.com/Jille/raft-grpc-transport"
 	"github.com/Jille/raftadmin"
 	"github.com/hashicorp/raft"
 	boltdb "github.com/hashicorp/raft-boltdb/v2"
-	proto "github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"github.com/tendermint/tendermint/libs/log"
 	"github.com/tendermint/tendermint/libs/service"
 	"google.golang.org/grpc"
@@ -138,7 +138,7 @@ func p2pURLToRaftAddress(p2pURL string) string {
 // Open opens the store. If enableSingle is set, and there are no existing peers,
 // then this node becomes the first node, and therefore leader, of the cluster.
 // localID should be the server identifier for this node.
-func (s *RaftStore) Open() (*gRPCTransport.Manager, error) {
+func (s *RaftStore) Open() (*raftgrpctransport.Manager, error) {
 	// Setup Raft configuration.
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(s.NodeID)
@@ -166,7 +166,7 @@ func (s *RaftStore) Open() (*gRPCTransport.Manager, error) {
 	raftAddress := raft.ServerAddress(p2pURLToRaftAddress(s.RaftBind))
 
 	// Setup Raft communication.
-	transportManager := gRPCTransport.New(raftAddress, []grpc.DialOption{
+	transportManager := raftgrpctransport.New(raftAddress, []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	})
 

@@ -1,61 +1,98 @@
 linters:
   enable:
     - bodyclose
-    - deadcode
     - depguard
     - dogsled
-    # - errcheck
-    # - funlen
-    # - gochecknoglobals
-    # - gochecknoinits
     - goconst
     - gocritic
-    # - gocyclo
-    # - godox
     - gofmt
     - goimports
-    # - golint
     - gosec
     - gosimple
     - govet
+    - importas
     - ineffassign
-    # - interfacer
     - lll
     - misspell
-    # - maligned
     - nakedret
     - prealloc
-    # - scopelint
+    - revive
     - staticcheck
-    - structcheck
     - stylecheck
     - typecheck
     - unconvert
-    # - unparam
     - unused
-    - varcheck
-    # - whitespace
-    # - wsl
-    # - gocognit
     - nolintlint
-
-issues:
-  exclude-rules:
-    - linters:
-        - lll
-      source: "https://"
-  max-same-issues: 50
 
 linters-settings:
   dogsled:
     max-blank-identifiers: 3
+  importas:
+    no-extra-aliases: true
+    alias:
+      - pkg: github.com/cosmos/cosmos-sdk/crypto/codec
+        alias: cryptocodec
+      - pkg: github.com/cosmos/cosmos-sdk/crypto/types
+        alias: cryptotypes
+      - pkg: github.com/cosmos/cosmos-sdk/x/slashing/types
+        alias: slashingtypes
+      - pkg: github.com/tendermint/tendermint/types
+        alias: tm
+      - pkg: github.com/tendermint/tendermint/config
+        alias: tmconfig
+      - pkg: github.com/tendermint/tendermint/crypto
+        alias: tmcrypto
+      - pkg: github.com/tendermint/tendermint/crypto/ed25519
+        alias: tmcryptoed25519
+      - pkg: github.com/tendermint/tendermint/crypto/encoding
+        alias: tmcryptoencoding
+      - pkg: github.com/tendermint/go-amino
+        alias: amino
+      - pkg: github.com/tendermint/tendermint/libs/bytes
+        alias: tmbytes
+      - pkg: github.com/tendermint/tendermint/libs/json
+        alias: tmjson
+      - pkg: github.com/tendermint/tendermint/libs/log
+        alias: tmlog
+      - pkg: github.com/tendermint/tendermint/libs/net
+        alias: tmnet
+      - pkg: github.com/tendermint/tendermint/libs/os
+        alias: tmos
+      - pkg: github.com/tendermint/tendermint/libs/service
+        alias: tmservice
+      - pkg: github.com/tendermint/tendermint/p2p/conn
+        alias: tmp2pconn
+      - pkg: github.com/tendermint/tendermint/proto/tendermint/types
+        alias: tmproto
+      - pkg: github.com/tendermint/tendermint/proto/tendermint/crypto
+        alias: tmprotocrypto
+      - pkg: github.com/tendermint/tendermint/proto/tendermint/privval
+        alias: tmprotoprivval
+      - pkg: github.com/tendermint/tendermint/rpc/client
+        alias: tmrpcclient
+      - pkg: github.com/tendermint/tendermint/rpc/client/http
+        alias: tmrpchttp
+      - pkg: github.com/tendermint/tendermint/rpc/jsonrpc/client
+        alias: tmrpcjsonclient
+      - pkg: github.com/tendermint/tendermint/rpc/jsonrpc/types
+        alias: tmrpcjsontypes
+      - pkg: github.com/tendermint/tendermint/rpc/core/types
+        alias: tmrpctypes
+      - pkg: github.com/grpc-ecosystem/go-grpc-middleware/retry
+        alias: grpcretry
+      - pkg: github.com/armon/go-metrics/prometheus
+        alias: gmprometheus
+      - pkg: github.com/mitchellh/go-homedir
+        alias: homedir
+      - pkg: gitlab.com/unit410/threshold-ed25519/pkg
+        alias: tsed25519
+      - pkg: github.com/Jille/raft-grpc-transport
+        alias: raftgrpctransport
+      - pkg: github.com/hashicorp/raft-boltdb/v2
+        alias: boltdb
+
   maligned:
     suggest-new: true
-  # govet:
-  #   check-shadowing: true
-  # golint:
-  #   min-confidence: 0
-  #   gocyclo:
-  #     min-complexity: 10
+  govet:
     misspell:
       locale: US

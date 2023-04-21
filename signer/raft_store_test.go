@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	tmcryptoed25519 "github.com/tendermint/tendermint/crypto/ed25519"
 )
 
 // Test_StoreInMemOpenSingleNode tests that a command can be applied to the log
@@ -17,7 +17,7 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 	tmpDir, _ := os.MkdirTemp("", "store_test")
 	defer os.RemoveAll(tmpDir)
 
-	dummyPub := tmCryptoEd25519.PubKey{}
+	dummyPub := tmcryptoed25519.PubKey{}
 
 	bitSize := 4096
 	rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)

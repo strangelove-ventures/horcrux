@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/hashicorp/raft"
-	proto "github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/libs/log"
-	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
-	rpcTypes "github.com/tendermint/tendermint/rpc/jsonrpc/types"
+	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
+	tmrpcjsontypes "github.com/tendermint/tendermint/rpc/jsonrpc/types"
 	tm "github.com/tendermint/tendermint/types"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
@@ -112,7 +112,7 @@ func (pv *ThresholdValidator) GetPubKey() (crypto.PubKey, error) {
 
 // SignVote signs a canonical representation of the vote, along with the
 // chainID. Implements PrivValidator.
-func (pv *ThresholdValidator) SignVote(chainID string, vote *tmProto.Vote) error {
+func (pv *ThresholdValidator) SignVote(chainID string, vote *tmproto.Vote) error {
 	block := &Block{
 		Height:    vote.Height,
 		Round:     int64(vote.Round),
@@ -130,7 +130,7 @@ func (pv *ThresholdValidator) SignVote(chainID string, vote *tmProto.Vote) error
 
 // SignProposal signs a canonical representation of the proposal, along with
 // the chainID. Implements PrivValidator.
-func (pv *ThresholdValidator) SignProposal(chainID string, proposal *tmProto.Proposal) error {
+func (pv *ThresholdValidator) SignProposal(chainID string, proposal *tmproto.Proposal) error {
 	block := &Block{
 		Height:    proposal.Height,
 		Round:     int64(proposal.Round),
@@ -335,8 +335,8 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 		totalNotRaftLeader.Inc()
 		signRes, err := pv.raftStore.LeaderSignBlock(CosignerSignBlockRequest{chainID, block})
 		if err != nil {
-			if _, ok := err.(*rpcTypes.RPCError); ok {
-				rpcErrUnwrapped := err.(*rpcTypes.RPCError).Data
+			if _, ok := err.(*tmrpcjsontypes.RPCError); ok {
+				rpcErrUnwrapped := err.(*tmrpcjsontypes.RPCError).Data
 				// Need to return BeyondBlockError after proxy since the error type will be lost over RPC
 				if len(rpcErrUnwrapped) > 33 && rpcErrUnwrapped[:33] == "Progress already started on block" {
 					return nil, stamp, &BeyondBlockError{msg: rpcErrUnwrapped}

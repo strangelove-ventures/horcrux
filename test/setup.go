@@ -18,7 +18,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type TestLogger interface {
+type Logger interface {
 	Name() string
 	Log(...interface{})
 	Logf(string, ...interface{})
@@ -40,19 +40,19 @@ func SetupTestRun(t *testing.T) (context.Context, string, *dockertest.Pool, stri
 	require.NoError(t, err)
 
 	// build the horcrux image
-	require.NoError(t, BuildTestSignerImage(pool))
+	require.NoError(t, BuildSignerImage(pool))
 
 	return context.Background(), home, pool, network.ID
 }
 
 // assemble gentx, build genesis file, configure peering, and start chain
 func Genesis(
-	tl TestLogger,
 	ctx context.Context,
+	tl Logger,
 	chain *ChainType,
 	nonHorcruxValidators,
-	fullnodes []*TestNode,
-	horcruxValidators []*TestValidator,
+	fullnodes []*Node,
+	horcruxValidators []*Validator,
 ) error {
 	var eg errgroup.Group
 
@@ -99,8 +99,8 @@ func Genesis(
 		return err
 	}
 
-	var validators TestNodes
-	var nodes TestNodes
+	var validators Nodes
+	var nodes Nodes
 
 	validators = append(validators, nonHorcruxValidators...)
 	nodes = append(nodes, nonHorcruxValidators...)
