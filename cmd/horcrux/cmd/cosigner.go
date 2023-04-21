@@ -14,7 +14,6 @@ import (
 	"github.com/strangelove-ventures/horcrux/signer"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmService "github.com/tendermint/tendermint/libs/service"
-	"github.com/tendermint/tendermint/types"
 )
 
 func cosignerCmd() *cobra.Command {
@@ -121,7 +120,6 @@ func startCosignerCmd() *cobra.Command {
 			var (
 				// services to stop on shutdown
 				services []tmService.Service
-				pv       types.PrivValidator
 				logger   = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator")
 			)
 
@@ -132,8 +130,6 @@ func startCosignerCmd() *cobra.Command {
 
 			logger.Info("Tendermint Validator", "mode", "threshold",
 				"priv-key", config.Config.PrivValKeyFile, "priv-state-dir", config.StateDir)
-
-			var val types.PrivValidator
 
 			key, err := signer.LoadCosignerKey(keyFile)
 			if err != nil {
@@ -209,7 +205,7 @@ func startCosignerCmd() *cobra.Command {
 			}
 			services = append(services, raftStore)
 
-			val = signer.NewThresholdValidator(
+			val := signer.NewThresholdValidator(
 				logger,
 				&config,
 				key.PubKey,
@@ -220,9 +216,9 @@ func startCosignerCmd() *cobra.Command {
 				raftStore,
 			)
 
-			raftStore.SetThresholdValidator(val.(*signer.ThresholdValidator))
+			raftStore.SetThresholdValidator(val)
 
-			pv = &signer.PvGuard{PrivValidator: val}
+			pv := &signer.PvGuard{PrivValidator: val}
 
 			pubkey, err := pv.GetPubKey()
 			if err != nil {

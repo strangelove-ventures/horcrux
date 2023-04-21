@@ -113,6 +113,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		total,
 		threshold,
 	)
+	defer cosigner1.waitForSignStatesToFlushToDisk()
 	cosigner2 := NewLocalCosigner(
 		&RuntimeConfig{},
 		key2,
@@ -123,6 +124,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		total,
 		threshold,
 	)
+	defer cosigner2.waitForSignStatesToFlushToDisk()
 
 	require.Equal(t, cosigner1.GetID(), 1)
 	require.Equal(t, cosigner2.GetID(), 2)

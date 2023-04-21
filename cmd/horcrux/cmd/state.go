@@ -112,12 +112,12 @@ func setStateCmd() *cobra.Command {
 				Signature: nil,
 				SignBytes: nil,
 			}
-			err = pv.Save(signState, nil, false)
+			err = pv.Save(signState, nil)
 			if err != nil {
 				fmt.Printf("error saving privval sign state")
 				return err
 			}
-			err = share.Save(signState, nil, false)
+			err = share.Save(signState, nil)
 			if err != nil {
 				fmt.Printf("error saving share sign state")
 				return err
@@ -200,12 +200,12 @@ func importStateCmd() *cobra.Command {
 				"  Step:      %v\n",
 				signState.Height, signState.Round, signState.Step)
 
-			err = pv.Save(signState, nil, false)
+			err = pv.Save(signState, nil)
 			if err != nil {
 				fmt.Printf("error saving privval sign state")
 				return err
 			}
-			err = share.Save(signState, nil, false)
+			err = share.Save(signState, nil)
 			if err != nil {
 				fmt.Printf("error saving share sign state")
 				return err
