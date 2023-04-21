@@ -123,18 +123,6 @@ func initCmd() *cobra.Command {
 				return err
 			}
 
-			// TODO - move to dynamic initialization
-			// if node is a cosigner initialize state files
-			// if cs {
-			// 	if _, err = signer.LoadOrCreateSignState(config.PrivValStateFile(cid)); err != nil {
-			// 		return err
-			// 	}
-			// 	if _, err = signer.LoadOrCreateSignState(config.ShareStateFile(cid)); err != nil {
-			// 		return err
-			// 	}
-			// }
-			// TODO end - move to dynamic initialization
-
 			fmt.Printf("Successfully initialized configuration: %s\n", config.ConfigFile)
 			return nil
 		},

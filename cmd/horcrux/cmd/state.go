@@ -154,13 +154,13 @@ func importStateCmd() *cobra.Command {
 				return err
 			}
 
-			// Recreate PrivValStateFile if necessary
+			// Recreate privValStateFile if necessary
 			pv, err := signer.LoadOrCreateSignState(config.PrivValStateFile(chainID))
 			if err != nil {
 				return err
 			}
 
-			// ShareStateFile does not exist during default config init, so create if necessary
+			// shareStateFile does not exist during default config init, so create if necessary
 			share, err := signer.LoadOrCreateSignState(config.ShareStateFile(chainID))
 			if err != nil {
 				return err

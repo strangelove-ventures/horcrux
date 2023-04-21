@@ -450,10 +450,11 @@ func (cosigner *LocalCosigner) setEphemeralSecretPart(req CosignerSetEphemeralSe
 		return errors.New("SourceSig field is required")
 	}
 
-	digestMsg := CosignerEphemeralSecretPart{}
-	digestMsg.SourceID = req.SourceID
-	digestMsg.SourceEphemeralSecretPublicKey = req.SourceEphemeralSecretPublicKey
-	digestMsg.EncryptedSharePart = req.EncryptedSharePart
+	digestMsg := CosignerEphemeralSecretPart{
+		SourceID:                       req.SourceID,
+		SourceEphemeralSecretPublicKey: req.SourceEphemeralSecretPublicKey,
+		EncryptedSharePart:             req.EncryptedSharePart,
+	}
 
 	digestBytes, err := tmjson.Marshal(digestMsg)
 	if err != nil {
