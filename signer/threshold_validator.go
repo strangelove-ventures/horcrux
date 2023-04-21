@@ -35,6 +35,8 @@ type ThresholdValidator struct {
 	raftStore *RaftStore
 
 	logger log.Logger
+
+	asyncWaitGroup sync.WaitGroup
 }
 
 type ChainSignState struct {
@@ -75,6 +77,7 @@ func (pv *ThresholdValidator) SaveLastSignedState(chainID string, signState Sign
 		signState,
 		pv.chainState[chainID].lastSignStateMutex,
 		true,
+		&pv.asyncWaitGroup,
 	)
 }
 
@@ -83,7 +86,22 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, signS
 		signState,
 		pv.chainState[chainID].lastSignStateInitiatedMutex,
 		true,
+		&pv.asyncWaitGroup,
 	)
+}
+
+func (pv *ThresholdValidator) Stop() {
+	pv.waitForSignStatesToFlushToDisk()
+}
+
+func (pv *ThresholdValidator) waitForSignStatesToFlushToDisk() {
+	pv.asyncWaitGroup.Wait()
+
+	switch cosigner := pv.cosigner.(type) {
+	case *LocalCosigner:
+		cosigner.waitForSignStatesToFlushToDisk()
+	default:
+	}
 }
 
 // GetPubKey returns the public key of the validator.
@@ -571,6 +589,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 		newLss.SignStateConsensus,
 		pv.chainState[chainID].lastSignStateMutex,
 		true,
+		&pv.asyncWaitGroup,
 	)
 	if err != nil {
 		if _, isSameHRSError := err.(*SameHRSError); !isSameHRSError {

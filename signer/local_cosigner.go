@@ -100,6 +100,8 @@ type LocalCosigner struct {
 	peers map[int]CosignerPeer
 
 	address string
+
+	asyncWaitGroup sync.WaitGroup
 }
 
 func (cosigner *LocalCosigner) SaveLastSignedState(chainID string, signState SignStateConsensus) error {
@@ -107,7 +109,12 @@ func (cosigner *LocalCosigner) SaveLastSignedState(chainID string, signState Sig
 		signState,
 		cosigner.chainState[chainID].lastSignStateMutex,
 		true,
+		&cosigner.asyncWaitGroup,
 	)
+}
+
+func (cosigner *LocalCosigner) waitForSignStatesToFlushToDisk() {
+	cosigner.asyncWaitGroup.Wait()
 }
 
 func NewLocalCosigner(
@@ -233,7 +240,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		Step:      hrst.Step,
 		Signature: sig,
 		SignBytes: req.SignBytes,
-	}, nil, true)
+	}, nil, true, &cosigner.asyncWaitGroup)
 
 	if err != nil {
 		if _, isSameHRSError := err.(*SameHRSError); !isSameHRSError {

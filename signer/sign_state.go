@@ -112,7 +112,7 @@ func (signState *SignState) GetFromCache(hrs HRSKey, lock *sync.Mutex) (HRSKey, 
 	return latestBlock, nil
 }
 
-func (signState *SignState) Save(ssc SignStateConsensus, lock *sync.Mutex, async bool) error {
+func (signState *SignState) Save(ssc SignStateConsensus, lock *sync.Mutex, async bool, asyncWaitGroup *sync.WaitGroup) error {
 	// One lock/unlock for less/equal check and mutation.
 	// Setting nil for lock for getErrorIfLessOrEqual to avoid recursive lock
 	if lock != nil {
@@ -139,7 +139,13 @@ func (signState *SignState) Save(ssc SignStateConsensus, lock *sync.Mutex, async
 	signState.Signature = ssc.Signature
 	signState.SignBytes = ssc.SignBytes
 	if async {
+		if asyncWaitGroup != nil {
+			asyncWaitGroup.Add(1)
+		}
 		go func() {
+			if asyncWaitGroup != nil {
+				defer asyncWaitGroup.Done()
+			}
 			signState.save()
 		}()
 	} else {

@@ -91,6 +91,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		total,
 		threshold,
 	)
+	defer cosigner1.waitForSignStatesToFlushToDisk()
 	cosigner2 := NewLocalCosigner(
 		&RuntimeConfig{},
 		key2,
@@ -100,6 +101,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		total,
 		threshold,
 	)
+	defer cosigner2.waitForSignStatesToFlushToDisk()
 
 	err = cosigner1.LoadSignStateIfNecessary(testChainID)
 	require.NoError(t, err)

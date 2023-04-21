@@ -21,6 +21,10 @@ import (
 )
 
 func TestIsRunning(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("test only valid on Linux")
+	}
+
 	homeDir := t.TempDir()
 	pidFilePath := filepath.Join(homeDir, "horcrux.pid")
 	pid := os.Getpid() + 1

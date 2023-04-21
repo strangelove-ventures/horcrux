@@ -129,7 +129,7 @@ func (softSigner *ThresholdSignerSoft) Sign(
 		Step:      hrst.Step,
 		Signature: sig,
 		SignBytes: req.SignBytes,
-	}, nil, true)
+	}, nil, true, nil)
 	if err != nil {
 		var isSameHRSError *SameHRSError
 		if !errors.As(err, &isSameHRSError) {

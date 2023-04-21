@@ -84,3 +84,5 @@ func (pv *SingleSignerValidator) loadChainStateIfNecessary(chainID string) (*Sin
 
 	return chainState, nil
 }
+
+func (pv *SingleSignerValidator) Stop() {}
