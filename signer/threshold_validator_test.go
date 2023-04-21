@@ -1,6 +1,7 @@
 package signer
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"path/filepath"
@@ -11,8 +12,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	"github.com/tendermint/tendermint/crypto/tmhash"
 	tmlog "github.com/tendermint/tendermint/libs/log"
+	tmrand "github.com/tendermint/tendermint/libs/rand"
 	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
+	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tm "github.com/tendermint/tendermint/types"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
@@ -350,18 +354,87 @@ func TestThresholdValidator2of3(t *testing.T) {
 
 	time.Sleep(3 * time.Second) // Ensure there is a leader
 
-	var proposal tmProto.Proposal
-	proposal.Height = 1
-	proposal.Round = 0
-	proposal.Type = tmProto.ProposalType
+	proposal := tmProto.Proposal{
+		Height: 1,
+		Round:  20,
+		Type:   tmProto.ProposalType,
+	}
 
 	signBytes := tm.ProposalSignBytes(testChainID, &proposal)
 
 	err = validator.SignProposal(testChainID, &proposal)
-	if err != nil {
-		t.Logf("%v", err)
-	}
 	require.NoError(t, err)
 
 	require.True(t, privateKey.PubKey().VerifySignature(signBytes, proposal.Signature))
+
+	firstSignature := proposal.Signature
+
+	require.Len(t, firstSignature, 64)
+
+	proposal = tmProto.Proposal{
+		Height:    1,
+		Round:     20,
+		Type:      tmProto.ProposalType,
+		Timestamp: time.Now(),
+	}
+
+	// should be able to sign same proposal with only differing timestamp
+	err = validator.SignProposal(testChainID, &proposal)
+	require.NoError(t, err)
+
+	// construct different block ID for proposal at same height as highest signed
+	randHash := tmrand.Bytes(tmhash.Size)
+	blockID := tmproto.BlockID{Hash: randHash,
+		PartSetHeader: tmproto.PartSetHeader{Total: 5, Hash: randHash}}
+
+	proposal = tmProto.Proposal{
+		Height:  1,
+		Round:   20,
+		Type:    tmProto.ProposalType,
+		BlockID: blockID,
+	}
+
+	// different than single-signer mode, threshold mode will be successful for this, but it will return the same signature as before
+	err = validator.SignProposal(testChainID, &proposal)
+	require.NoError(t, err)
+
+	require.True(t, bytes.Equal(firstSignature, proposal.Signature))
+
+	proposal = tmProto.Proposal{
+		Height: 1,
+		Round:  19,
+		Type:   tmProto.ProposalType,
+	}
+
+	// should not be able to sign lower than highest signed
+	err = validator.SignProposal(testChainID, &proposal)
+	require.Error(t, err, "double sign!")
+
+	// lower LSS should sign for different chain ID
+	err = validator.SignProposal("different", &proposal)
+	require.NoError(t, err)
+
+	// reinitialize validator to make sure new runtime will not allow double sign
+	validator = NewThresholdValidator(
+		tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
+		runtimeConfig,
+		privateKey.PubKey(),
+		int(threshold),
+		cosigner1,
+		thresholdPeers,
+		raftStore,
+	)
+
+	err = validator.SignProposal(testChainID, &proposal)
+	require.Error(t, err, "double sign!")
+
+	proposal = tmProto.Proposal{
+		Height: 1,
+		Round:  21,
+		Type:   tmProto.ProposalType,
+	}
+
+	// signing higher block now should succeed
+	err = validator.SignProposal(testChainID, &proposal)
+	require.NoError(t, err)
 }
