@@ -346,6 +346,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 		thresholdPeers,
 		raftStore,
 	)
+	defer validator.Stop()
 
 	err = validator.LoadSignStateIfNecessary(testChainID)
 	require.NoError(t, err)
@@ -419,7 +420,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 	require.NoError(t, err)
 
 	// reinitialize validator to make sure new runtime will not allow double sign
-	validator = NewThresholdValidator(
+	newValidator := NewThresholdValidator(
 		tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
 		runtimeConfig,
 		privateKey.PubKey(),
@@ -428,9 +429,9 @@ func TestThresholdValidator2of3(t *testing.T) {
 		thresholdPeers,
 		raftStore,
 	)
-	defer validator.Stop()
+	defer newValidator.Stop()
 
-	err = validator.SignProposal(testChainID, &proposal)
+	err = newValidator.SignProposal(testChainID, &proposal)
 	require.Error(t, err, "double sign!")
 
 	proposal = tmproto.Proposal{
@@ -440,6 +441,6 @@ func TestThresholdValidator2of3(t *testing.T) {
 	}
 
 	// signing higher block now should succeed
-	err = validator.SignProposal(testChainID, &proposal)
+	err = newValidator.SignProposal(testChainID, &proposal)
 	require.NoError(t, err)
 }
