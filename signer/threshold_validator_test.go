@@ -121,6 +121,7 @@ func TestThresholdValidator2of2(t *testing.T) {
 		thresholdPeers,
 		raftStore,
 	)
+	defer validator.Stop()
 
 	raftStore.SetThresholdValidator(validator)
 
@@ -258,6 +259,7 @@ func TestThresholdValidator3of3(t *testing.T) {
 		thresholdPeers,
 		raftStore,
 	)
+	defer validator.Stop()
 
 	raftStore.SetThresholdValidator(validator)
 
@@ -398,6 +400,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 		thresholdPeers,
 		raftStore,
 	)
+	defer validator.Stop()
 
 	raftStore.SetThresholdValidator(validator)
 

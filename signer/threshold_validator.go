@@ -42,6 +42,8 @@ type ThresholdValidator struct {
 	raftStore *RaftStore
 
 	logger log.Logger
+
+	asyncWaitGroup sync.WaitGroup
 }
 
 // NewThresholdValidator creates and returns a new ThresholdValidator
@@ -75,11 +77,27 @@ func NewThresholdValidator(
 }
 
 func (pv *ThresholdValidator) SaveLastSignedState(signState SignStateConsensus) error {
-	return pv.lastSignState.Save(signState, &pv.lastSignStateMutex, true)
+	return pv.lastSignState.Save(signState, &pv.lastSignStateMutex, &pv.asyncWaitGroup)
 }
 
 func (pv *ThresholdValidator) SaveLastSignedStateInitiated(signState SignStateConsensus) error {
-	return pv.lastSignStateInitiated.Save(signState, &pv.lastSignStateInitiatedMutex, true)
+	return pv.lastSignStateInitiated.Save(signState, &pv.lastSignStateInitiatedMutex, &pv.asyncWaitGroup)
+}
+
+// Stop safely shuts down the ThresholdValidator.
+func (pv *ThresholdValidator) Stop() {
+	pv.waitForSignStatesToFlushToDisk()
+}
+
+// waitForSignStatesToFlushToDisk waits for any sign states to finish writing to disk.
+func (pv *ThresholdValidator) waitForSignStatesToFlushToDisk() {
+	pv.asyncWaitGroup.Wait()
+
+	switch cosigner := pv.cosigner.(type) {
+	case *LocalCosigner:
+		cosigner.waitForSignStatesToFlushToDisk()
+	default:
+	}
 }
 
 // GetPubKey returns the public key of the validator.
@@ -479,7 +497,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 		SignBytes: signBytes,
 	}
 	// Err will be present if newLss is not above high watermark
-	err = pv.lastSignState.Save(newLss, &pv.lastSignStateMutex, true)
+	err = pv.lastSignState.Save(newLss, &pv.lastSignStateMutex, &pv.asyncWaitGroup)
 	if err != nil {
 		if _, isSameHRSError := err.(*SameHRSError); !isSameHRSError {
 			return nil, stamp, err

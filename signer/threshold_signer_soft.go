@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"sync"
 
 	tmcryptoed25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	tmjson "github.com/tendermint/tendermint/libs/json"
@@ -25,6 +26,8 @@ type ThresholdSignerSoft struct {
 	threshold uint8
 	// Height, Round, Step, Timestamp --> metadata
 	hrsMeta map[HRSTKey]HrsMetadata
+
+	asyncWaitGroup sync.WaitGroup
 }
 
 // NewThresholdSignerSoft constructs a ThresholdSigner
@@ -44,6 +47,14 @@ func NewThresholdSignerSoft(key CosignerKey, threshold, total uint8) ThresholdSi
 	softSigner.pubKeyBytes = ed25519Key[:]
 
 	return softSigner
+}
+
+func (softSigner *ThresholdSignerSoft) Stop() {
+	softSigner.waitForSignStatesToFlushToDisk()
+}
+
+func (softSigner *ThresholdSignerSoft) waitForSignStatesToFlushToDisk() {
+	softSigner.asyncWaitGroup.Wait()
 }
 
 // Implements ThresholdSigner
@@ -129,7 +140,7 @@ func (softSigner *ThresholdSignerSoft) Sign(
 		Step:      hrst.Step,
 		Signature: sig,
 		SignBytes: req.SignBytes,
-	}, nil, true)
+	}, nil, &softSigner.asyncWaitGroup)
 	if err != nil {
 		var isSameHRSError *SameHRSError
 		if !errors.As(err, &isSameHRSError) {

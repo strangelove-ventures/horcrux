@@ -24,6 +24,8 @@ type ThresholdSigner interface {
 	Sign(req CosignerSignRequest, m *LastSignStateWrapper) (CosignerSignResponse, error)
 
 	GetID() (int, error)
+
+	Stop()
 }
 
 // PeerMetadata holds the share and the ephermeral secret public key

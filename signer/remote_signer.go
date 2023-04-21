@@ -17,6 +17,13 @@ import (
 	tm "github.com/tendermint/tendermint/types"
 )
 
+// PrivValidator is a wrapper for tendermint PrivValidator,
+// with additional Stop method for safe shutdown.
+type PrivValidator interface {
+	tm.PrivValidator
+	Stop()
+}
+
 // ReconnRemoteSigner dials using its dialer and responds to any
 // signature requests using its privVal.
 type ReconnRemoteSigner struct {
@@ -26,7 +33,7 @@ type ReconnRemoteSigner struct {
 
 	address string
 	privKey tmCryptoEd2219.PrivKey
-	privVal tm.PrivValidator
+	privVal PrivValidator
 
 	dialer net.Dialer
 }
@@ -40,7 +47,7 @@ func NewReconnRemoteSigner(
 	config *RuntimeConfig,
 	address string,
 	logger tmLog.Logger,
-	privVal tm.PrivValidator,
+	privVal PrivValidator,
 	dialer net.Dialer,
 ) *ReconnRemoteSigner {
 	rs := &ReconnRemoteSigner{
@@ -59,6 +66,11 @@ func NewReconnRemoteSigner(
 func (rs *ReconnRemoteSigner) OnStart() error {
 	go rs.loop()
 	return nil
+}
+
+// OnStop implements cmn.Service.
+func (rs *ReconnRemoteSigner) OnStop() {
+	rs.privVal.Stop()
 }
 
 // main loop for ReconnRemoteSigner
@@ -270,7 +282,7 @@ func getRemoteSignerError(err error) *tmProtoPrivval.RemoteSignerError {
 }
 
 func StartRemoteSigners(config *RuntimeConfig, services []tmService.Service, logger tmLog.Logger,
-	privVal tm.PrivValidator, nodes []string) ([]tmService.Service, error) {
+	privVal PrivValidator, nodes []string) ([]tmService.Service, error) {
 	var err error
 	go StartMetrics()
 	for _, node := range nodes {
