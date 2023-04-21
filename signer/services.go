@@ -6,7 +6,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 
 	tmlog "github.com/tendermint/tendermint/libs/log"
@@ -69,8 +68,7 @@ manual deletion of PID file required`, pidFilePath, pid)
 }
 
 func WaitAndTerminate(logger tmlog.Logger, services []tmservice.Service, pidFilePath string) {
-	wg := sync.WaitGroup{}
-	wg.Add(1)
+	done := make(chan struct{})
 
 	pidFile, err := os.OpenFile(pidFilePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
@@ -91,7 +89,7 @@ func WaitAndTerminate(logger tmlog.Logger, services []tmservice.Service, pidFile
 				panic(err)
 			}
 		}
-		wg.Done()
+		close(done)
 	})
-	wg.Wait()
+	<-done
 }
