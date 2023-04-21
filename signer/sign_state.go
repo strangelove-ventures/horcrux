@@ -107,7 +107,7 @@ func (signState *SignState) GetFromCache(hrs HRSKey, lock *sync.Mutex) (HRSKey, 
 	return latestBlock, nil
 }
 
-// Save will update the high watermark height/round/step (HRS) if it is greater
+// Save updates the high watermark height/round/step (HRS) if it is greater
 // than the current high watermark. If pendingDiskWG is provided, the write operation
 // will be a separate goroutine (async). This allows pendingDiskWG to be used to .Wait()
 // for all pending SignState disk writes.

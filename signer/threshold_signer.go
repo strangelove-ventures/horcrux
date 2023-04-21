@@ -25,7 +25,7 @@ type ThresholdSigner interface {
 
 	GetID() (int, error)
 
-	// Stop should perform any cleanup work, such as flushing state files to disk, then shut down.
+	// Stop performs any cleanup work, such as flushing state files to disk, then shut down.
 	Stop()
 }
 
