@@ -603,8 +603,8 @@ func (tn *Node) AddGenesisAccount(ctx context.Context, address string) error {
 }
 
 // Gentx generates the gentx for a given node
-func (tn *Node) Gentx(ctx context.Context, name, pubKey string) error {
-	cmd := []string{tn.Chain.Bin, "gentx", valKey, "100000000000stake",
+func (tn *Node) Gentx(ctx context.Context, keyName, pubKey string) error {
+	cmd := []string{tn.Chain.Bin, "gentx", keyName, "100000000000stake",
 		"--pubkey", pubKey,
 		"--keyring-backend", "test",
 		"--home", tn.NodeHome(),
@@ -634,7 +634,7 @@ func (tn *Node) Start(ctx context.Context, preStart func()) error {
 		if preStart != nil {
 			preStart()
 		}
-		if err := tn.startContainer(ctx); err != nil {
+		if err := tn.startContainer(); err != nil {
 			return err
 		}
 
@@ -723,7 +723,7 @@ func (tn *Node) StopAndRemoveContainer(force bool) error {
 	})
 }
 
-func (tn *Node) startContainer(ctx context.Context) error {
+func (tn *Node) startContainer() error {
 	if err := tn.Pool.Client.StartContainer(tn.Container.ID, nil); err != nil {
 		return err
 	}
@@ -741,7 +741,7 @@ func (tn *Node) startContainer(ctx context.Context) error {
 }
 
 func (tn *Node) Bech32AddressForKey(keyName string) (string, error) {
-	key, err := tn.GetKey(valKey)
+	key, err := tn.GetKey(keyName)
 	if err != nil {
 		return "", err
 	}

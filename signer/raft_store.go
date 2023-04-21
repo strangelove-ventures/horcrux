@@ -109,10 +109,7 @@ func (s *RaftStore) init() error {
 	leaderhealth.Setup(s.raft, grpcServer, []string{"Leader"})
 	raftadmin.Register(grpcServer, s.raft)
 	reflection.Register(grpcServer)
-	if err := grpcServer.Serve(sock); err != nil {
-		return err
-	}
-	return nil
+	return grpcServer.Serve(sock)
 }
 
 // OnStart starts the raft server

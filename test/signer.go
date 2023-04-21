@@ -128,7 +128,7 @@ func StartSingleSignerContainers(
 func StartCosignerContainers(
 	signers Signers,
 	sentries Nodes,
-	threshold, total,
+	threshold,
 	sentriesPerSigner int,
 ) error {
 	eg := new(errgroup.Group)

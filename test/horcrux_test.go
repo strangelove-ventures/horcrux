@@ -36,7 +36,7 @@ func Test4Of7SignerTwoSentries(t *testing.T) {
 	otherValidatorNodes := GetValidators(1, totalValidators-1, 1, home, chainID, chain, pool, network, t)
 
 	// start our validator's horcrux cluster
-	require.NoError(t, ourValidator.StartHorcruxCluster(ctx, sentriesPerSigner))
+	require.NoError(t, ourValidator.StartHorcruxCluster(sentriesPerSigner))
 
 	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
 	require.NoError(t, Genesis(ctx, t, chain, otherValidatorNodes, []*Node{}, []*Validator{ourValidator}))
@@ -71,7 +71,7 @@ func Test2Of3SignerTwoSentries(t *testing.T) {
 	otherValidatorNodes := GetValidators(1, totalValidators-1, 1, home, chainID, chain, pool, network, t)
 
 	// start our validator's horcrux cluster
-	require.NoError(t, ourValidator.StartHorcruxCluster(ctx, sentriesPerSigner))
+	require.NoError(t, ourValidator.StartHorcruxCluster(sentriesPerSigner))
 
 	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
 	require.NoError(t, Genesis(ctx, t, chain, otherValidatorNodes, []*Node{}, []*Validator{ourValidator}))
@@ -106,7 +106,7 @@ func Test2Of3SignerUniqueSentry(t *testing.T) {
 	otherValidatorNodes := GetValidators(1, totalValidators-1, 1, home, chainID, chain, pool, network, t)
 
 	// start our validator's horcrux cluster
-	require.NoError(t, ourValidator.StartHorcruxCluster(ctx, sentriesPerSigner))
+	require.NoError(t, ourValidator.StartHorcruxCluster(sentriesPerSigner))
 
 	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
 	require.NoError(t, Genesis(ctx, t, chain, otherValidatorNodes, []*Node{}, []*Validator{ourValidator}))
@@ -248,7 +248,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	ourValidatorNode.GenNewPrivVal()
 
 	// start our new validator
-	require.NoError(t, ourValidatorUpgradedToHorcrux.StartHorcruxCluster(ctx, sentriesPerSigner))
+	require.NoError(t, ourValidatorUpgradedToHorcrux.StartHorcruxCluster(sentriesPerSigner))
 
 	t.Logf("{%s} -> Restarting Node...", ourValidatorNode.Name())
 	require.NoError(t, ourValidatorNode.Start(ctx, nil))
@@ -280,7 +280,7 @@ func TestDownedSigners2of3(t *testing.T) {
 	otherValidatorNodes := GetValidators(1, totalValidators-1, 1, home, chainID, chain, pool, network, t)
 
 	// start our validator's horcrux cluster
-	require.NoError(t, ourValidator.StartHorcruxCluster(ctx, sentriesPerSigner))
+	require.NoError(t, ourValidator.StartHorcruxCluster(sentriesPerSigner))
 
 	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
 	require.NoError(t, Genesis(ctx, t, chain, otherValidatorNodes, []*Node{}, []*Validator{ourValidator}))
@@ -326,7 +326,7 @@ func TestLeaderElection2of3(t *testing.T) {
 	otherValidatorNodes := GetValidators(1, totalValidators-1, 1, home, chainID, chain, pool, network, t)
 
 	// start our validator's horcrux cluster
-	require.NoError(t, ourValidator.StartHorcruxCluster(ctx, sentriesPerSigner))
+	require.NoError(t, ourValidator.StartHorcruxCluster(sentriesPerSigner))
 
 	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
 	require.NoError(t, Genesis(ctx, t, chain, otherValidatorNodes, []*Node{}, []*Validator{ourValidator}))
@@ -396,7 +396,7 @@ func TestDownedSigners3of5(t *testing.T) {
 	otherValidatorNodes := GetValidators(1, totalValidators-1, 1, home, chainID, chain, pool, network, t)
 
 	// start our validator's horcrux cluster
-	require.NoError(t, ourValidator.StartHorcruxCluster(ctx, sentriesPerSigner))
+	require.NoError(t, ourValidator.StartHorcruxCluster(sentriesPerSigner))
 
 	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
 	require.NoError(t, Genesis(ctx, t, chain, otherValidatorNodes, []*Node{}, []*Validator{ourValidator}))
@@ -468,7 +468,7 @@ func TestChainPureHorcrux(t *testing.T) {
 		validators = append(validators, validator)
 		allNodes = append(allNodes, validator.Sentries...)
 		startValidatorsErrGroup.Go(func() error {
-			return validator.StartHorcruxCluster(ctx, sentriesPerSigner)
+			return validator.StartHorcruxCluster(sentriesPerSigner)
 		})
 	}
 

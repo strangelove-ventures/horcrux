@@ -1,7 +1,6 @@
 package test
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -120,11 +119,10 @@ func (tv *Validator) generateShares(filePVKey privval.FilePVKey) error {
 }
 
 func (tv *Validator) StartHorcruxCluster(
-	ctx context.Context,
 	sentriesPerSigner int,
 ) error {
 	return StartCosignerContainers(tv.Signers, tv.Sentries,
-		tv.Threshold, len(tv.Signers), sentriesPerSigner)
+		tv.Threshold, sentriesPerSigner)
 }
 
 func (tv *Validator) WaitForConsecutiveBlocks(blocks int64) error {
