@@ -10,6 +10,8 @@ import (
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 )
 
+var _ PrivValidator = &SingleSignerValidator{}
+
 // SingleSignerValidator guards access to an underlying PrivValidator by using mutexes
 // for each of the PrivValidator interface functions
 type SingleSignerValidator struct {
