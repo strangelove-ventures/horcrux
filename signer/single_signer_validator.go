@@ -7,7 +7,6 @@ import (
 
 	tmcrypto "github.com/tendermint/tendermint/crypto"
 	tmjson "github.com/tendermint/tendermint/libs/json"
-	"github.com/tendermint/tendermint/privval"
 	tmprivval "github.com/tendermint/tendermint/privval"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 )
@@ -24,7 +23,7 @@ type SingleSignerValidator struct {
 }
 
 type SingleSignerChainState struct {
-	filePV  *privval.FilePV
+	filePV  *tmprivval.FilePV
 	pvMutex sync.Mutex
 }
 
@@ -98,16 +97,16 @@ func (pv *SingleSignerValidator) loadChainStateIfNecessary(chainID string) (*Sin
 
 	keyFile := pv.config.KeyFilePathSingleSigner()
 	stateFile := pv.config.PrivValStateFile(chainID)
-	var filePV *privval.FilePV
+	var filePV *tmprivval.FilePV
 	if _, err := os.Stat(stateFile); err != nil {
 		if !os.IsNotExist(err) {
 			panic(fmt.Errorf("failed to load state file (%s) - %w", stateFile, err))
 		}
 		// The only scenario in which we want to initialize a new state file
 		// is when the state file does not exist.
-		filePV = privval.LoadFilePVEmptyState(keyFile, stateFile)
+		filePV = tmprivval.LoadFilePVEmptyState(keyFile, stateFile)
 	} else {
-		filePV = privval.LoadFilePV(keyFile, stateFile)
+		filePV = tmprivval.LoadFilePV(keyFile, stateFile)
 	}
 
 	chainState = &SingleSignerChainState{
