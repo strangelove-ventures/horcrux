@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/signer"
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	tmService "github.com/tendermint/tendermint/libs/service"
+	tmservice "github.com/tendermint/tendermint/libs/service"
 	"github.com/tendermint/tendermint/privval"
 	"github.com/tendermint/tendermint/types"
 )
@@ -59,7 +59,7 @@ func startSignerCmd() *cobra.Command {
 
 			var (
 				// services to stop on shutdown
-				services []tmService.Service
+				services []tmservice.Service
 				logger   = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator")
 			)
 
@@ -86,7 +86,7 @@ func startSignerCmd() *cobra.Command {
 				val = privval.LoadFilePV(keyFile, stateFile)
 			}
 
-			pv := &signer.PvGuard{
+			pv := &signer.SingleSignerValidator{
 				PrivValidator: val,
 			}
 

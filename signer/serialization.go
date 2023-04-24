@@ -5,12 +5,12 @@ import (
 	"io"
 
 	"github.com/tendermint/tendermint/libs/protoio"
-	tmProtoPrivval "github.com/tendermint/tendermint/proto/tendermint/privval"
-	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
+	tmprotoprivval "github.com/tendermint/tendermint/proto/tendermint/privval"
+	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 )
 
 // ReadMsg reads a message from an io.Reader
-func ReadMsg(reader io.Reader) (msg tmProtoPrivval.Message, err error) {
+func ReadMsg(reader io.Reader) (msg tmprotoprivval.Message, err error) {
 	const maxRemoteSignerMsgSize = 1024 * 10
 	protoReader := protoio.NewDelimitedReader(reader, maxRemoteSignerMsgSize)
 	_, err = protoReader.ReadMsg(&msg)
@@ -18,7 +18,7 @@ func ReadMsg(reader io.Reader) (msg tmProtoPrivval.Message, err error) {
 }
 
 // WriteMsg writes a message to an io.Writer
-func WriteMsg(writer io.Writer, msg tmProtoPrivval.Message) (err error) {
+func WriteMsg(writer io.Writer, msg tmprotoprivval.Message) (err error) {
 	protoWriter := protoio.NewDelimitedWriter(writer)
 	_, err = protoWriter.WriteMsg(&msg)
 	return err
@@ -27,14 +27,14 @@ func WriteMsg(writer io.Writer, msg tmProtoPrivval.Message) (err error) {
 // UnpackHRS deserializes sign bytes and gets the height, round, and step
 func UnpackHRST(signBytes []byte) (HRSTKey, error) {
 	{
-		var proposal tmProto.CanonicalProposal
+		var proposal tmproto.CanonicalProposal
 		if err := protoio.UnmarshalDelimited(signBytes, &proposal); err == nil {
 			return HRSTKey{proposal.Height, proposal.Round, stepPropose, proposal.Timestamp.UnixNano()}, nil
 		}
 	}
 
 	{
-		var vote tmProto.CanonicalVote
+		var vote tmproto.CanonicalVote
 		if err := protoio.UnmarshalDelimited(signBytes, &vote); err == nil {
 			return HRSTKey{vote.Height, vote.Round, CanonicalVoteToStep(&vote), vote.Timestamp.UnixNano()}, nil
 		}

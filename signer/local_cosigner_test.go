@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
-	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
+	tmcryptoed25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tm "github.com/tendermint/tendermint/types"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
@@ -17,7 +17,7 @@ import (
 const testChainID = "test"
 
 func TestLocalCosignerGetID(t *testing.T) {
-	dummyPub := tmCryptoEd25519.PubKey{}
+	dummyPub := tmcryptoed25519.PubKey{}
 
 	bitSize := 4096
 	rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
@@ -71,7 +71,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		PublicKey: rsaKey2.PublicKey,
 	}}
 
-	privateKey := tmCryptoEd25519.GenPrivKey()
+	privateKey := tmcryptoed25519.GenPrivKey()
 
 	privKeyBytes := [64]byte{}
 	copy(privKeyBytes[:], privateKey[:])
@@ -157,10 +157,10 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	t.Logf("public keys: %x", publicKeys)
 	t.Logf("eph pub: %x", ephemeralPublic)
 	// pack a vote into sign bytes
-	var vote tmProto.Vote
+	var vote tmproto.Vote
 	vote.Height = 1
 	vote.Round = 0
-	vote.Type = tmProto.PrevoteType
+	vote.Type = tmproto.PrevoteType
 	vote.Timestamp = now
 
 	signBytes := tm.VoteSignBytes("chain-id", &vote)
@@ -190,53 +190,4 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 
 	t.Logf("signature: %x", signature)
 	require.True(t, privateKey.PubKey().VerifySignature(signBytes, signature))
-}
-
-func TestLocalCosignerWatermark(t *testing.T) {
-	/*
-		privateKey := tm_ed25519.GenPrivKey()
-
-		privKeyBytes := [64]byte{}
-		copy(privKeyBytes[:], privateKey[:])
-		secretShares := tsed25519.DealShares(privKeyBytes[:32], 2, 2)
-
-		key1 := CosignerKey{
-			PubKey:   privateKey.PubKey(),
-			ShareKey: secretShares[0],
-			ID:       1,
-		}
-
-		stateFile1, err := os.CreateTemp("", "state1.json")
-		require.NoError(t, err)
-		defer os.Remove(stateFile1.Name())
-
-		signState1, err := LoadOrCreateSignState(stateFile1.Name())
-
-		cosigner1 := NewLocalCosigner(key1, &signState1)
-
-		ephPublicKey, ephPrivateKey, err := ed25519.GenerateKey(rand.Reader)
-		require.NoError(t, err)
-
-		ephShares := tsed25519.DealShares(ephPrivateKey.Seed(), 2, 2)
-
-		signReq1 := CosignerSignRequest{
-			EphemeralPublic:      ephPublicKey,
-			EphemeralShareSecret: ephShares[0],
-			Height:               2,
-			Round:                0,
-			Step:                 0,
-			SignBytes:            []byte("Hello World!"),
-		}
-
-		_, err = cosigner1.Sign(signReq1)
-		require.NoError(t, err)
-
-		// watermark should have increased after signing
-		require.Equal(t, signState1.Height, int64(2))
-
-		// revert the height to a lower number and check if signing is rejected
-		signReq1.Height = 1
-		_, err = cosigner1.Sign(signReq1)
-		require.Error(t, err, "height regression. Got 1, last height 2")
-	*/
 }

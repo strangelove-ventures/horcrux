@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/raft"
-	proto "github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/strangelove-ventures/horcrux/signer/proto"
 )
 
 type CosignerGRPCServer struct {
@@ -17,7 +17,7 @@ type CosignerGRPCServer struct {
 }
 
 func (rpc *CosignerGRPCServer) SignBlock(
-	ctx context.Context, req *proto.CosignerGRPCSignBlockRequest) (*proto.CosignerGRPCSignBlockResponse, error) {
+	_ context.Context, req *proto.CosignerGRPCSignBlockRequest) (*proto.CosignerGRPCSignBlockResponse, error) {
 	block := &Block{
 		Height:    req.Block.GetHeight(),
 		Round:     req.Block.GetRound(),
@@ -35,7 +35,7 @@ func (rpc *CosignerGRPCServer) SignBlock(
 }
 
 func (rpc *CosignerGRPCServer) SetEphemeralSecretPartsAndSign(
-	ctx context.Context,
+	_ context.Context,
 	req *proto.CosignerGRPCSetEphemeralSecretPartsAndSignRequest,
 ) (*proto.CosignerGRPCSetEphemeralSecretPartsAndSignResponse, error) {
 	res, err := rpc.cosigner.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
@@ -54,7 +54,7 @@ func (rpc *CosignerGRPCServer) SetEphemeralSecretPartsAndSign(
 }
 
 func (rpc *CosignerGRPCServer) GetEphemeralSecretParts(
-	ctx context.Context,
+	_ context.Context,
 	req *proto.CosignerGRPCGetEphemeralSecretPartsRequest,
 ) (*proto.CosignerGRPCGetEphemeralSecretPartsResponse, error) {
 	res, err := rpc.cosigner.GetEphemeralSecretParts(HRSTKeyFromProto(req.GetHrst()))
@@ -67,7 +67,7 @@ func (rpc *CosignerGRPCServer) GetEphemeralSecretParts(
 }
 
 func (rpc *CosignerGRPCServer) TransferLeadership(
-	ctx context.Context,
+	_ context.Context,
 	req *proto.CosignerGRPCTransferLeadershipRequest,
 ) (*proto.CosignerGRPCTransferLeadershipResponse, error) {
 	leaderID := req.GetLeaderID()
