@@ -18,7 +18,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type TestLogger interface {
+type Logger interface {
 	Name() string
 	Log(...interface{})
 	Logf(string, ...interface{})
@@ -40,19 +40,19 @@ func SetupTestRun(t *testing.T) (context.Context, string, *dockertest.Pool, stri
 	require.NoError(t, err)
 
 	// build the horcrux image
-	require.NoError(t, BuildTestSignerImage(pool))
+	require.NoError(t, BuildSignerImage(pool))
 
 	return context.Background(), home, pool, network.ID
 }
 
 // assemble gentx, build genesis file, configure peering, and start chain
 func Genesis(
-	tl TestLogger,
 	ctx context.Context,
+	tl Logger,
 	chain *ChainType,
 	nonHorcruxValidators,
-	fullnodes []*TestNode,
-	horcruxValidators []*TestValidator,
+	fullnodes []*Node,
+	horcruxValidators []*Validator,
 ) error {
 	var eg errgroup.Group
 
@@ -80,7 +80,7 @@ func Genesis(
 		}
 
 		i := 0
-		var firstSentry *TestNode
+		var firstSentry *Node
 
 		for ; i < len(v.Sentries); i++ {
 			if v.Sentries[i].ChainID == chain.ChainID {
@@ -121,8 +121,8 @@ func Genesis(
 		return err
 	}
 
-	var validators TestNodes
-	var nodes TestNodes
+	var validators Nodes
+	var nodes Nodes
 
 	for _, v := range nonHorcruxValidators {
 		if v.ChainID != chain.ChainID {
@@ -134,7 +134,7 @@ func Genesis(
 
 	for _, horcruxValidator := range horcruxValidators {
 		if len(horcruxValidator.Sentries) > 0 {
-			var firstSentry *TestNode
+			var firstSentry *Node
 			for _, n := range horcruxValidator.Sentries {
 				if n.ChainID == chain.ChainID {
 					firstSentry = n

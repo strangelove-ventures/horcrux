@@ -1,31 +1,30 @@
 package test
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/ory/dockertest"
 	"github.com/strangelove-ventures/horcrux/signer"
-	crypto "github.com/tendermint/tendermint/crypto"
-	ed25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	tmcrypto "github.com/tendermint/tendermint/crypto"
+	tmcryptoed25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	"github.com/tendermint/tendermint/privval"
 )
 
-type TestValidator struct {
+type Validator struct {
 	Index         int
-	Sentries      TestNodes
-	Signers       TestSigners
-	tl            TestLogger
+	Sentries      Nodes
+	Signers       Signers
+	tl            Logger
 	Home          string
-	PubKey        crypto.PubKey
+	PubKey        tmcrypto.PubKey
 	PrivKeyShares []signer.CosignerKey
 	Threshold     int
 }
 
 func NewHorcruxValidator(
-	tl TestLogger,
+	tl Logger,
 	pool *dockertest.Pool,
 	networkID string,
 	home string,
@@ -33,11 +32,11 @@ func NewHorcruxValidator(
 	numSigners int,
 	threshold int,
 	chains ...*ChainType,
-) (*TestValidator, error) {
-	var sentries TestNodes
+) (*Validator, error) {
+	var sentries Nodes
 	for _, chain := range chains {
 		sentries = append(sentries,
-			MakeTestNodes(
+			MakeNodes(
 				index,
 				chain.NumSentries,
 				home,
@@ -49,10 +48,10 @@ func NewHorcruxValidator(
 			)...,
 		)
 	}
-	testValidator := &TestValidator{
+	testValidator := &Validator{
 		Index:     index,
 		Sentries:  sentries,
-		Signers:   MakeTestSigners(index, numSigners, home, pool, networkID, tl),
+		Signers:   MakeSigners(index, numSigners, home, pool, networkID, tl),
 		tl:        tl,
 		Home:      home,
 		Threshold: threshold,
@@ -64,7 +63,7 @@ func NewHorcruxValidator(
 }
 
 func NewHorcruxValidatorWithPrivValKey(
-	tl TestLogger,
+	tl Logger,
 	pool *dockertest.Pool,
 	networkID string,
 	home string,
@@ -75,11 +74,11 @@ func NewHorcruxValidatorWithPrivValKey(
 	threshold int,
 	chainType *ChainType,
 	privValKey privval.FilePVKey,
-) (*TestValidator, error) {
-	testValidator := &TestValidator{
+) (*Validator, error) {
+	testValidator := &Validator{
 		Index:     index,
-		Sentries:  MakeTestNodes(index, numSentries, home, chainID, chainType, pool, networkID, tl),
-		Signers:   MakeTestSigners(index, numSigners, home, pool, networkID, tl),
+		Sentries:  MakeNodes(index, numSentries, home, chainID, chainType, pool, networkID, tl),
+		Signers:   MakeSigners(index, numSigners, home, pool, networkID, tl),
 		tl:        tl,
 		Home:      home,
 		Threshold: threshold,
@@ -91,18 +90,18 @@ func NewHorcruxValidatorWithPrivValKey(
 }
 
 // Name is the name of the test validator
-func (tv *TestValidator) Name() string {
+func (tv *Validator) Name() string {
 	return fmt.Sprintf("validator-%d-%s", tv.Index, tv.tl.Name())
 }
 
 // Dir is the directory where the test validator files are stored
-func (tv *TestValidator) Dir() string {
+func (tv *Validator) Dir() string {
 	return filepath.Join(tv.Home, tv.Name())
 }
 
 // Generate Ed25519 Private Key
-func (tv *TestValidator) genPrivKeyAndShares() error {
-	privKey := ed25519.GenPrivKey()
+func (tv *Validator) genPrivKeyAndShares() error {
+	privKey := tmcryptoed25519.GenPrivKey()
 	pubKey := privKey.PubKey()
 	filePVKey := privval.FilePVKey{
 		Address: pubKey.Address(),
@@ -112,7 +111,7 @@ func (tv *TestValidator) genPrivKeyAndShares() error {
 	return tv.generateShares(filePVKey)
 }
 
-func (tv *TestValidator) generateShares(filePVKey privval.FilePVKey) error {
+func (tv *Validator) generateShares(filePVKey privval.FilePVKey) error {
 	tv.PubKey = filePVKey.PubKey
 	shares, err := signer.CreateCosignerShares(filePVKey, int64(tv.Threshold), int64(len(tv.Signers)))
 	if err != nil {
@@ -132,15 +131,14 @@ func (tv *TestValidator) generateShares(filePVKey privval.FilePVKey) error {
 	return nil
 }
 
-func (tv *TestValidator) StartHorcruxCluster(
-	ctx context.Context,
+func (tv *Validator) StartHorcruxCluster(
 	sentriesPerSigner int,
 ) error {
 	return StartCosignerContainers(tv.Signers, tv.Sentries,
-		tv.Threshold, len(tv.Signers), sentriesPerSigner)
+		tv.Threshold, sentriesPerSigner)
 }
 
-func (tv *TestValidator) WaitForConsecutiveBlocks(chainID string, blocks int64) error {
+func (tv *Validator) WaitForConsecutiveBlocks(chainID string, blocks int64) error {
 	for _, n := range tv.Sentries {
 		if n.ChainID == chainID {
 			return n.WaitForConsecutiveBlocks(blocks, tv.PubKey.Address())
@@ -149,7 +147,7 @@ func (tv *TestValidator) WaitForConsecutiveBlocks(chainID string, blocks int64) 
 	return fmt.Errorf("no sentry found with chain id: %s", chainID)
 }
 
-func (tv *TestValidator) EnsureNotSlashed(chainID string) error {
+func (tv *Validator) EnsureNotSlashed(chainID string) error {
 	for _, n := range tv.Sentries {
 		if n.ChainID == chainID {
 			return n.EnsureNotSlashed(tv.PubKey.Address())

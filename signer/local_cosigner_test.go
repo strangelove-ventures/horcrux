@@ -3,6 +3,8 @@ package signer
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -82,8 +84,17 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		ID:       2,
 	}
 
+	tmpDir := t.TempDir()
+
+	cosigner1Dir, cosigner2Dir := filepath.Join(tmpDir, "cosigner1"), filepath.Join(tmpDir, "cosigner2")
+	err = os.Mkdir(cosigner1Dir, 0700)
+	require.NoError(t, err)
+
+	err = os.Mkdir(cosigner2Dir, 0700)
+	require.NoError(t, err)
+
 	cosigner1 := NewLocalCosigner(
-		&RuntimeConfig{},
+		&RuntimeConfig{StateDir: cosigner1Dir},
 		key1,
 		*rsaKey1,
 		peers,
@@ -93,7 +104,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	)
 	defer cosigner1.waitForSignStatesToFlushToDisk()
 	cosigner2 := NewLocalCosigner(
-		&RuntimeConfig{},
+		&RuntimeConfig{StateDir: cosigner2Dir},
 		key2,
 		*rsaKey2,
 		peers,
@@ -175,53 +186,4 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 
 	t.Logf("signature: %x", signature)
 	require.True(t, privateKey.PubKey().VerifySignature(signBytes, signature))
-}
-
-func TestLocalCosignerWatermark(t *testing.T) {
-	/*
-		privateKey := tm_ed25519.GenPrivKey()
-
-		privKeyBytes := [64]byte{}
-		copy(privKeyBytes[:], privateKey[:])
-		secretShares := tsed25519.DealShares(privKeyBytes[:32], 2, 2)
-
-		key1 := CosignerKey{
-			PubKey:   privateKey.PubKey(),
-			ShareKey: secretShares[0],
-			ID:       1,
-		}
-
-		stateFile1, err := os.CreateTemp("", "state1.json")
-		require.NoError(t, err)
-		defer os.Remove(stateFile1.Name())
-
-		signState1, err := LoadOrCreateSignState(stateFile1.Name())
-
-		cosigner1 := NewLocalCosigner(key1, &signState1)
-
-		ephPublicKey, ephPrivateKey, err := ed25519.GenerateKey(rand.Reader)
-		require.NoError(t, err)
-
-		ephShares := tsed25519.DealShares(ephPrivateKey.Seed(), 2, 2)
-
-		signReq1 := CosignerSignRequest{
-			EphemeralPublic:      ephPublicKey,
-			EphemeralShareSecret: ephShares[0],
-			Height:               2,
-			Round:                0,
-			Step:                 0,
-			SignBytes:            []byte("Hello World!"),
-		}
-
-		_, err = cosigner1.Sign(signReq1)
-		require.NoError(t, err)
-
-		// watermark should have increased after signing
-		require.Equal(t, signState1.Height, int64(2))
-
-		// revert the height to a lower number and check if signing is rejected
-		signReq1.Height = 1
-		_, err = cosigner1.Sign(signReq1)
-		require.Error(t, err, "height regression. Got 1, last height 2")
-	*/
 }

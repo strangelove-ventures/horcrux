@@ -31,13 +31,13 @@ import (
 	"github.com/ory/dockertest/docker"
 	"github.com/strangelove-ventures/horcrux/signer"
 	tmconfig "github.com/tendermint/tendermint/config"
-	tmBytes "github.com/tendermint/tendermint/libs/bytes"
+	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/privval"
-	rpcclient "github.com/tendermint/tendermint/rpc/client"
-	rpchttp "github.com/tendermint/tendermint/rpc/client/http"
-	ctypes "github.com/tendermint/tendermint/rpc/core/types"
-	libclient "github.com/tendermint/tendermint/rpc/jsonrpc/client"
+	tmrpcclient "github.com/tendermint/tendermint/rpc/client"
+	tmrpchttp "github.com/tendermint/tendermint/rpc/client/http"
+	tmrpctypes "github.com/tendermint/tendermint/rpc/core/types"
+	tmrpcjsonclient "github.com/tendermint/tendermint/rpc/jsonrpc/client"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -71,7 +71,7 @@ func getHeighlinerChain(
 	binary string,
 	bech32Prefix string,
 	pubKeyAsBech32 bool,
-	preGenTx func(tn *TestNode) error,
+	preGenTx func(tn *Node) error,
 ) *ChainType {
 	return &ChainType{
 		ChainID:        chainID,
@@ -107,7 +107,7 @@ func getSentinelChain(
 ) *ChainType {
 	// sets "approve_by" in the genesis.json
 	// this is required for sentinel, genesis validation fails without it.
-	sentinelGenesisJSONModification := func(tn *TestNode) error {
+	sentinelGenesisJSONModification := func(tn *Node) error {
 		genesisJSON := filepath.Join(tn.NodeHome(), "config", "genesis.json")
 		address, err := tn.Bech32AddressForKey(valKey)
 		if err != nil {
@@ -145,11 +145,11 @@ type ChainType struct {
 	Ports map[docker.Port]struct{}
 
 	// some chains need additional steps, such as genesis.json modification, before executing gentx
-	PreGenTx func(tn *TestNode) error
+	PreGenTx func(tn *Node) error
 }
 
-// TestNode represents a node in the test network that is being created
-type TestNode struct {
+// Node represents a node in the test network that is being created
+type Node struct {
 	Home           string
 	Index          int
 	ValidatorIndex int
@@ -159,9 +159,9 @@ type TestNode struct {
 	Validator      bool
 	Pool           *dockertest.Pool
 	networkID      string
-	Client         rpcclient.Client
+	Client         tmrpcclient.Client
 	Container      *docker.Container
-	tl             TestLogger
+	tl             Logger
 	ec             params.EncodingConfig
 }
 
@@ -174,7 +174,7 @@ type ContainerPort struct {
 type Hosts []ContainerPort
 
 // CliContext creates a new Cosmos SDK client context
-func (tn *TestNode) CliContext() client.Context {
+func (tn *Node) CliContext() client.Context {
 	return client.Context{
 		Client:            tn.Client,
 		ChainID:           tn.ChainID,
@@ -186,8 +186,8 @@ func (tn *TestNode) CliContext() client.Context {
 	}
 }
 
-// MakeTestNodes creates the test node objects required for bootstrapping tests
-func MakeTestNodes(
+// MakeNodes creates the test node objects required for bootstrapping tests
+func MakeNodes(
 	validatorIndex,
 	count int,
 	home,
@@ -195,8 +195,8 @@ func MakeTestNodes(
 	chainType *ChainType,
 	pool *dockertest.Pool,
 	networkID string,
-	tl TestLogger,
-) (out TestNodes) {
+	tl Logger,
+) (out Nodes) {
 	err := pool.Client.PullImage(docker.PullImageOptions{
 		Repository: chainType.Repository,
 		Tag:        chainType.Version,
@@ -205,7 +205,7 @@ func MakeTestNodes(
 		tl.Logf("Error pulling image: %v", err)
 	}
 	for i := 0; i < count; i++ {
-		tn := &TestNode{Home: home, Index: i, ValidatorIndex: validatorIndex, Chain: chainType, ChainID: chainID,
+		tn := &Node{Home: home, Index: i, ValidatorIndex: validatorIndex, Chain: chainType, ChainID: chainID,
 			Pool: pool, networkID: networkID, tl: tl, ec: simapp.MakeTestEncodingConfig()}
 		tn.MkDir()
 		out = append(out, tn)
@@ -222,29 +222,29 @@ func GetValidators(
 	pool *dockertest.Pool,
 	networkID string,
 	t *testing.T,
-) (out TestNodes) {
+) (out Nodes) {
 	for i := startingValidatorIndex; i < startingValidatorIndex+count; i++ {
-		out = append(out, MakeTestNodes(i, chain.NumSentries, home, chain.ChainID, chain, pool, networkID, t)...)
+		out = append(out, MakeNodes(i, chain.NumSentries, home, chain.ChainID, chain, pool, networkID, t)...)
 	}
 	return
 }
 
-func GetAllNodes(nodes ...TestNodes) (out TestNodes) {
+func GetAllNodes(nodes ...Nodes) (out Nodes) {
 	for _, testNodes := range nodes {
 		out = append(out, testNodes...)
 	}
 	return
 }
 
-// NewClient creates and assigns a new Tendermint RPC client to the TestNode
-func (tn *TestNode) NewClient(addr string) error {
-	httpClient, err := libclient.DefaultHTTPClient(addr)
+// NewClient creates and assigns a new Tendermint RPC client to the Node
+func (tn *Node) NewClient(addr string) error {
+	httpClient, err := tmrpcjsonclient.DefaultHTTPClient(addr)
 	if err != nil {
 		return err
 	}
 
 	httpClient.Timeout = 10 * time.Second
-	rpcClient, err := rpchttp.NewWithClient(addr, "/websocket", httpClient)
+	rpcClient, err := tmrpchttp.NewWithClient(addr, "/websocket", httpClient)
 	if err != nil {
 		return err
 	}
@@ -254,7 +254,7 @@ func (tn *TestNode) NewClient(addr string) error {
 
 }
 
-func (tn *TestNode) GetHosts() (out Hosts) {
+func (tn *Node) GetHosts() (out Hosts) {
 	name := tn.Name()
 	for k := range tn.Chain.Ports {
 		host := ContainerPort{
@@ -267,7 +267,7 @@ func (tn *TestNode) GetHosts() (out Hosts) {
 	return
 }
 
-func (tn TestNodes) GetHosts() (out Hosts) {
+func (tn Nodes) GetHosts() (out Hosts) {
 	for _, n := range tn {
 		out = append(out, n.GetHosts()...)
 	}
@@ -330,47 +330,47 @@ ReachableCheckLoop:
 }
 
 // Name is the hostname of the test node container
-func (tn *TestNode) Name() string {
+func (tn *Node) Name() string {
 	return fmt.Sprintf("%s-val-%d-node-%d-%s", tn.ChainID, tn.ValidatorIndex, tn.Index, tn.tl.Name())
 }
 
 // Dir is the directory where the test node files are stored
-func (tn *TestNode) Dir() string {
+func (tn *Node) Dir() string {
 	return fmt.Sprintf("%s/%s/", tn.Home, tn.Name())
 }
 
 // MkDir creates the directory for the testnode
-func (tn *TestNode) MkDir() {
+func (tn *Node) MkDir() {
 	if err := os.MkdirAll(tn.Dir(), 0755); err != nil {
 		panic(err)
 	}
 }
 
 // GentxPath returns the path to the gentx for a node
-func (tn *TestNode) GentxPath() (string, error) {
+func (tn *Node) GentxPath() (string, error) {
 	id, err := tn.NodeID()
 	return filepath.Join(tn.Dir(), "config", "gentx", fmt.Sprintf("gentx-%s.json", id)), err
 }
 
-func (tn *TestNode) GenesisFilePath() string {
+func (tn *Node) GenesisFilePath() string {
 	return filepath.Join(tn.Dir(), "config", "genesis.json")
 }
 
-func (tn *TestNode) TMConfigPath() string {
+func (tn *Node) TMConfigPath() string {
 	return filepath.Join(tn.Dir(), "config", "config.toml")
 }
 
 // Bind returns the home folder bind point for running the node
-func (tn *TestNode) Bind() []string {
+func (tn *Node) Bind() []string {
 	return []string{fmt.Sprintf("%s:/home/.%s", tn.Dir(), tn.Chain.Bin)}
 }
 
-func (tn *TestNode) NodeHome() string {
+func (tn *Node) NodeHome() string {
 	return fmt.Sprintf("/home/.%s", tn.Chain.Bin)
 }
 
 // Keybase returns the keyring for a given node
-func (tn *TestNode) Keybase() keyring.Keyring {
+func (tn *Node) Keybase() keyring.Keyring {
 	kr, err := keyring.New("", keyring.BackendTest, tn.Dir(), os.Stdin)
 	if err != nil {
 		panic(err)
@@ -379,7 +379,7 @@ func (tn *TestNode) Keybase() keyring.Keyring {
 }
 
 // SetValidatorConfigAndPeers modifies the config for a validator node to start a chain
-func (tn *TestNode) SetValidatorConfigAndPeers(peers string, enablePrivVal bool) {
+func (tn *Node) SetValidatorConfigAndPeers(peers string, enablePrivVal bool) {
 	// Pull default config
 	cfg := tmconfig.DefaultConfig()
 
@@ -390,13 +390,13 @@ func (tn *TestNode) SetValidatorConfigAndPeers(peers string, enablePrivVal bool)
 	tmconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
 }
 
-func (tn *TestNode) SetPrivValListen(peers string) {
+func (tn *Node) SetPrivValListen(peers string) {
 	cfg := tmconfig.DefaultConfig()
 	stdconfigchanges(cfg, peers, true) // Reapply the changes made to the config file in SetValidatorConfigAndPeers()
 	tmconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
 }
 
-func (tn *TestNode) getValSigningInfo(address tmBytes.HexBytes) (*slashingtypes.QuerySigningInfoResponse, error) {
+func (tn *Node) getValSigningInfo(address tmbytes.HexBytes) (*slashingtypes.QuerySigningInfoResponse, error) {
 	valConsPrefix := fmt.Sprintf("%svalcons", tn.Chain.Bech32Prefix)
 	bech32ValConsAddress, err := bech32.ConvertAndEncode(valConsPrefix, address)
 	if err != nil {
@@ -408,11 +408,11 @@ func (tn *TestNode) getValSigningInfo(address tmBytes.HexBytes) (*slashingtypes.
 	})
 }
 
-func (tn *TestNode) GetMostRecentConsecutiveSignedBlocks(
+func (tn *Node) GetMostRecentConsecutiveSignedBlocks(
 	max int64,
-	address tmBytes.HexBytes,
+	address tmbytes.HexBytes,
 ) (count int64, latestHeight int64, err error) {
-	var status *ctypes.ResultStatus
+	var status *tmrpctypes.ResultStatus
 	status, err = tn.Client.Status(context.Background())
 	if err != nil {
 		return 0, 0, err
@@ -421,7 +421,7 @@ func (tn *TestNode) GetMostRecentConsecutiveSignedBlocks(
 	latestHeight = status.SyncInfo.LatestBlockHeight
 
 	for i := latestHeight; i > latestHeight-max && i > 0; i-- {
-		var block *ctypes.ResultBlock
+		var block *tmrpctypes.ResultBlock
 		block, err = tn.Client.Block(context.Background(), &i)
 		if err != nil {
 			return 0, 0, err
@@ -441,7 +441,7 @@ func (tn *TestNode) GetMostRecentConsecutiveSignedBlocks(
 	return count, latestHeight, nil
 }
 
-func (tn *TestNode) getMissingBlocks(address tmBytes.HexBytes) (int64, error) {
+func (tn *Node) getMissingBlocks(address tmbytes.HexBytes) (int64, error) {
 	missedBlocks, err := tn.getValSigningInfo(address)
 	if err != nil {
 		return 0, err
@@ -449,7 +449,7 @@ func (tn *TestNode) getMissingBlocks(address tmBytes.HexBytes) (int64, error) {
 	return missedBlocks.ValSigningInfo.MissedBlocksCounter, nil
 }
 
-func (tn *TestNode) EnsureNotSlashed(address tmBytes.HexBytes) error {
+func (tn *Node) EnsureNotSlashed(address tmbytes.HexBytes) error {
 	for i := 0; i < 50; i++ {
 		time.Sleep(1 * time.Second)
 		slashInfo, err := tn.getValSigningInfo(address)
@@ -496,7 +496,7 @@ func min(a, b int64) int64 {
 }
 
 // Wait until we have signed n blocks in a row
-func (tn *TestNode) WaitForConsecutiveBlocks(blocks int64, address tmBytes.HexBytes) error {
+func (tn *Node) WaitForConsecutiveBlocks(blocks int64, address tmbytes.HexBytes) error {
 	initialMissed, err := tn.getMissingBlocks(address)
 	if err != nil {
 		return err
@@ -569,7 +569,7 @@ func stdconfigchanges(cfg *tmconfig.Config, peers string, enablePrivVal bool) {
 
 // Exec runs a container for a specific job and block until the container exits
 // NOTE: on job containers generate random name
-func (tn *TestNode) Exec(ctx context.Context, cmd []string) (string, string, error) {
+func (tn *Node) Exec(ctx context.Context, cmd []string) (string, string, error) {
 	container := RandLowerCaseLetterString(10)
 	tn.tl.Logf("{%s}[%s] -> '%s'", tn.Name(), container, strings.Join(cmd, " "))
 	cont, err := tn.Pool.Client.CreateContainer(docker.CreateContainerOptions{
@@ -620,7 +620,7 @@ func (tn *TestNode) Exec(ctx context.Context, cmd []string) (string, string, err
 }
 
 // InitHomeFolder initializes a home folder for the given node
-func (tn *TestNode) InitHomeFolder(ctx context.Context) error {
+func (tn *Node) InitHomeFolder(ctx context.Context) error {
 	cmd := []string{tn.Chain.Bin, "init", tn.Name(),
 		"--chain-id", tn.ChainID,
 		"--home", tn.NodeHome(),
@@ -630,7 +630,7 @@ func (tn *TestNode) InitHomeFolder(ctx context.Context) error {
 }
 
 // CreateKey creates a key in the keyring backend test for the given node
-func (tn *TestNode) CreateKey(ctx context.Context, name string) error {
+func (tn *Node) CreateKey(ctx context.Context, name string) error {
 	cmd := []string{tn.Chain.Bin, "keys", "add", name,
 		"--keyring-backend", "test",
 		"--output", "json",
@@ -641,7 +641,7 @@ func (tn *TestNode) CreateKey(ctx context.Context, name string) error {
 }
 
 // AddGenesisAccount adds a genesis account for each key
-func (tn *TestNode) AddGenesisAccount(ctx context.Context, address string) error {
+func (tn *Node) AddGenesisAccount(ctx context.Context, address string) error {
 	cmd := []string{tn.Chain.Bin, "add-genesis-account", address, "1000000000000stake",
 		"--home", tn.NodeHome(),
 	}
@@ -650,8 +650,8 @@ func (tn *TestNode) AddGenesisAccount(ctx context.Context, address string) error
 }
 
 // Gentx generates the gentx for a given node
-func (tn *TestNode) Gentx(ctx context.Context, name, pubKey string) error {
-	cmd := []string{tn.Chain.Bin, "gentx", valKey, "100000000000stake",
+func (tn *Node) Gentx(ctx context.Context, keyName, pubKey string) error {
+	cmd := []string{tn.Chain.Bin, "gentx", keyName, "100000000000stake",
 		"--pubkey", pubKey,
 		"--keyring-backend", "test",
 		"--home", tn.NodeHome(),
@@ -662,7 +662,7 @@ func (tn *TestNode) Gentx(ctx context.Context, name, pubKey string) error {
 }
 
 // CollectGentxs runs collect gentxs on the node's home folders
-func (tn *TestNode) CollectGentxs(ctx context.Context) error {
+func (tn *Node) CollectGentxs(ctx context.Context) error {
 	cmd := []string{tn.Chain.Bin, "collect-gentxs",
 		"--home", tn.NodeHome(),
 	}
@@ -670,7 +670,7 @@ func (tn *TestNode) CollectGentxs(ctx context.Context) error {
 	return err
 }
 
-func (tn *TestNode) Start(ctx context.Context, preStart func()) error {
+func (tn *Node) Start(ctx context.Context, preStart func()) error {
 	// Retry loop for running container.
 	err := retry.Do(func() error {
 		// forcefully remove existing container, ignoring error
@@ -681,7 +681,7 @@ func (tn *TestNode) Start(ctx context.Context, preStart func()) error {
 		if preStart != nil {
 			preStart()
 		}
-		if err := tn.startContainer(ctx); err != nil {
+		if err := tn.startContainer(); err != nil {
 			return err
 		}
 
@@ -723,7 +723,7 @@ func (tn *TestNode) Start(ctx context.Context, preStart func()) error {
 	}, retry.DelayType(retry.BackOffDelay))
 }
 
-func (tn *TestNode) createContainer() error {
+func (tn *Node) createContainer() error {
 	cont, err := tn.Pool.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: tn.Name(),
 		Config: &docker.Config{
@@ -754,10 +754,10 @@ func (tn *TestNode) createContainer() error {
 	return nil
 }
 
-// StopAndRemoveContainer stops and removes a TestSigners docker container.
+// StopAndRemoveContainer stops and removes a Signers docker container.
 // If force is true, error for stopping container will be ignored and container
 // will be forcefully removed.
-func (tn *TestNode) StopAndRemoveContainer(force bool) error {
+func (tn *Node) StopAndRemoveContainer(force bool) error {
 	if tn.Container == nil {
 		return nil
 	}
@@ -770,7 +770,7 @@ func (tn *TestNode) StopAndRemoveContainer(force bool) error {
 	})
 }
 
-func (tn *TestNode) startContainer(ctx context.Context) error {
+func (tn *Node) startContainer() error {
 	if err := tn.Pool.Client.StartContainer(tn.Container.ID, nil); err != nil {
 		return err
 	}
@@ -787,8 +787,8 @@ func (tn *TestNode) startContainer(ctx context.Context) error {
 	return tn.NewClient(fmt.Sprintf("tcp://%s", port))
 }
 
-func (tn *TestNode) Bech32AddressForKey(keyName string) (string, error) {
-	key, err := tn.GetKey(valKey)
+func (tn *Node) Bech32AddressForKey(keyName string) (string, error) {
+	key, err := tn.GetKey(keyName)
 	if err != nil {
 		return "", err
 	}
@@ -800,7 +800,7 @@ func (tn *TestNode) Bech32AddressForKey(keyName string) (string, error) {
 }
 
 // InitValidatorFiles creates the node files and signs a genesis transaction
-func (tn *TestNode) InitValidatorFiles(ctx context.Context, pubKey string) error {
+func (tn *Node) InitValidatorFiles(ctx context.Context, pubKey string) error {
 	if err := tn.InitHomeFolder(ctx); err != nil {
 		return err
 	}
@@ -814,7 +814,7 @@ func (tn *TestNode) InitValidatorFiles(ctx context.Context, pubKey string) error
 	if err := tn.AddGenesisAccount(ctx, bech32Address); err != nil {
 		return err
 	}
-	// if override pubkey is not provided, use the one from this TestNode
+	// if override pubkey is not provided, use the one from this Node
 	if pubKey == "" {
 		bech32Prefix := ""
 		if tn.Chain.PubKeyAsBech32 {
@@ -838,7 +838,7 @@ func (tn *TestNode) InitValidatorFiles(ctx context.Context, pubKey string) error
 	return tn.Gentx(ctx, valKey, pubKey)
 }
 
-func (tn *TestNode) InitFullNodeFiles(ctx context.Context) error {
+func (tn *Node) InitFullNodeFiles(ctx context.Context) error {
 	return tn.InitHomeFolder(ctx)
 }
 
@@ -854,7 +854,7 @@ func containerExitError(container string, i int, stdout string, stderr string, e
 }
 
 // NodeID returns the node of a given node
-func (tn *TestNode) NodeID() (string, error) {
+func (tn *Node) NodeID() (string, error) {
 	nodeKey, err := p2p.LoadNodeKey(filepath.Join(tn.Dir(), "config", "node_key.json"))
 	if err != nil {
 		return "", err
@@ -863,7 +863,7 @@ func (tn *TestNode) NodeID() (string, error) {
 }
 
 // GetKey gets a key, waiting until it is available
-func (tn *TestNode) GetKey(name string) (info keyring.Info, err error) {
+func (tn *Node) GetKey(name string) (info keyring.Info, err error) {
 	return info, retry.Do(func() (err error) {
 		info, err = tn.Keybase().Key(name)
 		return err
@@ -881,11 +881,11 @@ func RandLowerCaseLetterString(length int) string {
 	return b.String()
 }
 
-// TestNodes is a collection of TestNode
-type TestNodes []*TestNode
+// Nodes is a collection of Node
+type Nodes []*Node
 
 // PeerString returns the string for connecting the nodes passed in
-func (tn TestNodes) PeerString() string {
+func (tn Nodes) PeerString() string {
 	bldr := new(strings.Builder)
 	for _, n := range tn {
 		id, err := n.NodeID()
@@ -900,7 +900,7 @@ func (tn TestNodes) PeerString() string {
 }
 
 // Peers returns the peer nodes for a given node if it is included in a set of nodes
-func (tn TestNodes) Peers(node *TestNode) (out TestNodes) {
+func (tn Nodes) Peers(node *Node) (out Nodes) {
 	for _, n := range tn {
 		if n.Index != node.Index {
 			out = append(out, n)
@@ -909,7 +909,7 @@ func (tn TestNodes) Peers(node *TestNode) (out TestNodes) {
 	return
 }
 
-func (tn TestNodes) ListenAddrs() string {
+func (tn Nodes) ListenAddrs() string {
 	out := []string{}
 	for _, n := range tn {
 		out = append(out, fmt.Sprintf("%s:%s", n.Name(), "1234"))
@@ -918,7 +918,7 @@ func (tn TestNodes) ListenAddrs() string {
 }
 
 // LogGenesisHashes logs the genesis hashes for the various nodes
-func (tn TestNodes) LogGenesisHashes() error {
+func (tn Nodes) LogGenesisHashes() error {
 	for _, n := range tn {
 		gen, err := os.ReadFile(n.GenesisFilePath())
 		if err != nil {
@@ -929,7 +929,7 @@ func (tn TestNodes) LogGenesisHashes() error {
 	return nil
 }
 
-func (tn TestNodes) WaitForHeight(height int64) error {
+func (tn Nodes) WaitForHeight(height int64) error {
 	var eg errgroup.Group
 	tn[0].tl.Logf("Waiting For Nodes To Reach Block Height %d...", height)
 	for _, n := range tn {
@@ -953,19 +953,19 @@ func (tn TestNodes) WaitForHeight(height int64) error {
 	return eg.Wait()
 }
 
-func (tn *TestNode) GetPrivVal() (privval.FilePVKey, error) {
+func (tn *Node) GetPrivVal() (privval.FilePVKey, error) {
 	return signer.ReadPrivValidatorFile(tn.privValKeyPath())
 }
 
-func (tn *TestNode) privValKeyPath() string {
+func (tn *Node) privValKeyPath() string {
 	return filepath.Join(tn.Dir(), "config", "priv_validator_key.json")
 }
 
-func (tn *TestNode) privValStatePath() string {
+func (tn *Node) privValStatePath() string {
 	return filepath.Join(tn.Dir(), "config", "priv_validator_state.json")
 }
 
-func (tn *TestNode) GenNewPrivVal() {
+func (tn *Node) GenNewPrivVal() {
 	_ = os.Remove(tn.privValKeyPath())
 	_ = os.Remove(tn.privValStatePath())
 	newFilePV := privval.GenFilePV(tn.privValKeyPath(), tn.privValStatePath())

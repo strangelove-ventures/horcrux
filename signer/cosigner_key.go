@@ -8,7 +8,7 @@ import (
 
 	amino "github.com/tendermint/go-amino"
 	tmcrypto "github.com/tendermint/tendermint/crypto"
-	tmed25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	tmcryptoed25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	tmcryptoencoding "github.com/tendermint/tendermint/crypto/encoding"
 	tmprotocrypto "github.com/tendermint/tendermint/proto/tendermint/crypto"
 )
@@ -86,10 +86,10 @@ func (cosignerKey *CosignerKey) UnmarshalJSON(data []byte) error {
 	// To support reading the public key bytes from these key files, we fallback to
 	// amino unmarshalling if the protobuf unmarshalling fails
 	if err != nil {
-		var pub tmed25519.PubKey
+		var pub tmcryptoed25519.PubKey
 		codec := amino.NewCodec()
 		codec.RegisterInterface((*tmcrypto.PubKey)(nil), nil)
-		codec.RegisterConcrete(tmed25519.PubKey{}, "tendermint/PubKeyEd25519", nil)
+		codec.RegisterConcrete(tmcryptoed25519.PubKey{}, "tendermint/PubKeyEd25519", nil)
 		errInner := codec.UnmarshalBinaryBare(aux.PubkeyBytes, &pub)
 		if errInner != nil {
 			return err

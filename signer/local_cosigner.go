@@ -101,20 +101,20 @@ type LocalCosigner struct {
 
 	address string
 
-	asyncWaitGroup sync.WaitGroup
+	pendingDiskWG sync.WaitGroup
 }
 
 func (cosigner *LocalCosigner) SaveLastSignedState(chainID string, signState SignStateConsensus) error {
+	cosigner.chainState[chainID].lastSignStateMutex.Lock()
+	defer cosigner.chainState[chainID].lastSignStateMutex.Unlock()
 	return cosigner.chainState[chainID].LastSignState.Save(
 		signState,
-		cosigner.chainState[chainID].lastSignStateMutex,
-		true,
-		&cosigner.asyncWaitGroup,
+		&cosigner.pendingDiskWG,
 	)
 }
 
 func (cosigner *LocalCosigner) waitForSignStatesToFlushToDisk() {
-	cosigner.asyncWaitGroup.Wait()
+	cosigner.pendingDiskWG.Wait()
 }
 
 func NewLocalCosigner(
@@ -240,7 +240,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		Step:      hrst.Step,
 		Signature: sig,
 		SignBytes: req.SignBytes,
-	}, nil, true, &cosigner.asyncWaitGroup)
+	}, &cosigner.pendingDiskWG)
 
 	if err != nil {
 		if _, isSameHRSError := err.(*SameHRSError); !isSameHRSError {

@@ -19,7 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"runtime"
-	dbg "runtime/debug"
+	"runtime/debug"
 
 	"github.com/spf13/cobra"
 )
@@ -45,7 +45,7 @@ type Info struct {
 }
 
 func NewInfo() Info {
-	bi, _ := dbg.ReadBuildInfo()
+	bi, _ := debug.ReadBuildInfo()
 
 	dependencyVersions := map[string]string{}
 

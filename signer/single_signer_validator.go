@@ -7,7 +7,7 @@ import (
 
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/privval"
-	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
+	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 )
 
 // SingleSignerValidator guards access to an underlying PrivValidator by using mutexes
@@ -37,7 +37,7 @@ func (pv *SingleSignerValidator) GetPubKey() (crypto.PubKey, error) {
 }
 
 // SignVote implements types.PrivValidator
-func (pv *SingleSignerValidator) SignVote(chainID string, vote *tmProto.Vote) error {
+func (pv *SingleSignerValidator) SignVote(chainID string, vote *tmproto.Vote) error {
 	chainState, err := pv.loadChainStateIfNecessary(chainID)
 	if err != nil {
 		return err
@@ -48,7 +48,7 @@ func (pv *SingleSignerValidator) SignVote(chainID string, vote *tmProto.Vote) er
 }
 
 // SignProposal implements types.PrivValidator
-func (pv *SingleSignerValidator) SignProposal(chainID string, proposal *tmProto.Proposal) error {
+func (pv *SingleSignerValidator) SignProposal(chainID string, proposal *tmproto.Proposal) error {
 	chainState, err := pv.loadChainStateIfNecessary(chainID)
 	if err != nil {
 		return err

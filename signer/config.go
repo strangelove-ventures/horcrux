@@ -52,10 +52,7 @@ func (c *Config) ValidateSingleSignerConfig() error {
 	if len(c.ChainNodes) == 0 {
 		return fmt.Errorf("need to have chain-nodes configured for priv-val connection")
 	}
-	if err := c.ChainNodes.Validate(); err != nil {
-		return err
-	}
-	return nil
+	return c.ChainNodes.Validate()
 }
 
 func (c *Config) ValidateCosignerConfig() error {
@@ -81,10 +78,7 @@ func (c *Config) ValidateCosignerConfig() error {
 	if _, err := url.Parse(c.CosignerConfig.P2PListen); err != nil {
 		return fmt.Errorf("failed to parse p2p listen address: %w", err)
 	}
-	if err := c.CosignerConfig.Peers.Validate(c.CosignerConfig.Shares); err != nil {
-		return err
-	}
-	return nil
+	return c.CosignerConfig.Peers.Validate(c.CosignerConfig.Shares)
 }
 
 type RuntimeConfig struct {

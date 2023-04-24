@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/Jille/grpc-multi-resolver"
-	grpc_retry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
+	_ "github.com/Jille/grpc-multi-resolver" // required to register resolver
+	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/client"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
@@ -35,9 +35,9 @@ horcrux elect 2 # elect specific leader`,
 			}
 
 			serviceConfig := `{"healthCheckConfig": {"serviceName": "Leader"}, "loadBalancingConfig": [ { "round_robin": {} } ]}`
-			retryOpts := []grpc_retry.CallOption{
-				grpc_retry.WithBackoff(grpc_retry.BackoffExponential(100 * time.Millisecond)),
-				grpc_retry.WithMax(5),
+			retryOpts := []grpcretry.CallOption{
+				grpcretry.WithBackoff(grpcretry.BackoffExponential(100 * time.Millisecond)),
+				grpcretry.WithMax(5),
 			}
 
 			grpcAddress, err := config.Config.CosignerConfig.LeaderElectMultiAddress()
@@ -49,7 +49,7 @@ horcrux elect 2 # elect specific leader`,
 			conn, err := grpc.Dial(grpcAddress,
 				grpc.WithDefaultServiceConfig(serviceConfig), grpc.WithTransportCredentials(insecure.NewCredentials()),
 				grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
-				grpc.WithUnaryInterceptor(grpc_retry.UnaryClientInterceptor(retryOpts...)))
+				grpc.WithUnaryInterceptor(grpcretry.UnaryClientInterceptor(retryOpts...)))
 			if err != nil {
 				return fmt.Errorf("dialing failed: %v", err)
 			}
@@ -101,9 +101,9 @@ func getLeaderCmd() *cobra.Command {
 				return fmt.Errorf("cosigner configuration has no peers")
 			}
 
-			retryOpts := []grpc_retry.CallOption{
-				grpc_retry.WithBackoff(grpc_retry.BackoffExponential(100 * time.Millisecond)),
-				grpc_retry.WithMax(5),
+			retryOpts := []grpcretry.CallOption{
+				grpcretry.WithBackoff(grpcretry.BackoffExponential(100 * time.Millisecond)),
+				grpcretry.WithMax(5),
 			}
 
 			grpcAddress, err := client.SanitizeAddress(config.Config.CosignerConfig.P2PListen)
@@ -115,7 +115,7 @@ func getLeaderCmd() *cobra.Command {
 			conn, err := grpc.Dial(grpcAddress,
 				grpc.WithTransportCredentials(insecure.NewCredentials()),
 				grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
-				grpc.WithUnaryInterceptor(grpc_retry.UnaryClientInterceptor(retryOpts...)))
+				grpc.WithUnaryInterceptor(grpcretry.UnaryClientInterceptor(retryOpts...)))
 			if err != nil {
 				return fmt.Errorf("dialing failed: %v", err)
 			}

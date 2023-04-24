@@ -62,7 +62,7 @@ func createCosignerSharesCmd() *cobra.Command {
 	return cmd
 }
 
-func validateCreateCosignerShares(cmd *cobra.Command, args []string) error {
+func validateCreateCosignerShares(_ *cobra.Command, args []string) error {
 	if len(args) != 3 {
 		return fmt.Errorf("wrong num args exp(3) got(%d)", len(args))
 	}

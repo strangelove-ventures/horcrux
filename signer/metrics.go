@@ -55,7 +55,7 @@ func (mt *metricsTimer) SetPreviousLocalEphemeralShare(t time.Time) {
 	mt.previousLocalEphemeralShare = t
 }
 
-func (mt *metricsTimer) UpdatePrometheusMetrics(t time.Time) {
+func (mt *metricsTimer) UpdatePrometheusMetrics() {
 	mt.mu.Lock()
 	defer mt.mu.Unlock()
 
@@ -252,7 +252,7 @@ var (
 func StartMetrics() {
 	// Update elapsed times on an interval basis
 	for {
-		metricsTimeKeeper.UpdatePrometheusMetrics(time.Now())
+		metricsTimeKeeper.UpdatePrometheusMetrics()
 
 		// Prometheus often only polls every 1 to every few seconds
 		// Frequent updates minimize reporting error.

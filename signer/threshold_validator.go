@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/hashicorp/raft"
-	proto "github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/libs/log"
-	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
-	rpcTypes "github.com/tendermint/tendermint/rpc/jsonrpc/types"
+	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
+	tmrpcjsontypes "github.com/tendermint/tendermint/rpc/jsonrpc/types"
 	tm "github.com/tendermint/tendermint/types"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
@@ -36,7 +36,7 @@ type ThresholdValidator struct {
 
 	logger log.Logger
 
-	asyncWaitGroup sync.WaitGroup
+	pendingDiskWG sync.WaitGroup
 }
 
 type ChainSignState struct {
@@ -73,29 +73,25 @@ func NewThresholdValidator(
 }
 
 func (pv *ThresholdValidator) SaveLastSignedState(chainID string, signState SignStateConsensus) error {
-	return pv.chainState[chainID].lastSignState.Save(
-		signState,
-		pv.chainState[chainID].lastSignStateMutex,
-		true,
-		&pv.asyncWaitGroup,
-	)
+	pv.chainState[chainID].lastSignStateMutex.Lock()
+	defer pv.chainState[chainID].lastSignStateMutex.Unlock()
+	return pv.chainState[chainID].lastSignState.Save(signState, &pv.pendingDiskWG)
 }
 
 func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, signState SignStateConsensus) error {
-	return pv.chainState[chainID].lastSignStateInitiated.Save(
-		signState,
-		pv.chainState[chainID].lastSignStateInitiatedMutex,
-		true,
-		&pv.asyncWaitGroup,
-	)
+	pv.chainState[chainID].lastSignStateInitiatedMutex.Lock()
+	defer pv.chainState[chainID].lastSignStateInitiatedMutex.Unlock()
+	return pv.chainState[chainID].lastSignStateInitiated.Save(signState, &pv.pendingDiskWG)
 }
 
+// Stop safely shuts down the ThresholdValidator.
 func (pv *ThresholdValidator) Stop() {
 	pv.waitForSignStatesToFlushToDisk()
 }
 
+// waitForSignStatesToFlushToDisk waits for any sign states to finish writing to disk.
 func (pv *ThresholdValidator) waitForSignStatesToFlushToDisk() {
-	pv.asyncWaitGroup.Wait()
+	pv.pendingDiskWG.Wait()
 
 	switch cosigner := pv.cosigner.(type) {
 	case *LocalCosigner:
@@ -112,7 +108,7 @@ func (pv *ThresholdValidator) GetPubKey() (crypto.PubKey, error) {
 
 // SignVote signs a canonical representation of the vote, along with the
 // chainID. Implements PrivValidator.
-func (pv *ThresholdValidator) SignVote(chainID string, vote *tmProto.Vote) error {
+func (pv *ThresholdValidator) SignVote(chainID string, vote *tmproto.Vote) error {
 	block := &Block{
 		Height:    vote.Height,
 		Round:     int64(vote.Round),
@@ -130,7 +126,7 @@ func (pv *ThresholdValidator) SignVote(chainID string, vote *tmProto.Vote) error
 
 // SignProposal signs a canonical representation of the proposal, along with
 // the chainID. Implements PrivValidator.
-func (pv *ThresholdValidator) SignProposal(chainID string, proposal *tmProto.Proposal) error {
+func (pv *ThresholdValidator) SignProposal(chainID string, proposal *tmproto.Proposal) error {
 	block := &Block{
 		Height:    proposal.Height,
 		Round:     int64(proposal.Round),
@@ -397,8 +393,8 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 			Block:   block,
 		})
 		if err != nil {
-			if _, ok := err.(*rpcTypes.RPCError); ok {
-				rpcErrUnwrapped := err.(*rpcTypes.RPCError).Data
+			if _, ok := err.(*tmrpcjsontypes.RPCError); ok {
+				rpcErrUnwrapped := err.(*tmrpcjsontypes.RPCError).Data
 				// Need to return BeyondBlockError after proxy since the error type will be lost over RPC
 				if len(rpcErrUnwrapped) > 33 && rpcErrUnwrapped[:33] == "Progress already started on block" {
 					return nil, stamp, &BeyondBlockError{msg: rpcErrUnwrapped}
@@ -585,12 +581,9 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 		},
 	}
 	// Err will be present if newLss is not above high watermark
-	err = pv.chainState[chainID].lastSignState.Save(
-		newLss.SignStateConsensus,
-		pv.chainState[chainID].lastSignStateMutex,
-		true,
-		&pv.asyncWaitGroup,
-	)
+	pv.chainState[chainID].lastSignStateMutex.Lock()
+	err = pv.chainState[chainID].lastSignState.Save(newLss.SignStateConsensus, &pv.pendingDiskWG)
+	pv.chainState[chainID].lastSignStateMutex.Unlock()
 	if err != nil {
 		if _, isSameHRSError := err.(*SameHRSError); !isSameHRSError {
 			return nil, stamp, err

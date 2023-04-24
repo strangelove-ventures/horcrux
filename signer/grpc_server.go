@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/raft"
-	proto "github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/strangelove-ventures/horcrux/signer/proto"
 )
 
 type GRPCServer struct {
@@ -17,7 +17,7 @@ type GRPCServer struct {
 }
 
 func (rpc *GRPCServer) SignBlock(
-	ctx context.Context,
+	_ context.Context,
 	req *proto.CosignerGRPCSignBlockRequest,
 ) (*proto.CosignerGRPCSignBlockResponse, error) {
 	block := &Block{
@@ -37,7 +37,7 @@ func (rpc *GRPCServer) SignBlock(
 }
 
 func (rpc *GRPCServer) SetEphemeralSecretPartsAndSign(
-	ctx context.Context,
+	_ context.Context,
 	req *proto.CosignerGRPCSetEphemeralSecretPartsAndSignRequest,
 ) (*proto.CosignerGRPCSetEphemeralSecretPartsAndSignResponse, error) {
 	res, err := rpc.cosigner.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
@@ -72,7 +72,7 @@ func (rpc *GRPCServer) SetEphemeralSecretPartsAndSign(
 }
 
 func (rpc *GRPCServer) GetEphemeralSecretParts(
-	ctx context.Context,
+	_ context.Context,
 	req *proto.CosignerGRPCGetEphemeralSecretPartsRequest,
 ) (*proto.CosignerGRPCGetEphemeralSecretPartsResponse, error) {
 	res, err := rpc.cosigner.GetEphemeralSecretParts(
@@ -88,7 +88,7 @@ func (rpc *GRPCServer) GetEphemeralSecretParts(
 }
 
 func (rpc *GRPCServer) TransferLeadership(
-	ctx context.Context,
+	_ context.Context,
 	req *proto.CosignerGRPCTransferLeadershipRequest,
 ) (*proto.CosignerGRPCTransferLeadershipResponse, error) {
 	leaderID := req.GetLeaderID()
@@ -109,8 +109,8 @@ func (rpc *GRPCServer) TransferLeadership(
 }
 
 func (rpc *GRPCServer) GetLeader(
-	ctx context.Context,
-	req *proto.CosignerGRPCGetLeaderRequest,
+	context.Context,
+	*proto.CosignerGRPCGetLeaderRequest,
 ) (*proto.CosignerGRPCGetLeaderResponse, error) {
 	leader := rpc.raftStore.GetLeader()
 	return &proto.CosignerGRPCGetLeaderResponse{Leader: string(leader)}, nil

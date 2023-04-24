@@ -3,7 +3,7 @@ package signer
 import (
 	"time"
 
-	proto "github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/strangelove-ventures/horcrux/signer/proto"
 )
 
 type HRSKey struct {

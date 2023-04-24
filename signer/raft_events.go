@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	proto "github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )

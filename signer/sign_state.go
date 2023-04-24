@@ -9,11 +9,11 @@ import (
 	"sync"
 
 	"github.com/gogo/protobuf/proto"
-	tmBytes "github.com/tendermint/tendermint/libs/bytes"
-	tmJson "github.com/tendermint/tendermint/libs/json"
+	tmbytes "github.com/tendermint/tendermint/libs/bytes"
+	tmjson "github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/protoio"
 	"github.com/tendermint/tendermint/libs/tempfile"
-	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
+	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 )
 
 const (
@@ -23,29 +23,29 @@ const (
 	blocksToCache      = 3
 )
 
-func CanonicalVoteToStep(vote *tmProto.CanonicalVote) int8 {
+func CanonicalVoteToStep(vote *tmproto.CanonicalVote) int8 {
 	switch vote.Type {
-	case tmProto.PrevoteType:
+	case tmproto.PrevoteType:
 		return stepPrevote
-	case tmProto.PrecommitType:
+	case tmproto.PrecommitType:
 		return stepPrecommit
 	default:
 		panic("Unknown vote type")
 	}
 }
 
-func VoteToStep(vote *tmProto.Vote) int8 {
+func VoteToStep(vote *tmproto.Vote) int8 {
 	switch vote.Type {
-	case tmProto.PrevoteType:
+	case tmproto.PrevoteType:
 		return stepPrevote
-	case tmProto.PrecommitType:
+	case tmproto.PrecommitType:
 		return stepPrecommit
 	default:
 		panic("Unknown vote type")
 	}
 }
 
-func ProposalToStep(_ *tmProto.Proposal) int8 {
+func ProposalToStep(_ *tmproto.Proposal) int8 {
 	return stepPropose
 }
 
@@ -56,7 +56,7 @@ type SignState struct {
 	Step            int8             `json:"step"`
 	EphemeralPublic []byte           `json:"ephemeral_public"`
 	Signature       []byte           `json:"signature,omitempty"`
-	SignBytes       tmBytes.HexBytes `json:"signbytes,omitempty"`
+	SignBytes       tmbytes.HexBytes `json:"signbytes,omitempty"`
 	cache           map[HRSKey]SignStateConsensus
 
 	filePath string
@@ -67,7 +67,7 @@ type SignStateConsensus struct {
 	Round     int64
 	Step      int8
 	Signature []byte
-	SignBytes tmBytes.HexBytes
+	SignBytes tmbytes.HexBytes
 }
 
 type ChainSignStateConsensus struct {
@@ -112,19 +112,14 @@ func (signState *SignState) GetFromCache(hrs HRSKey, lock *sync.Mutex) (HRSKey, 
 	return latestBlock, nil
 }
 
+// Save updates the high watermark height/round/step (HRS) if it is greater
+// than the current high watermark. If pendingDiskWG is provided, the write operation
+// will be a separate goroutine (async). This allows pendingDiskWG to be used to .Wait()
+// for all pending SignState disk writes.
 func (signState *SignState) Save(
 	ssc SignStateConsensus,
-	lock *sync.Mutex,
-	async bool,
-	asyncWaitGroup *sync.WaitGroup,
+	pendingDiskWG *sync.WaitGroup,
 ) error {
-	// One lock/unlock for less/equal check and mutation.
-	// Setting nil for lock for getErrorIfLessOrEqual to avoid recursive lock
-	if lock != nil {
-		lock.Lock()
-		defer lock.Unlock()
-	}
-
 	err := signState.GetErrorIfLessOrEqual(ssc.Height, ssc.Round, ssc.Step, nil)
 	if err != nil {
 		return err
@@ -143,14 +138,10 @@ func (signState *SignState) Save(
 	signState.Step = ssc.Step
 	signState.Signature = ssc.Signature
 	signState.SignBytes = ssc.SignBytes
-	if async {
-		if asyncWaitGroup != nil {
-			asyncWaitGroup.Add(1)
-		}
+	if pendingDiskWG != nil {
+		pendingDiskWG.Add(1)
 		go func() {
-			if asyncWaitGroup != nil {
-				defer asyncWaitGroup.Done()
-			}
+			defer pendingDiskWG.Done()
 			signState.save()
 		}()
 	} else {
@@ -169,7 +160,7 @@ func (signState *SignState) save() {
 	if outFile == "" {
 		panic("cannot save SignState: filePath not set")
 	}
-	jsonBytes, err := tmJson.MarshalIndent(signState, "", "  ")
+	jsonBytes, err := tmjson.MarshalIndent(signState, "", "  ")
 	if err != nil {
 		panic(err)
 	}
@@ -299,7 +290,7 @@ func LoadSignState(filepath string) (*SignState, error) {
 
 	state := new(SignState)
 
-	err = tmJson.Unmarshal(stateJSONBytes, &state)
+	err = tmjson.Unmarshal(stateJSONBytes, &state)
 	if err != nil {
 		return nil, err
 	}
@@ -351,7 +342,7 @@ func onlyDifferByTimestamp(step int8, signStateSignBytes, signBytes []byte) erro
 }
 
 func checkVoteOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) error {
-	var lastVote, newVote tmProto.CanonicalVote
+	var lastVote, newVote tmproto.CanonicalVote
 	if err := protoio.UnmarshalDelimited(lastSignBytes, &lastVote); err != nil {
 		return fmt.Errorf("lastSignBytes cannot be unmarshalled into vote: %v", err)
 	}
@@ -384,7 +375,7 @@ func checkVoteOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) error {
 }
 
 func checkProposalOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) error {
-	var lastProposal, newProposal tmProto.CanonicalProposal
+	var lastProposal, newProposal tmproto.CanonicalProposal
 	if err := protoio.UnmarshalDelimited(lastSignBytes, &lastProposal); err != nil {
 		return fmt.Errorf("lastSignBytes cannot be unmarshalled into proposal: %v", err)
 	}
