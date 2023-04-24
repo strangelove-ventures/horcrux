@@ -42,7 +42,8 @@ func TestSingleSignerValidator(t *testing.T) {
 	err = os.WriteFile(runtimeConfig.KeyFilePathSingleSigner(), marshaled, 0600)
 	require.NoError(t, err)
 
-	validator := NewSingleSignerValidator(runtimeConfig)
+	validator, err := NewSingleSignerValidator(runtimeConfig)
+	require.NoError(t, err)
 
 	proposal := tmproto.Proposal{
 		Height: 1,
@@ -99,7 +100,8 @@ func TestSingleSignerValidator(t *testing.T) {
 	require.NoError(t, err)
 
 	// reinitialize validator to make sure new runtime will not allow double sign
-	validator = NewSingleSignerValidator(runtimeConfig)
+	validator, err = NewSingleSignerValidator(runtimeConfig)
+	require.NoError(t, err)
 
 	err = validator.SignProposal(testChainID, &proposal)
 	require.Error(t, err, "double sign!")

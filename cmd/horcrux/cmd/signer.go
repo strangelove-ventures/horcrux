@@ -69,7 +69,10 @@ func startSignerCmd() *cobra.Command {
 			logger.Info("Tendermint Validator", "mode", "single-signer",
 				"priv-key", config.Config.PrivValKeyFile, "priv-state-dir", config.StateDir)
 
-			pv := signer.NewSingleSignerValidator(&config)
+			pv, err := signer.NewSingleSignerValidator(&config)
+			if err != nil {
+				return fmt.Errorf("failed to construct single signer validator: %w", err)
+			}
 
 			pubkey, err := pv.GetPubKey()
 			if err != nil {
