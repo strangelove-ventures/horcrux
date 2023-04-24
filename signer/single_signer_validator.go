@@ -15,8 +15,9 @@ var _ PrivValidator = &SingleSignerValidator{}
 // SingleSignerValidator guards access to an underlying PrivValidator by using mutexes
 // for each of the PrivValidator interface functions
 type SingleSignerValidator struct {
-	config     *RuntimeConfig
-	chainState map[string]*SingleSignerChainState
+	config       *RuntimeConfig
+	chainState   map[string]*SingleSignerChainState
+	chainStateMu sync.RWMutex
 }
 
 type SingleSignerChainState struct {
@@ -61,7 +62,10 @@ func (pv *SingleSignerValidator) SignProposal(chainID string, proposal *tmproto.
 }
 
 func (pv *SingleSignerValidator) loadChainStateIfNecessary(chainID string) (*SingleSignerChainState, error) {
-	if chainState, ok := pv.chainState[chainID]; ok {
+	pv.chainStateMu.RLock()
+	chainState, ok := pv.chainState[chainID]
+	pv.chainStateMu.RUnlock()
+	if ok {
 		return chainState, nil
 	}
 
@@ -79,10 +83,12 @@ func (pv *SingleSignerValidator) loadChainStateIfNecessary(chainID string) (*Sin
 		filePV = privval.LoadFilePV(keyFile, stateFile)
 	}
 
-	chainState := &SingleSignerChainState{
+	chainState = &SingleSignerChainState{
 		filePV: filePV,
 	}
+	pv.chainStateMu.Lock()
 	pv.chainState[chainID] = chainState
+	pv.chainStateMu.Unlock()
 
 	return chainState, nil
 }
