@@ -61,6 +61,11 @@ func startSignerCmd() *cobra.Command {
 				logger   = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator")
 			)
 
+			_, err = config.KeyFileExistsSingleSigner()
+			if err != nil {
+				return err
+			}
+
 			logger.Info("Tendermint Validator", "mode", "single-signer",
 				"priv-key", config.Config.PrivValKeyFile, "priv-state-dir", config.StateDir)
 
