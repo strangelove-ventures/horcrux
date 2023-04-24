@@ -94,8 +94,8 @@ func (rpc *GRPCServer) TransferLeadership(
 }
 
 func (rpc *GRPCServer) GetLeader(
-	_ context.Context,
-	_ *proto.CosignerGRPCGetLeaderRequest,
+	context.Context,
+	*proto.CosignerGRPCGetLeaderRequest,
 ) (*proto.CosignerGRPCGetLeaderResponse, error) {
 	leader := rpc.raftStore.GetLeader()
 	return &proto.CosignerGRPCGetLeaderResponse{Leader: string(leader)}, nil

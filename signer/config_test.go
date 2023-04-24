@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Nodes(t *testing.T) {
+func TestNodes(t *testing.T) {
 	c := signer.Config{
 		ChainNodes: signer.ChainNodes{
 			{
