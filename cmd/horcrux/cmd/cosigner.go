@@ -136,20 +136,6 @@ func startCosignerCmd() *cobra.Command {
 				return fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
 			}
 
-			// ok to auto initialize on disk since the cosigner share is the one that actually
-			// protects against double sign - this exists as a cache for the final signature
-			signState, err := signer.LoadOrCreateSignState(config.PrivValStateFile(config.Config.ChainID))
-			if err != nil {
-				panic(err)
-			}
-
-			// state for our cosigner share
-			// Not automatically initialized on disk to avoid double sign risk
-			shareSignState, err := signer.LoadSignState(config.ShareStateFile(config.Config.ChainID))
-			if err != nil {
-				panic(err)
-			}
-
 			cosigners := []signer.Cosigner{}
 
 			// add ourselves as a peer so localcosigner can handle GetEphSecPart requests
@@ -176,7 +162,6 @@ func startCosignerCmd() *cobra.Command {
 			localCosigner := signer.NewLocalCosigner(
 				&config,
 				key,
-				&shareSignState,
 				key.RSAKey,
 				peers,
 				cosignerConfig.P2PListen,
@@ -209,7 +194,6 @@ func startCosignerCmd() *cobra.Command {
 				logger,
 				&config,
 				key.PubKey,
-				signState,
 				cosignerConfig.Threshold,
 				localCosigner,
 				cosigners,

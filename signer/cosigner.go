@@ -40,6 +40,7 @@ func (hrst HRSTKey) toProto() *proto.HRST {
 // CosignerSignRequest is sent to a co-signer to obtain their signature for the SignBytes
 // The SignBytes should be a serialized block
 type CosignerSignRequest struct {
+	ChainID   string
 	SignBytes []byte
 }
 
@@ -95,6 +96,7 @@ func CosignerEphemeralSecretPartsFromProto(
 }
 
 type CosignerSetEphemeralSecretPartRequest struct {
+	ChainID                        string
 	SourceID                       int
 	SourceEphemeralSecretPublicKey []byte
 	EncryptedSharePart             []byte
@@ -119,6 +121,7 @@ type CosignerEphemeralSecretPartsResponse struct {
 }
 
 type CosignerSetEphemeralSecretPartsAndSignRequest struct {
+	ChainID          string
 	EncryptedSecrets []CosignerEphemeralSecretPart
 	HRST             HRSTKey
 	SignBytes        []byte
@@ -135,7 +138,7 @@ type Cosigner interface {
 	GetAddress() string
 
 	// Get ephemeral secret part for all peers
-	GetEphemeralSecretParts(hrst HRSTKey) (*CosignerEphemeralSecretPartsResponse, error)
+	GetEphemeralSecretParts(chainID string, hrst HRSTKey) (*CosignerEphemeralSecretPartsResponse, error)
 
 	// Sign the requested bytes
 	SetEphemeralSecretPartsAndSign(req CosignerSetEphemeralSecretPartsAndSignRequest) (*CosignerSignResponse, error)

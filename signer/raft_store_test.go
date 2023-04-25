@@ -28,16 +28,10 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 		ShareKey: []byte{},
 		ID:       1,
 	}
-	signState := SignState{
-		Height: 0,
-		Round:  0,
-		Step:   0,
-	}
 
 	cosigner := NewLocalCosigner(
 		&RuntimeConfig{},
 		key,
-		&signState,
 		*rsaKey,
 		[]CosignerPeer{{
 			ID:        1,

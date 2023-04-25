@@ -48,6 +48,7 @@ message CosignerGRPCSetEphemeralSecretPartsAndSignRequest {
 	repeated EphemeralSecretPart encryptedSecrets = 1;
 	HRST hrst = 2;
 	bytes signBytes = 3;
+  string chainID = 4;
 }
 
 message CosignerGRPCSetEphemeralSecretPartsAndSignResponse {
@@ -58,6 +59,7 @@ message CosignerGRPCSetEphemeralSecretPartsAndSignResponse {
 
 message CosignerGRPCGetEphemeralSecretPartsRequest {
 	HRST hrst = 1;
+  string chainID = 2;
 }
 
 message CosignerGRPCGetEphemeralSecretPartsResponse {

@@ -59,9 +59,9 @@ func showStateCmd() *cobra.Command {
 			}
 
 			fmt.Println("Private Validator State:")
-			printSignState(pv)
+			printSignState(*pv)
 			fmt.Println("Share Sign State:")
-			printSignState(share)
+			printSignState(*share)
 			return nil
 		},
 	}

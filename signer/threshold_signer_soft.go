@@ -219,6 +219,7 @@ func (softSigner *ThresholdSignerSoft) GetEphemeralSecretPart(
 	// generate metadata placeholder
 	if !ok {
 		newMeta, err := softSigner.DealShares(CosignerGetEphemeralSecretPartRequest{
+			ChainID:   req.ChainID,
 			Height:    req.Height,
 			Round:     req.Round,
 			Step:      req.Step,
@@ -330,9 +331,10 @@ func (softSigner *ThresholdSignerSoft) SetEphemeralSecretPart(
 	meta, ok := softSigner.hrsMeta[hrst] // generate metadata placeholder, softSigner.HrsMeta[hrst] is non-addressable
 	if !ok {
 		newMeta, err := softSigner.DealShares(CosignerGetEphemeralSecretPartRequest{
-			Height: req.Height,
-			Round:  req.Round,
-			Step:   req.Step,
+			ChainID: req.ChainID,
+			Height:  req.Height,
+			Round:   req.Round,
+			Step:    req.Step,
 		})
 		if err != nil {
 			return err
