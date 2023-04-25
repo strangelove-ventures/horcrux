@@ -98,8 +98,8 @@ func (pv *SingleSignerValidator) loadChainStateIfNecessary(chainID string) (*Sin
 		if !os.IsNotExist(err) {
 			panic(fmt.Errorf("failed to load state file (%s) - %w", stateFile, err))
 		}
-		// The only scenario in which we want to initialize a new state file
-		// is when the state file does not exist.
+		// The only scenario in which we want to create a new state file
+		// on disk is when the state file does not exist.
 		filePV = tmprivval.LoadFilePVEmptyState(keyFile, stateFile)
 	} else {
 		filePV = tmprivval.LoadFilePV(keyFile, stateFile)
