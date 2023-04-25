@@ -5,8 +5,9 @@ import (
 	"os"
 	"sync"
 
-	"github.com/tendermint/tendermint/crypto"
-	"github.com/tendermint/tendermint/privval"
+	tmcrypto "github.com/tendermint/tendermint/crypto"
+	tmjson "github.com/tendermint/tendermint/libs/json"
+	tmprivval "github.com/tendermint/tendermint/privval"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 )
 
@@ -14,26 +15,55 @@ import (
 // for each of the PrivValidator interface functions
 type SingleSignerValidator struct {
 	config     *RuntimeConfig
-	chainState map[string]*SingleSignerChainState
+	chainState sync.Map
+	pubKey     tmcrypto.PubKey
 }
 
+// SingleSignerChainState holds the priv validator and associated mutex for a single chain.
 type SingleSignerChainState struct {
-	filePV  *privval.FilePV
+	filePV *tmprivval.FilePV
+
+	// The filePV does not have any locking internally for signing operations.
+	// The high-watermark/last-signed-state within the FilePV prevents double sign
+	// as long as operations are synchronous. This lock is used to ensure that.
 	pvMutex sync.Mutex
 }
 
-func NewSingleSignerValidator(config *RuntimeConfig) *SingleSignerValidator {
-	return &SingleSignerValidator{
-		config:     config,
-		chainState: make(map[string]*SingleSignerChainState),
+// NewSingleSignerValidator constructs a validator for single-sign mode (not recommended).
+// NewThresholdValidator is recommended, but single-sign mode can be used for convenience.
+func NewSingleSignerValidator(config *RuntimeConfig) (*SingleSignerValidator, error) {
+	pv := &SingleSignerValidator{
+		config: config,
 	}
+
+	if err := pv.loadPubKey(); err != nil {
+		return nil, fmt.Errorf("failed to load priv validator key: %w", err)
+	}
+
+	return pv, nil
+}
+
+func (pv *SingleSignerValidator) loadPubKey() error {
+	keyFile := pv.config.KeyFilePathSingleSigner()
+
+	keyJSONBytes, err := os.ReadFile(keyFile)
+	if err != nil {
+		return err
+	}
+	pvKey := tmprivval.FilePVKey{}
+	err = tmjson.Unmarshal(keyJSONBytes, &pvKey)
+	if err != nil {
+		return err
+	}
+
+	pv.pubKey = pvKey.PrivKey.PubKey()
+
+	return nil
 }
 
 // GetPubKey implements types.PrivValidator
-func (pv *SingleSignerValidator) GetPubKey() (crypto.PubKey, error) {
-	keyFile := pv.config.KeyFilePathSingleSigner()
-	filePV := privval.LoadFilePVEmptyState(keyFile, "")
-	return filePV.GetPubKey()
+func (pv *SingleSignerValidator) GetPubKey() (tmcrypto.PubKey, error) {
+	return pv.pubKey, nil
 }
 
 // SignVote implements types.PrivValidator
@@ -59,28 +89,29 @@ func (pv *SingleSignerValidator) SignProposal(chainID string, proposal *tmproto.
 }
 
 func (pv *SingleSignerValidator) loadChainStateIfNecessary(chainID string) (*SingleSignerChainState, error) {
-	if chainState, ok := pv.chainState[chainID]; ok {
-		return chainState, nil
+	cachedChainState, ok := pv.chainState.Load(chainID)
+	if ok {
+		return cachedChainState.(*SingleSignerChainState), nil
 	}
 
 	keyFile := pv.config.KeyFilePathSingleSigner()
 	stateFile := pv.config.PrivValStateFile(chainID)
-	var filePV *privval.FilePV
+	var filePV *tmprivval.FilePV
 	if _, err := os.Stat(stateFile); err != nil {
 		if !os.IsNotExist(err) {
 			panic(fmt.Errorf("failed to load state file (%s) - %w", stateFile, err))
 		}
-		// The only scenario in which we want to initialize a new state file
-		// is when the state file does not exist.
-		filePV = privval.LoadFilePVEmptyState(keyFile, stateFile)
+		// The only scenario in which we want to create a new state file
+		// on disk is when the state file does not exist.
+		filePV = tmprivval.LoadFilePVEmptyState(keyFile, stateFile)
 	} else {
-		filePV = privval.LoadFilePV(keyFile, stateFile)
+		filePV = tmprivval.LoadFilePV(keyFile, stateFile)
 	}
 
 	chainState := &SingleSignerChainState{
 		filePV: filePV,
 	}
-	pv.chainState[chainID] = chainState
+	pv.chainState.Store(chainID, chainState)
 
 	return chainState, nil
 }
