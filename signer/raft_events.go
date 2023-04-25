@@ -26,14 +26,25 @@ func (f *fsm) shouldRetain(key string) bool {
 }
 
 func (f *fsm) handleLSSEvent(value string) {
-	lss := &SignStateConsensus{}
+	lss := &ChainSignStateConsensus{}
 	err := json.Unmarshal([]byte(value), lss)
 	if err != nil {
-		f.logger.Error("LSS Unmarshal Error", err.Error())
+		f.logger.Error(
+			"LastSignState Unmarshal Error",
+			"error", err,
+		)
 		return
 	}
-	_ = f.thresholdValidator.SaveLastSignedState(*lss)
-	_ = f.cosigner.SaveLastSignedState(*lss)
+	if err := f.thresholdValidator.LoadSignStateIfNecessary(lss.ChainID); err != nil {
+		f.logger.Error(
+			"Error loading sign state during raft replication",
+			"chain_id", lss.ChainID,
+			"error", err,
+		)
+		return
+	}
+	_ = f.thresholdValidator.SaveLastSignedState(lss.ChainID, lss.SignStateConsensus)
+	_ = f.cosigner.SaveLastSignedState(lss.ChainID, lss.SignStateConsensus)
 }
 
 func (s *RaftStore) getLeaderGRPCClient() (proto.CosignerGRPCClient, *grpc.ClientConn, error) {

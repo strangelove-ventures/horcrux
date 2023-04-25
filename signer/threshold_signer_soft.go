@@ -70,8 +70,8 @@ func (softSigner *ThresholdSignerSoft) GetID() (int, error) {
 // Implements ThresholdSigner
 func (softSigner *ThresholdSignerSoft) Sign(
 	req CosignerSignRequest, m *LastSignStateWrapper) (CosignerSignResponse, error) {
-	m.lastSignStateMutex.Lock()
-	defer m.lastSignStateMutex.Unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	res := CosignerSignResponse{}
 	lss := m.LastSignState
@@ -205,8 +205,8 @@ func (softSigner *ThresholdSignerSoft) GetEphemeralSecretPart(
 	res := CosignerEphemeralSecretPart{}
 
 	// protects the meta map
-	m.lastSignStateMutex.Lock()
-	defer m.lastSignStateMutex.Unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	hrst := HRSTKey{
 		Height:    req.Height,
@@ -219,6 +219,7 @@ func (softSigner *ThresholdSignerSoft) GetEphemeralSecretPart(
 	// generate metadata placeholder
 	if !ok {
 		newMeta, err := softSigner.DealShares(CosignerGetEphemeralSecretPartRequest{
+			ChainID:   req.ChainID,
 			Height:    req.Height,
 			Round:     req.Round,
 			Step:      req.Step,
@@ -317,8 +318,8 @@ func (softSigner *ThresholdSignerSoft) SetEphemeralSecretPart(
 	}
 
 	// protects the meta map
-	m.lastSignStateMutex.Lock()
-	defer m.lastSignStateMutex.Unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	hrst := HRSTKey{
 		Height:    req.Height,
@@ -330,9 +331,10 @@ func (softSigner *ThresholdSignerSoft) SetEphemeralSecretPart(
 	meta, ok := softSigner.hrsMeta[hrst] // generate metadata placeholder, softSigner.HrsMeta[hrst] is non-addressable
 	if !ok {
 		newMeta, err := softSigner.DealShares(CosignerGetEphemeralSecretPartRequest{
-			Height: req.Height,
-			Round:  req.Round,
-			Step:   req.Step,
+			ChainID: req.ChainID,
+			Height:  req.Height,
+			Round:   req.Round,
+			Step:    req.Step,
 		})
 		if err != nil {
 			return err

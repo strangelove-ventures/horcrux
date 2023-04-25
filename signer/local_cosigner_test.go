@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -28,16 +29,10 @@ func TestLocalCosignerGetID(t *testing.T) {
 		ShareKey: []byte{},
 		ID:       1,
 	}
-	signState := SignState{
-		Height: 0,
-		Round:  0,
-		Step:   0,
-	}
 
 	cosigner := NewLocalCosigner(
 		&RuntimeConfig{},
 		key,
-		&signState,
 		*rsaKey,
 		[]CosignerPeer{{
 			ID:        1,
@@ -83,30 +78,24 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		ID:       1,
 	}
 
-	stateFile1, err := os.CreateTemp("", "state1.json")
-	require.NoError(t, err)
-	defer os.Remove(stateFile1.Name())
-
-	signState1, err := LoadOrCreateSignState(stateFile1.Name())
-	require.NoError(t, err)
-
 	key2 := CosignerKey{
 		PubKey:   privateKey.PubKey(),
 		ShareKey: secretShares[1],
 		ID:       2,
 	}
 
-	stateFile2, err := os.CreateTemp("", "state2.json")
-	require.NoError(t, err)
-	defer os.Remove(stateFile2.Name())
+	tmpDir := t.TempDir()
 
-	signState2, err := LoadOrCreateSignState(stateFile2.Name())
+	cosigner1Dir, cosigner2Dir := filepath.Join(tmpDir, "cosigner1"), filepath.Join(tmpDir, "cosigner2")
+	err = os.Mkdir(cosigner1Dir, 0700)
+	require.NoError(t, err)
+
+	err = os.Mkdir(cosigner2Dir, 0700)
 	require.NoError(t, err)
 
 	cosigner1 := NewLocalCosigner(
-		&RuntimeConfig{},
+		&RuntimeConfig{StateDir: cosigner1Dir},
 		key1,
-		&signState1,
 		*rsaKey1,
 		peers,
 		"",
@@ -115,9 +104,8 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	)
 	defer cosigner1.waitForSignStatesToFlushToDisk()
 	cosigner2 := NewLocalCosigner(
-		&RuntimeConfig{},
+		&RuntimeConfig{StateDir: cosigner2Dir},
 		key2,
-		&signState2,
 		*rsaKey2,
 		peers,
 		"",
@@ -125,6 +113,12 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		threshold,
 	)
 	defer cosigner2.waitForSignStatesToFlushToDisk()
+
+	err = cosigner1.LoadSignStateIfNecessary(testChainID)
+	require.NoError(t, err)
+
+	err = cosigner2.LoadSignStateIfNecessary(testChainID)
+	require.NoError(t, err)
 
 	require.Equal(t, cosigner1.GetID(), 1)
 	require.Equal(t, cosigner2.GetID(), 2)
@@ -140,12 +134,12 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		Timestamp: now.UnixNano(),
 	}
 
-	ephemeralSharesFor2, err := cosigner1.GetEphemeralSecretParts(hrst)
+	ephemeralSharesFor2, err := cosigner1.GetEphemeralSecretParts(testChainID, hrst)
 	require.NoError(t, err)
 
 	publicKeys = append(publicKeys, ephemeralSharesFor2.EncryptedSecrets[0].SourceEphemeralSecretPublicKey)
 
-	ephemeralSharesFor1, err := cosigner2.GetEphemeralSecretParts(hrst)
+	ephemeralSharesFor1, err := cosigner2.GetEphemeralSecretParts(testChainID, hrst)
 	require.NoError(t, err)
 
 	t.Logf("Shares from 2: %d", len(ephemeralSharesFor1.EncryptedSecrets))
@@ -166,6 +160,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	signBytes := tm.VoteSignBytes("chain-id", &vote)
 
 	sigRes1, err := cosigner1.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
+		ChainID:          testChainID,
 		EncryptedSecrets: ephemeralSharesFor1.EncryptedSecrets,
 		HRST:             hrst,
 		SignBytes:        signBytes,
@@ -173,6 +168,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	require.NoError(t, err)
 
 	sigRes2, err := cosigner2.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
+		ChainID:          testChainID,
 		EncryptedSecrets: ephemeralSharesFor2.EncryptedSecrets,
 		HRST:             hrst,
 		SignBytes:        signBytes,

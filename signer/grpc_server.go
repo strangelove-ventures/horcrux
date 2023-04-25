@@ -17,7 +17,9 @@ type GRPCServer struct {
 }
 
 func (rpc *GRPCServer) SignBlock(
-	_ context.Context, req *proto.CosignerGRPCSignBlockRequest) (*proto.CosignerGRPCSignBlockResponse, error) {
+	_ context.Context,
+	req *proto.CosignerGRPCSignBlockRequest,
+) (*proto.CosignerGRPCSignBlockResponse, error) {
 	block := &Block{
 		Height:    req.Block.GetHeight(),
 		Round:     req.Block.GetRound(),
@@ -39,15 +41,25 @@ func (rpc *GRPCServer) SetEphemeralSecretPartsAndSign(
 	req *proto.CosignerGRPCSetEphemeralSecretPartsAndSignRequest,
 ) (*proto.CosignerGRPCSetEphemeralSecretPartsAndSignResponse, error) {
 	res, err := rpc.cosigner.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
+		ChainID:          req.ChainID,
 		EncryptedSecrets: CosignerEphemeralSecretPartsFromProto(req.GetEncryptedSecrets()),
 		HRST:             HRSTKeyFromProto(req.GetHrst()),
 		SignBytes:        req.GetSignBytes(),
 	})
 	if err != nil {
-		rpc.raftStore.logger.Error("Failed to sign with share", "error", err)
+		rpc.raftStore.logger.Error(
+			"Failed to sign with share",
+			"chain_id", req.ChainID,
+			"height", req.Hrst.Height,
+			"round", req.Hrst.Round,
+			"step", req.Hrst.Step,
+			"error", err,
+		)
 		return nil, err
 	}
-	rpc.raftStore.logger.Info("Signed with share",
+	rpc.raftStore.logger.Info(
+		"Signed with share",
+		"chain_id", req.ChainID,
 		"height", req.Hrst.Height,
 		"round", req.Hrst.Round,
 		"step", req.Hrst.Step,
@@ -63,7 +75,10 @@ func (rpc *GRPCServer) GetEphemeralSecretParts(
 	_ context.Context,
 	req *proto.CosignerGRPCGetEphemeralSecretPartsRequest,
 ) (*proto.CosignerGRPCGetEphemeralSecretPartsResponse, error) {
-	res, err := rpc.cosigner.GetEphemeralSecretParts(HRSTKeyFromProto(req.GetHrst()))
+	res, err := rpc.cosigner.GetEphemeralSecretParts(
+		req.ChainID,
+		HRSTKeyFromProto(req.GetHrst()),
+	)
 	if err != nil {
 		return nil, err
 	}

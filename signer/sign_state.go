@@ -70,6 +70,11 @@ type SignStateConsensus struct {
 	SignBytes tmbytes.HexBytes
 }
 
+type ChainSignStateConsensus struct {
+	ChainID            string
+	SignStateConsensus SignStateConsensus
+}
+
 func NewSignStateConsensus(height int64, round int64, step int8) SignStateConsensus {
 	return SignStateConsensus{
 		Height: height,
@@ -247,46 +252,73 @@ func (signState *SignState) GetErrorIfLessOrEqual(height int64, round int64, ste
 	return nil
 }
 
+// FreshCache returns a clone of a SignState with a new cache
+// including the most recent sign state.
+func (signState *SignState) FreshCache() *SignState {
+	newSignState := &SignState{
+		Height:          signState.Height,
+		Round:           signState.Round,
+		Step:            signState.Step,
+		EphemeralPublic: signState.EphemeralPublic,
+		Signature:       signState.Signature,
+		SignBytes:       signState.SignBytes,
+		cache:           make(map[HRSKey]SignStateConsensus),
+		filePath:        signState.filePath,
+	}
+
+	newSignState.cache[HRSKey{
+		Height: signState.Height,
+		Round:  signState.Round,
+		Step:   signState.Step,
+	}] = SignStateConsensus{
+		Height:    signState.Height,
+		Round:     signState.Round,
+		Step:      signState.Step,
+		Signature: signState.Signature,
+		SignBytes: signState.SignBytes,
+	}
+
+	return newSignState
+}
+
 // LoadSignState loads a sign state from disk.
-func LoadSignState(filepath string) (SignState, error) {
-	state := SignState{}
+func LoadSignState(filepath string) (*SignState, error) {
 	stateJSONBytes, err := os.ReadFile(filepath)
 	if err != nil {
-		return state, err
+		return nil, err
 	}
+
+	state := new(SignState)
 
 	err = tmjson.Unmarshal(stateJSONBytes, &state)
 	if err != nil {
-		return state, err
+		return nil, err
 	}
-	state.cache = make(map[HRSKey]SignStateConsensus)
-	state.cache[HRSKey{Height: state.Height, Round: state.Round, Step: state.Step}] = SignStateConsensus{
-		Height:    state.Height,
-		Round:     state.Round,
-		Step:      state.Step,
-		Signature: state.Signature,
-		SignBytes: state.SignBytes,
-	}
+
 	state.filePath = filepath
-	return state, nil
+
+	return state.FreshCache(), nil
 }
 
 // LoadOrCreateSignState loads the sign state from filepath
 // If the sign state could not be loaded, an empty sign state is initialized
 // and saved to filepath.
-func LoadOrCreateSignState(filepath string) (SignState, error) {
-	existing, err := LoadSignState(filepath)
-	if err == nil {
-		return existing, nil
+func LoadOrCreateSignState(filepath string) (*SignState, error) {
+	if _, err := os.Stat(filepath); err != nil {
+		if !os.IsNotExist(err) {
+			return nil, fmt.Errorf("unexpected error checking file existence (%s): %w", filepath, err)
+		}
+		// the only scenario where we want to create a new sign state file is when the file does not exist.
+		// Make an empty sign state and save it.
+		state := &SignState{
+			filePath: filepath,
+			cache:    make(map[HRSKey]SignStateConsensus),
+		}
+		state.save()
+		return state, nil
 	}
 
-	// There was an error loading the sign state
-	// Make an empty sign state and save it
-	state := SignState{}
-	state.filePath = filepath
-	state.cache = make(map[HRSKey]SignStateConsensus)
-	state.save()
-	return state, nil
+	return LoadSignState(filepath)
 }
 
 // OnlyDifferByTimestamp returns true if the sign bytes of the sign state
