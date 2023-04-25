@@ -19,7 +19,7 @@ import (
 
 type LastSignStateWrapper struct {
 	// Signing is thread safe - lastSignStateMutex is used for putting locks so only one goroutine can r/w to the function
-	lastSignStateMutex sync.Mutex
+	mu sync.Mutex
 
 	// lastSignState stores the last sign state for a share we have fully signed
 	// incremented whenever we are asked to sign a share
@@ -28,11 +28,11 @@ type LastSignStateWrapper struct {
 
 type ChainState struct {
 	// Signing is thread safe - lastSignStateMutex is used for putting locks so only one goroutine can r/w to the function
-	lastSignStateMutex *sync.Mutex
+	mu sync.Mutex
 
 	// lastSignState stores the last sign state for a share we have fully signed
 	// incremented whenever we are asked to sign a share
-	LastSignState *SignState
+	lastSignState *SignState
 
 	// Height, Round, Step -> metadata
 	hrsMeta map[HRSTKey]HrsMetadata
@@ -95,7 +95,7 @@ type LocalCosigner struct {
 	total       uint8
 	threshold   uint8
 
-	chainState map[string]ChainState
+	chainState map[string]*ChainState
 
 	peers map[int]CosignerPeer
 
@@ -104,15 +104,21 @@ type LocalCosigner struct {
 	pendingDiskWG sync.WaitGroup
 }
 
+// Save updates the high watermark height/round/step (HRS) if it is greater
+// than the current high watermark. A mutex is used to avoid concurrent state updates.
+// The disk write is scheduled in a separate goroutine which will perform an atomic write.
+// pendingDiskWG is used upon termination in pendingDiskWG to ensure all writes have completed.
 func (cosigner *LocalCosigner) SaveLastSignedState(chainID string, signState SignStateConsensus) error {
-	cosigner.chainState[chainID].lastSignStateMutex.Lock()
-	defer cosigner.chainState[chainID].lastSignStateMutex.Unlock()
-	return cosigner.chainState[chainID].LastSignState.Save(
+	cosigner.chainState[chainID].mu.Lock()
+	defer cosigner.chainState[chainID].mu.Unlock()
+	return cosigner.chainState[chainID].lastSignState.Save(
 		signState,
 		&cosigner.pendingDiskWG,
 	)
 }
 
+// waitForSignStatesToFlushToDisk waits for all state file writes queued
+// in SaveLastSignedState to complete before termination.
 func (cosigner *LocalCosigner) waitForSignStatesToFlushToDisk() {
 	cosigner.pendingDiskWG.Wait()
 }
@@ -130,7 +136,7 @@ func NewLocalCosigner(
 		config:     config,
 		key:        cosignerKey,
 		rsaKey:     rsaKey,
-		chainState: make(map[string]ChainState),
+		chainState: make(map[string]*ChainState),
 		peers:      make(map[int]CosignerPeer),
 		total:      total,
 		threshold:  threshold,
@@ -167,11 +173,11 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	// This function has multiple exit points.  Only start time can be guaranteed
 	metricsTimeKeeper.SetPreviousLocalSignStart(time.Now())
 
-	cosigner.chainState[chainID].lastSignStateMutex.Lock()
-	defer cosigner.chainState[chainID].lastSignStateMutex.Unlock()
+	cosigner.chainState[chainID].mu.Lock()
+	defer cosigner.chainState[chainID].mu.Unlock()
 
 	res := CosignerSignResponse{}
-	lss := cosigner.chainState[chainID].LastSignState
+	lss := cosigner.chainState[chainID].lastSignState
 
 	hrst, err := UnpackHRST(req.SignBytes)
 	if err != nil {
@@ -233,8 +239,8 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	sig := tsed25519.SignWithShare(
 		req.SignBytes, cosigner.key.ShareKey, ephemeralShare, cosigner.pubKeyBytes, ephemeralPublic)
 
-	cosigner.chainState[chainID].LastSignState.EphemeralPublic = ephemeralPublic
-	err = cosigner.chainState[chainID].LastSignState.Save(SignStateConsensus{
+	cosigner.chainState[chainID].lastSignState.EphemeralPublic = ephemeralPublic
+	err = cosigner.chainState[chainID].lastSignState.Save(SignStateConsensus{
 		Height:    hrst.Height,
 		Round:     hrst.Round,
 		Step:      hrst.Step,
@@ -311,10 +317,9 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 		return err
 	}
 
-	cosigner.chainState[chainID] = ChainState{
-		LastSignState:      shareSignState,
-		lastSignStateMutex: &sync.Mutex{},
-		hrsMeta:            make(map[HRSTKey]HrsMetadata),
+	cosigner.chainState[chainID] = &ChainState{
+		lastSignState: shareSignState,
+		hrsMeta:       make(map[HRSTKey]HrsMetadata),
 	}
 
 	return nil
@@ -365,8 +370,8 @@ func (cosigner *LocalCosigner) getEphemeralSecretPart(
 	res := CosignerEphemeralSecretPart{}
 
 	// protects the meta map
-	cosigner.chainState[chainID].lastSignStateMutex.Lock()
-	defer cosigner.chainState[chainID].lastSignStateMutex.Unlock()
+	cosigner.chainState[chainID].mu.Lock()
+	defer cosigner.chainState[chainID].mu.Unlock()
 
 	hrst := HRSTKey{
 		Height:    req.Height,
@@ -475,8 +480,8 @@ func (cosigner *LocalCosigner) setEphemeralSecretPart(req CosignerSetEphemeralSe
 	}
 
 	// protects the meta map
-	cosigner.chainState[chainID].lastSignStateMutex.Lock()
-	defer cosigner.chainState[chainID].lastSignStateMutex.Unlock()
+	cosigner.chainState[chainID].mu.Lock()
+	defer cosigner.chainState[chainID].mu.Unlock()
 
 	hrst := HRSTKey{
 		Height:    req.Height,

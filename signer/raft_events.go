@@ -30,7 +30,7 @@ func (f *fsm) handleLSSEvent(value string) {
 	err := json.Unmarshal([]byte(value), lss)
 	if err != nil {
 		f.logger.Error(
-			"LSS Unmarshal Error",
+			"LastSignState Unmarshal Error",
 			"error", err,
 		)
 		return

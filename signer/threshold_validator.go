@@ -72,12 +72,20 @@ func NewThresholdValidator(
 	}
 }
 
+// SaveLastSignedState updates the high watermark height/round/step (HRS) for a completed
+// sign process if it is greater than the current high watermark. A mutex is used to avoid concurrent
+// state updates. The disk write is scheduled in a separate goroutine which will perform an atomic write.
+// pendingDiskWG is used upon termination in pendingDiskWG to ensure all writes have completed.
 func (pv *ThresholdValidator) SaveLastSignedState(chainID string, signState SignStateConsensus) error {
 	pv.chainState[chainID].lastSignStateMutex.Lock()
 	defer pv.chainState[chainID].lastSignStateMutex.Unlock()
 	return pv.chainState[chainID].lastSignState.Save(signState, &pv.pendingDiskWG)
 }
 
+// SaveLastSignedStateInitiated updates the high watermark height/round/step (HRS) for an initiated
+// sign process if it is greater than the current high watermark. A mutex is used to avoid concurrent
+// state updates. The disk write is scheduled in a separate goroutine which will perform an atomic write.
+// pendingDiskWG is used upon termination in pendingDiskWG to ensure all writes have completed.
 func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, signState SignStateConsensus) error {
 	pv.chainState[chainID].lastSignStateInitiatedMutex.Lock()
 	defer pv.chainState[chainID].lastSignStateInitiatedMutex.Unlock()
