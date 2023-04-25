@@ -16,10 +16,9 @@ var _ PrivValidator = &SingleSignerValidator{}
 // SingleSignerValidator guards access to an underlying PrivValidator by using mutexes
 // for each of the PrivValidator interface functions
 type SingleSignerValidator struct {
-	config       *RuntimeConfig
-	chainState   map[string]*SingleSignerChainState
-	chainStateMu sync.RWMutex
-	pubKey       tmcrypto.PubKey
+	config     *RuntimeConfig
+	chainState sync.Map
+	pubKey     tmcrypto.PubKey
 }
 
 type SingleSignerChainState struct {
@@ -31,8 +30,7 @@ type SingleSignerChainState struct {
 // NewThresholdValidator is recommended, but single-sign mode can be used for convenience.
 func NewSingleSignerValidator(config *RuntimeConfig) (*SingleSignerValidator, error) {
 	pv := &SingleSignerValidator{
-		config:     config,
-		chainState: make(map[string]*SingleSignerChainState),
+		config: config,
 	}
 
 	if err := pv.loadPubKey(); err != nil {
@@ -88,11 +86,9 @@ func (pv *SingleSignerValidator) SignProposal(chainID string, proposal *tmproto.
 }
 
 func (pv *SingleSignerValidator) loadChainStateIfNecessary(chainID string) (*SingleSignerChainState, error) {
-	pv.chainStateMu.RLock()
-	chainState, ok := pv.chainState[chainID]
-	pv.chainStateMu.RUnlock()
+	cachedChainState, ok := pv.chainState.Load(chainID)
 	if ok {
-		return chainState, nil
+		return cachedChainState.(*SingleSignerChainState), nil
 	}
 
 	keyFile := pv.config.KeyFilePathSingleSigner()
@@ -109,12 +105,10 @@ func (pv *SingleSignerValidator) loadChainStateIfNecessary(chainID string) (*Sin
 		filePV = tmprivval.LoadFilePV(keyFile, stateFile)
 	}
 
-	chainState = &SingleSignerChainState{
+	chainState := &SingleSignerChainState{
 		filePV: filePV,
 	}
-	pv.chainStateMu.Lock()
-	pv.chainState[chainID] = chainState
-	pv.chainStateMu.Unlock()
+	pv.chainState.Store(chainID, chainState)
 
 	return chainState, nil
 }
