@@ -8,8 +8,6 @@ import (
 	"github.com/strangelove-ventures/horcrux/signer"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmservice "github.com/tendermint/tendermint/libs/service"
-	"github.com/tendermint/tendermint/privval"
-	"github.com/tendermint/tendermint/types"
 )
 
 const (
@@ -63,7 +61,7 @@ func startSignerCmd() *cobra.Command {
 				logger   = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator")
 			)
 
-			keyFile, err := config.KeyFileExistsSingleSigner()
+			_, err = config.KeyFileExistsSingleSigner()
 			if err != nil {
 				return err
 			}
@@ -71,23 +69,9 @@ func startSignerCmd() *cobra.Command {
 			logger.Info("Tendermint Validator", "mode", "single-signer",
 				"priv-key", config.Config.PrivValKeyFile, "priv-state-dir", config.StateDir)
 
-			stateFile := config.PrivValStateFile(config.Config.ChainID)
-
-			var val types.PrivValidator
-
-			if _, err := os.Stat(stateFile); err != nil {
-				if !os.IsNotExist(err) {
-					panic(fmt.Errorf("failed to load state file: %s", stateFile))
-				}
-				// The only scenario in which we want to initialize a new state file
-				// is when the state file does not exist.
-				val = privval.LoadFilePVEmptyState(keyFile, stateFile)
-			} else {
-				val = privval.LoadFilePV(keyFile, stateFile)
-			}
-
-			pv := &signer.SingleSignerValidator{
-				PrivValidator: val,
+			pv, err := signer.NewSingleSignerValidator(&config)
+			if err != nil {
+				return fmt.Errorf("failed to construct single signer validator: %w", err)
 			}
 
 			pubkey, err := pv.GetPubKey()

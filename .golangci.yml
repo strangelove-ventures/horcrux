@@ -58,10 +58,14 @@ linters-settings:
         alias: tmnet
       - pkg: github.com/tendermint/tendermint/libs/os
         alias: tmos
+      - pkg: github.com/tendermint/tendermint/libs/rand
+        alias: tmrand
       - pkg: github.com/tendermint/tendermint/libs/service
         alias: tmservice
       - pkg: github.com/tendermint/tendermint/p2p/conn
         alias: tmp2pconn
+      - pkg: github.com/tendermint/tendermint/privval
+        alias: tmprivval
       - pkg: github.com/tendermint/tendermint/proto/tendermint/types
         alias: tmproto
       - pkg: github.com/tendermint/tendermint/proto/tendermint/crypto

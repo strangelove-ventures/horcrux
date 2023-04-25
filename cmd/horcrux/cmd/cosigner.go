@@ -218,9 +218,7 @@ func startCosignerCmd() *cobra.Command {
 
 			raftStore.SetThresholdValidator(val)
 
-			pv := &signer.SingleSignerValidator{PrivValidator: val}
-
-			pubkey, err := pv.GetPubKey()
+			pubkey, err := val.GetPubKey()
 			if err != nil {
 				return fmt.Errorf("failed to get public key: %w", err)
 			}
@@ -228,7 +226,7 @@ func startCosignerCmd() *cobra.Command {
 
 			go EnableDebugAndMetrics(cmd.Context())
 
-			services, err = signer.StartRemoteSigners(&config, services, logger, pv, config.Config.Nodes())
+			services, err = signer.StartRemoteSigners(&config, services, logger, val, config.Config.Nodes())
 			if err != nil {
 				return fmt.Errorf("failed to start remote signer(s): %w", err)
 			}
