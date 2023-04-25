@@ -21,8 +21,13 @@ type SingleSignerValidator struct {
 	pubKey     tmcrypto.PubKey
 }
 
+// SingleSignerChainState holds the priv validator and associated mutex for a single chain.
 type SingleSignerChainState struct {
-	filePV  *tmprivval.FilePV
+	filePV *tmprivval.FilePV
+
+	// The filePV does not have any locking internally for signing operations.
+	// The high-watermark/last-signed-state within the FilePV prevents double sign
+	// as long as operations are synchronous. This lock is used to ensure that.
 	pvMutex sync.Mutex
 }
 
