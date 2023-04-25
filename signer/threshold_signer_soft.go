@@ -70,8 +70,8 @@ func (softSigner *ThresholdSignerSoft) GetID() (int, error) {
 // Implements ThresholdSigner
 func (softSigner *ThresholdSignerSoft) Sign(
 	req CosignerSignRequest, m *LastSignStateWrapper) (CosignerSignResponse, error) {
-	m.lastSignStateMutex.Lock()
-	defer m.lastSignStateMutex.Unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	res := CosignerSignResponse{}
 	lss := m.LastSignState
@@ -205,8 +205,8 @@ func (softSigner *ThresholdSignerSoft) GetEphemeralSecretPart(
 	res := CosignerEphemeralSecretPart{}
 
 	// protects the meta map
-	m.lastSignStateMutex.Lock()
-	defer m.lastSignStateMutex.Unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	hrst := HRSTKey{
 		Height:    req.Height,
@@ -318,8 +318,8 @@ func (softSigner *ThresholdSignerSoft) SetEphemeralSecretPart(
 	}
 
 	// protects the meta map
-	m.lastSignStateMutex.Lock()
-	defer m.lastSignStateMutex.Unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	hrst := HRSTKey{
 		Height:    req.Height,
