@@ -57,10 +57,7 @@ func (c *Config) ValidateSingleSignerConfig() error {
 	if err := c.ChainNodes.Validate(); err != nil {
 		errs = append(errs, err)
 	}
-	if len(errs) > 0 {
-		return errors.Join(errs...)
-	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func (c *Config) ValidateCosignerConfig() error {
@@ -92,10 +89,7 @@ func (c *Config) ValidateCosignerConfig() error {
 	if err := c.CosignerConfig.Peers.Validate(c.CosignerConfig.Shares); err != nil {
 		errs = append(errs, err)
 	}
-	if len(errs) > 0 {
-		return errors.Join(errs...)
-	}
-	return nil
+	return errors.Join(errs...)
 }
 
 type RuntimeConfig struct {
@@ -273,10 +267,7 @@ func (cns ChainNodes) Validate() error {
 			errs = append(errs, err)
 		}
 	}
-	if len(errs) > 0 {
-		return errors.Join(errs...)
-	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func ChainNodesFromArg(arg string) (out ChainNodes, err error) {
