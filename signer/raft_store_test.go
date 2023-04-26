@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
+	tmcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/stretchr/testify/require"
-	tmcryptoed25519 "github.com/tendermint/tendermint/crypto/ed25519"
 )
 
 // Test_StoreInMemOpenSingleNode tests that a command can be applied to the log

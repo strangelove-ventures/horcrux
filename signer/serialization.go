@@ -4,9 +4,9 @@ import (
 	"errors"
 	"io"
 
-	"github.com/tendermint/tendermint/libs/protoio"
-	tmprotoprivval "github.com/tendermint/tendermint/proto/tendermint/privval"
-	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
+	"github.com/cometbft/cometbft/libs/protoio"
+	tmprotoprivval "github.com/cometbft/cometbft/proto/tendermint/privval"
+	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
 )
 
 // ReadMsg reads a message from an io.Reader

@@ -5,10 +5,10 @@ import (
 	"os"
 	"sync"
 
-	tmcrypto "github.com/tendermint/tendermint/crypto"
-	tmjson "github.com/tendermint/tendermint/libs/json"
-	tmprivval "github.com/tendermint/tendermint/privval"
-	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
+	tmcrypto "github.com/cometbft/cometbft/crypto"
+	tmjson "github.com/cometbft/cometbft/libs/json"
+	tmprivval "github.com/cometbft/cometbft/privval"
+	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
 )
 
 var _ PrivValidator = &SingleSignerValidator{}

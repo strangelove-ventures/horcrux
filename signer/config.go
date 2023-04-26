@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cometbft/cometbft/crypto"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/codec/legacy"
 	"github.com/cosmos/cosmos-sdk/codec/types"
@@ -17,7 +18,6 @@ import (
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/cosmos/cosmos-sdk/types/bech32"
 	"github.com/strangelove-ventures/horcrux/client"
-	"github.com/tendermint/tendermint/crypto"
 	"gopkg.in/yaml.v2"
 )
 

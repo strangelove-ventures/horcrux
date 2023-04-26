@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 	"os"
 
+	tmcrypto "github.com/cometbft/cometbft/crypto"
+	tmcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	tmcryptoencoding "github.com/cometbft/cometbft/crypto/encoding"
+	tmprotocrypto "github.com/cometbft/cometbft/proto/tendermint/crypto"
 	amino "github.com/tendermint/go-amino"
-	tmcrypto "github.com/tendermint/tendermint/crypto"
-	tmcryptoed25519 "github.com/tendermint/tendermint/crypto/ed25519"
-	tmcryptoencoding "github.com/tendermint/tendermint/crypto/encoding"
-	tmprotocrypto "github.com/tendermint/tendermint/proto/tendermint/crypto"
 )
 
 // CosignerKey is a single key for an m-of-n threshold signer.

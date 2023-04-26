@@ -7,14 +7,14 @@ import (
 	"os"
 	"testing"
 
+	tmcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/crypto/tmhash"
+	tmjson "github.com/cometbft/cometbft/libs/json"
+	tmrand "github.com/cometbft/cometbft/libs/rand"
+	tmprivval "github.com/cometbft/cometbft/privval"
+	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	tm "github.com/cometbft/cometbft/types"
 	"github.com/stretchr/testify/require"
-	tmcryptoed25519 "github.com/tendermint/tendermint/crypto/ed25519"
-	"github.com/tendermint/tendermint/crypto/tmhash"
-	tmjson "github.com/tendermint/tendermint/libs/json"
-	tmrand "github.com/tendermint/tendermint/libs/rand"
-	tmprivval "github.com/tendermint/tendermint/privval"
-	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
-	tm "github.com/tendermint/tendermint/types"
 )
 
 func TestSingleSignerValidator(t *testing.T) {

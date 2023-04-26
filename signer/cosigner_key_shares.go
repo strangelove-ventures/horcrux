@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"os"
 
-	tmjson "github.com/tendermint/tendermint/libs/json"
-	"github.com/tendermint/tendermint/privval"
+	tmjson "github.com/cometbft/cometbft/libs/json"
+	"github.com/cometbft/cometbft/privval"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 

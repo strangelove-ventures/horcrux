@@ -3,9 +3,9 @@ package signer
 import (
 	"testing"
 
+	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	tm "github.com/cometbft/cometbft/types"
 	"github.com/stretchr/testify/require"
-	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
-	tm "github.com/tendermint/tendermint/types"
 )
 
 func TestUnpackHRSPrevote(t *testing.T) {

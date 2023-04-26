@@ -11,8 +11,8 @@ import (
 
 	"github.com/armon/go-metrics"
 	gmprometheus "github.com/armon/go-metrics/prometheus"
+	tmlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	tmlog "github.com/tendermint/tendermint/libs/log"
 )
 
 func AddPrometheusMetrics(mux *http.ServeMux) {

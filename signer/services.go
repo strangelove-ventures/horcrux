@@ -8,9 +8,9 @@ import (
 	"strings"
 	"syscall"
 
-	tmlog "github.com/tendermint/tendermint/libs/log"
-	tmos "github.com/tendermint/tendermint/libs/os"
-	tmservice "github.com/tendermint/tendermint/libs/service"
+	tmlog "github.com/cometbft/cometbft/libs/log"
+	tmos "github.com/cometbft/cometbft/libs/os"
+	tmservice "github.com/cometbft/cometbft/libs/service"
 )
 
 func RequireNotRunning(pidFilePath string) error {

@@ -5,16 +5,16 @@ import (
 	"net"
 	"time"
 
-	tmcryptoed25519 "github.com/tendermint/tendermint/crypto/ed25519"
-	tmcryptoencoding "github.com/tendermint/tendermint/crypto/encoding"
-	tmlog "github.com/tendermint/tendermint/libs/log"
-	tmnet "github.com/tendermint/tendermint/libs/net"
-	tmservice "github.com/tendermint/tendermint/libs/service"
-	tmp2pconn "github.com/tendermint/tendermint/p2p/conn"
-	tmprotocrypto "github.com/tendermint/tendermint/proto/tendermint/crypto"
-	tmprotoprivval "github.com/tendermint/tendermint/proto/tendermint/privval"
-	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
-	tm "github.com/tendermint/tendermint/types"
+	tmcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	tmcryptoencoding "github.com/cometbft/cometbft/crypto/encoding"
+	tmlog "github.com/cometbft/cometbft/libs/log"
+	tmnet "github.com/cometbft/cometbft/libs/net"
+	tmservice "github.com/cometbft/cometbft/libs/service"
+	tmp2pconn "github.com/cometbft/cometbft/p2p/conn"
+	tmprotocrypto "github.com/cometbft/cometbft/proto/tendermint/crypto"
+	tmprotoprivval "github.com/cometbft/cometbft/proto/tendermint/privval"
+	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	tm "github.com/cometbft/cometbft/types"
 )
 
 // PrivValidator is a wrapper for tendermint PrivValidator,

@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
+	tmcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	tm "github.com/cometbft/cometbft/types"
 	"github.com/stretchr/testify/require"
-	tmcryptoed25519 "github.com/tendermint/tendermint/crypto/ed25519"
-	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
-	tm "github.com/tendermint/tendermint/types"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 

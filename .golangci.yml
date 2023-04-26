@@ -36,51 +36,51 @@ linters-settings:
         alias: cryptotypes
       - pkg: github.com/cosmos/cosmos-sdk/x/slashing/types
         alias: slashingtypes
-      - pkg: github.com/tendermint/tendermint/types
+      - pkg: github.com/cometbft/cometbft/types
         alias: tm
-      - pkg: github.com/tendermint/tendermint/config
+      - pkg: github.com/cometbft/cometbft/config
         alias: tmconfig
-      - pkg: github.com/tendermint/tendermint/crypto
+      - pkg: github.com/cometbft/cometbft/crypto
         alias: tmcrypto
-      - pkg: github.com/tendermint/tendermint/crypto/ed25519
+      - pkg: github.com/cometbft/cometbft/crypto/ed25519
         alias: tmcryptoed25519
-      - pkg: github.com/tendermint/tendermint/crypto/encoding
+      - pkg: github.com/cometbft/cometbft/crypto/encoding
         alias: tmcryptoencoding
       - pkg: github.com/tendermint/go-amino
         alias: amino
-      - pkg: github.com/tendermint/tendermint/libs/bytes
+      - pkg: github.com/cometbft/cometbft/libs/bytes
         alias: tmbytes
-      - pkg: github.com/tendermint/tendermint/libs/json
+      - pkg: github.com/cometbft/cometbft/libs/json
         alias: tmjson
-      - pkg: github.com/tendermint/tendermint/libs/log
+      - pkg: github.com/cometbft/cometbft/libs/log
         alias: tmlog
-      - pkg: github.com/tendermint/tendermint/libs/net
+      - pkg: github.com/cometbft/cometbft/libs/net
         alias: tmnet
-      - pkg: github.com/tendermint/tendermint/libs/os
+      - pkg: github.com/cometbft/cometbft/libs/os
         alias: tmos
-      - pkg: github.com/tendermint/tendermint/libs/rand
+      - pkg: github.com/cometbft/cometbft/libs/rand
         alias: tmrand
-      - pkg: github.com/tendermint/tendermint/libs/service
+      - pkg: github.com/cometbft/cometbft/libs/service
         alias: tmservice
-      - pkg: github.com/tendermint/tendermint/p2p/conn
+      - pkg: github.com/cometbft/cometbft/p2p/conn
         alias: tmp2pconn
-      - pkg: github.com/tendermint/tendermint/privval
+      - pkg: github.com/cometbft/cometbft/privval
         alias: tmprivval
-      - pkg: github.com/tendermint/tendermint/proto/tendermint/types
+      - pkg: github.com/cometbft/cometbft/proto/tendermint/types
         alias: tmproto
-      - pkg: github.com/tendermint/tendermint/proto/tendermint/crypto
+      - pkg: github.com/cometbft/cometbft/proto/tendermint/crypto
         alias: tmprotocrypto
-      - pkg: github.com/tendermint/tendermint/proto/tendermint/privval
+      - pkg: github.com/cometbft/cometbft/proto/tendermint/privval
         alias: tmprotoprivval
-      - pkg: github.com/tendermint/tendermint/rpc/client
+      - pkg: github.com/cometbft/cometbft/rpc/client
         alias: tmrpcclient
-      - pkg: github.com/tendermint/tendermint/rpc/client/http
+      - pkg: github.com/cometbft/cometbft/rpc/client/http
         alias: tmrpchttp
-      - pkg: github.com/tendermint/tendermint/rpc/jsonrpc/client
+      - pkg: github.com/cometbft/cometbft/rpc/jsonrpc/client
         alias: tmrpcjsonclient
-      - pkg: github.com/tendermint/tendermint/rpc/jsonrpc/types
+      - pkg: github.com/cometbft/cometbft/rpc/jsonrpc/types
         alias: tmrpcjsontypes
-      - pkg: github.com/tendermint/tendermint/rpc/core/types
+      - pkg: github.com/cometbft/cometbft/rpc/core/types
         alias: tmrpctypes
       - pkg: github.com/grpc-ecosystem/go-grpc-middleware/retry
         alias: grpcretry

@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
+	tmlog "github.com/cometbft/cometbft/libs/log"
+	tmservice "github.com/cometbft/cometbft/libs/service"
 	"github.com/strangelove-ventures/horcrux/signer"
-	tmlog "github.com/tendermint/tendermint/libs/log"
-	tmservice "github.com/tendermint/tendermint/libs/service"
 
 	"github.com/stretchr/testify/require"
 )

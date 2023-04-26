@@ -58,7 +58,7 @@ func NewInfo() Info {
 		GitCommit:         Commit,
 		GoVersion:         fmt.Sprintf("%s %s/%s", runtime.Version(), runtime.GOOS, runtime.GOARCH),
 		CosmosSdkVersion:  dependencyVersions["github.com/cosmos/cosmos-sdk"],
-		TendermintVersion: dependencyVersions["github.com/tendermint/tendermint"],
+		TendermintVersion: dependencyVersions["github.com/cometbft/cometbft"],
 	}
 }
 

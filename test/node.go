@@ -20,24 +20,23 @@ import (
 	"time"
 
 	"github.com/avast/retry-go"
+	tmconfig "github.com/cometbft/cometbft/config"
+	tmbytes "github.com/cometbft/cometbft/libs/bytes"
+	"github.com/cometbft/cometbft/p2p"
+	"github.com/cometbft/cometbft/privval"
+	tmrpcclient "github.com/cometbft/cometbft/rpc/client"
+	tmrpchttp "github.com/cometbft/cometbft/rpc/client/http"
+	tmrpctypes "github.com/cometbft/cometbft/rpc/core/types"
+	tmrpcjsonclient "github.com/cometbft/cometbft/rpc/jsonrpc/client"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
-	"github.com/cosmos/cosmos-sdk/simapp"
-	"github.com/cosmos/cosmos-sdk/simapp/params"
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/bech32"
+	"github.com/cosmos/cosmos-sdk/types/module/testutil"
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
 	"github.com/strangelove-ventures/horcrux/signer"
-	tmconfig "github.com/tendermint/tendermint/config"
-	tmbytes "github.com/tendermint/tendermint/libs/bytes"
-	"github.com/tendermint/tendermint/p2p"
-	"github.com/tendermint/tendermint/privval"
-	tmrpcclient "github.com/tendermint/tendermint/rpc/client"
-	tmrpchttp "github.com/tendermint/tendermint/rpc/client/http"
-	tmrpctypes "github.com/tendermint/tendermint/rpc/core/types"
-	tmrpcjsonclient "github.com/tendermint/tendermint/rpc/jsonrpc/client"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -162,7 +161,7 @@ type Node struct {
 	Client         tmrpcclient.Client
 	Container      *docker.Container
 	tl             Logger
-	ec             params.EncodingConfig
+	ec             testutil.TestEncodingConfig
 }
 
 type ContainerPort struct {
@@ -206,7 +205,7 @@ func MakeNodes(
 	}
 	for i := 0; i < count; i++ {
 		tn := &Node{Home: home, Index: i, ValidatorIndex: validatorIndex, Chain: chainType, ChainID: chainID,
-			Pool: pool, networkID: networkID, tl: tl, ec: simapp.MakeTestEncodingConfig()}
+			Pool: pool, networkID: networkID, tl: tl, ec: testutil.MakeTestEncodingConfig()}
 		tn.MkDir()
 		out = append(out, tn)
 	}

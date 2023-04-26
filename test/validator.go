@@ -5,11 +5,11 @@ import (
 	"os"
 	"path/filepath"
 
+	tmcrypto "github.com/cometbft/cometbft/crypto"
+	tmcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/privval"
 	"github.com/ory/dockertest"
 	"github.com/strangelove-ventures/horcrux/signer"
-	tmcrypto "github.com/tendermint/tendermint/crypto"
-	tmcryptoed25519 "github.com/tendermint/tendermint/crypto/ed25519"
-	"github.com/tendermint/tendermint/privval"
 )
 
 type Validator struct {

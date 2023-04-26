@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 
+	tmlog "github.com/cometbft/cometbft/libs/log"
+	tmservice "github.com/cometbft/cometbft/libs/service"
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/signer"
-	tmlog "github.com/tendermint/tendermint/libs/log"
-	tmservice "github.com/tendermint/tendermint/libs/service"
 )
 
 const (

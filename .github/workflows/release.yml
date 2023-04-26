@@ -25,7 +25,7 @@ jobs:
       # TODO:figure out how to add the supported SDK and tendermint versions
       # here we need to run the following and save the results to ENV in the goreleaser action
       # SDKVERSION := $(shell go list -m -u -f '{{.Version}}' github.com/cosmos/cosmos-sdk)
-      # TMVERSION := $(shell go list -m -u -f '{{.Version}}' github.com/tendermint/tendermint)
+      # TMVERSION := $(shell go list -m -u -f '{{.Version}}' github.com/cometbft/cometbft)
       # Also see .goreleaser.yaml to wire up the environment variables
 
       - run: echo ":rocket::rocket::rocket:" > ../release_notes.md 
