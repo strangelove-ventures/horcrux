@@ -1,6 +1,7 @@
 package signer
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -49,36 +50,52 @@ func (c *Config) MustMarshalYaml() []byte {
 }
 
 func (c *Config) ValidateSingleSignerConfig() error {
+	var errs []error
 	if len(c.ChainNodes) == 0 {
-		return fmt.Errorf("need to have chain-nodes configured for priv-val connection")
+		errs = append(errs, fmt.Errorf("need to have chain-nodes configured for priv-val connection"))
 	}
-	return c.ChainNodes.Validate()
+	if err := c.ChainNodes.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+	return nil
 }
 
 func (c *Config) ValidateCosignerConfig() error {
+	var errs []error
 	if err := c.ValidateSingleSignerConfig(); err != nil {
-		return err
+		errs = append(errs, err)
 	}
 	if c.CosignerConfig == nil {
-		return fmt.Errorf("cosigner config can't be empty")
+		errs = append(errs, fmt.Errorf("cosigner config can't be empty"))
+		// the rest of the checks depend on non-nil c.CosignerConfig
+		return errors.Join(errs...)
 	}
 	if c.CosignerConfig.Threshold <= c.CosignerConfig.Shares/2 {
-		return fmt.Errorf("threshold (%d) must be greater than number of shares (%d) / 2",
-			c.CosignerConfig.Threshold, c.CosignerConfig.Shares)
+		errs = append(errs, fmt.Errorf("threshold (%d) must be greater than number of shares (%d) / 2",
+			c.CosignerConfig.Threshold, c.CosignerConfig.Shares))
 	}
 	if c.CosignerConfig.Shares < c.CosignerConfig.Threshold {
-		return fmt.Errorf("number of shares (%d) must be greater or equal to threshold (%d)",
-			c.CosignerConfig.Shares, c.CosignerConfig.Threshold)
+		errs = append(errs, fmt.Errorf("number of shares (%d) must be greater or equal to threshold (%d)",
+			c.CosignerConfig.Shares, c.CosignerConfig.Threshold))
 	}
 
 	_, err := time.ParseDuration(c.CosignerConfig.Timeout)
 	if err != nil {
-		return fmt.Errorf("invalid --timeout: %w", err)
+		errs = append(errs, fmt.Errorf("invalid --timeout: %w", err))
 	}
 	if _, err := url.Parse(c.CosignerConfig.P2PListen); err != nil {
-		return fmt.Errorf("failed to parse p2p listen address: %w", err)
+		errs = append(errs, fmt.Errorf("failed to parse p2p listen address: %w", err))
 	}
-	return c.CosignerConfig.Peers.Validate(c.CosignerConfig.Shares)
+	if err := c.CosignerConfig.Peers.Validate(c.CosignerConfig.Shares); err != nil {
+		errs = append(errs, err)
+	}
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+	return nil
 }
 
 type RuntimeConfig struct {
@@ -218,16 +235,22 @@ func duplicatePeers(peers []CosignerPeerConfig) (duplicates map[int][]string) {
 }
 
 func PeersFromFlag(peers []string) (out []CosignerPeerConfig, err error) {
+	var errs []error
 	for _, p := range peers {
 		ps := strings.Split(p, "|")
 		if len(ps) != 2 {
-			return nil, fmt.Errorf("invalid peer string %s, expected format: tcp://{addr}:{port}|{share-id}", p)
+			errs = append(errs, fmt.Errorf("invalid peer string %s, expected format: tcp://{addr}:{port}|{share-id}", p))
+			continue
 		}
 		shareid, err := strconv.ParseInt(ps[1], 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse share ID: %w", err)
+			errs = append(errs, fmt.Errorf("failed to parse share ID: %w", err))
+			continue
 		}
 		out = append(out, CosignerPeerConfig{ShareID: int(shareid), P2PAddr: ps[0]})
+	}
+	if len(errs) > 0 {
+		return nil, errors.Join(errs...)
 	}
 	return out, nil
 }
@@ -244,10 +267,14 @@ func (cn ChainNode) Validate() error {
 type ChainNodes []ChainNode
 
 func (cns ChainNodes) Validate() error {
+	var errs []error
 	for _, cn := range cns {
 		if err := cn.Validate(); err != nil {
-			return err
+			errs = append(errs, err)
 		}
+	}
+	if len(errs) > 0 {
+		return errors.Join(errs...)
 	}
 	return nil
 }
