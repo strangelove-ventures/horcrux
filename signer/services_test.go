@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	tmlog "github.com/cometbft/cometbft/libs/log"
-	tmservice "github.com/cometbft/cometbft/libs/service"
+	cbftlog "github.com/cometbft/cometbft/libs/log"
+	cbftservice "github.com/cometbft/cometbft/libs/service"
 	"github.com/strangelove-ventures/horcrux/signer"
 
 	"github.com/stretchr/testify/require"
@@ -113,8 +113,8 @@ func TestConcurrentStart(t *testing.T) {
 	homeDir := t.TempDir()
 	pidFilePath := filepath.Join(homeDir, "horcrux.pid")
 
-	var logger tmlog.Logger
-	var services []tmservice.Service
+	var logger cbftlog.Logger
+	var services []cbftservice.Service
 
 	var wg sync.WaitGroup
 	wg.Add(concurrentAttempts)
@@ -155,8 +155,8 @@ func TestIsRunningAndWaitForService(t *testing.T) {
 	homeDir := t.TempDir()
 	pidFilePath := filepath.Join(homeDir, "horcrux.pid")
 
-	var logger tmlog.Logger
-	var services []tmservice.Service
+	var logger cbftlog.Logger
+	var services []cbftservice.Service
 	go func() { signer.WaitAndTerminate(logger, services, pidFilePath) }()
 
 	// Wait for signer.WaitAndTerminate to create pidFile

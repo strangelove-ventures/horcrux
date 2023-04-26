@@ -10,12 +10,12 @@ import (
 	"os"
 	"testing"
 
-	tmcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	cbftcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/crypto/tmhash"
-	tmlog "github.com/cometbft/cometbft/libs/log"
-	tmrand "github.com/cometbft/cometbft/libs/rand"
-	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	tm "github.com/cometbft/cometbft/types"
+	cbftlog "github.com/cometbft/cometbft/libs/log"
+	cbftrand "github.com/cometbft/cometbft/libs/rand"
+	cbftproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	cbft "github.com/cometbft/cometbft/types"
 	"github.com/stretchr/testify/require"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
@@ -63,7 +63,7 @@ func TestThresholdValidator2of2(t *testing.T) {
 		PublicKey: rsaKey2.PublicKey,
 	}}
 
-	privateKey := tmcryptoed25519.GenPrivKey()
+	privateKey := cbftcryptoed25519.GenPrivKey()
 
 	privKeyBytes := privateKey[:]
 	secretShares := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
@@ -101,7 +101,7 @@ func TestThresholdValidator2of2(t *testing.T) {
 	raftStore := getMockRaftStore(cosigner1, tmpDir)
 
 	validator := NewThresholdValidator(
-		tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
+		cbftlog.NewTMLogger(cbftlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
 		runtimeConfig,
 		privateKey.PubKey(),
 		int(threshold),
@@ -118,13 +118,13 @@ func TestThresholdValidator2of2(t *testing.T) {
 
 	time.Sleep(3 * time.Second) // Ensure there is a leader
 
-	proposal := tmproto.Proposal{
+	proposal := cbftproto.Proposal{
 		Height: 1,
 		Round:  0,
-		Type:   tmproto.ProposalType,
+		Type:   cbftproto.ProposalType,
 	}
 
-	signBytes := tm.ProposalSignBytes(testChainID, &proposal)
+	signBytes := cbft.ProposalSignBytes(testChainID, &proposal)
 
 	err = validator.SignProposal(testChainID, &proposal)
 	require.NoError(t, err)
@@ -168,7 +168,7 @@ func TestThresholdValidator3of3(t *testing.T) {
 		PublicKey: rsaKey3.PublicKey,
 	}}
 
-	privateKey := tmcryptoed25519.GenPrivKey()
+	privateKey := cbftcryptoed25519.GenPrivKey()
 
 	privKeyBytes := privateKey[:]
 	secretShares := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
@@ -218,7 +218,7 @@ func TestThresholdValidator3of3(t *testing.T) {
 	raftStore := getMockRaftStore(cosigner1, tmpDir)
 
 	validator := NewThresholdValidator(
-		tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
+		cbftlog.NewTMLogger(cbftlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
 		runtimeConfig,
 		privateKey.PubKey(),
 		int(threshold),
@@ -235,13 +235,13 @@ func TestThresholdValidator3of3(t *testing.T) {
 
 	time.Sleep(3 * time.Second) // Ensure there is a leader
 
-	proposal := tmproto.Proposal{
+	proposal := cbftproto.Proposal{
 		Height: 1,
 		Round:  0,
-		Type:   tmproto.ProposalType,
+		Type:   cbftproto.ProposalType,
 	}
 
-	signBytes := tm.ProposalSignBytes(testChainID, &proposal)
+	signBytes := cbft.ProposalSignBytes(testChainID, &proposal)
 
 	err = validator.SignProposal(testChainID, &proposal)
 	if err != nil {
@@ -288,7 +288,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 		PublicKey: rsaKey3.PublicKey,
 	}}
 
-	privateKey := tmcryptoed25519.GenPrivKey()
+	privateKey := cbftcryptoed25519.GenPrivKey()
 
 	privKeyBytes := privateKey[:]
 	secretShares := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
@@ -338,7 +338,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 	raftStore := getMockRaftStore(cosigner1, tmpDir)
 
 	validator := NewThresholdValidator(
-		tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
+		cbftlog.NewTMLogger(cbftlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
 		runtimeConfig,
 		privateKey.PubKey(),
 		int(threshold),
@@ -358,13 +358,13 @@ func TestThresholdValidator2of3(t *testing.T) {
 
 	time.Sleep(3 * time.Second) // Ensure there is a leader
 
-	proposal := tmproto.Proposal{
+	proposal := cbftproto.Proposal{
 		Height: 1,
 		Round:  20,
-		Type:   tmproto.ProposalType,
+		Type:   cbftproto.ProposalType,
 	}
 
-	signBytes := tm.ProposalSignBytes(testChainID, &proposal)
+	signBytes := cbft.ProposalSignBytes(testChainID, &proposal)
 
 	err = validator.SignProposal(testChainID, &proposal)
 	require.NoError(t, err)
@@ -375,10 +375,10 @@ func TestThresholdValidator2of3(t *testing.T) {
 
 	require.Len(t, firstSignature, 64)
 
-	proposal = tmproto.Proposal{
+	proposal = cbftproto.Proposal{
 		Height:    1,
 		Round:     20,
-		Type:      tmproto.ProposalType,
+		Type:      cbftproto.ProposalType,
 		Timestamp: time.Now(),
 	}
 
@@ -387,14 +387,14 @@ func TestThresholdValidator2of3(t *testing.T) {
 	require.NoError(t, err)
 
 	// construct different block ID for proposal at same height as highest signed
-	randHash := tmrand.Bytes(tmhash.Size)
-	blockID := tmproto.BlockID{Hash: randHash,
-		PartSetHeader: tmproto.PartSetHeader{Total: 5, Hash: randHash}}
+	randHash := cbftrand.Bytes(tmhash.Size)
+	blockID := cbftproto.BlockID{Hash: randHash,
+		PartSetHeader: cbftproto.PartSetHeader{Total: 5, Hash: randHash}}
 
-	proposal = tmproto.Proposal{
+	proposal = cbftproto.Proposal{
 		Height:  1,
 		Round:   20,
-		Type:    tmproto.ProposalType,
+		Type:    cbftproto.ProposalType,
 		BlockID: blockID,
 	}
 
@@ -405,10 +405,10 @@ func TestThresholdValidator2of3(t *testing.T) {
 
 	require.True(t, bytes.Equal(firstSignature, proposal.Signature))
 
-	proposal = tmproto.Proposal{
+	proposal = cbftproto.Proposal{
 		Height: 1,
 		Round:  19,
-		Type:   tmproto.ProposalType,
+		Type:   cbftproto.ProposalType,
 	}
 
 	// should not be able to sign lower than highest signed
@@ -421,7 +421,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 
 	// reinitialize validator to make sure new runtime will not allow double sign
 	newValidator := NewThresholdValidator(
-		tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
+		cbftlog.NewTMLogger(cbftlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
 		runtimeConfig,
 		privateKey.PubKey(),
 		int(threshold),
@@ -434,10 +434,10 @@ func TestThresholdValidator2of3(t *testing.T) {
 	err = newValidator.SignProposal(testChainID, &proposal)
 	require.Error(t, err, "double sign!")
 
-	proposal = tmproto.Proposal{
+	proposal = cbftproto.Proposal{
 		Height: 1,
 		Round:  21,
-		Type:   tmproto.ProposalType,
+		Type:   cbftproto.ProposalType,
 	}
 
 	// signing higher block now should succeed

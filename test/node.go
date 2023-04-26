@@ -20,14 +20,14 @@ import (
 	"time"
 
 	"github.com/avast/retry-go"
-	tmconfig "github.com/cometbft/cometbft/config"
-	tmbytes "github.com/cometbft/cometbft/libs/bytes"
+	cbftconfig "github.com/cometbft/cometbft/config"
+	cbftbytes "github.com/cometbft/cometbft/libs/bytes"
 	"github.com/cometbft/cometbft/p2p"
 	"github.com/cometbft/cometbft/privval"
-	tmrpcclient "github.com/cometbft/cometbft/rpc/client"
-	tmrpchttp "github.com/cometbft/cometbft/rpc/client/http"
-	tmrpctypes "github.com/cometbft/cometbft/rpc/core/types"
-	tmrpcjsonclient "github.com/cometbft/cometbft/rpc/jsonrpc/client"
+	cbftrpcclient "github.com/cometbft/cometbft/rpc/client"
+	cbftrpchttp "github.com/cometbft/cometbft/rpc/client/http"
+	cbftrpctypes "github.com/cometbft/cometbft/rpc/core/types"
+	cbftrpcjsonclient "github.com/cometbft/cometbft/rpc/jsonrpc/client"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/cosmos/cosmos-sdk/types"
@@ -158,7 +158,7 @@ type Node struct {
 	Validator      bool
 	Pool           *dockertest.Pool
 	networkID      string
-	Client         tmrpcclient.Client
+	Client         cbftrpcclient.Client
 	Container      *docker.Container
 	tl             Logger
 	ec             testutil.TestEncodingConfig
@@ -237,13 +237,13 @@ func GetAllNodes(nodes ...Nodes) (out Nodes) {
 
 // NewClient creates and assigns a new Tendermint RPC client to the Node
 func (tn *Node) NewClient(addr string) error {
-	httpClient, err := tmrpcjsonclient.DefaultHTTPClient(addr)
+	httpClient, err := cbftrpcjsonclient.DefaultHTTPClient(addr)
 	if err != nil {
 		return err
 	}
 
 	httpClient.Timeout = 10 * time.Second
-	rpcClient, err := tmrpchttp.NewWithClient(addr, "/websocket", httpClient)
+	rpcClient, err := cbftrpchttp.NewWithClient(addr, "/websocket", httpClient)
 	if err != nil {
 		return err
 	}
@@ -380,22 +380,22 @@ func (tn *Node) Keybase() keyring.Keyring {
 // SetValidatorConfigAndPeers modifies the config for a validator node to start a chain
 func (tn *Node) SetValidatorConfigAndPeers(peers string, enablePrivVal bool) {
 	// Pull default config
-	cfg := tmconfig.DefaultConfig()
+	cfg := cbftconfig.DefaultConfig()
 
 	// change config to include everything needed
 	stdconfigchanges(cfg, peers, enablePrivVal)
 
 	// overwrite with the new config
-	tmconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
+	cbftconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
 }
 
 func (tn *Node) SetPrivValListen(peers string) {
-	cfg := tmconfig.DefaultConfig()
+	cfg := cbftconfig.DefaultConfig()
 	stdconfigchanges(cfg, peers, true) // Reapply the changes made to the config file in SetValidatorConfigAndPeers()
-	tmconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
+	cbftconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
 }
 
-func (tn *Node) getValSigningInfo(address tmbytes.HexBytes) (*slashingtypes.QuerySigningInfoResponse, error) {
+func (tn *Node) getValSigningInfo(address cbftbytes.HexBytes) (*slashingtypes.QuerySigningInfoResponse, error) {
 	valConsPrefix := fmt.Sprintf("%svalcons", tn.Chain.Bech32Prefix)
 	bech32ValConsAddress, err := bech32.ConvertAndEncode(valConsPrefix, address)
 	if err != nil {
@@ -409,9 +409,9 @@ func (tn *Node) getValSigningInfo(address tmbytes.HexBytes) (*slashingtypes.Quer
 
 func (tn *Node) GetMostRecentConsecutiveSignedBlocks(
 	max int64,
-	address tmbytes.HexBytes,
+	address cbftbytes.HexBytes,
 ) (count int64, latestHeight int64, err error) {
-	var status *tmrpctypes.ResultStatus
+	var status *cbftrpctypes.ResultStatus
 	status, err = tn.Client.Status(context.Background())
 	if err != nil {
 		return 0, 0, err
@@ -420,7 +420,7 @@ func (tn *Node) GetMostRecentConsecutiveSignedBlocks(
 	latestHeight = status.SyncInfo.LatestBlockHeight
 
 	for i := latestHeight; i > latestHeight-max && i > 0; i-- {
-		var block *tmrpctypes.ResultBlock
+		var block *cbftrpctypes.ResultBlock
 		block, err = tn.Client.Block(context.Background(), &i)
 		if err != nil {
 			return 0, 0, err
@@ -440,7 +440,7 @@ func (tn *Node) GetMostRecentConsecutiveSignedBlocks(
 	return count, latestHeight, nil
 }
 
-func (tn *Node) getMissingBlocks(address tmbytes.HexBytes) (int64, error) {
+func (tn *Node) getMissingBlocks(address cbftbytes.HexBytes) (int64, error) {
 	missedBlocks, err := tn.getValSigningInfo(address)
 	if err != nil {
 		return 0, err
@@ -448,7 +448,7 @@ func (tn *Node) getMissingBlocks(address tmbytes.HexBytes) (int64, error) {
 	return missedBlocks.ValSigningInfo.MissedBlocksCounter, nil
 }
 
-func (tn *Node) EnsureNotSlashed(address tmbytes.HexBytes) error {
+func (tn *Node) EnsureNotSlashed(address cbftbytes.HexBytes) error {
 	for i := 0; i < 50; i++ {
 		time.Sleep(1 * time.Second)
 		slashInfo, err := tn.getValSigningInfo(address)
@@ -495,7 +495,7 @@ func min(a, b int64) int64 {
 }
 
 // Wait until we have signed n blocks in a row
-func (tn *Node) WaitForConsecutiveBlocks(blocks int64, address tmbytes.HexBytes) error {
+func (tn *Node) WaitForConsecutiveBlocks(blocks int64, address cbftbytes.HexBytes) error {
 	initialMissed, err := tn.getMissingBlocks(address)
 	if err != nil {
 		return err
@@ -543,7 +543,7 @@ func (tn *Node) WaitForConsecutiveBlocks(blocks int64, address tmbytes.HexBytes)
 	return errors.New("timed out waiting for cluster to recover signing blocks")
 }
 
-func stdconfigchanges(cfg *tmconfig.Config, peers string, enablePrivVal bool) {
+func stdconfigchanges(cfg *cbftconfig.Config, peers string, enablePrivVal bool) {
 	// turn down blocktimes to make the chain faster
 	cfg.Consensus.TimeoutCommit = blockTime * time.Second
 	cfg.Consensus.TimeoutPropose = blockTime * time.Second

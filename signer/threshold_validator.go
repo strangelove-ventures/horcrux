@@ -9,9 +9,9 @@ import (
 
 	"github.com/cometbft/cometbft/crypto"
 	"github.com/cometbft/cometbft/libs/log"
-	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	tmrpcjsontypes "github.com/cometbft/cometbft/rpc/jsonrpc/types"
-	tm "github.com/cometbft/cometbft/types"
+	cbftproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	cbftrpcjsontypes "github.com/cometbft/cometbft/rpc/jsonrpc/types"
+	cbft "github.com/cometbft/cometbft/types"
 	"github.com/hashicorp/raft"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
@@ -116,13 +116,13 @@ func (pv *ThresholdValidator) GetPubKey() (crypto.PubKey, error) {
 
 // SignVote signs a canonical representation of the vote, along with the
 // chainID. Implements PrivValidator.
-func (pv *ThresholdValidator) SignVote(chainID string, vote *tmproto.Vote) error {
+func (pv *ThresholdValidator) SignVote(chainID string, vote *cbftproto.Vote) error {
 	block := &Block{
 		Height:    vote.Height,
 		Round:     int64(vote.Round),
 		Step:      VoteToStep(vote),
 		Timestamp: vote.Timestamp,
-		SignBytes: tm.VoteSignBytes(chainID, vote),
+		SignBytes: cbft.VoteSignBytes(chainID, vote),
 	}
 	sig, stamp, err := pv.SignBlock(chainID, block)
 
@@ -134,13 +134,13 @@ func (pv *ThresholdValidator) SignVote(chainID string, vote *tmproto.Vote) error
 
 // SignProposal signs a canonical representation of the proposal, along with
 // the chainID. Implements PrivValidator.
-func (pv *ThresholdValidator) SignProposal(chainID string, proposal *tmproto.Proposal) error {
+func (pv *ThresholdValidator) SignProposal(chainID string, proposal *cbftproto.Proposal) error {
 	block := &Block{
 		Height:    proposal.Height,
 		Round:     int64(proposal.Round),
 		Step:      ProposalToStep(proposal),
 		Timestamp: proposal.Timestamp,
-		SignBytes: tm.ProposalSignBytes(chainID, proposal),
+		SignBytes: cbft.ProposalSignBytes(chainID, proposal),
 	}
 	sig, stamp, err := pv.SignBlock(chainID, block)
 
@@ -401,8 +401,8 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 			Block:   block,
 		})
 		if err != nil {
-			if _, ok := err.(*tmrpcjsontypes.RPCError); ok {
-				rpcErrUnwrapped := err.(*tmrpcjsontypes.RPCError).Data
+			if _, ok := err.(*cbftrpcjsontypes.RPCError); ok {
+				rpcErrUnwrapped := err.(*cbftrpcjsontypes.RPCError).Data
 				// Need to return BeyondBlockError after proxy since the error type will be lost over RPC
 				if len(rpcErrUnwrapped) > 33 && rpcErrUnwrapped[:33] == "Progress already started on block" {
 					return nil, stamp, &BeyondBlockError{msg: rpcErrUnwrapped}

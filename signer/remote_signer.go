@@ -5,32 +5,32 @@ import (
 	"net"
 	"time"
 
-	tmcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	tmcryptoencoding "github.com/cometbft/cometbft/crypto/encoding"
-	tmlog "github.com/cometbft/cometbft/libs/log"
-	tmnet "github.com/cometbft/cometbft/libs/net"
-	tmservice "github.com/cometbft/cometbft/libs/service"
-	tmp2pconn "github.com/cometbft/cometbft/p2p/conn"
-	tmprotocrypto "github.com/cometbft/cometbft/proto/tendermint/crypto"
-	tmprotoprivval "github.com/cometbft/cometbft/proto/tendermint/privval"
-	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	tm "github.com/cometbft/cometbft/types"
+	cbftcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	cbftcryptoencoding "github.com/cometbft/cometbft/crypto/encoding"
+	cbftlog "github.com/cometbft/cometbft/libs/log"
+	cbftnet "github.com/cometbft/cometbft/libs/net"
+	cbftservice "github.com/cometbft/cometbft/libs/service"
+	cbftp2pconn "github.com/cometbft/cometbft/p2p/conn"
+	cbftprotocrypto "github.com/cometbft/cometbft/proto/tendermint/crypto"
+	cbftprotoprivval "github.com/cometbft/cometbft/proto/tendermint/privval"
+	cbftproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	cbft "github.com/cometbft/cometbft/types"
 )
 
 // PrivValidator is a wrapper for tendermint PrivValidator,
 // with additional Stop method for safe shutdown.
 type PrivValidator interface {
-	tm.PrivValidator
+	cbft.PrivValidator
 	Stop()
 }
 
 // ReconnRemoteSigner dials using its dialer and responds to any
 // signature requests using its privVal.
 type ReconnRemoteSigner struct {
-	tmservice.BaseService
+	cbftservice.BaseService
 
 	address string
-	privKey tmcryptoed25519.PrivKey
+	privKey cbftcryptoed25519.PrivKey
 	privVal PrivValidator
 
 	dialer net.Dialer
@@ -43,7 +43,7 @@ type ReconnRemoteSigner struct {
 // If the connection is broken, the ReconnRemoteSigner will attempt to reconnect.
 func NewReconnRemoteSigner(
 	address string,
-	logger tmlog.Logger,
+	logger cbftlog.Logger,
 	privVal PrivValidator,
 	dialer net.Dialer,
 ) *ReconnRemoteSigner {
@@ -51,10 +51,10 @@ func NewReconnRemoteSigner(
 		address: address,
 		privVal: privVal,
 		dialer:  dialer,
-		privKey: tmcryptoed25519.GenPrivKey(),
+		privKey: cbftcryptoed25519.GenPrivKey(),
 	}
 
-	rs.BaseService = *tmservice.NewBaseService(logger, "RemoteSigner", rs)
+	rs.BaseService = *cbftservice.NewBaseService(logger, "RemoteSigner", rs)
 	return rs
 }
 
@@ -83,7 +83,7 @@ func (rs *ReconnRemoteSigner) loop() {
 		}
 
 		for conn == nil {
-			proto, address := tmnet.ProtocolAndAddress(rs.address)
+			proto, address := cbftnet.ProtocolAndAddress(rs.address)
 			netConn, err := rs.dialer.Dial(proto, address)
 			if err != nil {
 				sentryConnectTries.Add(float64(1))
@@ -96,7 +96,7 @@ func (rs *ReconnRemoteSigner) loop() {
 			sentryConnectTries.Set(0)
 
 			rs.Logger.Info("Connected to Sentry", "address", rs.address)
-			conn, err = tmp2pconn.MakeSecretConnection(netConn, rs.privKey)
+			conn, err = cbftp2pconn.MakeSecretConnection(netConn, rs.privKey)
 			if err != nil {
 				conn = nil
 				rs.Logger.Error("Secret Conn", "err", err)
@@ -134,25 +134,25 @@ func (rs *ReconnRemoteSigner) loop() {
 	}
 }
 
-func (rs *ReconnRemoteSigner) handleRequest(req tmprotoprivval.Message) tmprotoprivval.Message {
+func (rs *ReconnRemoteSigner) handleRequest(req cbftprotoprivval.Message) cbftprotoprivval.Message {
 	switch typedReq := req.Sum.(type) {
-	case *tmprotoprivval.Message_SignVoteRequest:
+	case *cbftprotoprivval.Message_SignVoteRequest:
 		return rs.handleSignVoteRequest(typedReq.SignVoteRequest.ChainId, typedReq.SignVoteRequest.Vote)
-	case *tmprotoprivval.Message_SignProposalRequest:
+	case *cbftprotoprivval.Message_SignProposalRequest:
 		return rs.handleSignProposalRequest(typedReq.SignProposalRequest.ChainId, typedReq.SignProposalRequest.Proposal)
-	case *tmprotoprivval.Message_PubKeyRequest:
+	case *cbftprotoprivval.Message_PubKeyRequest:
 		return rs.handlePubKeyRequest(typedReq.PubKeyRequest.ChainId)
-	case *tmprotoprivval.Message_PingRequest:
+	case *cbftprotoprivval.Message_PingRequest:
 		return rs.handlePingRequest()
 	default:
 		rs.Logger.Error("Unknown request", "err", fmt.Errorf("%v", typedReq))
-		return tmprotoprivval.Message{}
+		return cbftprotoprivval.Message{}
 	}
 }
 
-func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *tmproto.Vote) tmprotoprivval.Message {
-	msgSum := &tmprotoprivval.Message_SignedVoteResponse{SignedVoteResponse: &tmprotoprivval.SignedVoteResponse{
-		Vote:  tmproto.Vote{},
+func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *cbftproto.Vote) cbftprotoprivval.Message {
+	msgSum := &cbftprotoprivval.Message_SignedVoteResponse{SignedVoteResponse: &cbftprotoprivval.SignedVoteResponse{
+		Vote:  cbftproto.Vote{},
 		Error: nil,
 	}}
 
@@ -184,7 +184,7 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *tmprot
 			failedSignVote.Inc()
 		}
 		msgSum.SignedVoteResponse.Error = getRemoteSignerError(err)
-		return tmprotoprivval.Message{Sum: msgSum}
+		return cbftprotoprivval.Message{Sum: msgSum}
 	}
 	// Show signatures provided to each node have the same signature and timestamps
 	sigLen := 6
@@ -202,7 +202,7 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *tmprot
 		"node", rs.address,
 	)
 
-	if vote.Type == tmproto.PrecommitType {
+	if vote.Type == cbftproto.PrecommitType {
 		stepSize := vote.Height - previousPrecommitHeight
 		if previousPrecommitHeight != 0 && stepSize > 1 {
 			missedPrecommits.Add(float64(stepSize))
@@ -218,7 +218,7 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *tmprot
 		lastPrecommitRound.Set(float64(vote.Round))
 		totalPrecommitsSigned.Inc()
 	}
-	if vote.Type == tmproto.PrevoteType {
+	if vote.Type == cbftproto.PrevoteType {
 		// Determine number of heights since the last Prevote
 		stepSize := vote.Height - previousPrevoteHeight
 		if previousPrevoteHeight != 0 && stepSize > 1 {
@@ -238,16 +238,16 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *tmprot
 	}
 
 	msgSum.SignedVoteResponse.Vote = *vote
-	return tmprotoprivval.Message{Sum: msgSum}
+	return cbftprotoprivval.Message{Sum: msgSum}
 }
 
 func (rs *ReconnRemoteSigner) handleSignProposalRequest(
 	chainID string,
-	proposal *tmproto.Proposal,
-) tmprotoprivval.Message {
-	msgSum := &tmprotoprivval.Message_SignedProposalResponse{
-		SignedProposalResponse: &tmprotoprivval.SignedProposalResponse{
-			Proposal: tmproto.Proposal{},
+	proposal *cbftproto.Proposal,
+) cbftprotoprivval.Message {
+	msgSum := &cbftprotoprivval.Message_SignedProposalResponse{
+		SignedProposalResponse: &cbftprotoprivval.SignedProposalResponse{
+			Proposal: cbftproto.Proposal{},
 			Error:    nil,
 		}}
 
@@ -276,7 +276,7 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(
 			)
 		}
 		msgSum.SignedProposalResponse.Error = getRemoteSignerError(err)
-		return tmprotoprivval.Message{Sum: msgSum}
+		return cbftprotoprivval.Message{Sum: msgSum}
 	}
 	// Show signatures provided to each node have the same signature and timestamps
 	sigLen := 6
@@ -297,13 +297,13 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(
 	lastProposalRound.Set(float64(proposal.Round))
 	totalProposalsSigned.Inc()
 	msgSum.SignedProposalResponse.Proposal = *proposal
-	return tmprotoprivval.Message{Sum: msgSum}
+	return cbftprotoprivval.Message{Sum: msgSum}
 }
 
-func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) tmprotoprivval.Message {
+func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) cbftprotoprivval.Message {
 	totalPubKeyRequests.Inc()
-	msgSum := &tmprotoprivval.Message_PubKeyResponse{PubKeyResponse: &tmprotoprivval.PubKeyResponse{
-		PubKey: tmprotocrypto.PublicKey{},
+	msgSum := &cbftprotoprivval.Message_PubKeyResponse{PubKeyResponse: &cbftprotoprivval.PubKeyResponse{
+		PubKey: cbftprotocrypto.PublicKey{},
 		Error:  nil,
 	}}
 
@@ -316,9 +316,9 @@ func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) tmprotoprivval
 			"error", err,
 		)
 		msgSum.PubKeyResponse.Error = getRemoteSignerError(err)
-		return tmprotoprivval.Message{Sum: msgSum}
+		return cbftprotoprivval.Message{Sum: msgSum}
 	}
-	pk, err := tmcryptoencoding.PubKeyToProto(pubKey)
+	pk, err := cbftcryptoencoding.PubKeyToProto(pubKey)
 	if err != nil {
 		rs.Logger.Error(
 			"Failed to get Pub Key",
@@ -327,36 +327,40 @@ func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) tmprotoprivval
 			"error", err,
 		)
 		msgSum.PubKeyResponse.Error = getRemoteSignerError(err)
-		return tmprotoprivval.Message{Sum: msgSum}
+		return cbftprotoprivval.Message{Sum: msgSum}
 	}
 	msgSum.PubKeyResponse.PubKey = pk
-	return tmprotoprivval.Message{Sum: msgSum}
+	return cbftprotoprivval.Message{Sum: msgSum}
 }
 
-func (rs *ReconnRemoteSigner) handlePingRequest() tmprotoprivval.Message {
-	return tmprotoprivval.Message{Sum: &tmprotoprivval.Message_PingResponse{PingResponse: &tmprotoprivval.PingResponse{}}}
+func (rs *ReconnRemoteSigner) handlePingRequest() cbftprotoprivval.Message {
+	return cbftprotoprivval.Message{
+		Sum: &cbftprotoprivval.Message_PingResponse{
+			PingResponse: &cbftprotoprivval.PingResponse{},
+		},
+	}
 }
 
-func getRemoteSignerError(err error) *tmprotoprivval.RemoteSignerError {
+func getRemoteSignerError(err error) *cbftprotoprivval.RemoteSignerError {
 	if err == nil {
 		return nil
 	}
-	return &tmprotoprivval.RemoteSignerError{
+	return &cbftprotoprivval.RemoteSignerError{
 		Code:        0,
 		Description: err.Error(),
 	}
 }
 
 func StartRemoteSigners(
-	services []tmservice.Service,
-	logger tmlog.Logger,
+	services []cbftservice.Service,
+	logger cbftlog.Logger,
 	privVal PrivValidator,
 	nodes []string,
-) ([]tmservice.Service, error) {
+) ([]cbftservice.Service, error) {
 	var err error
 	go StartMetrics()
 	for _, node := range nodes {
-		// Tendermint requires a connection within 3 seconds of start or crashes
+		// CometBFT requires a connection within 3 seconds of start or crashes
 		// A long timeout such as 30 seconds would cause the sentry to fail in loops
 		// Use a short timeout and dial often to connect within 3 second window
 		dialer := net.Dialer{Timeout: 2 * time.Second}

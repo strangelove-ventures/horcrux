@@ -8,11 +8,11 @@ import (
 	"os"
 	"sync"
 
-	tmbytes "github.com/cometbft/cometbft/libs/bytes"
-	tmjson "github.com/cometbft/cometbft/libs/json"
+	cbftbytes "github.com/cometbft/cometbft/libs/bytes"
+	cbftjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/cometbft/cometbft/libs/protoio"
 	"github.com/cometbft/cometbft/libs/tempfile"
-	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	cbftproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	"github.com/gogo/protobuf/proto"
 )
 
@@ -23,40 +23,40 @@ const (
 	blocksToCache      = 3
 )
 
-func CanonicalVoteToStep(vote *tmproto.CanonicalVote) int8 {
+func CanonicalVoteToStep(vote *cbftproto.CanonicalVote) int8 {
 	switch vote.Type {
-	case tmproto.PrevoteType:
+	case cbftproto.PrevoteType:
 		return stepPrevote
-	case tmproto.PrecommitType:
+	case cbftproto.PrecommitType:
 		return stepPrecommit
 	default:
 		panic("Unknown vote type")
 	}
 }
 
-func VoteToStep(vote *tmproto.Vote) int8 {
+func VoteToStep(vote *cbftproto.Vote) int8 {
 	switch vote.Type {
-	case tmproto.PrevoteType:
+	case cbftproto.PrevoteType:
 		return stepPrevote
-	case tmproto.PrecommitType:
+	case cbftproto.PrecommitType:
 		return stepPrecommit
 	default:
 		panic("Unknown vote type")
 	}
 }
 
-func ProposalToStep(_ *tmproto.Proposal) int8 {
+func ProposalToStep(_ *cbftproto.Proposal) int8 {
 	return stepPropose
 }
 
 // SignState stores signing information for high level watermark management.
 type SignState struct {
-	Height          int64            `json:"height"`
-	Round           int64            `json:"round"`
-	Step            int8             `json:"step"`
-	EphemeralPublic []byte           `json:"ephemeral_public"`
-	Signature       []byte           `json:"signature,omitempty"`
-	SignBytes       tmbytes.HexBytes `json:"signbytes,omitempty"`
+	Height          int64              `json:"height"`
+	Round           int64              `json:"round"`
+	Step            int8               `json:"step"`
+	EphemeralPublic []byte             `json:"ephemeral_public"`
+	Signature       []byte             `json:"signature,omitempty"`
+	SignBytes       cbftbytes.HexBytes `json:"signbytes,omitempty"`
 	cache           map[HRSKey]SignStateConsensus
 
 	filePath string
@@ -67,7 +67,7 @@ type SignStateConsensus struct {
 	Round     int64
 	Step      int8
 	Signature []byte
-	SignBytes tmbytes.HexBytes
+	SignBytes cbftbytes.HexBytes
 }
 
 type ChainSignStateConsensus struct {
@@ -160,7 +160,7 @@ func (signState *SignState) save() {
 	if outFile == "" {
 		panic("cannot save SignState: filePath not set")
 	}
-	jsonBytes, err := tmjson.MarshalIndent(signState, "", "  ")
+	jsonBytes, err := cbftjson.MarshalIndent(signState, "", "  ")
 	if err != nil {
 		panic(err)
 	}
@@ -290,7 +290,7 @@ func LoadSignState(filepath string) (*SignState, error) {
 
 	state := new(SignState)
 
-	err = tmjson.Unmarshal(stateJSONBytes, &state)
+	err = cbftjson.Unmarshal(stateJSONBytes, &state)
 	if err != nil {
 		return nil, err
 	}
@@ -342,7 +342,7 @@ func onlyDifferByTimestamp(step int8, signStateSignBytes, signBytes []byte) erro
 }
 
 func checkVoteOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) error {
-	var lastVote, newVote tmproto.CanonicalVote
+	var lastVote, newVote cbftproto.CanonicalVote
 	if err := protoio.UnmarshalDelimited(lastSignBytes, &lastVote); err != nil {
 		return fmt.Errorf("lastSignBytes cannot be unmarshalled into vote: %v", err)
 	}
@@ -375,7 +375,7 @@ func checkVoteOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) error {
 }
 
 func checkProposalOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) error {
-	var lastProposal, newProposal tmproto.CanonicalProposal
+	var lastProposal, newProposal cbftproto.CanonicalProposal
 	if err := protoio.UnmarshalDelimited(lastSignBytes, &lastProposal); err != nil {
 		return fmt.Errorf("lastSignBytes cannot be unmarshalled into proposal: %v", err)
 	}

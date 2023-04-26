@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	tmcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	cbftcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,7 +17,7 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 	tmpDir, _ := os.MkdirTemp("", "store_test")
 	defer os.RemoveAll(tmpDir)
 
-	dummyPub := tmcryptoed25519.PubKey{}
+	dummyPub := cbftcryptoed25519.PubKey{}
 
 	bitSize := 4096
 	rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)

@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	tmcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	tmjson "github.com/cometbft/cometbft/libs/json"
+	cbftcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	cbftjson "github.com/cometbft/cometbft/libs/json"
 	"gitlab.com/unit410/edwards25519"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
@@ -148,7 +148,7 @@ func NewLocalCosigner(
 	}
 
 	// cache the public key bytes for signing operations
-	cosigner.pubKeyBytes = cosigner.key.PubKey.(tmcryptoed25519.PubKey)[:]
+	cosigner.pubKeyBytes = cosigner.key.PubKey.(cbftcryptoed25519.PubKey)[:]
 
 	return cosigner
 }
@@ -426,7 +426,7 @@ func (cosigner *LocalCosigner) getEphemeralSecretPart(
 	// sign the response payload with our private key
 	// cosigners can verify the signature to confirm sender validity
 	{
-		jsonBytes, err := tmjson.Marshal(res)
+		jsonBytes, err := cbftjson.Marshal(res)
 
 		if err != nil {
 			return res, err
@@ -461,7 +461,7 @@ func (cosigner *LocalCosigner) setEphemeralSecretPart(req CosignerSetEphemeralSe
 		EncryptedSharePart:             req.EncryptedSharePart,
 	}
 
-	digestBytes, err := tmjson.Marshal(digestMsg)
+	digestBytes, err := cbftjson.Marshal(digestMsg)
 	if err != nil {
 		return err
 	}

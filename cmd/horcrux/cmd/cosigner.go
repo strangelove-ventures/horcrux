@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	tmlog "github.com/cometbft/cometbft/libs/log"
-	tmservice "github.com/cometbft/cometbft/libs/service"
+	cbftlog "github.com/cometbft/cometbft/libs/log"
+	cbftservice "github.com/cometbft/cometbft/libs/service"
 	"github.com/cosmos/cosmos-sdk/types/bech32"
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/signer"
@@ -119,8 +119,8 @@ func startCosignerCmd() *cobra.Command {
 
 			var (
 				// services to stop on shutdown
-				services []tmservice.Service
-				logger   = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "validator")
+				services []cbftservice.Service
+				logger   = cbftlog.NewTMLogger(cbftlog.NewSyncWriter(os.Stdout)).With("module", "validator")
 			)
 
 			keyFile, err := config.KeyFileExistsCosigner()
@@ -128,7 +128,7 @@ func startCosignerCmd() *cobra.Command {
 				return err
 			}
 
-			logger.Info("Tendermint Validator", "mode", "threshold",
+			logger.Info("CometBFT Validator", "mode", "threshold",
 				"priv-key", config.Config.PrivValKeyFile, "priv-state-dir", config.StateDir)
 
 			key, err := signer.LoadCosignerKey(keyFile)

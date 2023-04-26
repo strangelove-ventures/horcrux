@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/signer"
 
-	tmjson "github.com/cometbft/cometbft/libs/json"
+	cbftjson "github.com/cometbft/cometbft/libs/json"
 )
 
 // Snippet Taken from https://raw.githubusercontent.com/cometbft/cometbft/main/privval/file.go
@@ -187,7 +187,7 @@ func importStateCmd() *cobra.Command {
 
 			pvState := &FilePVLastSignState{}
 
-			err = tmjson.Unmarshal([]byte(finalJSON), &pvState)
+			err = cbftjson.Unmarshal([]byte(finalJSON), &pvState)
 			if err != nil {
 				fmt.Println("Error parsing priv_validator_state.json")
 				return err
