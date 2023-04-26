@@ -28,16 +28,29 @@ func NewHorcruxValidator(
 	pool *dockertest.Pool,
 	networkID string,
 	home string,
-	chainID string,
 	index int,
-	numSentries int,
 	numSigners int,
 	threshold int,
-	chainType *ChainType,
+	chains ...*ChainType,
 ) (*Validator, error) {
+	var sentries Nodes
+	for _, chain := range chains {
+		sentries = append(sentries,
+			MakeNodes(
+				index,
+				chain.NumSentries,
+				home,
+				chain.ChainID,
+				chain,
+				pool,
+				networkID,
+				tl,
+			)...,
+		)
+	}
 	testValidator := &Validator{
 		Index:     index,
-		Sentries:  MakeNodes(index, numSentries, home, chainID, chainType, pool, networkID, tl),
+		Sentries:  sentries,
 		Signers:   MakeSigners(index, numSigners, home, pool, networkID, tl),
 		tl:        tl,
 		Home:      home,
@@ -125,10 +138,20 @@ func (tv *Validator) StartHorcruxCluster(
 		tv.Threshold, sentriesPerSigner)
 }
 
-func (tv *Validator) WaitForConsecutiveBlocks(blocks int64) error {
-	return tv.Sentries[0].WaitForConsecutiveBlocks(blocks, tv.PubKey.Address())
+func (tv *Validator) WaitForConsecutiveBlocks(chainID string, blocks int64) error {
+	for _, n := range tv.Sentries {
+		if n.ChainID == chainID {
+			return n.WaitForConsecutiveBlocks(blocks, tv.PubKey.Address())
+		}
+	}
+	return fmt.Errorf("no sentry found with chain id: %s", chainID)
 }
 
-func (tv *Validator) EnsureNotSlashed() error {
-	return tv.Sentries[0].EnsureNotSlashed(tv.PubKey.Address())
+func (tv *Validator) EnsureNotSlashed(chainID string) error {
+	for _, n := range tv.Sentries {
+		if n.ChainID == chainID {
+			return n.EnsureNotSlashed(tv.PubKey.Address())
+		}
+	}
+	return fmt.Errorf("no sentry found with chain id: %s", chainID)
 }

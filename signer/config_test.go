@@ -365,8 +365,7 @@ func TestRuntimeConfigWriteConfigFile(t *testing.T) {
 	require.NoError(t, c.WriteConfigFile())
 	configYamlBz, err := os.ReadFile(configFile)
 	require.NoError(t, err)
-	require.Equal(t, `chain-id: ""
-cosigner:
+	require.Equal(t, `cosigner:
   threshold: 2
   shares: 3
   p2p-listen: tcp://127.0.0.1:2222

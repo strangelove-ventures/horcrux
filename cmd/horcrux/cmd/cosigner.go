@@ -210,7 +210,7 @@ func startCosignerCmd() *cobra.Command {
 
 			go EnableDebugAndMetrics(cmd.Context())
 
-			services, err = signer.StartRemoteSigners(&config, services, logger, val, config.Config.Nodes())
+			services, err = signer.StartRemoteSigners(services, logger, val, config.Config.Nodes())
 			if err != nil {
 				return fmt.Errorf("failed to start remote signer(s): %w", err)
 			}

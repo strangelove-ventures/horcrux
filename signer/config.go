@@ -28,7 +28,6 @@ type NodeConfig struct {
 // Config maps to the on-disk JSON format
 type Config struct {
 	PrivValKeyFile *string         `json:"key-file,omitempty" yaml:"key-file,omitempty"`
-	ChainID        string          `json:"chain-id" yaml:"chain-id"`
 	CosignerConfig *CosignerConfig `json:"cosigner,omitempty" yaml:"cosigner,omitempty"`
 	ChainNodes     ChainNodes      `json:"chain-nodes,omitempty" yaml:"chain-nodes,omitempty"`
 	DebugAddr      string          `json:"debug-addr,omitempty" yaml:"debug-addr,omitempty"`

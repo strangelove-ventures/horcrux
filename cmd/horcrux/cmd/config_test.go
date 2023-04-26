@@ -6,12 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/strangelove-ventures/horcrux/signer"
 	"github.com/stretchr/testify/require"
-)
-
-const (
-	chainID = "horcrux-1"
 )
 
 func TestConfigInitCmd(t *testing.T) {
@@ -26,7 +21,6 @@ func TestConfigInitCmd(t *testing.T) {
 			name: "valid init",
 			home: tmpHome + "_valid_init",
 			args: []string{
-				chainID,
 				"tcp://10.168.0.1:1234",
 				"-c",
 				"-p", "tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3",
@@ -40,7 +34,6 @@ func TestConfigInitCmd(t *testing.T) {
 			name: "invalid chain-nodes",
 			home: tmpHome + "_invalid_chain-nodes",
 			args: []string{
-				chainID,
 				"://10.168.0.1:1234", // Missing/malformed protocol scheme
 				"-c",
 				"-p", "tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3",
@@ -54,7 +47,6 @@ func TestConfigInitCmd(t *testing.T) {
 			name: "invalid peer-nodes",
 			home: tmpHome + "_invalid_peer-nodes",
 			args: []string{
-				chainID,
 				"tcp://10.168.0.1:1234",
 				"-c",
 				"-p", "tcp://10.168.1.2:2222,tcp://10.168.1.3:2222", // Missing share IDs
@@ -84,24 +76,6 @@ func TestConfigInitCmd(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-
-				ss, err := signer.LoadSignState(filepath.Join(tmpConfig, "state", chainID+"_priv_validator_state.json"))
-				require.NoError(t, err)
-				require.Equal(t, int64(0), ss.Height)
-				require.Equal(t, int64(0), ss.Round)
-				require.Equal(t, int8(0), ss.Step)
-				require.Nil(t, ss.EphemeralPublic)
-				require.Nil(t, ss.Signature)
-				require.Nil(t, ss.SignBytes)
-
-				ss, err = signer.LoadSignState(filepath.Join(tmpConfig, "state", chainID+"_share_sign_state.json"))
-				require.NoError(t, err)
-				require.Equal(t, int64(0), ss.Height)
-				require.Equal(t, int64(0), ss.Round)
-				require.Equal(t, int8(0), ss.Step)
-				require.Nil(t, ss.EphemeralPublic)
-				require.Nil(t, ss.Signature)
-				require.Nil(t, ss.SignBytes)
 			}
 		})
 	}

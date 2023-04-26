@@ -29,8 +29,6 @@ type PrivValidator interface {
 type ReconnRemoteSigner struct {
 	tmservice.BaseService
 
-	config *RuntimeConfig
-
 	address string
 	privKey tmcryptoed25519.PrivKey
 	privVal PrivValidator
@@ -44,14 +42,12 @@ type ReconnRemoteSigner struct {
 //
 // If the connection is broken, the ReconnRemoteSigner will attempt to reconnect.
 func NewReconnRemoteSigner(
-	config *RuntimeConfig,
 	address string,
 	logger tmlog.Logger,
 	privVal PrivValidator,
 	dialer net.Dialer,
 ) *ReconnRemoteSigner {
 	rs := &ReconnRemoteSigner{
-		config:  config,
 		address: address,
 		privVal: privVal,
 		dialer:  dialer,
@@ -141,11 +137,11 @@ func (rs *ReconnRemoteSigner) loop() {
 func (rs *ReconnRemoteSigner) handleRequest(req tmprotoprivval.Message) tmprotoprivval.Message {
 	switch typedReq := req.Sum.(type) {
 	case *tmprotoprivval.Message_SignVoteRequest:
-		return rs.handleSignVoteRequest(typedReq.SignVoteRequest.Vote)
+		return rs.handleSignVoteRequest(typedReq.SignVoteRequest.ChainId, typedReq.SignVoteRequest.Vote)
 	case *tmprotoprivval.Message_SignProposalRequest:
-		return rs.handleSignProposalRequest(typedReq.SignProposalRequest.Proposal)
+		return rs.handleSignProposalRequest(typedReq.SignProposalRequest.ChainId, typedReq.SignProposalRequest.Proposal)
 	case *tmprotoprivval.Message_PubKeyRequest:
-		return rs.handlePubKeyRequest()
+		return rs.handlePubKeyRequest(typedReq.PubKeyRequest.ChainId)
 	case *tmprotoprivval.Message_PingRequest:
 		return rs.handlePingRequest()
 	default:
@@ -154,19 +150,37 @@ func (rs *ReconnRemoteSigner) handleRequest(req tmprotoprivval.Message) tmprotop
 	}
 }
 
-func (rs *ReconnRemoteSigner) handleSignVoteRequest(vote *tmproto.Vote) tmprotoprivval.Message {
+func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *tmproto.Vote) tmprotoprivval.Message {
 	msgSum := &tmprotoprivval.Message_SignedVoteResponse{SignedVoteResponse: &tmprotoprivval.SignedVoteResponse{
 		Vote:  tmproto.Vote{},
 		Error: nil,
 	}}
-	if err := rs.privVal.SignVote(rs.config.Config.ChainID, vote); err != nil {
+
+	if err := rs.privVal.SignVote(chainID, vote); err != nil {
 		switch typedErr := err.(type) {
 		case *BeyondBlockError:
-			rs.Logger.Debug("Rejecting sign vote request", "reason", typedErr.msg)
+			rs.Logger.Debug(
+				"Rejecting sign vote request",
+				"chain_id", chainID,
+				"height", vote.Height,
+				"round", vote.Round,
+				"type", vote.Type,
+				"node", rs.address,
+				"validator", fmt.Sprintf("%X", vote.ValidatorAddress),
+				"reason", typedErr.msg,
+			)
 			beyondBlockErrors.Inc()
 		default:
-			rs.Logger.Error("Failed to sign vote", "address", rs.address, "error", err, "vote_type", vote.Type,
-				"height", vote.Height, "round", vote.Round, "validator", fmt.Sprintf("%X", vote.ValidatorAddress))
+			rs.Logger.Error(
+				"Failed to sign vote",
+				"chain_id", chainID,
+				"height", vote.Height,
+				"round", vote.Round,
+				"type", vote.Type,
+				"node", rs.address,
+				"validator", fmt.Sprintf("%X", vote.ValidatorAddress),
+				"error", err,
+			)
 			failedSignVote.Inc()
 		}
 		msgSum.SignedVoteResponse.Error = getRemoteSignerError(err)
@@ -177,8 +191,16 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(vote *tmproto.Vote) tmprotop
 	if len(vote.Signature) < sigLen {
 		sigLen = len(vote.Signature)
 	}
-	rs.Logger.Info("Signed vote", "height", vote.Height, "round", vote.Round, "type", vote.Type,
-		"sig", vote.Signature[:sigLen], "ts", vote.Timestamp.Unix(), "node", rs.address)
+	rs.Logger.Info(
+		"Signed vote",
+		"chain_id", chainID,
+		"height", vote.Height,
+		"round", vote.Round,
+		"type", vote.Type,
+		"sig", vote.Signature[:sigLen],
+		"ts", vote.Timestamp.Unix(),
+		"node", rs.address,
+	)
 
 	if vote.Type == tmproto.PrecommitType {
 		stepSize := vote.Height - previousPrecommitHeight
@@ -219,25 +241,58 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(vote *tmproto.Vote) tmprotop
 	return tmprotoprivval.Message{Sum: msgSum}
 }
 
-func (rs *ReconnRemoteSigner) handleSignProposalRequest(proposal *tmproto.Proposal) tmprotoprivval.Message {
+func (rs *ReconnRemoteSigner) handleSignProposalRequest(
+	chainID string,
+	proposal *tmproto.Proposal,
+) tmprotoprivval.Message {
 	msgSum := &tmprotoprivval.Message_SignedProposalResponse{
 		SignedProposalResponse: &tmprotoprivval.SignedProposalResponse{
 			Proposal: tmproto.Proposal{},
 			Error:    nil,
 		}}
-	if err := rs.privVal.SignProposal(rs.config.Config.ChainID, proposal); err != nil {
+
+	if err := rs.privVal.SignProposal(chainID, proposal); err != nil {
 		switch typedErr := err.(type) {
 		case *BeyondBlockError:
-			rs.Logger.Debug("Rejecting proposal sign request", "reason", typedErr.msg)
+			rs.Logger.Debug(
+				"Rejecting proposal sign request",
+				"chain_id", chainID,
+				"height", proposal.Height,
+				"round", proposal.Round,
+				"type", proposal.Type,
+				"node", rs.address,
+				"reason", typedErr.msg,
+			)
 			beyondBlockErrors.Inc()
 		default:
-			rs.Logger.Error("Failed to sign proposal", "address", rs.address, "error", err, "proposal", proposal)
+			rs.Logger.Error(
+				"Failed to sign proposal",
+				"chain_id", chainID,
+				"height", proposal.Height,
+				"round", proposal.Round,
+				"type", proposal.Type,
+				"node", rs.address,
+				"error", err,
+			)
 		}
 		msgSum.SignedProposalResponse.Error = getRemoteSignerError(err)
 		return tmprotoprivval.Message{Sum: msgSum}
 	}
-	rs.Logger.Info("Signed proposal", "node", rs.address,
-		"height", proposal.Height, "round", proposal.Round, "type", proposal.Type)
+	// Show signatures provided to each node have the same signature and timestamps
+	sigLen := 6
+	if len(proposal.Signature) < sigLen {
+		sigLen = len(proposal.Signature)
+	}
+	rs.Logger.Info(
+		"Signed proposal",
+		"chain_id", chainID,
+		"height", proposal.Height,
+		"round", proposal.Round,
+		"type", proposal.Type,
+		"sig", proposal.Signature[:sigLen],
+		"ts", proposal.Timestamp.Unix(),
+		"node", rs.address,
+	)
 	lastProposalHeight.Set(float64(proposal.Height))
 	lastProposalRound.Set(float64(proposal.Round))
 	totalProposalsSigned.Inc()
@@ -245,21 +300,32 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(proposal *tmproto.Propos
 	return tmprotoprivval.Message{Sum: msgSum}
 }
 
-func (rs *ReconnRemoteSigner) handlePubKeyRequest() tmprotoprivval.Message {
+func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) tmprotoprivval.Message {
 	totalPubKeyRequests.Inc()
 	msgSum := &tmprotoprivval.Message_PubKeyResponse{PubKeyResponse: &tmprotoprivval.PubKeyResponse{
 		PubKey: tmprotocrypto.PublicKey{},
 		Error:  nil,
 	}}
+
 	pubKey, err := rs.privVal.GetPubKey()
 	if err != nil {
-		rs.Logger.Error("Failed to get Pub Key", "address", rs.address, "error", err)
+		rs.Logger.Error(
+			"Failed to get Pub Key",
+			"chain_id", chainID,
+			"node", rs.address,
+			"error", err,
+		)
 		msgSum.PubKeyResponse.Error = getRemoteSignerError(err)
 		return tmprotoprivval.Message{Sum: msgSum}
 	}
 	pk, err := tmcryptoencoding.PubKeyToProto(pubKey)
 	if err != nil {
-		rs.Logger.Error("Failed to get Pub Key", "address", rs.address, "error", err)
+		rs.Logger.Error(
+			"Failed to get Pub Key",
+			"chain_id", chainID,
+			"node", rs.address,
+			"error", err,
+		)
 		msgSum.PubKeyResponse.Error = getRemoteSignerError(err)
 		return tmprotoprivval.Message{Sum: msgSum}
 	}
@@ -281,8 +347,12 @@ func getRemoteSignerError(err error) *tmprotoprivval.RemoteSignerError {
 	}
 }
 
-func StartRemoteSigners(config *RuntimeConfig, services []tmservice.Service, logger tmlog.Logger,
-	privVal PrivValidator, nodes []string) ([]tmservice.Service, error) {
+func StartRemoteSigners(
+	services []tmservice.Service,
+	logger tmlog.Logger,
+	privVal PrivValidator,
+	nodes []string,
+) ([]tmservice.Service, error) {
 	var err error
 	go StartMetrics()
 	for _, node := range nodes {
@@ -290,7 +360,7 @@ func StartRemoteSigners(config *RuntimeConfig, services []tmservice.Service, log
 		// A long timeout such as 30 seconds would cause the sentry to fail in loops
 		// Use a short timeout and dial often to connect within 3 second window
 		dialer := net.Dialer{Timeout: 2 * time.Second}
-		s := NewReconnRemoteSigner(config, node, logger, privVal, dialer)
+		s := NewReconnRemoteSigner(node, logger, privVal, dialer)
 
 		err = s.Start()
 		if err != nil {

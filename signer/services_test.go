@@ -21,8 +21,15 @@ import (
 )
 
 func TestIsRunning(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("test only valid on Linux")
+	}
+
 	homeDir := t.TempDir()
 	pidFilePath := filepath.Join(homeDir, "horcrux.pid")
+
+	// this child process exists for linux, but not macOS
+	// TODO: make this test work with macOS, maybe spawn child process or dummy horcrux process.
 	pid := os.Getpid() + 1
 	err := os.WriteFile(
 		pidFilePath,

@@ -24,19 +24,17 @@ func configCmd() *cobra.Command {
 
 func initCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "init [chain-id] [chain-nodes]",
+		Use:     "init [chain-nodes]",
 		Aliases: []string{"i"},
 		Short:   "initialize configuration file and home directory if one doesn't already exist",
 		Long: "initialize configuration file, use flags for cosigner configuration.\n\n" +
-			"[chain-id] is the chain id of the chain to validate\n" +
 			"[chain-nodes] is a comma separated array of chain node addresses i.e.\n" +
 			"tcp://chain-node-1:1234,tcp://chain-node-2:1234",
-		Args: cobra.RangeArgs(1, 2),
+		Args: cobra.RangeArgs(0, 1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			cid := args[0]
 			var cn signer.ChainNodes
-			if len(args) == 2 {
-				cn, err = signer.ChainNodesFromArg(args[1])
+			if len(args) == 1 {
+				cn, err = signer.ChainNodesFromArg(args[0])
 				if err != nil {
 					return err
 				}
@@ -87,7 +85,6 @@ func initCmd() *cobra.Command {
 
 				cfg = signer.Config{
 					PrivValKeyFile: keyFile,
-					ChainID:        cid,
 					CosignerConfig: &signer.CosignerConfig{
 						Threshold: threshold,
 						Shares:    len(peers) + 1,
@@ -103,12 +100,8 @@ func initCmd() *cobra.Command {
 				}
 			} else {
 				// Single Signer Config
-				if len(cn) == 0 {
-					return fmt.Errorf("must input at least one node")
-				}
 				cfg = signer.Config{
 					PrivValKeyFile: keyFile,
-					ChainID:        cid,
 					ChainNodes:     cn,
 					DebugAddr:      debugAddr,
 				}
@@ -128,16 +121,6 @@ func initCmd() *cobra.Command {
 			config.Config = cfg
 			if err = config.WriteConfigFile(); err != nil {
 				return err
-			}
-
-			// if node is a cosigner initialize state files
-			if cs {
-				if _, err = signer.LoadOrCreateSignState(config.PrivValStateFile(cid)); err != nil {
-					return err
-				}
-				if _, err = signer.LoadOrCreateSignState(config.ShareStateFile(cid)); err != nil {
-					return err
-				}
 			}
 
 			fmt.Printf("Successfully initialized configuration: %s\n", config.ConfigFile)

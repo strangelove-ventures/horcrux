@@ -376,8 +376,7 @@ func (ts *Signer) ExecHorcruxCmd(ctx context.Context, cmd ...string) error {
 // blocks until the container exits
 func (ts *Signer) InitSingleSignerConfig(ctx context.Context, listenNodes Nodes) error {
 	return ts.ExecHorcruxCmd(ctx,
-		"config", "init",
-		listenNodes[0].ChainID, listenNodes.ListenAddrs())
+		"config", "init", listenNodes.ListenAddrs())
 }
 
 // InitCosignerConfig creates and runs a container to init a signer nodes config files
@@ -385,8 +384,7 @@ func (ts *Signer) InitSingleSignerConfig(ctx context.Context, listenNodes Nodes)
 func (ts *Signer) InitCosignerConfig(
 	ctx context.Context, listenNodes Nodes, peers Signers, skip, threshold int) error {
 	return ts.ExecHorcruxCmd(ctx,
-		"config", "init",
-		listenNodes[0].ChainID, listenNodes.ListenAddrs(),
+		"config", "init", listenNodes.ListenAddrs(),
 		"--cosigner",
 		fmt.Sprintf("--peers=%s", peers.PeerString(skip)),
 		fmt.Sprintf("--threshold=%d", threshold),
