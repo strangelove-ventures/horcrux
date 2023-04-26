@@ -18,14 +18,14 @@ jobs:
     runs-on: [self-hosted, linux]
     steps:
       # Install and setup go
-      - name: Set up Go 1.19
-        uses: actions/setup-go@v2
+      - name: Set up Go 1.20
+        uses: actions/setup-go@v4
         with:
-          go-version: 1.19
+          go-version: 1.20.3
 
       # checkout horcrux
       - name: checkout horcrux
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       # cleanup docker environment on self-hosted test runner
       - name: prepare fresh docker environment
