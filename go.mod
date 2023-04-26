@@ -1,6 +1,6 @@
 module github.com/strangelove-ventures/horcrux
 
-go 1.19
+go 1.20
 
 require (
 	github.com/Jille/grpc-multi-resolver v1.1.0
