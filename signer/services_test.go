@@ -27,7 +27,7 @@ func init() {
 }
 
 func mockHorcruxChildProcess(pidFilePath string) {
-	os.WriteFile(
+	_ = os.WriteFile(
 		pidFilePath,
 		[]byte(fmt.Sprintf("%d\n", os.Getpid())),
 		0600,

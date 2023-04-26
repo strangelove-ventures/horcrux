@@ -36,6 +36,8 @@ linters-settings:
         alias: cryptotypes
       - pkg: github.com/cosmos/cosmos-sdk/x/slashing/types
         alias: slashingtypes
+      - pkg : github.com/kraken-hpc/go-fork
+        alias: fork
       - pkg: github.com/tendermint/tendermint/types
         alias: tm
       - pkg: github.com/tendermint/tendermint/config
