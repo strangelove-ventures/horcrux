@@ -17,29 +17,37 @@ import (
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmservice "github.com/tendermint/tendermint/libs/service"
 
+	fork "github.com/kraken-hpc/go-fork"
 	"github.com/stretchr/testify/require"
 )
 
-func TestIsRunning(t *testing.T) {
-	if runtime.GOOS != "linux" {
-		t.Skip("test only valid on Linux")
-	}
+func init() {
+	fork.RegisterFunc("child", mockHorcruxChildProcess)
+	fork.Init()
+}
 
+func mockHorcruxChildProcess(pidFilePath string) {
+	os.WriteFile(
+		pidFilePath,
+		[]byte(fmt.Sprintf("%d\n", os.Getpid())),
+		0600,
+	)
+}
+
+func TestIsRunning(t *testing.T) {
 	homeDir := t.TempDir()
 	pidFilePath := filepath.Join(homeDir, "horcrux.pid")
 
-	// this child process exists for linux, but not macOS
-	// TODO: make this test work with macOS, maybe spawn child process or dummy horcrux process.
-	pid := os.Getpid() + 1
-	err := os.WriteFile(
-		pidFilePath,
-		[]byte(fmt.Sprintf("%d\n", pid)),
-		0600,
-	)
-	require.NoError(t, err, "error writing pid file")
+	err := fork.Fork("child", pidFilePath)
+	require.NoError(t, err)
+
+	time.Sleep(time.Second * 1)
+
+	pidBz, err := os.ReadFile(pidFilePath)
+	require.NoError(t, err)
 
 	err = signer.RequireNotRunning(pidFilePath)
-	expectedErrorMsg := fmt.Sprintf("horcrux is already running on PID: %d", pid)
+	expectedErrorMsg := fmt.Sprintf("horcrux is already running on PID: %s", strings.TrimSpace(string(pidBz)))
 	require.EqualError(t, err, expectedErrorMsg)
 }
 
