@@ -355,17 +355,17 @@ func (tn *Node) GenesisFilePath() string {
 	return filepath.Join(tn.Dir(), "config", "genesis.json")
 }
 
-func (tn *Node) TMConfigPath() string {
+func (tn *Node) cometBFTConfigPath() string {
 	return filepath.Join(tn.Dir(), "config", "config.toml")
 }
 
 // Bind returns the home folder bind point for running the node
 func (tn *Node) Bind() []string {
-	return []string{fmt.Sprintf("%s:/home/.%s", tn.Dir(), tn.Chain.Bin)}
+	return []string{fmt.Sprintf("%s:/.simapp", tn.Dir())}
 }
 
 func (tn *Node) NodeHome() string {
-	return fmt.Sprintf("/home/.%s", tn.Chain.Bin)
+	return "/.simapp"
 }
 
 // Keybase returns the keyring for a given node
@@ -386,13 +386,13 @@ func (tn *Node) SetValidatorConfigAndPeers(peers string, enablePrivVal bool) {
 	stdconfigchanges(cfg, peers, enablePrivVal)
 
 	// overwrite with the new config
-	cbftconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
+	cbftconfig.WriteConfigFile(tn.cometBFTConfigPath(), cfg)
 }
 
 func (tn *Node) SetPrivValListen(peers string) {
 	cfg := cbftconfig.DefaultConfig()
 	stdconfigchanges(cfg, peers, true) // Reapply the changes made to the config file in SetValidatorConfigAndPeers()
-	cbftconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
+	cbftconfig.WriteConfigFile(tn.cometBFTConfigPath(), cfg)
 }
 
 func (tn *Node) getValSigningInfo(address cbftbytes.HexBytes) (*slashingtypes.QuerySigningInfoResponse, error) {
@@ -641,7 +641,7 @@ func (tn *Node) CreateKey(ctx context.Context, name string) error {
 
 // AddGenesisAccount adds a genesis account for each key
 func (tn *Node) AddGenesisAccount(ctx context.Context, address string) error {
-	cmd := []string{tn.Chain.Bin, "add-genesis-account", address, "1000000000000stake",
+	cmd := []string{tn.Chain.Bin, "genesis", "add-genesis-account", address, "1000000000000stake",
 		"--home", tn.NodeHome(),
 	}
 	_, _, err := tn.Exec(ctx, cmd)
@@ -650,7 +650,7 @@ func (tn *Node) AddGenesisAccount(ctx context.Context, address string) error {
 
 // Gentx generates the gentx for a given node
 func (tn *Node) Gentx(ctx context.Context, keyName, pubKey string) error {
-	cmd := []string{tn.Chain.Bin, "gentx", keyName, "100000000000stake",
+	cmd := []string{tn.Chain.Bin, "genesis", "gentx", keyName, "100000000000stake",
 		"--pubkey", pubKey,
 		"--keyring-backend", "test",
 		"--home", tn.NodeHome(),
@@ -662,7 +662,7 @@ func (tn *Node) Gentx(ctx context.Context, keyName, pubKey string) error {
 
 // CollectGentxs runs collect gentxs on the node's home folders
 func (tn *Node) CollectGentxs(ctx context.Context) error {
-	cmd := []string{tn.Chain.Bin, "collect-gentxs",
+	cmd := []string{tn.Chain.Bin, "genesis", "collect-gentxs",
 		"--home", tn.NodeHome(),
 	}
 	_, _, err := tn.Exec(ctx, cmd)
