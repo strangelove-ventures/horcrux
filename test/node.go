@@ -370,7 +370,7 @@ func (tn *Node) NodeHome() string {
 
 // Keybase returns the keyring for a given node
 func (tn *Node) Keybase() keyring.Keyring {
-	kr, err := keyring.New("", keyring.BackendTest, tn.Dir(), os.Stdin)
+	kr, err := keyring.New("", keyring.BackendTest, tn.Dir(), os.Stdin, tn.ec.Codec)
 	if err != nil {
 		panic(err)
 	}
@@ -791,7 +791,11 @@ func (tn *Node) Bech32AddressForKey(keyName string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	bech32Address, err := types.Bech32ifyAddressBytes(tn.Chain.Bech32Prefix, key.GetAddress())
+	addr, err := key.GetAddress()
+	if err != nil {
+		return "", err
+	}
+	bech32Address, err := types.Bech32ifyAddressBytes(tn.Chain.Bech32Prefix, addr)
 	if err != nil {
 		return "", err
 	}
@@ -862,7 +866,7 @@ func (tn *Node) NodeID() (string, error) {
 }
 
 // GetKey gets a key, waiting until it is available
-func (tn *Node) GetKey(name string) (info keyring.Info, err error) {
+func (tn *Node) GetKey(name string) (info *keyring.Record, err error) {
 	return info, retry.Do(func() (err error) {
 		info, err = tn.Keybase().Key(name)
 		return err
