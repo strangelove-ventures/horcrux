@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	cbftjson "github.com/cometbft/cometbft/libs/json"
+	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
 	"github.com/strangelove-ventures/horcrux/signer"
@@ -89,7 +89,7 @@ func StartSingleSignerContainers(
 		return err
 	}
 
-	pvFile, err := cbftjson.Marshal(pv)
+	pvFile, err := cometjson.Marshal(pv)
 	if err != nil {
 		return err
 	}

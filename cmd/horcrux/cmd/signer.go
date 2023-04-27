@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	cbftlog "github.com/cometbft/cometbft/libs/log"
-	cbftservice "github.com/cometbft/cometbft/libs/service"
+	cometlog "github.com/cometbft/cometbft/libs/log"
+	cometservice "github.com/cometbft/cometbft/libs/service"
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/signer"
 )
@@ -57,8 +57,8 @@ func startSignerCmd() *cobra.Command {
 
 			var (
 				// services to stop on shutdown
-				services []cbftservice.Service
-				logger   = cbftlog.NewTMLogger(cbftlog.NewSyncWriter(os.Stdout)).With("module", "validator")
+				services []cometservice.Service
+				logger   = cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)).With("module", "validator")
 			)
 
 			_, err = config.KeyFileExistsSingleSigner()

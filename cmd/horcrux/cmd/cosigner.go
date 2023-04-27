@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	cbftlog "github.com/cometbft/cometbft/libs/log"
-	cbftservice "github.com/cometbft/cometbft/libs/service"
+	cometlog "github.com/cometbft/cometbft/libs/log"
+	cometservice "github.com/cometbft/cometbft/libs/service"
 	"github.com/cosmos/cosmos-sdk/types/bech32"
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/signer"
@@ -119,8 +119,8 @@ func startCosignerCmd() *cobra.Command {
 
 			var (
 				// services to stop on shutdown
-				services []cbftservice.Service
-				logger   = cbftlog.NewTMLogger(cbftlog.NewSyncWriter(os.Stdout)).With("module", "validator")
+				services []cometservice.Service
+				logger   = cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)).With("module", "validator")
 			)
 
 			keyFile, err := config.KeyFileExistsCosigner()

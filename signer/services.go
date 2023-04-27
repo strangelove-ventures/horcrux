@@ -8,9 +8,9 @@ import (
 	"strings"
 	"syscall"
 
-	cbftlog "github.com/cometbft/cometbft/libs/log"
-	cbftos "github.com/cometbft/cometbft/libs/os"
-	cbftservice "github.com/cometbft/cometbft/libs/service"
+	cometlog "github.com/cometbft/cometbft/libs/log"
+	cometos "github.com/cometbft/cometbft/libs/os"
+	cometservice "github.com/cometbft/cometbft/libs/service"
 )
 
 func RequireNotRunning(pidFilePath string) error {
@@ -67,7 +67,7 @@ manual deletion of PID file required`, pidFilePath, pid)
 	return fmt.Errorf("unexpected error while signaling horcrux PID: %d", pid)
 }
 
-func WaitAndTerminate(logger cbftlog.Logger, services []cbftservice.Service, pidFilePath string) {
+func WaitAndTerminate(logger cometlog.Logger, services []cometservice.Service, pidFilePath string) {
 	done := make(chan struct{})
 
 	pidFile, err := os.OpenFile(pidFilePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
@@ -79,7 +79,7 @@ func WaitAndTerminate(logger cbftlog.Logger, services []cbftservice.Service, pid
 	if err != nil {
 		panic(fmt.Errorf("error writing to lock file: %s. %w", pidFilePath, err))
 	}
-	cbftos.TrapSignal(logger, func() {
+	cometos.TrapSignal(logger, func() {
 		if err := os.Remove(pidFilePath); err != nil {
 			fmt.Printf("Error removing lock file: %v\n", err)
 		}

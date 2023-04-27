@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	cbftcrypto "github.com/cometbft/cometbft/crypto"
-	cbftcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	cometcrypto "github.com/cometbft/cometbft/crypto"
+	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/privval"
 	"github.com/ory/dockertest"
 	"github.com/strangelove-ventures/horcrux/signer"
@@ -18,7 +18,7 @@ type Validator struct {
 	Signers       Signers
 	tl            Logger
 	Home          string
-	PubKey        cbftcrypto.PubKey
+	PubKey        cometcrypto.PubKey
 	PrivKeyShares []signer.CosignerKey
 	Threshold     int
 }
@@ -101,7 +101,7 @@ func (tv *Validator) Dir() string {
 
 // Generate Ed25519 Private Key
 func (tv *Validator) genPrivKeyAndShares() error {
-	privKey := cbftcryptoed25519.GenPrivKey()
+	privKey := cometcryptoed25519.GenPrivKey()
 	pubKey := privKey.PubKey()
 	filePVKey := privval.FilePVKey{
 		Address: pubKey.Address(),

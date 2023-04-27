@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	cbftcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	cbftproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	cbft "github.com/cometbft/cometbft/types"
+	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	comet "github.com/cometbft/cometbft/types"
 	"github.com/stretchr/testify/require"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
@@ -18,7 +18,7 @@ import (
 const testChainID = "test"
 
 func TestLocalCosignerGetID(t *testing.T) {
-	dummyPub := cbftcryptoed25519.PubKey{}
+	dummyPub := cometcryptoed25519.PubKey{}
 
 	bitSize := 4096
 	rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
@@ -66,7 +66,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		PublicKey: rsaKey2.PublicKey,
 	}}
 
-	privateKey := cbftcryptoed25519.GenPrivKey()
+	privateKey := cometcryptoed25519.GenPrivKey()
 
 	privKeyBytes := [64]byte{}
 	copy(privKeyBytes[:], privateKey[:])
@@ -151,13 +151,13 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	t.Logf("public keys: %x", publicKeys)
 	t.Logf("eph pub: %x", ephemeralPublic)
 	// pack a vote into sign bytes
-	var vote cbftproto.Vote
+	var vote cometproto.Vote
 	vote.Height = 1
 	vote.Round = 0
-	vote.Type = cbftproto.PrevoteType
+	vote.Type = cometproto.PrevoteType
 	vote.Timestamp = now
 
-	signBytes := cbft.VoteSignBytes("chain-id", &vote)
+	signBytes := comet.VoteSignBytes("chain-id", &vote)
 
 	sigRes1, err := cosigner1.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
 		ChainID:          testChainID,

@@ -5,32 +5,32 @@ import (
 	"net"
 	"time"
 
-	cbftcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	cbftcryptoencoding "github.com/cometbft/cometbft/crypto/encoding"
-	cbftlog "github.com/cometbft/cometbft/libs/log"
-	cbftnet "github.com/cometbft/cometbft/libs/net"
-	cbftservice "github.com/cometbft/cometbft/libs/service"
-	cbftp2pconn "github.com/cometbft/cometbft/p2p/conn"
-	cbftprotocrypto "github.com/cometbft/cometbft/proto/tendermint/crypto"
-	cbftprotoprivval "github.com/cometbft/cometbft/proto/tendermint/privval"
-	cbftproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	cbft "github.com/cometbft/cometbft/types"
+	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	cometcryptoencoding "github.com/cometbft/cometbft/crypto/encoding"
+	cometlog "github.com/cometbft/cometbft/libs/log"
+	cometnet "github.com/cometbft/cometbft/libs/net"
+	cometservice "github.com/cometbft/cometbft/libs/service"
+	cometp2pconn "github.com/cometbft/cometbft/p2p/conn"
+	cometprotocrypto "github.com/cometbft/cometbft/proto/tendermint/crypto"
+	cometprotoprivval "github.com/cometbft/cometbft/proto/tendermint/privval"
+	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	comet "github.com/cometbft/cometbft/types"
 )
 
 // PrivValidator is a wrapper for tendermint PrivValidator,
 // with additional Stop method for safe shutdown.
 type PrivValidator interface {
-	cbft.PrivValidator
+	comet.PrivValidator
 	Stop()
 }
 
 // ReconnRemoteSigner dials using its dialer and responds to any
 // signature requests using its privVal.
 type ReconnRemoteSigner struct {
-	cbftservice.BaseService
+	cometservice.BaseService
 
 	address string
-	privKey cbftcryptoed25519.PrivKey
+	privKey cometcryptoed25519.PrivKey
 	privVal PrivValidator
 
 	dialer net.Dialer
@@ -43,7 +43,7 @@ type ReconnRemoteSigner struct {
 // If the connection is broken, the ReconnRemoteSigner will attempt to reconnect.
 func NewReconnRemoteSigner(
 	address string,
-	logger cbftlog.Logger,
+	logger cometlog.Logger,
 	privVal PrivValidator,
 	dialer net.Dialer,
 ) *ReconnRemoteSigner {
@@ -51,10 +51,10 @@ func NewReconnRemoteSigner(
 		address: address,
 		privVal: privVal,
 		dialer:  dialer,
-		privKey: cbftcryptoed25519.GenPrivKey(),
+		privKey: cometcryptoed25519.GenPrivKey(),
 	}
 
-	rs.BaseService = *cbftservice.NewBaseService(logger, "RemoteSigner", rs)
+	rs.BaseService = *cometservice.NewBaseService(logger, "RemoteSigner", rs)
 	return rs
 }
 
@@ -83,7 +83,7 @@ func (rs *ReconnRemoteSigner) loop() {
 		}
 
 		for conn == nil {
-			proto, address := cbftnet.ProtocolAndAddress(rs.address)
+			proto, address := cometnet.ProtocolAndAddress(rs.address)
 			netConn, err := rs.dialer.Dial(proto, address)
 			if err != nil {
 				sentryConnectTries.Add(float64(1))
@@ -96,7 +96,7 @@ func (rs *ReconnRemoteSigner) loop() {
 			sentryConnectTries.Set(0)
 
 			rs.Logger.Info("Connected to Sentry", "address", rs.address)
-			conn, err = cbftp2pconn.MakeSecretConnection(netConn, rs.privKey)
+			conn, err = cometp2pconn.MakeSecretConnection(netConn, rs.privKey)
 			if err != nil {
 				conn = nil
 				rs.Logger.Error("Secret Conn", "err", err)
@@ -134,25 +134,25 @@ func (rs *ReconnRemoteSigner) loop() {
 	}
 }
 
-func (rs *ReconnRemoteSigner) handleRequest(req cbftprotoprivval.Message) cbftprotoprivval.Message {
+func (rs *ReconnRemoteSigner) handleRequest(req cometprotoprivval.Message) cometprotoprivval.Message {
 	switch typedReq := req.Sum.(type) {
-	case *cbftprotoprivval.Message_SignVoteRequest:
+	case *cometprotoprivval.Message_SignVoteRequest:
 		return rs.handleSignVoteRequest(typedReq.SignVoteRequest.ChainId, typedReq.SignVoteRequest.Vote)
-	case *cbftprotoprivval.Message_SignProposalRequest:
+	case *cometprotoprivval.Message_SignProposalRequest:
 		return rs.handleSignProposalRequest(typedReq.SignProposalRequest.ChainId, typedReq.SignProposalRequest.Proposal)
-	case *cbftprotoprivval.Message_PubKeyRequest:
+	case *cometprotoprivval.Message_PubKeyRequest:
 		return rs.handlePubKeyRequest(typedReq.PubKeyRequest.ChainId)
-	case *cbftprotoprivval.Message_PingRequest:
+	case *cometprotoprivval.Message_PingRequest:
 		return rs.handlePingRequest()
 	default:
 		rs.Logger.Error("Unknown request", "err", fmt.Errorf("%v", typedReq))
-		return cbftprotoprivval.Message{}
+		return cometprotoprivval.Message{}
 	}
 }
 
-func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *cbftproto.Vote) cbftprotoprivval.Message {
-	msgSum := &cbftprotoprivval.Message_SignedVoteResponse{SignedVoteResponse: &cbftprotoprivval.SignedVoteResponse{
-		Vote:  cbftproto.Vote{},
+func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *cometproto.Vote) cometprotoprivval.Message {
+	msgSum := &cometprotoprivval.Message_SignedVoteResponse{SignedVoteResponse: &cometprotoprivval.SignedVoteResponse{
+		Vote:  cometproto.Vote{},
 		Error: nil,
 	}}
 
@@ -184,7 +184,7 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *cbftpr
 			failedSignVote.Inc()
 		}
 		msgSum.SignedVoteResponse.Error = getRemoteSignerError(err)
-		return cbftprotoprivval.Message{Sum: msgSum}
+		return cometprotoprivval.Message{Sum: msgSum}
 	}
 	// Show signatures provided to each node have the same signature and timestamps
 	sigLen := 6
@@ -202,7 +202,7 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *cbftpr
 		"node", rs.address,
 	)
 
-	if vote.Type == cbftproto.PrecommitType {
+	if vote.Type == cometproto.PrecommitType {
 		stepSize := vote.Height - previousPrecommitHeight
 		if previousPrecommitHeight != 0 && stepSize > 1 {
 			missedPrecommits.Add(float64(stepSize))
@@ -218,7 +218,7 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *cbftpr
 		lastPrecommitRound.Set(float64(vote.Round))
 		totalPrecommitsSigned.Inc()
 	}
-	if vote.Type == cbftproto.PrevoteType {
+	if vote.Type == cometproto.PrevoteType {
 		// Determine number of heights since the last Prevote
 		stepSize := vote.Height - previousPrevoteHeight
 		if previousPrevoteHeight != 0 && stepSize > 1 {
@@ -238,16 +238,16 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *cbftpr
 	}
 
 	msgSum.SignedVoteResponse.Vote = *vote
-	return cbftprotoprivval.Message{Sum: msgSum}
+	return cometprotoprivval.Message{Sum: msgSum}
 }
 
 func (rs *ReconnRemoteSigner) handleSignProposalRequest(
 	chainID string,
-	proposal *cbftproto.Proposal,
-) cbftprotoprivval.Message {
-	msgSum := &cbftprotoprivval.Message_SignedProposalResponse{
-		SignedProposalResponse: &cbftprotoprivval.SignedProposalResponse{
-			Proposal: cbftproto.Proposal{},
+	proposal *cometproto.Proposal,
+) cometprotoprivval.Message {
+	msgSum := &cometprotoprivval.Message_SignedProposalResponse{
+		SignedProposalResponse: &cometprotoprivval.SignedProposalResponse{
+			Proposal: cometproto.Proposal{},
 			Error:    nil,
 		}}
 
@@ -276,7 +276,7 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(
 			)
 		}
 		msgSum.SignedProposalResponse.Error = getRemoteSignerError(err)
-		return cbftprotoprivval.Message{Sum: msgSum}
+		return cometprotoprivval.Message{Sum: msgSum}
 	}
 	// Show signatures provided to each node have the same signature and timestamps
 	sigLen := 6
@@ -297,13 +297,13 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(
 	lastProposalRound.Set(float64(proposal.Round))
 	totalProposalsSigned.Inc()
 	msgSum.SignedProposalResponse.Proposal = *proposal
-	return cbftprotoprivval.Message{Sum: msgSum}
+	return cometprotoprivval.Message{Sum: msgSum}
 }
 
-func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) cbftprotoprivval.Message {
+func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) cometprotoprivval.Message {
 	totalPubKeyRequests.Inc()
-	msgSum := &cbftprotoprivval.Message_PubKeyResponse{PubKeyResponse: &cbftprotoprivval.PubKeyResponse{
-		PubKey: cbftprotocrypto.PublicKey{},
+	msgSum := &cometprotoprivval.Message_PubKeyResponse{PubKeyResponse: &cometprotoprivval.PubKeyResponse{
+		PubKey: cometprotocrypto.PublicKey{},
 		Error:  nil,
 	}}
 
@@ -316,9 +316,9 @@ func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) cbftprotoprivv
 			"error", err,
 		)
 		msgSum.PubKeyResponse.Error = getRemoteSignerError(err)
-		return cbftprotoprivval.Message{Sum: msgSum}
+		return cometprotoprivval.Message{Sum: msgSum}
 	}
-	pk, err := cbftcryptoencoding.PubKeyToProto(pubKey)
+	pk, err := cometcryptoencoding.PubKeyToProto(pubKey)
 	if err != nil {
 		rs.Logger.Error(
 			"Failed to get Pub Key",
@@ -327,36 +327,36 @@ func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) cbftprotoprivv
 			"error", err,
 		)
 		msgSum.PubKeyResponse.Error = getRemoteSignerError(err)
-		return cbftprotoprivval.Message{Sum: msgSum}
+		return cometprotoprivval.Message{Sum: msgSum}
 	}
 	msgSum.PubKeyResponse.PubKey = pk
-	return cbftprotoprivval.Message{Sum: msgSum}
+	return cometprotoprivval.Message{Sum: msgSum}
 }
 
-func (rs *ReconnRemoteSigner) handlePingRequest() cbftprotoprivval.Message {
-	return cbftprotoprivval.Message{
-		Sum: &cbftprotoprivval.Message_PingResponse{
-			PingResponse: &cbftprotoprivval.PingResponse{},
+func (rs *ReconnRemoteSigner) handlePingRequest() cometprotoprivval.Message {
+	return cometprotoprivval.Message{
+		Sum: &cometprotoprivval.Message_PingResponse{
+			PingResponse: &cometprotoprivval.PingResponse{},
 		},
 	}
 }
 
-func getRemoteSignerError(err error) *cbftprotoprivval.RemoteSignerError {
+func getRemoteSignerError(err error) *cometprotoprivval.RemoteSignerError {
 	if err == nil {
 		return nil
 	}
-	return &cbftprotoprivval.RemoteSignerError{
+	return &cometprotoprivval.RemoteSignerError{
 		Code:        0,
 		Description: err.Error(),
 	}
 }
 
 func StartRemoteSigners(
-	services []cbftservice.Service,
-	logger cbftlog.Logger,
+	services []cometservice.Service,
+	logger cometlog.Logger,
 	privVal PrivValidator,
 	nodes []string,
-) ([]cbftservice.Service, error) {
+) ([]cometservice.Service, error) {
 	var err error
 	go StartMetrics()
 	for _, node := range nodes {

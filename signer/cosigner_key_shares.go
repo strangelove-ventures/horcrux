@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"os"
 
-	cbftjson "github.com/cometbft/cometbft/libs/json"
+	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/cometbft/cometbft/privval"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
@@ -45,7 +45,7 @@ func ReadPrivValidatorFile(priv string) (out privval.FilePVKey, err error) {
 	if bz, err = os.ReadFile(priv); err != nil {
 		return
 	}
-	if err = cbftjson.Unmarshal(bz, &out); err != nil {
+	if err = cometjson.Unmarshal(bz, &out); err != nil {
 		return
 	}
 	return

@@ -3,19 +3,19 @@ package signer
 import (
 	"testing"
 
-	cbftproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	cbft "github.com/cometbft/cometbft/types"
+	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	comet "github.com/cometbft/cometbft/types"
 	"github.com/stretchr/testify/require"
 )
 
 func TestUnpackHRSPrevote(t *testing.T) {
-	vote := cbftproto.Vote{
+	vote := cometproto.Vote{
 		Height: 1,
 		Round:  2,
-		Type:   cbftproto.PrevoteType,
+		Type:   cometproto.PrevoteType,
 	}
 
-	signBytes := cbft.VoteSignBytes("chain-id", &vote)
+	signBytes := comet.VoteSignBytes("chain-id", &vote)
 
 	hrs, err := UnpackHRST(signBytes)
 	require.NoError(t, err)
@@ -25,13 +25,13 @@ func TestUnpackHRSPrevote(t *testing.T) {
 }
 
 func TestUnpackHRSPrecommit(t *testing.T) {
-	vote := cbftproto.Vote{
+	vote := cometproto.Vote{
 		Height: 3,
 		Round:  2,
-		Type:   cbftproto.PrecommitType,
+		Type:   cometproto.PrecommitType,
 	}
 
-	signBytes := cbft.VoteSignBytes("chain-id", &vote)
+	signBytes := comet.VoteSignBytes("chain-id", &vote)
 
 	hrs, err := UnpackHRST(signBytes)
 	require.NoError(t, err)
@@ -41,13 +41,13 @@ func TestUnpackHRSPrecommit(t *testing.T) {
 }
 
 func TestUnpackHRSProposal(t *testing.T) {
-	proposal := cbftproto.Proposal{
+	proposal := cometproto.Proposal{
 		Height: 1,
 		Round:  2,
-		Type:   cbftproto.ProposalType,
+		Type:   cometproto.ProposalType,
 	}
 
-	signBytes := cbft.ProposalSignBytes("chain-id", &proposal)
+	signBytes := comet.ProposalSignBytes("chain-id", &proposal)
 
 	hrs, err := UnpackHRST(signBytes)
 	require.NoError(t, err)

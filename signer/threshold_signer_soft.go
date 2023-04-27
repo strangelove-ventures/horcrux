@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"sync"
 
-	cbftcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	cbftjson "github.com/cometbft/cometbft/libs/json"
+	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	cometjson "github.com/cometbft/cometbft/libs/json"
 	"gitlab.com/unit410/edwards25519"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
@@ -42,7 +42,7 @@ func NewThresholdSignerSoft(key CosignerKey, threshold, total uint8) ThresholdSi
 
 	// cache the public key bytes for signing operations.
 	// Ensures casting else it will naturally panic.
-	ed25519Key := softSigner.key.PubKey.(cbftcryptoed25519.PubKey)
+	ed25519Key := softSigner.key.PubKey.(cometcryptoed25519.PubKey)
 	softSigner.pubKeyBytes = make([]byte, len(ed25519Key))
 	softSigner.pubKeyBytes = ed25519Key[:]
 
@@ -261,7 +261,7 @@ func (softSigner *ThresholdSignerSoft) GetEphemeralSecretPart(
 	// sign the response payload with our private key
 	// cosigners can verify the signature to confirm sender validity
 
-	jsonBytes, err := cbftjson.Marshal(res)
+	jsonBytes, err := cometjson.Marshal(res)
 
 	if err != nil {
 		return res, err
@@ -299,7 +299,7 @@ func (softSigner *ThresholdSignerSoft) SetEphemeralSecretPart(
 		// SourceSig:                      []byte{},
 	}
 
-	digestBytes, err := cbftjson.Marshal(digestMsg)
+	digestBytes, err := cometjson.Marshal(digestMsg)
 	if err != nil {
 		return err
 	}

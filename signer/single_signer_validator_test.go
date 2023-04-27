@@ -7,13 +7,13 @@ import (
 	"os"
 	"testing"
 
-	cbftcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/crypto/tmhash"
-	cbftjson "github.com/cometbft/cometbft/libs/json"
-	cbftrand "github.com/cometbft/cometbft/libs/rand"
-	cbftprivval "github.com/cometbft/cometbft/privval"
-	cbftproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	cbft "github.com/cometbft/cometbft/types"
+	cometjson "github.com/cometbft/cometbft/libs/json"
+	cometrand "github.com/cometbft/cometbft/libs/rand"
+	cometprivval "github.com/cometbft/cometbft/privval"
+	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	comet "github.com/cometbft/cometbft/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -30,9 +30,9 @@ func TestSingleSignerValidator(t *testing.T) {
 		StateDir: filepath.Join(tmpDir, "state"),
 	}
 
-	privateKey := cbftcryptoed25519.GenPrivKey()
+	privateKey := cometcryptoed25519.GenPrivKey()
 
-	marshaled, err := cbftjson.Marshal(cbftprivval.FilePVKey{
+	marshaled, err := cometjson.Marshal(cometprivval.FilePVKey{
 		Address: privateKey.PubKey().Address(),
 		PubKey:  privateKey.PubKey(),
 		PrivKey: privateKey,
@@ -45,23 +45,23 @@ func TestSingleSignerValidator(t *testing.T) {
 	validator, err := NewSingleSignerValidator(runtimeConfig)
 	require.NoError(t, err)
 
-	proposal := cbftproto.Proposal{
+	proposal := cometproto.Proposal{
 		Height: 1,
 		Round:  20,
-		Type:   cbftproto.ProposalType,
+		Type:   cometproto.ProposalType,
 	}
 
-	signBytes := cbft.ProposalSignBytes(testChainID, &proposal)
+	signBytes := comet.ProposalSignBytes(testChainID, &proposal)
 
 	err = validator.SignProposal(testChainID, &proposal)
 	require.NoError(t, err)
 
 	require.True(t, privateKey.PubKey().VerifySignature(signBytes, proposal.Signature))
 
-	proposal = cbftproto.Proposal{
+	proposal = cometproto.Proposal{
 		Height:    1,
 		Round:     20,
-		Type:      cbftproto.ProposalType,
+		Type:      cometproto.ProposalType,
 		Timestamp: time.Now(),
 	}
 
@@ -70,14 +70,14 @@ func TestSingleSignerValidator(t *testing.T) {
 	require.NoError(t, err)
 
 	// construct different block ID for proposal at same height as highest signed
-	randHash := cbftrand.Bytes(tmhash.Size)
-	blockID := cbftproto.BlockID{Hash: randHash,
-		PartSetHeader: cbftproto.PartSetHeader{Total: 5, Hash: randHash}}
+	randHash := cometrand.Bytes(tmhash.Size)
+	blockID := cometproto.BlockID{Hash: randHash,
+		PartSetHeader: cometproto.PartSetHeader{Total: 5, Hash: randHash}}
 
-	proposal = cbftproto.Proposal{
+	proposal = cometproto.Proposal{
 		Height:  1,
 		Round:   20,
-		Type:    cbftproto.ProposalType,
+		Type:    cometproto.ProposalType,
 		BlockID: blockID,
 	}
 
@@ -85,10 +85,10 @@ func TestSingleSignerValidator(t *testing.T) {
 	err = validator.SignProposal(testChainID, &proposal)
 	require.Error(t, err, "double sign!")
 
-	proposal = cbftproto.Proposal{
+	proposal = cometproto.Proposal{
 		Height: 1,
 		Round:  19,
-		Type:   cbftproto.ProposalType,
+		Type:   cometproto.ProposalType,
 	}
 
 	// should not be able to sign lower than highest signed
@@ -106,10 +106,10 @@ func TestSingleSignerValidator(t *testing.T) {
 	err = validator.SignProposal(testChainID, &proposal)
 	require.Error(t, err, "double sign!")
 
-	proposal = cbftproto.Proposal{
+	proposal = cometproto.Proposal{
 		Height: 1,
 		Round:  21,
-		Type:   cbftproto.ProposalType,
+		Type:   cometproto.ProposalType,
 	}
 
 	// signing higher block now should succeed
