@@ -73,7 +73,7 @@ func TestValidateSingleSignerConfig(t *testing.T) {
 			require.NoError(t, err, tc.name)
 		} else {
 			require.Error(t, err, tc.name)
-			require.Equal(t, tc.expectErr, err, tc.name)
+			require.EqualError(t, err, tc.expectErr.Error(), tc.name)
 		}
 	}
 }
@@ -293,7 +293,7 @@ func TestValidateCosignerConfig(t *testing.T) {
 			require.NoError(t, err, tc.name)
 		} else {
 			require.Error(t, err, tc.name)
-			require.Equal(t, tc.expectErr, err, tc.name)
+			require.EqualError(t, err, tc.expectErr.Error(), tc.name)
 		}
 	}
 }
@@ -528,7 +528,7 @@ func TestCosignerPeersConfigValidate(t *testing.T) {
 			require.NoError(t, err, tc.name)
 		} else {
 			require.Error(t, err, tc.name)
-			require.Equal(t, tc.expectErr, err, tc.name)
+			require.EqualError(t, err, tc.expectErr.Error(), tc.name)
 		}
 	}
 }
@@ -570,7 +570,7 @@ func TestPeersFromFlag(t *testing.T) {
 			require.NoError(t, err, tc.name)
 		} else {
 			require.Error(t, err, tc.name)
-			require.Equal(t, tc.expectErr, err, tc.name)
+			require.EqualError(t, err, tc.expectErr.Error(), tc.name)
 		}
 	}
 }
