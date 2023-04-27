@@ -34,14 +34,43 @@ func mockHorcruxChildProcess(pidFilePath string) {
 	)
 }
 
+func waitForFileToExist(file string, timeout time.Duration) error {
+	exp := time.After(timeout)
+	tick := time.Tick(20 * time.Millisecond)
+	for {
+		select {
+		case <-exp:
+			return fmt.Errorf("timed out")
+		case <-tick:
+			if _, err := os.Stat(file); err != nil {
+				if os.IsNotExist(err) {
+					// file does not exist yet
+					continue
+				} else {
+					// unexpected error
+					return err
+				}
+			}
+			// file exists
+			return nil
+		}
+	}
+}
+
 func TestIsRunning(t *testing.T) {
+	t.Parallel()
+
 	homeDir := t.TempDir()
 	pidFilePath := filepath.Join(homeDir, "horcrux.pid")
 
+	// github.com/kraken-hpc/go-fork package used (in tests only) to create a new pid with args[0] of horcrux.
+	// This lets us mock a horcrux process to test the "horcrux is already running" case.
 	err := fork.Fork("child", pidFilePath)
 	require.NoError(t, err)
 
-	time.Sleep(time.Second * 1)
+	// wait for child process to start and write pidFilePath
+	err = waitForFileToExist(pidFilePath, 1*time.Second)
+	require.NoError(t, err)
 
 	pidBz, err := os.ReadFile(pidFilePath)
 	require.NoError(t, err)

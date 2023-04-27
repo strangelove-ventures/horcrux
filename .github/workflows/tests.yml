@@ -21,7 +21,7 @@ jobs:
       - name: Set up Go 1.20
         uses: actions/setup-go@v4
         with:
-          go-version: 1.20.3
+          go-version: '^1.20.0'
 
       # checkout horcrux
       - name: checkout horcrux
