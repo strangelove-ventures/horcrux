@@ -1,6 +1,6 @@
 module github.com/strangelove-ventures/horcrux
 
-go 1.19
+go 1.20
 
 require (
 	github.com/Jille/grpc-multi-resolver v1.1.0
@@ -15,6 +15,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/hashicorp/raft v1.3.10
 	github.com/hashicorp/raft-boltdb/v2 v2.2.2
+	github.com/kraken-hpc/go-fork v0.1.1
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/ory/dockertest v3.3.5+incompatible
 	github.com/prometheus/client_golang v1.14.0
