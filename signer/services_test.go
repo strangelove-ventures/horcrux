@@ -46,10 +46,9 @@ func waitForFileToExist(file string, timeout time.Duration) error {
 				if os.IsNotExist(err) {
 					// file does not exist yet
 					continue
-				} else {
-					// unexpected error
-					return err
 				}
+				// unexpected error
+				return err
 			}
 			// file exists
 			return nil
@@ -58,8 +57,6 @@ func waitForFileToExist(file string, timeout time.Duration) error {
 }
 
 func TestIsRunning(t *testing.T) {
-	t.Parallel()
-
 	homeDir := t.TempDir()
 	pidFilePath := filepath.Join(homeDir, "horcrux.pid")
 
