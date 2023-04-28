@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
+	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
 	"github.com/strangelove-ventures/horcrux/signer"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
-	tmjson "github.com/tendermint/tendermint/libs/json"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -89,7 +89,7 @@ func StartSingleSignerContainers(
 		return err
 	}
 
-	pvFile, err := tmjson.Marshal(pv)
+	pvFile, err := cometjson.Marshal(pv)
 	if err != nil {
 		return err
 	}

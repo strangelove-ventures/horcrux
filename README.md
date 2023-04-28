@@ -1,6 +1,6 @@
 # Horcrux
 
-Horcrux is a [multi-party-computation (MPC)](https://en.wikipedia.org/wiki/Secure_multi-party_computation) signing service for Tendermint nodes
+Horcrux is a [multi-party-computation (MPC)](https://en.wikipedia.org/wiki/Secure_multi-party_computation) signing service for CometBFT (Formerly known as Tendermint) nodes
 
 ## Why use Horcrux?
 
@@ -12,7 +12,7 @@ Take your validator infrastructure to the next level of security and availabilit
 
 ## Design
 
-Validator operators for tendermint chains balance operational and risk tradeoffs to avoid penalties via slashing for liveliness faults or double signing blocks.
+Validator operators balance operational and risk tradeoffs to avoid penalties via slashing for liveliness faults or double signing blocks.
 
 Traditional high-availability systems where the keys exist on hot spares risk double signing if there are failover detection bugs. Low-availability systems, or manual failover, risk downtime if manual intervention cannot respond in a timely manner.
 
@@ -54,7 +54,7 @@ software or this license, under any kind of legal claim.
 
 ## References
 
-- [Tendermint Validator Documentation](https://docs.tendermint.com/master/tendermint-core/validators.html)
+- [CometBFT Validator Documentation](https://docs.cometbft.com/main/core/validators)
 - [Cosmos Hub Validator Documentation](https://hub.cosmos.network/master/validators/overview.html)
 - [Provably Secure Distributed Schnorr Signatures and a (t, n) Threshold Scheme for Implicit Certificates](http://cacr.uwaterloo.ca/techreports/2001/corr2001-13.ps)
 

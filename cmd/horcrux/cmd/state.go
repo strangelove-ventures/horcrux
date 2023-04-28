@@ -12,10 +12,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/signer"
 
-	tmjson "github.com/tendermint/tendermint/libs/json"
+	cometjson "github.com/cometbft/cometbft/libs/json"
 )
 
-// Snippet Taken from https://raw.githubusercontent.com/tendermint/tendermint/main/privval/file.go
+// Snippet Taken from https://raw.githubusercontent.com/cometbft/cometbft/main/privval/file.go
 // FilePVLastSignState stores the mutable part of PrivValidator.
 type FilePVLastSignState struct {
 	Height int64 `json:"height"`
@@ -187,7 +187,7 @@ func importStateCmd() *cobra.Command {
 
 			pvState := &FilePVLastSignState{}
 
-			err = tmjson.Unmarshal([]byte(finalJSON), &pvState)
+			err = cometjson.Unmarshal([]byte(finalJSON), &pvState)
 			if err != nil {
 				fmt.Println("Error parsing priv_validator_state.json")
 				return err

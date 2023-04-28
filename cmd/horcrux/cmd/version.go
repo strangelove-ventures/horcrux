@@ -32,16 +32,16 @@ var (
 	// sdk version
 	SDKVersion = ""
 	// tendermint version
-	TMVersion = ""
+	CBFTVersion = ""
 )
 
 // Info defines the application version information.
 type Info struct {
-	Version           string `json:"version" yaml:"version"`
-	GitCommit         string `json:"commit" yaml:"commit"`
-	GoVersion         string `json:"go_version" yaml:"go_version"`
-	CosmosSdkVersion  string `json:"cosmos_sdk_version" yaml:"cosmos_sdk_version"`
-	TendermintVersion string `json:"tendermint_version" yaml:"tendermint_version"`
+	Version          string `json:"version" yaml:"version"`
+	GitCommit        string `json:"commit" yaml:"commit"`
+	GoVersion        string `json:"go_version" yaml:"go_version"`
+	CosmosSdkVersion string `json:"cosmos_sdk_version" yaml:"cosmos_sdk_version"`
+	CometBFTVersion  string `json:"cometbft_version" yaml:"cometbft_version"`
 }
 
 func NewInfo() Info {
@@ -54,11 +54,11 @@ func NewInfo() Info {
 	}
 
 	return Info{
-		Version:           Version,
-		GitCommit:         Commit,
-		GoVersion:         fmt.Sprintf("%s %s/%s", runtime.Version(), runtime.GOOS, runtime.GOARCH),
-		CosmosSdkVersion:  dependencyVersions["github.com/cosmos/cosmos-sdk"],
-		TendermintVersion: dependencyVersions["github.com/tendermint/tendermint"],
+		Version:          Version,
+		GitCommit:        Commit,
+		GoVersion:        fmt.Sprintf("%s %s/%s", runtime.Version(), runtime.GOOS, runtime.GOARCH),
+		CosmosSdkVersion: dependencyVersions["github.com/cosmos/cosmos-sdk"],
+		CometBFTVersion:  dependencyVersions["github.com/cometbft/cometbft"],
 	}
 }
 

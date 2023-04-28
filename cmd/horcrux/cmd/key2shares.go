@@ -19,9 +19,9 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/cometbft/cometbft/libs/os"
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/signer"
-	"github.com/tendermint/tendermint/libs/os"
 )
 
 // CreateCosignerSharesCmd is a cobra command for creating cosigner shares from a priv validator

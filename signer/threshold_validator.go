@@ -7,13 +7,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cometbft/cometbft/crypto"
+	"github.com/cometbft/cometbft/libs/log"
+	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	cometrpcjsontypes "github.com/cometbft/cometbft/rpc/jsonrpc/types"
+	comet "github.com/cometbft/cometbft/types"
 	"github.com/hashicorp/raft"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
-	"github.com/tendermint/tendermint/crypto"
-	"github.com/tendermint/tendermint/libs/log"
-	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
-	tmrpcjsontypes "github.com/tendermint/tendermint/rpc/jsonrpc/types"
-	tm "github.com/tendermint/tendermint/types"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
@@ -116,13 +116,13 @@ func (pv *ThresholdValidator) GetPubKey() (crypto.PubKey, error) {
 
 // SignVote signs a canonical representation of the vote, along with the
 // chainID. Implements PrivValidator.
-func (pv *ThresholdValidator) SignVote(chainID string, vote *tmproto.Vote) error {
+func (pv *ThresholdValidator) SignVote(chainID string, vote *cometproto.Vote) error {
 	block := &Block{
 		Height:    vote.Height,
 		Round:     int64(vote.Round),
 		Step:      VoteToStep(vote),
 		Timestamp: vote.Timestamp,
-		SignBytes: tm.VoteSignBytes(chainID, vote),
+		SignBytes: comet.VoteSignBytes(chainID, vote),
 	}
 	sig, stamp, err := pv.SignBlock(chainID, block)
 
@@ -134,13 +134,13 @@ func (pv *ThresholdValidator) SignVote(chainID string, vote *tmproto.Vote) error
 
 // SignProposal signs a canonical representation of the proposal, along with
 // the chainID. Implements PrivValidator.
-func (pv *ThresholdValidator) SignProposal(chainID string, proposal *tmproto.Proposal) error {
+func (pv *ThresholdValidator) SignProposal(chainID string, proposal *cometproto.Proposal) error {
 	block := &Block{
 		Height:    proposal.Height,
 		Round:     int64(proposal.Round),
 		Step:      ProposalToStep(proposal),
 		Timestamp: proposal.Timestamp,
-		SignBytes: tm.ProposalSignBytes(chainID, proposal),
+		SignBytes: comet.ProposalSignBytes(chainID, proposal),
 	}
 	sig, stamp, err := pv.SignBlock(chainID, block)
 
@@ -401,8 +401,8 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 			Block:   block,
 		})
 		if err != nil {
-			if _, ok := err.(*tmrpcjsontypes.RPCError); ok {
-				rpcErrUnwrapped := err.(*tmrpcjsontypes.RPCError).Data
+			if _, ok := err.(*cometrpcjsontypes.RPCError); ok {
+				rpcErrUnwrapped := err.(*cometrpcjsontypes.RPCError).Data
 				// Need to return BeyondBlockError after proxy since the error type will be lost over RPC
 				if len(rpcErrUnwrapped) > 33 && rpcErrUnwrapped[:33] == "Progress already started on block" {
 					return nil, stamp, &BeyondBlockError{msg: rpcErrUnwrapped}
