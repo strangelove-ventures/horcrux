@@ -6,20 +6,20 @@ import (
 	"encoding/json"
 	"os"
 
+	cometcrypto "github.com/cometbft/cometbft/crypto"
+	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	cometcryptoencoding "github.com/cometbft/cometbft/crypto/encoding"
+	cometprotocrypto "github.com/cometbft/cometbft/proto/tendermint/crypto"
 	amino "github.com/tendermint/go-amino"
-	tmcrypto "github.com/tendermint/tendermint/crypto"
-	tmcryptoed25519 "github.com/tendermint/tendermint/crypto/ed25519"
-	tmcryptoencoding "github.com/tendermint/tendermint/crypto/encoding"
-	tmprotocrypto "github.com/tendermint/tendermint/proto/tendermint/crypto"
 )
 
 // CosignerKey is a single key for an m-of-n threshold signer.
 type CosignerKey struct {
-	PubKey       tmcrypto.PubKey  `json:"pub_key"`
-	ShareKey     []byte           `json:"secret_share"`
-	RSAKey       rsa.PrivateKey   `json:"rsa_key"`
-	ID           int              `json:"id"`
-	CosignerKeys []*rsa.PublicKey `json:"rsa_pubs"`
+	PubKey       cometcrypto.PubKey `json:"pub_key"`
+	ShareKey     []byte             `json:"secret_share"`
+	RSAKey       rsa.PrivateKey     `json:"rsa_key"`
+	ID           int                `json:"id"`
+	CosignerKeys []*rsa.PublicKey   `json:"rsa_pubs"`
 }
 
 func (cosignerKey *CosignerKey) MarshalJSON() ([]byte, error) {
@@ -33,7 +33,7 @@ func (cosignerKey *CosignerKey) MarshalJSON() ([]byte, error) {
 		rsaPubKeysBytes = append(rsaPubKeysBytes, publicBytes)
 	}
 
-	protoPubkey, err := tmcryptoencoding.PubKeyToProto(cosignerKey.PubKey)
+	protoPubkey, err := cometcryptoencoding.PubKeyToProto(cosignerKey.PubKey)
 	if err != nil {
 		return nil, err
 	}
@@ -75,8 +75,8 @@ func (cosignerKey *CosignerKey) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	var pubkey tmcrypto.PubKey
-	var protoPubkey tmprotocrypto.PublicKey
+	var pubkey cometcrypto.PubKey
+	var protoPubkey cometprotocrypto.PublicKey
 	err = protoPubkey.Unmarshal(aux.PubkeyBytes)
 
 	// Prior to the tendermint protobuf migration, the public key bytes in key files
@@ -86,17 +86,17 @@ func (cosignerKey *CosignerKey) UnmarshalJSON(data []byte) error {
 	// To support reading the public key bytes from these key files, we fallback to
 	// amino unmarshalling if the protobuf unmarshalling fails
 	if err != nil {
-		var pub tmcryptoed25519.PubKey
+		var pub cometcryptoed25519.PubKey
 		codec := amino.NewCodec()
-		codec.RegisterInterface((*tmcrypto.PubKey)(nil), nil)
-		codec.RegisterConcrete(tmcryptoed25519.PubKey{}, "tendermint/PubKeyEd25519", nil)
+		codec.RegisterInterface((*cometcrypto.PubKey)(nil), nil)
+		codec.RegisterConcrete(cometcryptoed25519.PubKey{}, "tendermint/PubKeyEd25519", nil)
 		errInner := codec.UnmarshalBinaryBare(aux.PubkeyBytes, &pub)
 		if errInner != nil {
 			return err
 		}
 		pubkey = pub
 	} else {
-		pubkey, err = tmcryptoencoding.PubKeyFromProto(protoPubkey)
+		pubkey, err = cometcryptoencoding.PubKeyFromProto(protoPubkey)
 		if err != nil {
 			return err
 		}

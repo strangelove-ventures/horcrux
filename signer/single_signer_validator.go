@@ -5,10 +5,10 @@ import (
 	"os"
 	"sync"
 
-	tmcrypto "github.com/tendermint/tendermint/crypto"
-	tmjson "github.com/tendermint/tendermint/libs/json"
-	tmprivval "github.com/tendermint/tendermint/privval"
-	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
+	cometcrypto "github.com/cometbft/cometbft/crypto"
+	cometjson "github.com/cometbft/cometbft/libs/json"
+	cometprivval "github.com/cometbft/cometbft/privval"
+	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 )
 
 var _ PrivValidator = &SingleSignerValidator{}
@@ -18,12 +18,12 @@ var _ PrivValidator = &SingleSignerValidator{}
 type SingleSignerValidator struct {
 	config     *RuntimeConfig
 	chainState sync.Map
-	pubKey     tmcrypto.PubKey
+	pubKey     cometcrypto.PubKey
 }
 
 // SingleSignerChainState holds the priv validator and associated mutex for a single chain.
 type SingleSignerChainState struct {
-	filePV *tmprivval.FilePV
+	filePV *cometprivval.FilePV
 
 	// The filePV does not have any locking internally for signing operations.
 	// The high-watermark/last-signed-state within the FilePV prevents double sign
@@ -52,8 +52,8 @@ func (pv *SingleSignerValidator) loadPubKey() error {
 	if err != nil {
 		return err
 	}
-	pvKey := tmprivval.FilePVKey{}
-	err = tmjson.Unmarshal(keyJSONBytes, &pvKey)
+	pvKey := cometprivval.FilePVKey{}
+	err = cometjson.Unmarshal(keyJSONBytes, &pvKey)
 	if err != nil {
 		return err
 	}
@@ -64,12 +64,12 @@ func (pv *SingleSignerValidator) loadPubKey() error {
 }
 
 // GetPubKey implements types.PrivValidator
-func (pv *SingleSignerValidator) GetPubKey() (tmcrypto.PubKey, error) {
+func (pv *SingleSignerValidator) GetPubKey() (cometcrypto.PubKey, error) {
 	return pv.pubKey, nil
 }
 
 // SignVote implements types.PrivValidator
-func (pv *SingleSignerValidator) SignVote(chainID string, vote *tmproto.Vote) error {
+func (pv *SingleSignerValidator) SignVote(chainID string, vote *cometproto.Vote) error {
 	chainState, err := pv.loadChainStateIfNecessary(chainID)
 	if err != nil {
 		return err
@@ -80,7 +80,7 @@ func (pv *SingleSignerValidator) SignVote(chainID string, vote *tmproto.Vote) er
 }
 
 // SignProposal implements types.PrivValidator
-func (pv *SingleSignerValidator) SignProposal(chainID string, proposal *tmproto.Proposal) error {
+func (pv *SingleSignerValidator) SignProposal(chainID string, proposal *cometproto.Proposal) error {
 	chainState, err := pv.loadChainStateIfNecessary(chainID)
 	if err != nil {
 		return err
@@ -98,16 +98,16 @@ func (pv *SingleSignerValidator) loadChainStateIfNecessary(chainID string) (*Sin
 
 	keyFile := pv.config.KeyFilePathSingleSigner()
 	stateFile := pv.config.PrivValStateFile(chainID)
-	var filePV *tmprivval.FilePV
+	var filePV *cometprivval.FilePV
 	if _, err := os.Stat(stateFile); err != nil {
 		if !os.IsNotExist(err) {
 			panic(fmt.Errorf("failed to load state file (%s) - %w", stateFile, err))
 		}
 		// The only scenario in which we want to create a new state file
 		// on disk is when the state file does not exist.
-		filePV = tmprivval.LoadFilePVEmptyState(keyFile, stateFile)
+		filePV = cometprivval.LoadFilePVEmptyState(keyFile, stateFile)
 	} else {
-		filePV = tmprivval.LoadFilePV(keyFile, stateFile)
+		filePV = cometprivval.LoadFilePV(keyFile, stateFile)
 	}
 
 	chainState := &SingleSignerChainState{

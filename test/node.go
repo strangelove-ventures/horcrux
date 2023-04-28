@@ -20,24 +20,23 @@ import (
 	"time"
 
 	"github.com/avast/retry-go"
+	cometconfig "github.com/cometbft/cometbft/config"
+	cometbytes "github.com/cometbft/cometbft/libs/bytes"
+	"github.com/cometbft/cometbft/p2p"
+	"github.com/cometbft/cometbft/privval"
+	cometrpcclient "github.com/cometbft/cometbft/rpc/client"
+	cometrpchttp "github.com/cometbft/cometbft/rpc/client/http"
+	cometrpctypes "github.com/cometbft/cometbft/rpc/core/types"
+	cometrpcjsonclient "github.com/cometbft/cometbft/rpc/jsonrpc/client"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
-	"github.com/cosmos/cosmos-sdk/simapp"
-	"github.com/cosmos/cosmos-sdk/simapp/params"
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/bech32"
+	"github.com/cosmos/cosmos-sdk/types/module/testutil"
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
 	"github.com/strangelove-ventures/horcrux/signer"
-	tmconfig "github.com/tendermint/tendermint/config"
-	tmbytes "github.com/tendermint/tendermint/libs/bytes"
-	"github.com/tendermint/tendermint/p2p"
-	"github.com/tendermint/tendermint/privval"
-	tmrpcclient "github.com/tendermint/tendermint/rpc/client"
-	tmrpchttp "github.com/tendermint/tendermint/rpc/client/http"
-	tmrpctypes "github.com/tendermint/tendermint/rpc/core/types"
-	tmrpcjsonclient "github.com/tendermint/tendermint/rpc/jsonrpc/client"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -159,10 +158,10 @@ type Node struct {
 	Validator      bool
 	Pool           *dockertest.Pool
 	networkID      string
-	Client         tmrpcclient.Client
+	Client         cometrpcclient.Client
 	Container      *docker.Container
 	tl             Logger
-	ec             params.EncodingConfig
+	ec             testutil.TestEncodingConfig
 }
 
 type ContainerPort struct {
@@ -206,7 +205,7 @@ func MakeNodes(
 	}
 	for i := 0; i < count; i++ {
 		tn := &Node{Home: home, Index: i, ValidatorIndex: validatorIndex, Chain: chainType, ChainID: chainID,
-			Pool: pool, networkID: networkID, tl: tl, ec: simapp.MakeTestEncodingConfig()}
+			Pool: pool, networkID: networkID, tl: tl, ec: testutil.MakeTestEncodingConfig()}
 		tn.MkDir()
 		out = append(out, tn)
 	}
@@ -238,13 +237,13 @@ func GetAllNodes(nodes ...Nodes) (out Nodes) {
 
 // NewClient creates and assigns a new Tendermint RPC client to the Node
 func (tn *Node) NewClient(addr string) error {
-	httpClient, err := tmrpcjsonclient.DefaultHTTPClient(addr)
+	httpClient, err := cometrpcjsonclient.DefaultHTTPClient(addr)
 	if err != nil {
 		return err
 	}
 
 	httpClient.Timeout = 10 * time.Second
-	rpcClient, err := tmrpchttp.NewWithClient(addr, "/websocket", httpClient)
+	rpcClient, err := cometrpchttp.NewWithClient(addr, "/websocket", httpClient)
 	if err != nil {
 		return err
 	}
@@ -356,22 +355,22 @@ func (tn *Node) GenesisFilePath() string {
 	return filepath.Join(tn.Dir(), "config", "genesis.json")
 }
 
-func (tn *Node) TMConfigPath() string {
+func (tn *Node) cometBFTConfigPath() string {
 	return filepath.Join(tn.Dir(), "config", "config.toml")
 }
 
 // Bind returns the home folder bind point for running the node
 func (tn *Node) Bind() []string {
-	return []string{fmt.Sprintf("%s:/home/.%s", tn.Dir(), tn.Chain.Bin)}
+	return []string{fmt.Sprintf("%s:/.simapp", tn.Dir())}
 }
 
 func (tn *Node) NodeHome() string {
-	return fmt.Sprintf("/home/.%s", tn.Chain.Bin)
+	return "/.simapp"
 }
 
 // Keybase returns the keyring for a given node
 func (tn *Node) Keybase() keyring.Keyring {
-	kr, err := keyring.New("", keyring.BackendTest, tn.Dir(), os.Stdin)
+	kr, err := keyring.New("", keyring.BackendTest, tn.Dir(), os.Stdin, tn.ec.Codec)
 	if err != nil {
 		panic(err)
 	}
@@ -381,22 +380,22 @@ func (tn *Node) Keybase() keyring.Keyring {
 // SetValidatorConfigAndPeers modifies the config for a validator node to start a chain
 func (tn *Node) SetValidatorConfigAndPeers(peers string, enablePrivVal bool) {
 	// Pull default config
-	cfg := tmconfig.DefaultConfig()
+	cfg := cometconfig.DefaultConfig()
 
 	// change config to include everything needed
 	stdconfigchanges(cfg, peers, enablePrivVal)
 
 	// overwrite with the new config
-	tmconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
+	cometconfig.WriteConfigFile(tn.cometBFTConfigPath(), cfg)
 }
 
 func (tn *Node) SetPrivValListen(peers string) {
-	cfg := tmconfig.DefaultConfig()
+	cfg := cometconfig.DefaultConfig()
 	stdconfigchanges(cfg, peers, true) // Reapply the changes made to the config file in SetValidatorConfigAndPeers()
-	tmconfig.WriteConfigFile(tn.TMConfigPath(), cfg)
+	cometconfig.WriteConfigFile(tn.cometBFTConfigPath(), cfg)
 }
 
-func (tn *Node) getValSigningInfo(address tmbytes.HexBytes) (*slashingtypes.QuerySigningInfoResponse, error) {
+func (tn *Node) getValSigningInfo(address cometbytes.HexBytes) (*slashingtypes.QuerySigningInfoResponse, error) {
 	valConsPrefix := fmt.Sprintf("%svalcons", tn.Chain.Bech32Prefix)
 	bech32ValConsAddress, err := bech32.ConvertAndEncode(valConsPrefix, address)
 	if err != nil {
@@ -410,9 +409,9 @@ func (tn *Node) getValSigningInfo(address tmbytes.HexBytes) (*slashingtypes.Quer
 
 func (tn *Node) GetMostRecentConsecutiveSignedBlocks(
 	max int64,
-	address tmbytes.HexBytes,
+	address cometbytes.HexBytes,
 ) (count int64, latestHeight int64, err error) {
-	var status *tmrpctypes.ResultStatus
+	var status *cometrpctypes.ResultStatus
 	status, err = tn.Client.Status(context.Background())
 	if err != nil {
 		return 0, 0, err
@@ -421,7 +420,7 @@ func (tn *Node) GetMostRecentConsecutiveSignedBlocks(
 	latestHeight = status.SyncInfo.LatestBlockHeight
 
 	for i := latestHeight; i > latestHeight-max && i > 0; i-- {
-		var block *tmrpctypes.ResultBlock
+		var block *cometrpctypes.ResultBlock
 		block, err = tn.Client.Block(context.Background(), &i)
 		if err != nil {
 			return 0, 0, err
@@ -441,7 +440,7 @@ func (tn *Node) GetMostRecentConsecutiveSignedBlocks(
 	return count, latestHeight, nil
 }
 
-func (tn *Node) getMissingBlocks(address tmbytes.HexBytes) (int64, error) {
+func (tn *Node) getMissingBlocks(address cometbytes.HexBytes) (int64, error) {
 	missedBlocks, err := tn.getValSigningInfo(address)
 	if err != nil {
 		return 0, err
@@ -449,7 +448,7 @@ func (tn *Node) getMissingBlocks(address tmbytes.HexBytes) (int64, error) {
 	return missedBlocks.ValSigningInfo.MissedBlocksCounter, nil
 }
 
-func (tn *Node) EnsureNotSlashed(address tmbytes.HexBytes) error {
+func (tn *Node) EnsureNotSlashed(address cometbytes.HexBytes) error {
 	for i := 0; i < 50; i++ {
 		time.Sleep(1 * time.Second)
 		slashInfo, err := tn.getValSigningInfo(address)
@@ -496,7 +495,7 @@ func min(a, b int64) int64 {
 }
 
 // Wait until we have signed n blocks in a row
-func (tn *Node) WaitForConsecutiveBlocks(blocks int64, address tmbytes.HexBytes) error {
+func (tn *Node) WaitForConsecutiveBlocks(blocks int64, address cometbytes.HexBytes) error {
 	initialMissed, err := tn.getMissingBlocks(address)
 	if err != nil {
 		return err
@@ -544,7 +543,7 @@ func (tn *Node) WaitForConsecutiveBlocks(blocks int64, address tmbytes.HexBytes)
 	return errors.New("timed out waiting for cluster to recover signing blocks")
 }
 
-func stdconfigchanges(cfg *tmconfig.Config, peers string, enablePrivVal bool) {
+func stdconfigchanges(cfg *cometconfig.Config, peers string, enablePrivVal bool) {
 	// turn down blocktimes to make the chain faster
 	cfg.Consensus.TimeoutCommit = blockTime * time.Second
 	cfg.Consensus.TimeoutPropose = blockTime * time.Second
@@ -642,7 +641,7 @@ func (tn *Node) CreateKey(ctx context.Context, name string) error {
 
 // AddGenesisAccount adds a genesis account for each key
 func (tn *Node) AddGenesisAccount(ctx context.Context, address string) error {
-	cmd := []string{tn.Chain.Bin, "add-genesis-account", address, "1000000000000stake",
+	cmd := []string{tn.Chain.Bin, "genesis", "add-genesis-account", address, "1000000000000stake",
 		"--home", tn.NodeHome(),
 	}
 	_, _, err := tn.Exec(ctx, cmd)
@@ -651,7 +650,7 @@ func (tn *Node) AddGenesisAccount(ctx context.Context, address string) error {
 
 // Gentx generates the gentx for a given node
 func (tn *Node) Gentx(ctx context.Context, keyName, pubKey string) error {
-	cmd := []string{tn.Chain.Bin, "gentx", keyName, "100000000000stake",
+	cmd := []string{tn.Chain.Bin, "genesis", "gentx", keyName, "100000000000stake",
 		"--pubkey", pubKey,
 		"--keyring-backend", "test",
 		"--home", tn.NodeHome(),
@@ -663,7 +662,7 @@ func (tn *Node) Gentx(ctx context.Context, keyName, pubKey string) error {
 
 // CollectGentxs runs collect gentxs on the node's home folders
 func (tn *Node) CollectGentxs(ctx context.Context) error {
-	cmd := []string{tn.Chain.Bin, "collect-gentxs",
+	cmd := []string{tn.Chain.Bin, "genesis", "collect-gentxs",
 		"--home", tn.NodeHome(),
 	}
 	_, _, err := tn.Exec(ctx, cmd)
@@ -792,7 +791,11 @@ func (tn *Node) Bech32AddressForKey(keyName string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	bech32Address, err := types.Bech32ifyAddressBytes(tn.Chain.Bech32Prefix, key.GetAddress())
+	addr, err := key.GetAddress()
+	if err != nil {
+		return "", err
+	}
+	bech32Address, err := types.Bech32ifyAddressBytes(tn.Chain.Bech32Prefix, addr)
 	if err != nil {
 		return "", err
 	}
@@ -863,7 +866,7 @@ func (tn *Node) NodeID() (string, error) {
 }
 
 // GetKey gets a key, waiting until it is available
-func (tn *Node) GetKey(name string) (info keyring.Info, err error) {
+func (tn *Node) GetKey(name string) (info *keyring.Record, err error) {
 	return info, retry.Do(func() (err error) {
 		info, err = tn.Keybase().Key(name)
 		return err

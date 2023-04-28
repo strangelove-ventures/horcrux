@@ -172,7 +172,12 @@ func Genesis(
 			return err
 		}
 
-		bech32Address, err := types.Bech32ifyAddressBytes(chain.Bech32Prefix, n0key.GetAddress())
+		addr, err := n0key.GetAddress()
+		if err != nil {
+			return err
+		}
+
+		bech32Address, err := types.Bech32ifyAddressBytes(chain.Bech32Prefix, addr)
 		if err != nil {
 			return err
 		}
