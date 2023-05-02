@@ -39,11 +39,13 @@ func TestSingleSignerValidator(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = os.WriteFile(runtimeConfig.KeyFilePathSingleSigner(), marshaled, 0600)
+	err = os.WriteFile(runtimeConfig.KeyFilePathSingleSigner(testChainID), marshaled, 0600)
 	require.NoError(t, err)
 
-	validator, err := NewSingleSignerValidator(runtimeConfig)
+	err = os.WriteFile(runtimeConfig.KeyFilePathSingleSigner("different"), marshaled, 0600)
 	require.NoError(t, err)
+
+	validator := NewSingleSignerValidator(runtimeConfig)
 
 	proposal := cometproto.Proposal{
 		Height: 1,
@@ -100,8 +102,7 @@ func TestSingleSignerValidator(t *testing.T) {
 	require.NoError(t, err)
 
 	// reinitialize validator to make sure new runtime will not allow double sign
-	validator, err = NewSingleSignerValidator(runtimeConfig)
-	require.NoError(t, err)
+	validator = NewSingleSignerValidator(runtimeConfig)
 
 	err = validator.SignProposal(testChainID, &proposal)
 	require.Error(t, err, "double sign!")

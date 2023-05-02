@@ -62,6 +62,42 @@ func createCosignerSharesCmd() *cobra.Command {
 	return cmd
 }
 
+// CreateCosignerSharesCmd is a cobra command for creating cosigner shares from a priv validator
+func createCosignerSharesRSACmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "create-shares-rsa [shares]",
+		Aliases: []string{"shard", "shares"},
+		Args:    cobra.ExactArgs(1),
+		Short:   "Create  cosigner shares",
+
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
+			shares := args[2]
+			n, err := strconv.ParseInt(shares, 10, 64)
+			if err != nil {
+				return fmt.Errorf("error parsing shares (%s): %w", shares, err)
+			}
+
+			csKeys, err := signer.CreateCosignerSharesRSA(int(n))
+			if err != nil {
+				return err
+			}
+
+			// silence usage after all input has been validated
+			cmd.SilenceUsage = true
+
+			for _, c := range csKeys {
+				filename := fmt.Sprintf("cosigner_%d.json", c.ID)
+				if err = signer.WriteCosignerShareRSAFile(c, filename); err != nil {
+					return err
+				}
+				fmt.Printf("Created RSA Share %s\n", filename)
+			}
+			return nil
+		},
+	}
+	return cmd
+}
+
 func validateCreateCosignerShares(_ *cobra.Command, args []string) error {
 	if len(args) != 3 {
 		return fmt.Errorf("wrong num args exp(3) got(%d)", len(args))

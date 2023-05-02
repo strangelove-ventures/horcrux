@@ -23,20 +23,30 @@ func CreateCosignerSharesFromFile(priv string, threshold, shares int64) ([]Cosig
 // CreateCosignerShares creates cosigner key objects from a privval.FilePVKey
 func CreateCosignerShares(pv privval.FilePVKey, threshold, shares int64) (out []CosignerKey, err error) {
 	privshares := tsed25519.DealShares(tsed25519.ExpandSecret(pv.PrivKey.Bytes()[:32]), uint8(threshold), uint8(shares))
-	rsaKeys, pubKeys, err := makeRSAKeys(len(privshares))
+	for idx, share := range privshares {
+		out = append(out, CosignerKey{
+			PubKey:   pv.PubKey,
+			ShareKey: share,
+			ID:       idx + 1,
+		})
+	}
+	return out, nil
+}
+
+// CreateCosignerShares creates cosigner key objects from a privval.FilePVKey
+func CreateCosignerSharesRSA(shares int) (out []CosignerKeyRSA, err error) {
+	rsaKeys, pubKeys, err := makeRSAKeys(shares)
 	if err != nil {
 		return nil, err
 	}
-	for idx, share := range privshares {
-		out = append(out, CosignerKey{
-			PubKey:       pv.PubKey,
-			ShareKey:     share,
-			ID:           idx + 1,
-			RSAKey:       *rsaKeys[idx],
+	for i, key := range rsaKeys {
+		out = append(out, CosignerKeyRSA{
+			ID:           i + 1,
+			RSAKey:       *key,
 			CosignerKeys: pubKeys,
 		})
 	}
-	return
+	return out, nil
 }
 
 // ReadPrivValidatorFile reads in a privval.FilePVKey from a given file
@@ -57,7 +67,16 @@ func WriteCosignerShareFile(cosigner CosignerKey, file string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(file, jsonBytes, 0644) //nolint
+	return os.WriteFile(file, jsonBytes, 0600)
+}
+
+// WriteCosignerShareRSAFile writes a cosigner RSA key to a given file name
+func WriteCosignerShareRSAFile(cosigner CosignerKeyRSA, file string) error {
+	jsonBytes, err := json.Marshal(&cosigner)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(file, jsonBytes, 0600)
 }
 
 func makeRSAKeys(num int) (rsaKeys []*rsa.PrivateKey, pubKeys []*rsa.PublicKey, err error) {

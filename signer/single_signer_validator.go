@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
-	cometjson "github.com/cometbft/cometbft/libs/json"
 	cometprivval "github.com/cometbft/cometbft/privval"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 )
@@ -18,7 +17,6 @@ var _ PrivValidator = &SingleSignerValidator{}
 type SingleSignerValidator struct {
 	config     *RuntimeConfig
 	chainState sync.Map
-	pubKey     cometcrypto.PubKey
 }
 
 // SingleSignerChainState holds the priv validator and associated mutex for a single chain.
@@ -33,39 +31,19 @@ type SingleSignerChainState struct {
 
 // NewSingleSignerValidator constructs a validator for single-sign mode (not recommended).
 // NewThresholdValidator is recommended, but single-sign mode can be used for convenience.
-func NewSingleSignerValidator(config *RuntimeConfig) (*SingleSignerValidator, error) {
-	pv := &SingleSignerValidator{
+func NewSingleSignerValidator(config *RuntimeConfig) *SingleSignerValidator {
+	return &SingleSignerValidator{
 		config: config,
 	}
-
-	if err := pv.loadPubKey(); err != nil {
-		return nil, fmt.Errorf("failed to load priv validator key: %w", err)
-	}
-
-	return pv, nil
-}
-
-func (pv *SingleSignerValidator) loadPubKey() error {
-	keyFile := pv.config.KeyFilePathSingleSigner()
-
-	keyJSONBytes, err := os.ReadFile(keyFile)
-	if err != nil {
-		return err
-	}
-	pvKey := cometprivval.FilePVKey{}
-	err = cometjson.Unmarshal(keyJSONBytes, &pvKey)
-	if err != nil {
-		return err
-	}
-
-	pv.pubKey = pvKey.PrivKey.PubKey()
-
-	return nil
 }
 
 // GetPubKey implements types.PrivValidator
-func (pv *SingleSignerValidator) GetPubKey() (cometcrypto.PubKey, error) {
-	return pv.pubKey, nil
+func (pv *SingleSignerValidator) GetPubKey(chainID string) (cometcrypto.PubKey, error) {
+	chainState, err := pv.loadChainStateIfNecessary(chainID)
+	if err != nil {
+		return nil, err
+	}
+	return chainState.filePV.GetPubKey()
 }
 
 // SignVote implements types.PrivValidator
@@ -96,7 +74,11 @@ func (pv *SingleSignerValidator) loadChainStateIfNecessary(chainID string) (*Sin
 		return cachedChainState.(*SingleSignerChainState), nil
 	}
 
-	keyFile := pv.config.KeyFilePathSingleSigner()
+	keyFile := pv.config.KeyFilePathSingleSigner(chainID)
+	if _, err := os.Stat(keyFile); err != nil {
+		return nil, fmt.Errorf("failed to load key file (%s) - %w", keyFile, err)
+	}
+
 	stateFile := pv.config.PrivValStateFile(chainID)
 	var filePV *cometprivval.FilePV
 	if _, err := os.Stat(stateFile); err != nil {

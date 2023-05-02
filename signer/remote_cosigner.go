@@ -2,9 +2,11 @@ package signer
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"time"
 
+	cometcrypto "github.com/cometbft/cometbft/crypto"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -44,6 +46,18 @@ func (cosigner *RemoteCosigner) GetID() int {
 // Implements the cosigner interface
 func (cosigner *RemoteCosigner) GetAddress() string {
 	return cosigner.address
+}
+
+// GetPubKey returns public key of the validator.
+// Implements Cosigner interface
+func (cosigner *RemoteCosigner) GetPubKey(_ string) (cometcrypto.PubKey, error) {
+	return nil, fmt.Errorf("unexpected call to RemoteCosigner.GetPubKey")
+}
+
+// VerifySignature validates a signed payload against the public key.
+// Implements Cosigner interface
+func (cosigner *RemoteCosigner) VerifySignature(_ string, _, _ []byte) bool {
+	return false
 }
 
 func (cosigner *RemoteCosigner) getGRPCClient() (proto.CosignerGRPCClient, *grpc.ClientConn, error) {

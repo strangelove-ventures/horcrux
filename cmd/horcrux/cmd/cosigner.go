@@ -37,18 +37,18 @@ type AddressCmdOutput struct {
 
 func addressCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:          "address [bech32]",
+		Use:          "address [chain-id] [bech32]",
 		Short:        "Get public key hex address and valcons address",
 		Example:      `horcrux cosigner address cosmos`,
 		SilenceUsage: true,
-		Args:         cobra.RangeArgs(0, 1),
+		Args:         cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			err := config.Config.ValidateCosignerConfig()
 			if err != nil {
 				return err
 			}
 
-			keyFile, err := config.KeyFileExistsCosigner()
+			keyFile, err := config.KeyFileExistsCosigner(args[0])
 			if err != nil {
 				return err
 			}
@@ -71,13 +71,13 @@ func addressCmd() *cobra.Command {
 				PubKey:     pubKeyJSON,
 			}
 
-			if len(args) == 1 {
-				bech32ValConsAddress, err := bech32.ConvertAndEncode(args[0]+"valcons", pubKeyAddress)
+			if len(args) == 2 {
+				bech32ValConsAddress, err := bech32.ConvertAndEncode(args[1]+"valcons", pubKeyAddress)
 				if err != nil {
 					return err
 				}
 				output.ValConsAddress = bech32ValConsAddress
-				pubKeyBech32, err := signer.PubKey(args[0], pubKey)
+				pubKeyBech32, err := signer.PubKey(args[1], pubKey)
 				if err != nil {
 					return err
 				}
@@ -117,21 +117,26 @@ func startCosignerCmd() *cobra.Command {
 				return err
 			}
 
-			var (
-				// services to stop on shutdown
-				services []cometservice.Service
-				logger   = cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)).With("module", "validator")
+			logger := cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)).With("module", "validator")
+
+			logger.Info(
+				"CometBFT Validator",
+				"mode", "threshold",
+				"priv-state-dir", config.StateDir,
 			)
 
-			keyFile, err := config.KeyFileExistsCosigner()
+			keyFile, err := config.KeyFileExistsCosignerRSA()
 			if err != nil {
 				return err
 			}
 
-			logger.Info("CometBFT Validator", "mode", "threshold",
-				"priv-key", config.Config.PrivValKeyFile, "priv-state-dir", config.StateDir)
+			logger.Info(
+				"CometBFT Validator",
+				"mode", "threshold",
+				"priv-state-dir", config.StateDir,
+			)
 
-			key, err := signer.LoadCosignerKey(keyFile)
+			key, err := signer.LoadCosignerKeyRSA(keyFile)
 			if err != nil {
 				return fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
 			}
@@ -161,7 +166,7 @@ func startCosignerCmd() *cobra.Command {
 
 			localCosigner := signer.NewLocalCosigner(
 				&config,
-				key,
+				key.ID,
 				key.RSAKey,
 				peers,
 				cosignerConfig.P2PListen,
@@ -188,12 +193,11 @@ func startCosignerCmd() *cobra.Command {
 			if err := raftStore.Start(); err != nil {
 				return fmt.Errorf("error starting raft store: %w", err)
 			}
-			services = append(services, raftStore)
+			services := []cometservice.Service{raftStore}
 
 			val := signer.NewThresholdValidator(
 				logger,
 				&config,
-				key.PubKey,
 				cosignerConfig.Threshold,
 				localCosigner,
 				cosigners,
@@ -201,12 +205,6 @@ func startCosignerCmd() *cobra.Command {
 			)
 
 			raftStore.SetThresholdValidator(val)
-
-			pubkey, err := val.GetPubKey()
-			if err != nil {
-				return fmt.Errorf("failed to get public key: %w", err)
-			}
-			logger.Info("Signer", "address", pubkey.Address())
 
 			go EnableDebugAndMetrics(cmd.Context())
 

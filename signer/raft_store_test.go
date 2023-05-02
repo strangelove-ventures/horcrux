@@ -31,7 +31,7 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 
 	cosigner := NewLocalCosigner(
 		&RuntimeConfig{},
-		key,
+		key.ID,
 		*rsaKey,
 		[]CosignerPeer{{
 			ID:        1,

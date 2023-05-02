@@ -94,7 +94,14 @@ func StartSingleSignerContainers(
 		return err
 	}
 
-	err = os.WriteFile(filepath.Join(testSigners[0].Dir(), "priv_validator_key.json"), pvFile, 0600)
+	err = os.WriteFile(
+		filepath.Join(
+			testSigners[0].Dir(),
+			fmt.Sprintf("%s_priv_validator_key.json", validator.ChainID),
+		),
+		pvFile,
+		0600,
+	)
 	if err != nil {
 		return err
 	}

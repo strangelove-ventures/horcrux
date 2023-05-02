@@ -37,17 +37,6 @@ func TestThresholdValidator2of2(t *testing.T) {
 	total := uint8(2)
 	threshold := uint8(2)
 
-	tmpDir := t.TempDir()
-	stateDir := filepath.Join(tmpDir, "state")
-
-	err := os.MkdirAll(stateDir, 0777)
-	require.NoError(t, err)
-
-	runtimeConfig := &RuntimeConfig{
-		HomeDir:  tmpDir,
-		StateDir: filepath.Join(tmpDir, "state"),
-	}
-
 	bitSize := 4096
 	rsaKey1, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(t, err)
@@ -68,10 +57,43 @@ func TestThresholdValidator2of2(t *testing.T) {
 	privKeyBytes := privateKey[:]
 	secretShares := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
 
+	tmpDir := t.TempDir()
+
+	var cosigner1, cosigner2 Cosigner
+
+	cosigner1Dir := filepath.Join(tmpDir, "cosigner1")
+	err = os.MkdirAll(cosigner1Dir, 0777)
+	require.NoError(t, err)
+
+	cosigner1Config := &RuntimeConfig{
+		HomeDir:  cosigner1Dir,
+		StateDir: cosigner1Dir,
+	}
+
 	key1 := CosignerKey{
 		PubKey:   privateKey.PubKey(),
 		ShareKey: secretShares[0],
 		ID:       1,
+	}
+
+	cosigner1 = NewLocalCosigner(
+		cosigner1Config,
+		key1.ID, *rsaKey1,
+		peers, "", total, threshold,
+	)
+
+	key1Bz, err := key1.MarshalJSON()
+	require.NoError(t, err)
+	err = os.WriteFile(cosigner1Config.KeyFilePathCosigner(testChainID), key1Bz, 0600)
+	require.NoError(t, err)
+
+	cosigner2Dir := filepath.Join(tmpDir, "cosigner2")
+	err = os.MkdirAll(cosigner2Dir, 0777)
+	require.NoError(t, err)
+
+	cosigner2Config := &RuntimeConfig{
+		HomeDir:  cosigner2Dir,
+		StateDir: cosigner2Dir,
 	}
 
 	key2 := CosignerKey{
@@ -80,18 +102,16 @@ func TestThresholdValidator2of2(t *testing.T) {
 		ID:       2,
 	}
 
-	var cosigner1, cosigner2 Cosigner
-
-	cosigner1 = NewLocalCosigner(
-		runtimeConfig,
-		key1, *rsaKey1,
-		peers, "", total, threshold,
-	)
 	cosigner2 = NewLocalCosigner(
-		runtimeConfig,
-		key2, *rsaKey2,
+		cosigner2Config,
+		key2.ID, *rsaKey2,
 		peers, "", total, threshold,
 	)
+
+	key2Bz, err := key2.MarshalJSON()
+	require.NoError(t, err)
+	err = os.WriteFile(cosigner2Config.KeyFilePathCosigner(testChainID), key2Bz, 0600)
+	require.NoError(t, err)
 
 	require.Equal(t, cosigner1.GetID(), 1)
 	require.Equal(t, cosigner2.GetID(), 2)
@@ -102,8 +122,7 @@ func TestThresholdValidator2of2(t *testing.T) {
 
 	validator := NewThresholdValidator(
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
-		runtimeConfig,
-		privateKey.PubKey(),
+		cosigner1Config,
 		int(threshold),
 		cosigner1,
 		thresholdPeers,
@@ -136,17 +155,6 @@ func TestThresholdValidator3of3(t *testing.T) {
 	total := uint8(3)
 	threshold := uint8(3)
 
-	tmpDir := t.TempDir()
-	stateDir := filepath.Join(tmpDir, "state")
-
-	err := os.MkdirAll(stateDir, 0777)
-	require.NoError(t, err)
-
-	runtimeConfig := &RuntimeConfig{
-		HomeDir:  tmpDir,
-		StateDir: filepath.Join(tmpDir, "state"),
-	}
-
 	bitSize := 4096
 	rsaKey1, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(t, err)
@@ -173,10 +181,43 @@ func TestThresholdValidator3of3(t *testing.T) {
 	privKeyBytes := privateKey[:]
 	secretShares := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
 
+	tmpDir := t.TempDir()
+
+	var cosigner1, cosigner2, cosigner3 Cosigner
+
+	cosigner1Dir := filepath.Join(tmpDir, "cosigner1")
+	err = os.MkdirAll(cosigner1Dir, 0777)
+	require.NoError(t, err)
+
+	cosigner1Config := &RuntimeConfig{
+		HomeDir:  cosigner1Dir,
+		StateDir: cosigner1Dir,
+	}
+
 	key1 := CosignerKey{
 		PubKey:   privateKey.PubKey(),
 		ShareKey: secretShares[0],
 		ID:       1,
+	}
+
+	cosigner1 = NewLocalCosigner(
+		cosigner1Config,
+		key1.ID, *rsaKey1,
+		peers, "", total, threshold,
+	)
+
+	key1Bz, err := key1.MarshalJSON()
+	require.NoError(t, err)
+	err = os.WriteFile(cosigner1Config.KeyFilePathCosigner(testChainID), key1Bz, 0600)
+	require.NoError(t, err)
+
+	cosigner2Dir := filepath.Join(tmpDir, "cosigner2")
+	err = os.MkdirAll(cosigner2Dir, 0777)
+	require.NoError(t, err)
+
+	cosigner2Config := &RuntimeConfig{
+		HomeDir:  cosigner2Dir,
+		StateDir: cosigner2Dir,
 	}
 
 	key2 := CosignerKey{
@@ -185,29 +226,42 @@ func TestThresholdValidator3of3(t *testing.T) {
 		ID:       2,
 	}
 
+	cosigner2 = NewLocalCosigner(
+		cosigner2Config,
+		key2.ID, *rsaKey2,
+		peers, "", total, threshold,
+	)
+
+	key2Bz, err := key2.MarshalJSON()
+	require.NoError(t, err)
+	err = os.WriteFile(cosigner2Config.KeyFilePathCosigner(testChainID), key2Bz, 0600)
+	require.NoError(t, err)
+
+	cosigner3Dir := filepath.Join(tmpDir, "cosigner3")
+	err = os.MkdirAll(cosigner3Dir, 0777)
+	require.NoError(t, err)
+
+	cosigner3Config := &RuntimeConfig{
+		HomeDir:  cosigner3Dir,
+		StateDir: cosigner3Dir,
+	}
+
 	key3 := CosignerKey{
 		PubKey:   privateKey.PubKey(),
 		ShareKey: secretShares[2],
 		ID:       3,
 	}
 
-	var cosigner1, cosigner2, cosigner3 Cosigner
-
-	cosigner1 = NewLocalCosigner(
-		runtimeConfig,
-		key1, *rsaKey1,
-		peers, "", total, threshold,
-	)
-	cosigner2 = NewLocalCosigner(
-		runtimeConfig,
-		key2, *rsaKey2,
-		peers, "", total, threshold,
-	)
 	cosigner3 = NewLocalCosigner(
-		runtimeConfig,
-		key3, *rsaKey3,
+		cosigner3Config,
+		key3.ID, *rsaKey3,
 		peers, "", total, threshold,
 	)
+
+	key3Bz, err := key3.MarshalJSON()
+	require.NoError(t, err)
+	err = os.WriteFile(cosigner3Config.KeyFilePathCosigner(testChainID), key3Bz, 0600)
+	require.NoError(t, err)
 
 	require.Equal(t, cosigner1.GetID(), 1)
 	require.Equal(t, cosigner2.GetID(), 2)
@@ -219,8 +273,7 @@ func TestThresholdValidator3of3(t *testing.T) {
 
 	validator := NewThresholdValidator(
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
-		runtimeConfig,
-		privateKey.PubKey(),
+		cosigner1Config,
 		int(threshold),
 		cosigner1,
 		thresholdPeers,
@@ -256,17 +309,6 @@ func TestThresholdValidator2of3(t *testing.T) {
 	total := uint8(3)
 	threshold := uint8(2)
 
-	tmpDir := t.TempDir()
-	stateDir := filepath.Join(tmpDir, "state")
-
-	err := os.MkdirAll(stateDir, 0777)
-	require.NoError(t, err)
-
-	runtimeConfig := &RuntimeConfig{
-		HomeDir:  tmpDir,
-		StateDir: filepath.Join(tmpDir, "state"),
-	}
-
 	bitSize := 4096
 	rsaKey1, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(t, err)
@@ -293,10 +335,44 @@ func TestThresholdValidator2of3(t *testing.T) {
 	privKeyBytes := privateKey[:]
 	secretShares := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
 
+	tmpDir := t.TempDir()
+
+	var cosigner1, cosigner2, cosigner3 Cosigner
+	cosigner1Dir := filepath.Join(tmpDir, "cosigner1")
+	err = os.MkdirAll(cosigner1Dir, 0777)
+	require.NoError(t, err)
+
+	cosigner1Config := &RuntimeConfig{
+		HomeDir:  cosigner1Dir,
+		StateDir: cosigner1Dir,
+	}
+
 	key1 := CosignerKey{
 		PubKey:   privateKey.PubKey(),
 		ShareKey: secretShares[0],
 		ID:       1,
+	}
+
+	cosigner1 = NewLocalCosigner(
+		cosigner1Config,
+		key1.ID, *rsaKey1,
+		peers, "", total, threshold,
+	)
+
+	key1Bz, err := key1.MarshalJSON()
+	require.NoError(t, err)
+	err = os.WriteFile(cosigner1Config.KeyFilePathCosigner(testChainID), key1Bz, 0600)
+	require.NoError(t, err)
+	err = os.WriteFile(cosigner1Config.KeyFilePathCosigner("different"), key1Bz, 0600)
+	require.NoError(t, err)
+
+	cosigner2Dir := filepath.Join(tmpDir, "cosigner2")
+	err = os.MkdirAll(cosigner2Dir, 0777)
+	require.NoError(t, err)
+
+	cosigner2Config := &RuntimeConfig{
+		HomeDir:  cosigner2Dir,
+		StateDir: cosigner2Dir,
 	}
 
 	key2 := CosignerKey{
@@ -305,29 +381,46 @@ func TestThresholdValidator2of3(t *testing.T) {
 		ID:       2,
 	}
 
+	cosigner2 = NewLocalCosigner(
+		cosigner2Config,
+		key2.ID, *rsaKey2,
+		peers, "", total, threshold,
+	)
+
+	key2Bz, err := key2.MarshalJSON()
+	require.NoError(t, err)
+	err = os.WriteFile(cosigner2Config.KeyFilePathCosigner(testChainID), key2Bz, 0600)
+	require.NoError(t, err)
+	err = os.WriteFile(cosigner2Config.KeyFilePathCosigner("different"), key2Bz, 0600)
+	require.NoError(t, err)
+
+	cosigner3Dir := filepath.Join(tmpDir, "cosigner3")
+	err = os.MkdirAll(cosigner3Dir, 0777)
+	require.NoError(t, err)
+
+	cosigner3Config := &RuntimeConfig{
+		HomeDir:  cosigner3Dir,
+		StateDir: cosigner3Dir,
+	}
+
 	key3 := CosignerKey{
 		PubKey:   privateKey.PubKey(),
 		ShareKey: secretShares[2],
 		ID:       3,
 	}
 
-	var cosigner1, cosigner2, cosigner3 Cosigner
-
-	cosigner1 = NewLocalCosigner(
-		runtimeConfig,
-		key1, *rsaKey1,
-		peers, "", total, threshold,
-	)
-	cosigner2 = NewLocalCosigner(
-		runtimeConfig,
-		key2, *rsaKey2,
-		peers, "", total, threshold,
-	)
 	cosigner3 = NewLocalCosigner(
-		runtimeConfig,
-		key3, *rsaKey3,
+		cosigner3Config,
+		key3.ID, *rsaKey3,
 		peers, "", total, threshold,
 	)
+
+	key3Bz, err := key3.MarshalJSON()
+	require.NoError(t, err)
+	err = os.WriteFile(cosigner3Config.KeyFilePathCosigner(testChainID), key3Bz, 0600)
+	require.NoError(t, err)
+	err = os.WriteFile(cosigner3Config.KeyFilePathCosigner("different"), key3Bz, 0600)
+	require.NoError(t, err)
 
 	require.Equal(t, cosigner1.GetID(), 1)
 	require.Equal(t, cosigner2.GetID(), 2)
@@ -339,8 +432,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 
 	validator := NewThresholdValidator(
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
-		runtimeConfig,
-		privateKey.PubKey(),
+		cosigner1Config,
 		int(threshold),
 		cosigner1,
 		thresholdPeers,
@@ -422,8 +514,7 @@ func TestThresholdValidator2of3(t *testing.T) {
 	// reinitialize validator to make sure new runtime will not allow double sign
 	newValidator := NewThresholdValidator(
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
-		runtimeConfig,
-		privateKey.PubKey(),
+		cosigner1Config,
 		int(threshold),
 		cosigner1,
 		thresholdPeers,
