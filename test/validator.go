@@ -19,7 +19,7 @@ type Validator struct {
 	tl        Logger
 	Home      string
 	PubKeys   map[string]cometcrypto.PubKey
-	Threshold int
+	Threshold uint8
 }
 
 func NewHorcruxValidator(
@@ -29,7 +29,7 @@ func NewHorcruxValidator(
 	home string,
 	index int,
 	numSigners int,
-	threshold int,
+	threshold uint8,
 	chains ...*ChainType,
 ) (*Validator, error) {
 	var sentries Nodes
@@ -73,7 +73,7 @@ func NewHorcruxValidatorWithPrivValKey(
 	index int,
 	numSentries int,
 	numSigners int,
-	threshold int,
+	threshold uint8,
 	chainType *ChainType,
 	privValKey privval.FilePVKey,
 ) (*Validator, error) {
@@ -158,7 +158,7 @@ func (tv *Validator) genEd25519Shares(
 
 	tv.PubKeys[chainID] = key.PubKey
 
-	shares, err := signer.CreateCosignerShares(key, int64(tv.Threshold), int64(len(tv.Signers)))
+	shares, err := signer.CreateCosignerShares(key, uint8(tv.Threshold), uint8(len(tv.Signers)))
 	if err != nil {
 		return err
 	}
