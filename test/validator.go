@@ -158,7 +158,7 @@ func (tv *Validator) genEd25519Shares(
 
 	tv.PubKeys[chainID] = key.PubKey
 
-	shares, err := signer.CreateCosignerShares(key, uint8(tv.Threshold), uint8(len(tv.Signers)))
+	shares, err := signer.CreateCosignerShares(key, tv.Threshold, uint8(len(tv.Signers)))
 	if err != nil {
 		return err
 	}
