@@ -125,8 +125,10 @@ func createCosignerEd25519SharesCmd() *cobra.Command {
 			}
 
 			out, _ := cmd.Flags().GetString(flagOutputDir)
-			if err := os.MkdirAll(out, 0700); err != nil {
-				return err
+			if out != "" {
+				if err := os.MkdirAll(out, 0700); err != nil {
+					return err
+				}
 			}
 
 			// silence usage after all input has been validated
@@ -172,8 +174,10 @@ func createCosignerRSASharesCmd() *cobra.Command {
 			}
 
 			out, _ := cmd.Flags().GetString(flagOutputDir)
-			if err := os.MkdirAll(out, 0700); err != nil {
-				return err
+			if out != "" {
+				if err := os.MkdirAll(out, 0700); err != nil {
+					return err
+				}
 			}
 
 			// silence usage after all input has been validated

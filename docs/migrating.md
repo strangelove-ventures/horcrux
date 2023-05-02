@@ -103,12 +103,12 @@ On some computer that contains your `priv_validator_key.json` create a folder to
 $ ls
 priv_validator_key.json
 
-$ horcrux create-ed25519-shares cosmoshub-4 priv_validator_key.json 2 3
+$ horcrux create-ed25519-shares --chain-id cosmoshub-4 --key-file priv_validator_key.json --threshold 2 --shares 3
 Created Ed25519 Share cosigner_1/cosmoshub-4_share.json
 Created Ed25519 Share cosigner_2/cosmoshub-4_share.json
 Created Ed25519 Share cosigner_3/cosmoshub-4_share.json
 
-$ horcrux create-rsa-shares 3
+$ horcrux create-rsa-shares --shares 3
 Created RSA Share cosigner_1/rsa_keys.json
 Created RSA Share cosigner_2/rsa_keys.json
 Created RSA Share cosigner_3/rsa_keys.json
