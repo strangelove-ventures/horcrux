@@ -44,7 +44,7 @@ func createCosignerDirectoryIfNecessary(id int) (string, error) {
 }
 
 // CreateCosignerSharesCmd is a cobra command for creating cosigner shares from a priv validator
-func createCosignerSharesCmd() *cobra.Command {
+func createCosignerEd25519SharesCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create-ed25519-shares [chain-id] [priv_validator.json] [threshold] [shares]",
 		Aliases: []string{"shard", "shares"},
@@ -102,7 +102,7 @@ func createCosignerSharesCmd() *cobra.Command {
 }
 
 // CreateCosignerSharesCmd is a cobra command for creating cosigner shares from a priv validator
-func createCosignerSharesRSACmd() *cobra.Command {
+func createCosignerRSASharesCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create-rsa-shares [shares]",
 		Aliases: []string{"shard", "shares"},
@@ -114,6 +114,10 @@ func createCosignerSharesRSACmd() *cobra.Command {
 			n, err := strconv.ParseInt(shares, 10, 64)
 			if err != nil {
 				return fmt.Errorf("error parsing shares (%s): %w", shares, err)
+			}
+
+			if n <= 0 {
+				return fmt.Errorf("shares must be greater than zero (%s): %w", shares, err)
 			}
 
 			csKeys, err := signer.CreateCosignerSharesRSA(int(n))
