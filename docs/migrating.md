@@ -103,31 +103,35 @@ On some computer that contains your `priv_validator_key.json` create a folder to
 $ ls
 priv_validator_key.json
 
-$ horcrux create-ed25519-shares priv_validator_key.json 2 3
-Created Ed25519 Share private_share_1.json
-Created Ed25519 Share private_share_2.json
-Created Ed25519 Share private_share_3.json
+$ horcrux create-ed25519-shares cosmoshub-4 priv_validator_key.json 2 3
+Created Ed25519 Share cosigner_1/cosmoshub-4_share.json
+Created Ed25519 Share cosigner_2/cosmoshub-4_share.json
+Created Ed25519 Share cosigner_3/cosmoshub-4_share.json
 
-$ horcrux create-rsa-shares 3                      
-Created RSA Share rsa_keys_1.json
-Created RSA Share rsa_keys_2.json
-Created RSA Share rsa_keys_3.json
+$ horcrux create-rsa-shares 3
+Created RSA Share cosigner_1/rsa_keys.json
+Created RSA Share cosigner_2/rsa_keys.json
+Created RSA Share cosigner_3/rsa_keys.json
 
-$ ls
-rsa_keys_1.json
-rsa_keys_2.json
-rsa_keys_3.json
-private_share_1.json
-private_share_2.json
-private_share_3.json
-priv_validator_key.json
+$ ls -R
+.:
+cosigner_1  cosigner_2  cosigner_3 priv_validator_key.json
+
+./cosigner_1:
+cosmoshub-4_share.json  rsa_keys.json
+
+./cosigner_2:
+cosmoshub-4_share.json  rsa_keys.json
+
+./cosigner_3:
+cosmoshub-4_share.json  rsa_keys.json
 ```
 
-The shares need to be moved their co-responding signer nodes at `~/.horcrux/{chain-id}_share.json` and `~/.horcrux/rsa_keys.json`, respectively. `{chain-id}` must be the chain ID of the chain you intend to sign blocks for. It is very important to make sure the share `{id}` (in `private_share_{id}.json` and `rsa_keys_{id}.json`) is on the corresponding cosigner node otherwise your signer cluster won't communicate properly and will not sign blocks. If you have named your nodes with their index as the signer index, as in this guide, this operation should be easy to check.
+The files need to be moved their corresponding signer nodes in the `~/.horcrux/` directory. It is important to make sure the files for the cosigner `{id}` (in `cosigner_{id}`) are placed on the corresponding cosigner node. If not, the cluster will not produce valid signatures. If you have named your nodes with their index as the signer index, as in this guide, this operation should be easy to check.
 
-At the end of this step, each of your horcrux nodes will have a `~/.horcrux/{chain-id}_share.json` file with the contents matching the appropriate `private_share_{id}.json` file corresponding to the node number. Additionally, each of your horcrux nodes will have a `~/.horcrux/rsa_keys.json` file with the contents matching the appropriate `rsa_keys_{id}.json` file corresponding to the node number.
+At the end of this step, each of your horcrux nodes will have a `~/.horcrux/{chain-id}_share.json` file with the contents matching the appropriate `cosigner_{id}/share.json` file corresponding to the node number. Additionally, each of your horcrux nodes will have a `~/.horcrux/rsa_keys.json` file with the contents matching the appropriate `cosigner_{id}/rsa_keys.json` file corresponding to the node number.
 
-If you will be signing for multiple chain IDs with this single horcrux cluster, repeat the `horcrux create-ed25519-shares` command with the `priv_validator_key.json` for each additional chain ID, and move to the horcrux nodes with the proper filename `{chain_id}_share.json`.
+If you will be signing for multiple chains with this single horcrux cluster, repeat the `horcrux create-ed25519-shares` command with the `priv_validator_key.json` for each additional chain ID, and again place on the corresponding horcrux nodes.
 
 ### 4. Halt your validator node and supply signer state data `horcrux` nodes
 

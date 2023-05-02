@@ -381,6 +381,10 @@ func (cosigner *LocalCosigner) dealShares(req CosignerGetEphemeralSecretPartRequ
 }
 
 func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
+	if chainID == "" {
+		return fmt.Errorf("chain id cannot be empty")
+	}
+
 	if _, ok := cosigner.chainState.Load(chainID); ok {
 		return nil
 	}
