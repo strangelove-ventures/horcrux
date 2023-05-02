@@ -196,12 +196,23 @@ func (e *BeyondBlockError) Error() string { return e.msg }
 func (pv *ThresholdValidator) newBeyondBlockError(chainID string, hrs HRSKey) *BeyondBlockError {
 	cs, ok := pv.chainState.Load(chainID)
 	if !ok {
-		return &BeyondBlockError{msg: fmt.Sprintf("[%s] Progress already started on block, skipping. failed to load chain state", chainID)}
+		return &BeyondBlockError{
+			msg: fmt.Sprintf(
+				"[%s] Progress already started on block, skipping. failed to load chain state",
+				chainID,
+			),
+		}
 	}
 
 	css, ok := cs.(ChainSignState)
 	if !ok {
-		return &BeyondBlockError{msg: fmt.Sprintf("[%s] Progress already started on block, skipping. expected: (ChainSignState), actual: (%T)", chainID, cs)}
+		return &BeyondBlockError{
+			msg: fmt.Sprintf(
+				"[%s] Progress already started on block, skipping. expected: (ChainSignState), actual: (%T)",
+				chainID,
+				cs,
+			),
+		}
 	}
 
 	lss := css.lastSignStateInitiated

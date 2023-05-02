@@ -307,7 +307,11 @@ func TestRuntimeConfigKeyFilePath(t *testing.T) {
 	}
 
 	require.Equal(t, filepath.Join(dir, fmt.Sprintf("%s_share.json", testChainID)), c.KeyFilePathCosigner(testChainID))
-	require.Equal(t, filepath.Join(dir, fmt.Sprintf("%s_priv_validator_key.json", testChainID)), c.KeyFilePathSingleSigner(testChainID))
+	require.Equal(
+		t,
+		filepath.Join(dir, fmt.Sprintf("%s_priv_validator_key.json", testChainID)),
+		c.KeyFilePathSingleSigner(testChainID),
+	)
 }
 
 func TestRuntimeConfigPrivValStateFile(t *testing.T) {

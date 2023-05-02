@@ -34,7 +34,7 @@ func NewHorcruxValidator(
 	chains ...*ChainType,
 ) (*Validator, error) {
 	var sentries Nodes
-	var chainIDs []string
+	chainIDs := make([]string, 0, len(chains))
 	for _, chain := range chains {
 		sentries = append(sentries,
 			MakeNodes(

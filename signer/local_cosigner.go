@@ -400,6 +400,10 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 		return fmt.Errorf("error reading cosigner key: %s", err)
 	}
 
+	if key.ID != cosigner.id {
+		return fmt.Errorf("key shard ID (%d) in (%s) does not match cosigner ID (%d)", key.ID, keyFile, cosigner.id)
+	}
+
 	cosigner.chainState.Store(chainID, &ChainState{
 		lastSignState: shareSignState,
 		hrsMeta:       make(map[HRSTKey]HrsMetadata),
