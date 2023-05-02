@@ -163,7 +163,7 @@ func (cosignerKey *CosignerKeyRSA) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// LoadCosignerKey loads a CosignerKey from file.
+// LoadCosignerKeyRSA loads a CosignerKeyRSA from file.
 func LoadCosignerKeyRSA(file string) (CosignerKeyRSA, error) {
 	pvKey := CosignerKeyRSA{}
 	keyJSONBytes, err := os.ReadFile(file)

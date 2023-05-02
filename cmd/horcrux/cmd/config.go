@@ -135,8 +135,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().IntP("threshold", "t", 0, "indicate number of signatures required for threshold signature")
 	cmd.Flags().StringP("listen", "l", "", "listen address of the signer")
 	cmd.Flags().StringP("debug-addr", "d", "", "listen address for Debug and Prometheus metrics in format localhost:8543")
-	cmd.Flags().StringP("key-dir", "k", "",
-		"priv val key directory")
+	cmd.Flags().StringP("key-dir", "k", "", "priv val key directory")
 	cmd.Flags().String("timeout", "1500ms", "configure cosigner rpc server timeout value, \n"+
 		"accepts valid duration strings for Go's time.ParseDuration() e.g. 1s, 1000ms, 1.5m")
 	cmd.Flags().BoolP("overwrite", "o", false, "set to overwrite an existing config.yaml")

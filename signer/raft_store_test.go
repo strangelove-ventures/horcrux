@@ -19,7 +19,6 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 
 	dummyPub := cometcryptoed25519.PubKey{}
 
-	bitSize := 4096
 	rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(t, err)
 

@@ -12,7 +12,7 @@ import (
 )
 
 // CreateCosignerSharesFromFile creates cosigner key objects from a priv_validator_key.json file
-func CreateCosignerSharesFromFile(priv string, threshold, shares int64) ([]CosignerKey, error) {
+func CreateCosignerSharesFromFile(priv string, threshold, shares uint8) ([]CosignerKey, error) {
 	pv, err := ReadPrivValidatorFile(priv)
 	if err != nil {
 		return nil, err
@@ -21,7 +21,7 @@ func CreateCosignerSharesFromFile(priv string, threshold, shares int64) ([]Cosig
 }
 
 // CreateCosignerShares creates cosigner key objects from a privval.FilePVKey
-func CreateCosignerShares(pv privval.FilePVKey, threshold, shares int64) (out []CosignerKey, err error) {
+func CreateCosignerShares(pv privval.FilePVKey, threshold, shares uint8) (out []CosignerKey, err error) {
 	privshares := tsed25519.DealShares(tsed25519.ExpandSecret(pv.PrivKey.Bytes()[:32]), uint8(threshold), uint8(shares))
 	for idx, share := range privshares {
 		out = append(out, CosignerKey{

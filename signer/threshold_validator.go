@@ -74,19 +74,25 @@ func NewThresholdValidator(
 // state updates. The disk write is scheduled in a separate goroutine which will perform an atomic write.
 // pendingDiskWG is used upon termination in pendingDiskWG to ensure all writes have completed.
 func (pv *ThresholdValidator) SaveLastSignedState(chainID string, signState SignStateConsensus) error {
-	cs, ok := pv.chainState.Load(chainID)
-	if !ok {
-		return fmt.Errorf("failed to load chain state for %s", chainID)
-	}
-
-	css, ok := cs.(ChainSignState)
-	if !ok {
-		return fmt.Errorf("expected: (ChainSignState), actual: (%T)", cs)
-	}
+	css := pv.mustLoadChainState(chainID)
 
 	css.lastSignStateMutex.Lock()
 	defer css.lastSignStateMutex.Unlock()
 	return css.lastSignState.Save(signState, &pv.pendingDiskWG)
+}
+
+func (pv *ThresholdValidator) mustLoadChainState(chainID string) ChainSignState {
+	cs, ok := pv.chainState.Load(chainID)
+	if !ok {
+		panic(fmt.Errorf("failed to load chain state for %s", chainID))
+	}
+
+	css, ok := cs.(ChainSignState)
+	if !ok {
+		panic(fmt.Errorf("expected: (ChainSignState), actual: (%T)", cs))
+	}
+
+	return css
 }
 
 // SaveLastSignedStateInitiated updates the high watermark height/round/step (HRS) for an initiated
@@ -94,15 +100,7 @@ func (pv *ThresholdValidator) SaveLastSignedState(chainID string, signState Sign
 // state updates. The disk write is scheduled in a separate goroutine which will perform an atomic write.
 // pendingDiskWG is used upon termination in pendingDiskWG to ensure all writes have completed.
 func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, signState SignStateConsensus) error {
-	cs, ok := pv.chainState.Load(chainID)
-	if !ok {
-		return fmt.Errorf("failed to load chain state for %s", chainID)
-	}
-
-	css, ok := cs.(ChainSignState)
-	if !ok {
-		return fmt.Errorf("expected: (ChainSignState), actual: (%T)", cs)
-	}
+	css := pv.mustLoadChainState(chainID)
 
 	css.lastSignStateInitiatedMutex.Lock()
 	defer css.lastSignStateInitiatedMutex.Unlock()
@@ -194,26 +192,7 @@ type BeyondBlockError struct {
 func (e *BeyondBlockError) Error() string { return e.msg }
 
 func (pv *ThresholdValidator) newBeyondBlockError(chainID string, hrs HRSKey) *BeyondBlockError {
-	cs, ok := pv.chainState.Load(chainID)
-	if !ok {
-		return &BeyondBlockError{
-			msg: fmt.Sprintf(
-				"[%s] Progress already started on block, skipping. failed to load chain state",
-				chainID,
-			),
-		}
-	}
-
-	css, ok := cs.(ChainSignState)
-	if !ok {
-		return &BeyondBlockError{
-			msg: fmt.Sprintf(
-				"[%s] Progress already started on block, skipping. expected: (ChainSignState), actual: (%T)",
-				chainID,
-				cs,
-			),
-		}
-	}
+	css := pv.mustLoadChainState(chainID)
 
 	lss := css.lastSignStateInitiated
 	return &BeyondBlockError{
@@ -392,15 +371,7 @@ func (pv *ThresholdValidator) getExistingBlockSignature(chainID string, block *B
 		step,
 	}
 
-	cs, ok := pv.chainState.Load(chainID)
-	if !ok {
-		return nil, stamp, fmt.Errorf("failed to load chain state for %s", chainID)
-	}
-
-	css, ok := cs.(ChainSignState)
-	if !ok {
-		return nil, stamp, fmt.Errorf("expected: (ChainSignState), actual: (%T)", cs)
-	}
+	css := pv.mustLoadChainState(chainID)
 
 	latestBlock, existingSignature := css.lastSignState.GetFromCache(
 		hrs,
@@ -640,15 +611,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 		},
 	}
 
-	cs, ok := pv.chainState.Load(chainID)
-	if !ok {
-		return nil, stamp, fmt.Errorf("failed to load chain state for %s", chainID)
-	}
-
-	css, ok := cs.(ChainSignState)
-	if !ok {
-		return nil, stamp, fmt.Errorf("expected: (ChainSignState), actual: (%T)", cs)
-	}
+	css := pv.mustLoadChainState(chainID)
 
 	// Err will be present if newLss is not above high watermark
 	css.lastSignStateMutex.Lock()

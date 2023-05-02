@@ -16,17 +16,17 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/signer"
 )
 
-func createCosignerDirectoryIfNecessary(id int) (string, error) {
-	dir := fmt.Sprintf("cosigner_%d", id)
+func createCosignerDirectoryIfNecessary(out string, id int) (string, error) {
+	dir := filepath.Join(out, fmt.Sprintf("cosigner_%d", id))
 	dirStat, err := os.Stat(dir)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -43,41 +43,89 @@ func createCosignerDirectoryIfNecessary(id int) (string, error) {
 	return dir, nil
 }
 
+const (
+	flagOutputDir = "out"
+	flagThreshold = "threshold"
+	flagShares    = "shares"
+	flagKeyFile   = "key-file"
+	flagChainID   = "chain-id"
+)
+
+func addOutputDirFlag(cmd *cobra.Command) {
+	cmd.Flags().StringP(flagOutputDir, "", "", "output directory")
+}
+
+func addShareFlag(cmd *cobra.Command) {
+	cmd.Flags().Uint8(flagShares, 0, "total key shares")
+}
+
+func addShardFlags(cmd *cobra.Command) {
+	addShareFlag(cmd)
+	cmd.Flags().Uint8(flagThreshold, 0, "threshold number of shares required to successfully sign")
+	cmd.Flags().String(flagKeyFile, "", "priv_validator_key.json file to shard")
+	cmd.Flags().String(flagChainID, "", "key shards will sign for this chain ID")
+}
+
 // CreateCosignerSharesCmd is a cobra command for creating cosigner shares from a priv validator
 func createCosignerEd25519SharesCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "create-ed25519-shares [chain-id] [priv_validator.json] [threshold] [shares]",
+		Use:     "create-ed25519-shares chain-id priv-validator-key-file threshold shares",
 		Aliases: []string{"shard", "shares"},
-		Args:    cobra.ExactArgs(4),
-		Short:   "Create  cosigner shares",
+		Args:    cobra.NoArgs,
+		Short:   "Create cosigner Ed25519 shares",
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			chainID, keyFile, threshold, shares := args[0], args[1], args[2], args[3]
+			flags := cmd.Flags()
+
+			chainID, _ := flags.GetString(flagChainID)
+			keyFile, _ := flags.GetString(flagKeyFile)
+			threshold, _ := flags.GetUint8(flagThreshold)
+			shares, _ := flags.GetUint8(flagShares)
+
+			var errs []error
+
+			if keyFile == "" {
+				errs = append(errs, fmt.Errorf("key-file flag must be provided and non-empty"))
+			}
+
+			if chainID == "" {
+				errs = append(errs, fmt.Errorf("chain-id flag must be provided and non-empty"))
+			}
+
+			if threshold == 0 {
+				errs = append(errs, fmt.Errorf("threshold flag must be provided and non-zero"))
+			}
+
+			if shares == 0 {
+				errs = append(errs, fmt.Errorf("shares flag must be provided and non-zero"))
+			}
 
 			if _, err := os.Stat(keyFile); err != nil {
-				return fmt.Errorf("error accessing priv_validator_key file(%s): %w", keyFile, err)
+				errs = append(errs, fmt.Errorf("error accessing priv_validator_key file(%s): %w", keyFile, err))
 			}
 
-			t, err := strconv.ParseInt(threshold, 10, 64)
+			if threshold > shares {
+				errs = append(errs, fmt.Errorf(
+					"threshold cannot be greater than total shares, got [threshold](%d) > [shares](%d)",
+					threshold, shares,
+				))
+			}
+
+			if threshold <= shares/2 {
+				errs = append(errs, fmt.Errorf("threshold must be greater than total shares "+
+					"divided by 2, got [threshold](%d) <= [shares](%d) / 2", threshold, shares))
+			}
+
+			if len(errs) > 0 {
+				return errors.Join(errs...)
+			}
+
+			csKeys, err := signer.CreateCosignerSharesFromFile(keyFile, threshold, shares)
 			if err != nil {
-				return fmt.Errorf("error parsing threshold (%s): %w", threshold, err)
+				return err
 			}
 
-			n, err := strconv.ParseInt(shares, 10, 64)
-			if err != nil {
-				return fmt.Errorf("error parsing shares (%s): %w", shares, err)
-			}
-
-			if t > n {
-				return fmt.Errorf("threshold cannot be greater than total shares, got [threshold](%d) > [shares](%d)", t, n)
-			}
-
-			if t <= n/2 {
-				return fmt.Errorf("threshold must be greater than total shares "+
-					"divided by 2, got [threshold](%d) <= [shares](%d) / 2", t, n)
-			}
-
-			csKeys, err := signer.CreateCosignerSharesFromFile(keyFile, t, n)
-			if err != nil {
+			out, _ := cmd.Flags().GetString(flagOutputDir)
+			if err := os.MkdirAll(out, 0700); err != nil {
 				return err
 			}
 
@@ -85,7 +133,7 @@ func createCosignerEd25519SharesCmd() *cobra.Command {
 			cmd.SilenceUsage = true
 
 			for _, c := range csKeys {
-				dir, err := createCosignerDirectoryIfNecessary(c.ID)
+				dir, err := createCosignerDirectoryIfNecessary(out, c.ID)
 				if err != nil {
 					return err
 				}
@@ -93,35 +141,38 @@ func createCosignerEd25519SharesCmd() *cobra.Command {
 				if err = signer.WriteCosignerShareFile(c, filename); err != nil {
 					return err
 				}
-				fmt.Printf("Created Ed25519 Share %s\n", filename)
+				fmt.Fprintf(cmd.OutOrStdout(), "Created Ed25519 Share %s\n", filename)
 			}
 			return nil
 		},
 	}
+	addShardFlags(cmd)
+	addOutputDirFlag(cmd)
 	return cmd
 }
 
 // CreateCosignerSharesCmd is a cobra command for creating cosigner shares from a priv validator
 func createCosignerRSASharesCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "create-rsa-shares [shares]",
+		Use:     "create-rsa-shares shares",
 		Aliases: []string{"shard", "shares"},
-		Args:    cobra.ExactArgs(1),
-		Short:   "Create  cosigner shares",
+		Args:    cobra.NoArgs,
+		Short:   "Create cosigner RSA shares",
 
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			shares := args[0]
-			n, err := strconv.ParseInt(shares, 10, 64)
-			if err != nil {
-				return fmt.Errorf("error parsing shares (%s): %w", shares, err)
+			shares, _ := cmd.Flags().GetUint8(flagShares)
+
+			if shares <= 0 {
+				return fmt.Errorf("shares must be greater than zero (%d): %w", shares, err)
 			}
 
-			if n <= 0 {
-				return fmt.Errorf("shares must be greater than zero (%s): %w", shares, err)
+			csKeys, err := signer.CreateCosignerSharesRSA(int(shares))
+			if err != nil {
+				return err
 			}
 
-			csKeys, err := signer.CreateCosignerSharesRSA(int(n))
-			if err != nil {
+			out, _ := cmd.Flags().GetString(flagOutputDir)
+			if err := os.MkdirAll(out, 0700); err != nil {
 				return err
 			}
 
@@ -129,7 +180,7 @@ func createCosignerRSASharesCmd() *cobra.Command {
 			cmd.SilenceUsage = true
 
 			for _, c := range csKeys {
-				dir, err := createCosignerDirectoryIfNecessary(c.ID)
+				dir, err := createCosignerDirectoryIfNecessary(out, c.ID)
 				if err != nil {
 					return err
 				}
@@ -137,10 +188,12 @@ func createCosignerRSASharesCmd() *cobra.Command {
 				if err = signer.WriteCosignerShareRSAFile(c, filename); err != nil {
 					return err
 				}
-				fmt.Printf("Created RSA Share %s\n", filename)
+				fmt.Fprintf(cmd.OutOrStdout(), "Created RSA Share %s\n", filename)
 			}
 			return nil
 		},
 	}
+	addShareFlag(cmd)
+	addOutputDirFlag(cmd)
 	return cmd
 }

@@ -1,13 +1,23 @@
 package signer
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/strangelove-ventures/horcrux/signer/testdata"
 	"github.com/stretchr/testify/require"
 )
 
 func TestLoadCosignerKey(t *testing.T) {
-	key, err := LoadCosignerKeyRSA("./fixtures/rsa_keys.json")
+	tmp := t.TempDir()
+
+	rsaKeyFile := filepath.Join(tmp, "rsa_keys.json")
+
+	err := os.WriteFile(rsaKeyFile, testdata.RSAKeys, 0600)
+	require.NoError(t, err)
+
+	key, err := LoadCosignerKeyRSA(rsaKeyFile)
 	require.NoError(t, err)
 	require.Equal(t, key.ID, 3)
 

@@ -7,26 +7,21 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/strangelove-ventures/horcrux/cmd/horcrux/cmd/testdata"
 	"github.com/stretchr/testify/require"
 )
 
 func TestMigrateV2toV3(t *testing.T) {
-	v2ConfigBz, err := os.ReadFile("./fixtures/config-v2.yaml")
-	require.NoError(t, err)
-
-	v2ShareBz, err := os.ReadFile("./fixtures/cosigner-key-v2.json")
-	require.NoError(t, err)
-
 	tmp := t.TempDir()
 
 	configFile := filepath.Join(tmp, "config.yaml")
 
-	err = os.WriteFile(configFile, v2ConfigBz, 0600)
+	err := os.WriteFile(configFile, testdata.ConfigV2, 0600)
 	require.NoError(t, err)
 
 	keyShareFile := filepath.Join(tmp, "share.json")
 
-	err = os.WriteFile(keyShareFile, v2ShareBz, 0600)
+	err = os.WriteFile(keyShareFile, testdata.CosignerKeyV2, 0600)
 	require.NoError(t, err)
 
 	cmd := rootCmd()
@@ -47,26 +42,17 @@ func TestMigrateV2toV3(t *testing.T) {
 	newKeyShareFileBz, err := os.ReadFile(newKeyShareFile)
 	require.NoError(t, err)
 
-	v3ShareBz, err := os.ReadFile("./fixtures/cosigner-key-migrated-ed25519.json")
-	require.NoError(t, err)
-
-	require.Equal(t, string(v3ShareBz), string(newKeyShareFileBz))
+	require.Equal(t, testdata.CosignerKeyMigratedEd25519, string(newKeyShareFileBz))
 
 	newRSAKeyFileBz, err := os.ReadFile(newRSAKeyFile)
 	require.NoError(t, err)
 
-	v3RSABz, err := os.ReadFile("./fixtures/cosigner-key-migrated-rsa.json")
-	require.NoError(t, err)
-
-	require.Equal(t, string(v3RSABz), string(newRSAKeyFileBz))
+	require.Equal(t, testdata.CosignerKeyMigratedRSA, string(newRSAKeyFileBz))
 
 	newConfigFileBz, err := os.ReadFile(configFile)
 	require.NoError(t, err)
 
-	v3ConfigBz, err := os.ReadFile("./fixtures/config-migrated.yaml")
-	require.NoError(t, err)
-
-	require.Equal(t, string(v3ConfigBz), string(newConfigFileBz))
+	require.Equal(t, testdata.ConfigMigrated, string(newConfigFileBz))
 }
 
 func appendToFile(file, append string) error {
@@ -81,21 +67,15 @@ func appendToFile(file, append string) error {
 }
 
 func TestMigrateV2toV3DifferentKeyFilePath(t *testing.T) {
-	v2ConfigBz, err := os.ReadFile("./fixtures/config-v2.yaml")
-	require.NoError(t, err)
-
-	v2ShareBz, err := os.ReadFile("./fixtures/cosigner-key-v2.json")
-	require.NoError(t, err)
-
 	tmp := t.TempDir()
 
 	keyDir := filepath.Join(tmp, "keys")
-	err = os.Mkdir(keyDir, 0700)
+	err := os.Mkdir(keyDir, 0700)
 	require.NoError(t, err)
 
 	configFile := filepath.Join(tmp, "config.yaml")
 
-	err = os.WriteFile(configFile, v2ConfigBz, 0600)
+	err = os.WriteFile(configFile, testdata.ConfigV2, 0600)
 	require.NoError(t, err)
 
 	keyShareFile := filepath.Join(keyDir, "share.json")
@@ -103,7 +83,7 @@ func TestMigrateV2toV3DifferentKeyFilePath(t *testing.T) {
 	err = appendToFile(configFile, fmt.Sprintf("key-file: %s", keyShareFile))
 	require.NoError(t, err)
 
-	err = os.WriteFile(keyShareFile, v2ShareBz, 0600)
+	err = os.WriteFile(keyShareFile, testdata.CosignerKeyV2, 0600)
 	require.NoError(t, err)
 
 	cmd := rootCmd()
@@ -124,24 +104,15 @@ func TestMigrateV2toV3DifferentKeyFilePath(t *testing.T) {
 	newKeyShareFileBz, err := os.ReadFile(newKeyShareFile)
 	require.NoError(t, err)
 
-	v3ShareBz, err := os.ReadFile("./fixtures/cosigner-key-migrated-ed25519.json")
-	require.NoError(t, err)
-
-	require.Equal(t, string(v3ShareBz), string(newKeyShareFileBz))
+	require.Equal(t, testdata.CosignerKeyMigratedEd25519, string(newKeyShareFileBz))
 
 	newRSAKeyFileBz, err := os.ReadFile(newRSAKeyFile)
 	require.NoError(t, err)
 
-	v3RSABz, err := os.ReadFile("./fixtures/cosigner-key-migrated-rsa.json")
-	require.NoError(t, err)
-
-	require.Equal(t, string(v3RSABz), string(newRSAKeyFileBz))
+	require.Equal(t, testdata.CosignerKeyMigratedRSA, string(newRSAKeyFileBz))
 
 	newConfigFileBz, err := os.ReadFile(configFile)
 	require.NoError(t, err)
 
-	v3ConfigBz, err := os.ReadFile("./fixtures/config-migrated.yaml")
-	require.NoError(t, err)
-
-	require.Equal(t, fmt.Sprintf("key-dir: %s\n", keyDir)+string(v3ConfigBz), string(newConfigFileBz))
+	require.Equal(t, fmt.Sprintf("key-dir: %s\n", keyDir)+testdata.ConfigMigrated, string(newConfigFileBz))
 }

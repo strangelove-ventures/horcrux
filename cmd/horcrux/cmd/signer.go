@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/spf13/cobra"
@@ -39,7 +38,9 @@ func startSignerCmd() *cobra.Command {
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			fmt.Fprintln(cmd.OutOrStdout(), singleSignerWarning)
+			out := cmd.OutOrStdout()
+
+			fmt.Fprintln(out, singleSignerWarning)
 
 			acceptRisk, _ := cmd.Flags().GetBool(flagAcceptRisk)
 			if !acceptRisk {
@@ -54,7 +55,7 @@ func startSignerCmd() *cobra.Command {
 				return err
 			}
 
-			logger := cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)).With("module", "validator")
+			logger := cometlog.NewTMLogger(cometlog.NewSyncWriter(out)).With("module", "validator")
 
 			logger.Info(
 				"CometBFT Validator",
@@ -64,7 +65,7 @@ func startSignerCmd() *cobra.Command {
 
 			pv := signer.NewSingleSignerValidator(&config)
 
-			go EnableDebugAndMetrics(cmd.Context())
+			go EnableDebugAndMetrics(cmd.Context(), out)
 
 			services, err := signer.StartRemoteSigners(nil, logger, pv, config.Config.Nodes())
 			if err != nil {

@@ -15,12 +15,15 @@ import (
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
-const testChainID = "test"
+const (
+	testChainID  = "chain-1"
+	testChainID2 = "chain-2"
+	bitSize      = 4096
+)
 
 func TestLocalCosignerGetID(t *testing.T) {
 	dummyPub := cometcryptoed25519.PubKey{}
 
-	bitSize := 4096
 	rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(t, err)
 
@@ -52,7 +55,6 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	total := uint8(2)
 	threshold := uint8(2)
 
-	bitSize := 4096
 	rsaKey1, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(t, err)
 

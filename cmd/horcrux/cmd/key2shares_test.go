@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"io"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -27,48 +26,73 @@ func TestKey2Shares(t *testing.T) {
 		expectErr bool
 	}{
 		{
-			name:      "valid threshold and shares",
-			args:      []string{testChainID, privValidatorKeyFile, "2", "3"},
+			name: "valid threshold and shares",
+			args: []string{
+				"--chain-id", testChainID,
+				"--key-file", privValidatorKeyFile,
+				"--threshold", "2",
+				"--shares", "3",
+			},
 			expectErr: false,
 		},
 		{
-			name:      "valid threshold and shares 2",
-			args:      []string{testChainID, privValidatorKeyFile, "3", "5"},
+			name: "valid threshold and shares 2",
+			args: []string{
+				"--chain-id", testChainID,
+				"--key-file", privValidatorKeyFile,
+				"--threshold", "3",
+				"--shares", "5",
+			},
 			expectErr: false,
 		},
 		{
-			name:      "threshold exactly half of shares",
-			args:      []string{testChainID, privValidatorKeyFile, "2", "4"},
+			name: "threshold exactly half of shares",
+			args: []string{
+				"--chain-id", testChainID,
+				"--key-file", privValidatorKeyFile,
+				"--threshold", "2",
+				"--shares", "4",
+			},
 			expectErr: true,
 		},
 		{
-			name:      "threshold less than half of shares",
-			args:      []string{testChainID, privValidatorKeyFile, "1", "3"},
+			name: "threshold less than half of shares",
+			args: []string{
+				"--chain-id", testChainID,
+				"--key-file", privValidatorKeyFile,
+				"--threshold", "1",
+				"--shares", "3",
+			},
 			expectErr: true,
 		},
 		{
-			name:      "threshold exceeds shares",
-			args:      []string{testChainID, privValidatorKeyFile, "4", "3"},
+			name: "threshold exceeds shares",
+			args: []string{
+				"--chain-id", testChainID,
+				"--key-file", privValidatorKeyFile,
+				"--threshold", "4",
+				"--shares", "3",
+			},
 			expectErr: true,
 		},
 		{
-			name:      "non-numeric threshold and shares",
-			args:      []string{testChainID, privValidatorKeyFile, "two", "three"},
+			name: "non-numeric threshold and shares",
+			args: []string{
+				"--chain-id", testChainID,
+				"--key-file", privValidatorKeyFile,
+				"--threshold", "two",
+				"--shares", "three",
+			},
 			expectErr: true,
 		},
 	}
-
-	cwd, err := os.Getwd()
-	require.NoError(t, err)
-
-	require.NoError(t, os.Chdir(tmp))
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 
 			cmd := rootCmd()
 			cmd.SetOutput(io.Discard)
-			args := append([]string{"create-ed25519-shares", "--home", tmp}, tc.args...)
+			args := append([]string{"create-ed25519-shares", "--home", tmp, "--out", tmp}, tc.args...)
 			cmd.SetArgs(args)
 			err := cmd.Execute()
 			if tc.expectErr {
@@ -78,8 +102,6 @@ func TestKey2Shares(t *testing.T) {
 			}
 		})
 	}
-
-	require.NoError(t, os.Chdir(cwd))
 }
 
 func TestRSAShares(t *testing.T) {
@@ -92,26 +114,21 @@ func TestRSAShares(t *testing.T) {
 	}{
 		{
 			name:      "valid shares",
-			args:      []string{"3"},
+			args:      []string{"--shares", "3"},
 			expectErr: false,
 		},
 		{
 			name:      "invalid shares",
-			args:      []string{"0"},
+			args:      []string{"--shares", "0"},
 			expectErr: true,
 		},
 	}
-
-	cwd, err := os.Getwd()
-	require.NoError(t, err)
-
-	require.NoError(t, os.Chdir(tmp))
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			cmd := rootCmd()
 			cmd.SetOutput(io.Discard)
-			args := append([]string{"create-rsa-shares", "--home", tmp}, tc.args...)
+			args := append([]string{"create-rsa-shares", "--home", tmp, "--out", tmp}, tc.args...)
 			cmd.SetArgs(args)
 			err := cmd.Execute()
 			if tc.expectErr {
@@ -121,6 +138,4 @@ func TestRSAShares(t *testing.T) {
 			}
 		})
 	}
-
-	require.NoError(t, os.Chdir(cwd))
 }

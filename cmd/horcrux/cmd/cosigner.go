@@ -37,7 +37,7 @@ type AddressCmdOutput struct {
 
 func addressCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:          "address [chain-id] [bech32]",
+		Use:          "address chain-id [bech32]",
 		Short:        "Get public key hex address and valcons address",
 		Example:      `horcrux cosigner address cosmos`,
 		SilenceUsage: true,
@@ -117,7 +117,9 @@ func startCosignerCmd() *cobra.Command {
 				return err
 			}
 
-			logger := cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)).With("module", "validator")
+			out := cmd.OutOrStdout()
+
+			logger := cometlog.NewTMLogger(cometlog.NewSyncWriter(out)).With("module", "validator")
 
 			logger.Info(
 				"CometBFT Validator",
@@ -206,7 +208,7 @@ func startCosignerCmd() *cobra.Command {
 
 			raftStore.SetThresholdValidator(val)
 
-			go EnableDebugAndMetrics(cmd.Context())
+			go EnableDebugAndMetrics(cmd.Context(), out)
 
 			services, err = signer.StartRemoteSigners(services, logger, val, config.Config.Nodes())
 			if err != nil {
