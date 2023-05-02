@@ -27,7 +27,7 @@ import (
 // CreateCosignerSharesCmd is a cobra command for creating cosigner shares from a priv validator
 func createCosignerSharesCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "create-shares [priv_validator.json] [threshold] [shares]",
+		Use:     "create-ed25519-shares [priv_validator.json] [threshold] [shares]",
 		Aliases: []string{"shard", "shares"},
 		Args:    validateCreateCosignerShares,
 		Short:   "Create  cosigner shares",
@@ -51,10 +51,11 @@ func createCosignerSharesCmd() *cobra.Command {
 			cmd.SilenceUsage = true
 
 			for _, c := range csKeys {
-				if err = signer.WriteCosignerShareFile(c, fmt.Sprintf("private_share_%d.json", c.ID)); err != nil {
+				filename := fmt.Sprintf("private_share_%d.json", c.ID)
+				if err = signer.WriteCosignerShareFile(c, filename); err != nil {
 					return err
 				}
-				fmt.Printf("Created Share %d\n", c.ID)
+				fmt.Printf("Created Ed25519 Share %s\n", filename)
 			}
 			return nil
 		},
@@ -65,13 +66,13 @@ func createCosignerSharesCmd() *cobra.Command {
 // CreateCosignerSharesCmd is a cobra command for creating cosigner shares from a priv validator
 func createCosignerSharesRSACmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "create-shares-rsa [shares]",
+		Use:     "create-rsa-shares [shares]",
 		Aliases: []string{"shard", "shares"},
 		Args:    cobra.ExactArgs(1),
 		Short:   "Create  cosigner shares",
 
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			shares := args[2]
+			shares := args[0]
 			n, err := strconv.ParseInt(shares, 10, 64)
 			if err != nil {
 				return fmt.Errorf("error parsing shares (%s): %w", shares, err)
@@ -86,7 +87,7 @@ func createCosignerSharesRSACmd() *cobra.Command {
 			cmd.SilenceUsage = true
 
 			for _, c := range csKeys {
-				filename := fmt.Sprintf("cosigner_%d.json", c.ID)
+				filename := fmt.Sprintf("rsa_keys_%d.json", c.ID)
 				if err = signer.WriteCosignerShareRSAFile(c, filename); err != nil {
 					return err
 				}

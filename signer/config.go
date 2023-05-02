@@ -124,7 +124,11 @@ func (c RuntimeConfig) KeyFilePathCosigner(chainID string) string {
 }
 
 func (c RuntimeConfig) KeyFilePathCosignerRSA() string {
-	return filepath.Join(c.HomeDir, "cosigner.json")
+	keyDir := c.HomeDir
+	if kd := c.cachedKeyDirectory(); kd != "" {
+		keyDir = kd
+	}
+	return filepath.Join(keyDir, "rsa_keys.json")
 }
 
 func (c RuntimeConfig) PrivValStateFile(chainID string) string {

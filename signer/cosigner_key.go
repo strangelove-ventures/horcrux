@@ -13,7 +13,7 @@ import (
 	amino "github.com/tendermint/go-amino"
 )
 
-// CosignerKey is a single key for an m-of-n threshold signer.
+// CosignerKey is a single Ed255219 key shard for an m-of-n threshold signer.
 type CosignerKey struct {
 	PubKey   cometcrypto.PubKey `json:"pub_key"`
 	ShareKey []byte             `json:"secret_share"`
@@ -102,7 +102,7 @@ func LoadCosignerKey(file string) (CosignerKey, error) {
 	return pvKey, nil
 }
 
-// CosignerKey is a single key for an m-of-n threshold signer.
+// CosignerKey is a single RSA key for an m-of-n threshold signer.
 type CosignerKeyRSA struct {
 	RSAKey       rsa.PrivateKey   `json:"rsa_key"`
 	ID           int              `json:"id"`

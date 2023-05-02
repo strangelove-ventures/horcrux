@@ -129,7 +129,7 @@ func (tv *Validator) generateShares(filePVKey privval.FilePVKey, chainIDs ...str
 		if err := os.MkdirAll(s.Dir(), 0700); err != nil {
 			return err
 		}
-		cosignerFilename := filepath.Join(s.Dir(), "cosigner.json")
+		cosignerFilename := filepath.Join(s.Dir(), "rsa_keys.json")
 		if err := signer.WriteCosignerShareRSAFile(rsaShares[i], cosignerFilename); err != nil {
 			return err
 		}

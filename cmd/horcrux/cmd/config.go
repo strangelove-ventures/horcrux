@@ -18,6 +18,7 @@ func configCmd() *cobra.Command {
 	}
 
 	cmd.AddCommand(initCmd())
+	cmd.AddCommand(migrateCmd())
 
 	return cmd
 }
