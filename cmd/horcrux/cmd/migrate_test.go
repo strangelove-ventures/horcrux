@@ -19,6 +19,8 @@ func TestMigrateV2toV3(t *testing.T) {
 	err := os.WriteFile(configFile, testdata.ConfigV2, 0600)
 	require.NoError(t, err)
 
+	fmt.Printf("test data: %s\n", string(testdata.ConfigV2))
+
 	keyShareFile := filepath.Join(tmp, "share.json")
 
 	err = os.WriteFile(keyShareFile, testdata.CosignerKeyV2, 0600)

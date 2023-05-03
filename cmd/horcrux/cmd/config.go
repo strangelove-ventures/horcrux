@@ -1,10 +1,7 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
-	"net"
-	"net/url"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -68,28 +65,10 @@ func initCmd() *cobra.Command {
 					return err
 				}
 
-				listen, _ := cmdFlags.GetString("listen")
-				if listen == "" {
-					return errors.New("must input at least one node")
-				}
-				url, err := url.Parse(listen)
-				if err != nil {
-					return fmt.Errorf("error parsing listen address: %s, %v", listen, err)
-				}
-				host, _, err := net.SplitHostPort(url.Host)
-				if err != nil {
-					return err
-				}
-				if host == "0.0.0.0" {
-					return errors.New("host cannot be 0.0.0.0, must be reachable from other peers")
-				}
-
 				cfg = signer.Config{
 					PrivValKeyDir: keyDir,
 					CosignerConfig: &signer.CosignerConfig{
 						Threshold: threshold,
-						Shares:    len(peers) + 1,
-						P2PListen: listen,
 						Peers:     peers,
 						Timeout:   timeout,
 					},
@@ -133,7 +112,6 @@ func initCmd() *cobra.Command {
 		"cosigner peer addresses in format tcp://{addr}:{port}|{share-id} \n"+
 			"(i.e. \"tcp://node-1:2222|2,tcp://node-2:2222|3\")")
 	cmd.Flags().IntP("threshold", "t", 0, "indicate number of signatures required for threshold signature")
-	cmd.Flags().StringP("listen", "l", "", "listen address of the signer")
 	cmd.Flags().StringP("debug-addr", "d", "", "listen address for Debug and Prometheus metrics in format localhost:8543")
 	cmd.Flags().StringP("key-dir", "k", "", "priv val key directory")
 	cmd.Flags().String("timeout", "1500ms", "configure cosigner rpc server timeout value, \n"+

@@ -3,6 +3,7 @@ package signer
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -70,23 +71,21 @@ func (c *Config) ValidateCosignerConfig() error {
 		// the rest of the checks depend on non-nil c.CosignerConfig
 		return errors.Join(errs...)
 	}
-	if c.CosignerConfig.Threshold <= c.CosignerConfig.Shares/2 {
+	shares := len(c.CosignerConfig.Peers)
+	if c.CosignerConfig.Threshold <= shares/2 {
 		errs = append(errs, fmt.Errorf("threshold (%d) must be greater than number of shares (%d) / 2",
-			c.CosignerConfig.Threshold, c.CosignerConfig.Shares))
+			c.CosignerConfig.Threshold, shares))
 	}
-	if c.CosignerConfig.Shares < c.CosignerConfig.Threshold {
+	if shares < c.CosignerConfig.Threshold {
 		errs = append(errs, fmt.Errorf("number of shares (%d) must be greater or equal to threshold (%d)",
-			c.CosignerConfig.Shares, c.CosignerConfig.Threshold))
+			shares, c.CosignerConfig.Threshold))
 	}
 
 	_, err := time.ParseDuration(c.CosignerConfig.Timeout)
 	if err != nil {
 		errs = append(errs, fmt.Errorf("invalid --timeout: %w", err))
 	}
-	if _, err := url.Parse(c.CosignerConfig.P2PListen); err != nil {
-		errs = append(errs, fmt.Errorf("failed to parse p2p listen address: %w", err))
-	}
-	if err := c.CosignerConfig.Peers.Validate(c.CosignerConfig.Shares); err != nil {
+	if err := c.CosignerConfig.Peers.Validate(shares); err != nil {
 		errs = append(errs, err)
 	}
 	return errors.Join(errs...)
@@ -175,17 +174,14 @@ func (c RuntimeConfig) KeyFileExistsCosignerRSA() (string, error) {
 
 type CosignerConfig struct {
 	Threshold int                 `json:"threshold"   yaml:"threshold"`
-	Shares    int                 `json:"shares" yaml:"shares"`
-	P2PListen string              `json:"p2p-listen"  yaml:"p2p-listen"`
 	Peers     CosignerPeersConfig `json:"peers"       yaml:"peers"`
 	Timeout   string              `json:"rpc-timeout" yaml:"rpc-timeout"`
 }
 
 func (cfg *CosignerConfig) LeaderElectMultiAddress() (string, error) {
-	addresses := make([]string, 1+len(cfg.Peers))
-	addresses[0] = cfg.P2PListen
+	addresses := make([]string, len(cfg.Peers))
 	for i, peer := range cfg.Peers {
-		addresses[i+1] = peer.P2PAddr
+		addresses[i] = peer.P2PAddr
 	}
 	return client.MultiAddress(addresses)
 }
@@ -198,26 +194,43 @@ type CosignerPeerConfig struct {
 type CosignerPeersConfig []CosignerPeerConfig
 
 func (peers CosignerPeersConfig) Validate(shares int) error {
+	var errs []error
 	// Check IDs to make sure none are duplicated
 	if dupl := duplicatePeers(peers); len(dupl) != 0 {
-		return fmt.Errorf("found duplicate share IDs in args: %v", dupl)
+		errs = append(errs, fmt.Errorf("found duplicate share IDs in args: %v", dupl))
 	}
 
 	// Make sure that the peers' IDs match the number of shares.
 	for _, peer := range peers {
 		if peer.ShareID < 1 || peer.ShareID > shares {
-			return fmt.Errorf("peer ID %v in args is out of range, must be between 1 and %v, inclusive",
-				peer.ShareID, shares)
+			errs = append(errs, fmt.Errorf("peer ID %d in args is out of range, must be between 1 and %d, inclusive",
+				peer.ShareID, shares))
+		}
+
+		url, err := url.Parse(peer.P2PAddr)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to parse peer %d p2p address: %w", peer.ShareID, err))
+			continue
+		}
+
+		host, _, err := net.SplitHostPort(url.Host)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to parse peer %d host port: %w", peer.ShareID, err))
+			continue
+		}
+		if host == "0.0.0.0" {
+			errs = append(errs, fmt.Errorf("host cannot be 0.0.0.0, must be reachable from other peers"))
 		}
 	}
 
 	// Check that exactly {num-shares}-1 peers are in the peer list, assuming
 	// the remaining peer ID is the ID the local node is configured with.
-	if len(peers) != shares-1 {
-		return fmt.Errorf("incorrect number of peers. expected (%d shares - local node = %d peers)",
-			shares, shares-1)
+	if len(peers) != shares {
+		errs = append(errs, fmt.Errorf("incorrect number of peers. expected (%d shares = %d peers)",
+			shares, shares))
 	}
-	return nil
+
+	return errors.Join(errs...)
 }
 
 func duplicatePeers(peers []CosignerPeerConfig) (duplicates map[int][]string) {

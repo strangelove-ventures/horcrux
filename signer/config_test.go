@@ -93,10 +93,12 @@ func TestValidateCosignerConfig(t *testing.T) {
 			config: signer.Config{
 				CosignerConfig: &signer.CosignerConfig{
 					Threshold: 2,
-					Shares:    3,
 					Timeout:   "1000ms",
-					P2PListen: "tcp://127.0.0.1:2222",
 					Peers: signer.CosignerPeersConfig{
+						{
+							ShareID: 1,
+							P2PAddr: "tcp://127.0.0.1:2223",
+						},
 						{
 							ShareID: 2,
 							P2PAddr: "tcp://127.0.0.1:2223",
@@ -143,10 +145,12 @@ func TestValidateCosignerConfig(t *testing.T) {
 			config: signer.Config{
 				CosignerConfig: &signer.CosignerConfig{
 					Threshold: 2,
-					Shares:    3,
 					Timeout:   "1000ms",
-					P2PListen: ":2222",
 					Peers: signer.CosignerPeersConfig{
+						{
+							ShareID: 1,
+							P2PAddr: ":2222",
+						},
 						{
 							ShareID: 2,
 							P2PAddr: "tcp://127.0.0.1:2223",
@@ -169,7 +173,7 @@ func TestValidateCosignerConfig(t *testing.T) {
 					},
 				},
 			},
-			expectErr: fmt.Errorf("failed to parse p2p listen address: %w", &url.Error{
+			expectErr: fmt.Errorf("failed to parse peer 1 p2p address: %w", &url.Error{
 				Op:  "parse",
 				URL: ":2222",
 				Err: fmt.Errorf("missing protocol scheme"),
@@ -179,11 +183,13 @@ func TestValidateCosignerConfig(t *testing.T) {
 			name: "not enough peers",
 			config: signer.Config{
 				CosignerConfig: &signer.CosignerConfig{
-					Threshold: 2,
-					Shares:    3,
+					Threshold: 3,
 					Timeout:   "1000ms",
-					P2PListen: "tcp://127.0.0.1:2222",
 					Peers: signer.CosignerPeersConfig{
+						{
+							ShareID: 1,
+							P2PAddr: "tcp://127.0.0.1:2222",
+						},
 						{
 							ShareID: 2,
 							P2PAddr: "tcp://127.0.0.1:2223",
@@ -202,17 +208,19 @@ func TestValidateCosignerConfig(t *testing.T) {
 					},
 				},
 			},
-			expectErr: fmt.Errorf("incorrect number of peers. expected (3 shares - local node = 2 peers)"),
+			expectErr: fmt.Errorf("number of shares (2) must be greater or equal to threshold (3)"),
 		},
 		{
 			name: "invalid timeout",
 			config: signer.Config{
 				CosignerConfig: &signer.CosignerConfig{
 					Threshold: 2,
-					Shares:    3,
 					Timeout:   "1000",
-					P2PListen: "tcp://127.0.0.1:2222",
 					Peers: signer.CosignerPeersConfig{
+						{
+							ShareID: 1,
+							P2PAddr: "tcp://127.0.0.1:2222",
+						},
 						{
 							ShareID: 2,
 							P2PAddr: "tcp://127.0.0.1:2223",
@@ -242,10 +250,12 @@ func TestValidateCosignerConfig(t *testing.T) {
 			config: signer.Config{
 				CosignerConfig: &signer.CosignerConfig{
 					Threshold: 2,
-					Shares:    3,
 					Timeout:   "1000ms",
-					P2PListen: "tcp://127.0.0.1:2222",
 					Peers: signer.CosignerPeersConfig{
+						{
+							ShareID: 1,
+							P2PAddr: "tcp://127.0.0.1:2222",
+						},
 						{
 							ShareID: 2,
 							P2PAddr: "tcp://127.0.0.1:2223",
@@ -265,10 +275,12 @@ func TestValidateCosignerConfig(t *testing.T) {
 			config: signer.Config{
 				CosignerConfig: &signer.CosignerConfig{
 					Threshold: 2,
-					Shares:    3,
 					Timeout:   "1000ms",
-					P2PListen: "tcp://127.0.0.1:2222",
 					Peers: signer.CosignerPeersConfig{
+						{
+							ShareID: 1,
+							P2PAddr: "tcp://127.0.0.1:2222",
+						},
 						{
 							ShareID: 2,
 							P2PAddr: "tcp://127.0.0.1:2223",
@@ -340,10 +352,12 @@ func TestRuntimeConfigWriteConfigFile(t *testing.T) {
 		Config: signer.Config{
 			CosignerConfig: &signer.CosignerConfig{
 				Threshold: 2,
-				Shares:    3,
 				Timeout:   "1000ms",
-				P2PListen: "tcp://127.0.0.1:2222",
 				Peers: signer.CosignerPeersConfig{
+					{
+						ShareID: 1,
+						P2PAddr: "tcp://127.0.0.1:2222",
+					},
 					{
 						ShareID: 2,
 						P2PAddr: "tcp://127.0.0.1:2223",
@@ -373,9 +387,9 @@ func TestRuntimeConfigWriteConfigFile(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, `cosigner:
   threshold: 2
-  shares: 3
-  p2p-listen: tcp://127.0.0.1:2222
   peers:
+  - share-id: 1
+    p2p-addr: tcp://127.0.0.1:2222
   - share-id: 2
     p2p-addr: tcp://127.0.0.1:2223
   - share-id: 3
@@ -438,10 +452,12 @@ func TestRuntimeConfigKeyFileExists(t *testing.T) {
 func TestCosignerConfigLeaderElectMultiAddress(t *testing.T) {
 	c := &signer.CosignerConfig{
 		Threshold: 2,
-		Shares:    3,
 		Timeout:   "1000ms",
-		P2PListen: "tcp://127.0.0.1:2222",
 		Peers: signer.CosignerPeersConfig{
+			{
+				ShareID: 1,
+				P2PAddr: "tcp://127.0.0.1:2222",
+			},
 			{
 				ShareID: 2,
 				P2PAddr: "tcp://127.0.0.1:2223",
@@ -469,6 +485,10 @@ func TestCosignerPeersConfigValidate(t *testing.T) {
 		{
 			name: "valid config",
 			peers: signer.CosignerPeersConfig{
+				{
+					ShareID: 1,
+					P2PAddr: "tcp://127.0.0.1:2222",
+				},
 				{
 					ShareID: 2,
 					P2PAddr: "tcp://127.0.0.1:2223",
@@ -509,7 +529,7 @@ func TestCosignerPeersConfigValidate(t *testing.T) {
 				},
 			},
 			shares:    4,
-			expectErr: fmt.Errorf("incorrect number of peers. expected (4 shares - local node = 3 peers)"),
+			expectErr: fmt.Errorf("incorrect number of peers. expected (4 shares = 4 peers)"),
 		},
 		{
 			name: "duplicate peer",
@@ -523,7 +543,7 @@ func TestCosignerPeersConfigValidate(t *testing.T) {
 					P2PAddr: "tcp://127.0.0.1:2223",
 				},
 			},
-			shares:    3,
+			shares:    2,
 			expectErr: fmt.Errorf("found duplicate share IDs in args: map[2:[tcp://127.0.0.1:2223 tcp://127.0.0.1:2223]]"),
 		},
 	}

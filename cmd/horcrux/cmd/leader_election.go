@@ -9,6 +9,7 @@ import (
 	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/client"
+	"github.com/strangelove-ventures/horcrux/signer"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -93,12 +94,35 @@ func getLeaderCmd() *cobra.Command {
 		Example:      `horcrux leader`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			if config.Config.CosignerConfig == nil {
+			cosignerConfig := config.Config.CosignerConfig
+			if cosignerConfig == nil {
 				return fmt.Errorf("cosigner configuration is not present in config file")
 			}
 
-			if len(config.Config.CosignerConfig.Peers) == 0 {
+			if len(cosignerConfig.Peers) == 0 {
 				return fmt.Errorf("cosigner configuration has no peers")
+			}
+
+			keyFile, err := config.KeyFileExistsCosignerRSA()
+			if err != nil {
+				return err
+			}
+
+			key, err := signer.LoadCosignerKeyRSA(keyFile)
+			if err != nil {
+				return fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
+			}
+
+			var p2pListen string
+
+			for _, peer := range cosignerConfig.Peers {
+				if peer.ShareID == key.ID {
+					p2pListen = peer.P2PAddr
+				}
+			}
+
+			if p2pListen == "" {
+				return fmt.Errorf("peer config does not exist for our share ID %d", key.ID)
 			}
 
 			retryOpts := []grpcretry.CallOption{
@@ -106,7 +130,7 @@ func getLeaderCmd() *cobra.Command {
 				grpcretry.WithMax(5),
 			}
 
-			grpcAddress, err := client.SanitizeAddress(config.Config.CosignerConfig.P2PListen)
+			grpcAddress, err := client.SanitizeAddress(p2pListen)
 			if err != nil {
 				return err
 			}

@@ -23,6 +23,9 @@ type (
 	v2Config struct {
 		ChainID        string  `json:"chain-id" yaml:"chain-id"`
 		PrivValKeyFile *string `json:"key-file,omitempty" yaml:"key-file,omitempty"`
+		Cosigner       struct {
+			P2PListen string `json:"p2p-listen"  yaml:"p2p-listen"`
+		} `json:"cosigner"  yaml:"cosigner"`
 	}
 
 	v2CosignerKey struct {
@@ -118,10 +121,10 @@ func (cosignerKey *v2CosignerKey) validate() error {
 
 func migrateCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:          "migrate",
+		Use:          "migrate [chain-id]",
 		Short:        "Migrate config and key files from v2 to v3",
 		SilenceUsage: true,
-		Args:         cobra.NoArgs,
+		Args:         cobra.RangeArgs(0, 1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
@@ -130,17 +133,23 @@ func migrateCmd() *cobra.Command {
 				return err
 			}
 
+			var chainID string
+
 			var legacyConfig v2Config
 
 			if err := yaml.Unmarshal(configFile, &legacyConfig); err != nil {
 				return fmt.Errorf("failed to read config file as legacy: %w", err)
 			}
 
-			if legacyConfig.ChainID == "" {
-				return fmt.Errorf("unable to migrate v2 config without chain-id")
-			}
+			if len(args) == 1 {
+				chainID = args[0]
+			} else {
+				if legacyConfig.ChainID == "" {
+					return fmt.Errorf("unable to migrate v2 config without chain-id. please provide [chain-id] argument")
+				}
 
-			chainID := legacyConfig.ChainID
+				chainID = legacyConfig.ChainID
+			}
 
 			var legacyCosignerKeyFile string
 
@@ -201,6 +210,13 @@ func migrateCmd() *cobra.Command {
 			newRSAPath := config.KeyFilePathCosignerRSA()
 			if err := os.WriteFile(newRSAPath, newRSAKeyBz, 0600); err != nil {
 				return fmt.Errorf("failed to write new RSA key to %s: %w", newRSAPath, err)
+			}
+
+			if legacyConfig.Cosigner.P2PListen != "" {
+				config.Config.CosignerConfig.Peers = append(config.Config.CosignerConfig.Peers, signer.CosignerPeerConfig{
+					ShareID: legacyCosignerKey.ID,
+					P2PAddr: legacyConfig.Cosigner.P2PListen,
+				})
 			}
 
 			if err := config.WriteConfigFile(); err != nil {

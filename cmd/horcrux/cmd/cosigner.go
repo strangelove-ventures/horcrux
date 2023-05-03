@@ -143,25 +143,30 @@ func startCosignerCmd() *cobra.Command {
 				return fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
 			}
 
-			cosigners := []signer.Cosigner{}
-
-			// add ourselves as a peer so localcosigner can handle GetEphSecPart requests
-			peers := []signer.CosignerPeer{{
-				ID:        key.ID,
-				PublicKey: key.RSAKey.PublicKey,
-			}}
-
 			cosignerConfig := config.Config.CosignerConfig
 
-			for _, cosignerParams := range cosignerConfig.Peers {
-				cosigner := signer.NewRemoteCosigner(cosignerParams.ShareID, cosignerParams.P2PAddr)
-				cosigners = append(cosigners, cosigner)
+			cosigners := make([]signer.Cosigner, 0, len(cosignerConfig.Peers))
+			peers := make([]signer.CosignerPeer, len(cosignerConfig.Peers))
+
+			var p2pListen string
+
+			for i, cosignerParams := range cosignerConfig.Peers {
+				if cosignerParams.ShareID != key.ID {
+					cosigner := signer.NewRemoteCosigner(cosignerParams.ShareID, cosignerParams.P2PAddr)
+					cosigners = append(cosigners, cosigner)
+				} else {
+					p2pListen = cosignerParams.P2PAddr
+				}
 
 				pubKey := key.CosignerKeys[cosignerParams.ShareID-1]
-				peers = append(peers, signer.CosignerPeer{
-					ID:        cosigner.GetID(),
+				peers[i] = signer.CosignerPeer{
+					ID:        key.ID,
 					PublicKey: *pubKey,
-				})
+				}
+			}
+
+			if p2pListen == "" {
+				return fmt.Errorf("peer config does not exist for our share ID %d", key.ID)
 			}
 
 			total := len(cosignerConfig.Peers) + 1
@@ -171,7 +176,7 @@ func startCosignerCmd() *cobra.Command {
 				key.ID,
 				key.RSAKey,
 				peers,
-				cosignerConfig.P2PListen,
+				p2pListen,
 				uint8(total),
 				uint8(cosignerConfig.Threshold),
 			)
@@ -191,7 +196,7 @@ func startCosignerCmd() *cobra.Command {
 
 			// Start RAFT store listener
 			raftStore := signer.NewRaftStore(nodeID,
-				raftDir, cosignerConfig.P2PListen, timeout, logger, localCosigner, cosigners)
+				raftDir, p2pListen, timeout, logger, localCosigner, cosigners)
 			if err := raftStore.Start(); err != nil {
 				return fmt.Errorf("error starting raft store: %w", err)
 			}
