@@ -63,20 +63,11 @@ $ sudo nano /etc/systemd/system/horcrux.service
 $ sudo systemctl daemon-reload
 ```
 
-After that is done, initialize the configuration for each node using the `horcrux` cli. Each node will require a slightly different command. Below are the commands for each of the 3 signer nodes given the private IPs above. Input your own data here:
+After that is done, initialize the configuration for the cosigners using the `horcrux` cli. If you would like different cosigners to connect to different sentry node(s), modify the first argument to generate different config for each cosigner.
 
 ```bash
-# Run this command on the signer-1 VM
-# signer-1 connects to sentry-1
-$ horcrux config init "tcp://10.168.0.1:1234" -c -p "tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3" -l "tcp://10.168.1.1:2222" -t 2
-
-# Run this command on the signer-2 VM
-# signer-2 connects to sentry-2
-$ horcrux config init "tcp://10.168.0.2:1234" -c -p "tcp://10.168.1.1:2222|1,tcp://10.168.1.3:2222|3" -l "tcp://10.168.1.2:2222" -t 2
-
-# Run this command on the signer-3 VM
-# signer-3 connects to sentry-3
-$ horcrux config init "tcp://10.168.0.3:1234" -c -p "tcp://10.168.1.1:2222|1,tcp://10.168.1.2:2222|2" -l "tcp://10.168.1.3:2222" -t 2
+# Run this command to generate a config file that can be used on all config nodes.
+$ horcrux config init "tcp://10.168.0.1:1234" -c -p "tcp://10.168.1.1:2222|1,tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3" -t 2 --timeout 1000ms
 ```
 
 > **Note** 
@@ -219,6 +210,6 @@ You now can sleep much better at night because you are much less likely to have 
 
 ### 8. Administration Commands
 
-`horcrux elect` - Elect a new cluster leader. Pass an optional argument with the intended leader ID to elect that cosigner as the new leader, e.g. `horcrux elect 3` to elect cosigner with `ID: 3` as leader
+`horcrux elect` - Elect a new cluster leader. Pass an optional argument with the intended leader ID to elect that cosigner as the new leader, e.g. `horcrux elect 3` to elect cosigner with `ID: 3` as leader. This is an optimistic leader election, it is not guaranteed that the exact requested leader will be elected.
 
 `horcrux cosigner address` - Get the public key address as both hex and optionally the validator consensus bech32 address. To retrieve the valcons bech32 address, pass an optional argument with the chain's bech32 valcons prefix, e.g. `horcrux cosigner address cosmosvalcons`
