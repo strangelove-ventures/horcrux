@@ -5,6 +5,7 @@ import (
 	"net"
 	"time"
 
+	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	cometcryptoencoding "github.com/cometbft/cometbft/crypto/encoding"
 	cometlog "github.com/cometbft/cometbft/libs/log"
@@ -14,13 +15,14 @@ import (
 	cometprotocrypto "github.com/cometbft/cometbft/proto/tendermint/crypto"
 	cometprotoprivval "github.com/cometbft/cometbft/proto/tendermint/privval"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	comet "github.com/cometbft/cometbft/types"
 )
 
 // PrivValidator is a wrapper for tendermint PrivValidator,
 // with additional Stop method for safe shutdown.
 type PrivValidator interface {
-	comet.PrivValidator
+	SignVote(chainID string, vote *cometproto.Vote) error
+	SignProposal(chainID string, proposal *cometproto.Proposal) error
+	GetPubKey(chainID string) (cometcrypto.PubKey, error)
 	Stop()
 }
 
@@ -307,7 +309,7 @@ func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) cometprotopriv
 		Error:  nil,
 	}}
 
-	pubKey, err := rs.privVal.GetPubKey()
+	pubKey, err := rs.privVal.GetPubKey(chainID)
 	if err != nil {
 		rs.Logger.Error(
 			"Failed to get Pub Key",

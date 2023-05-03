@@ -17,7 +17,7 @@ func testChainSingleNodeAndHorcrux(
 	t *testing.T,
 	totalValidators int, // total number of validators on chain (one horcrux + single node for the rest)
 	totalSigners int, // total number of signers for the single horcrux validator
-	threshold int, // key shard threshold, and therefore how many horcrux signers must participate to sign a block
+	threshold uint8, // key shard threshold, and therefore how many horcrux signers must participate to sign a block
 	totalSentries int, // number of sentry nodes for the single horcrux validator
 	sentriesPerSigner int, // how many sentries should each horcrux signer connect to (min: 1, max: totalSentries)
 ) {

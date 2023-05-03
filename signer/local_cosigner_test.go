@@ -15,12 +15,15 @@ import (
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
-const testChainID = "test"
+const (
+	testChainID  = "chain-1"
+	testChainID2 = "chain-2"
+	bitSize      = 4096
+)
 
 func TestLocalCosignerGetID(t *testing.T) {
 	dummyPub := cometcryptoed25519.PubKey{}
 
-	bitSize := 4096
 	rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(t, err)
 
@@ -32,7 +35,7 @@ func TestLocalCosignerGetID(t *testing.T) {
 
 	cosigner := NewLocalCosigner(
 		&RuntimeConfig{},
-		key,
+		key.ID,
 		*rsaKey,
 		[]CosignerPeer{{
 			ID:        1,
@@ -42,7 +45,8 @@ func TestLocalCosignerGetID(t *testing.T) {
 		0,
 		0,
 	)
-	require.Equal(t, cosigner.GetID(), 1)
+
+	require.Equal(t, 1, cosigner.GetID())
 }
 
 func TestLocalCosignerSign2of2(t *testing.T) {
@@ -51,7 +55,6 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	total := uint8(2)
 	threshold := uint8(2)
 
-	bitSize := 4096
 	rsaKey1, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(t, err)
 
@@ -94,24 +97,43 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	require.NoError(t, err)
 
 	cosigner1 := NewLocalCosigner(
-		&RuntimeConfig{StateDir: cosigner1Dir},
-		key1,
+		&RuntimeConfig{
+			HomeDir:  cosigner1Dir,
+			StateDir: cosigner1Dir,
+		},
+		key1.ID,
 		*rsaKey1,
 		peers,
 		"",
 		total,
 		threshold,
 	)
+
+	key1Bz, err := key1.MarshalJSON()
+	require.NoError(t, err)
+	err = os.WriteFile(cosigner1.config.KeyFilePathCosigner(testChainID), key1Bz, 0600)
+	require.NoError(t, err)
+
 	defer cosigner1.waitForSignStatesToFlushToDisk()
+
 	cosigner2 := NewLocalCosigner(
-		&RuntimeConfig{StateDir: cosigner2Dir},
-		key2,
+		&RuntimeConfig{
+			HomeDir:  cosigner2Dir,
+			StateDir: cosigner2Dir,
+		},
+		key2.ID,
 		*rsaKey2,
 		peers,
 		"",
 		total,
 		threshold,
 	)
+
+	key2Bz, err := key2.MarshalJSON()
+	require.NoError(t, err)
+	err = os.WriteFile(cosigner2.config.KeyFilePathCosigner(testChainID), key2Bz, 0600)
+	require.NoError(t, err)
+
 	defer cosigner2.waitForSignStatesToFlushToDisk()
 
 	err = cosigner1.LoadSignStateIfNecessary(testChainID)

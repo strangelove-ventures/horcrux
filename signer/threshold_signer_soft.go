@@ -21,6 +21,7 @@ import (
 type ThresholdSignerSoft struct {
 	pubKeyBytes []byte
 	key         CosignerKey
+	rsaKey      CosignerKeyRSA
 	// total signers
 	total     uint8
 	threshold uint8
@@ -32,9 +33,10 @@ type ThresholdSignerSoft struct {
 
 // NewThresholdSignerSoft constructs a ThresholdSigner
 // that signs using the local key share file.
-func NewThresholdSignerSoft(key CosignerKey, threshold, total uint8) ThresholdSigner {
+func NewThresholdSignerSoft(key CosignerKey, rsaKey CosignerKeyRSA, threshold, total uint8) ThresholdSigner {
 	softSigner := &ThresholdSignerSoft{
 		key:       key,
+		rsaKey:    rsaKey,
 		hrsMeta:   make(map[HRSTKey]HrsMetadata),
 		total:     total,
 		threshold: threshold,
@@ -268,7 +270,7 @@ func (softSigner *ThresholdSignerSoft) GetEphemeralSecretPart(
 	}
 
 	digest := sha256.Sum256(jsonBytes)
-	signature, err := rsa.SignPSS(rand.Reader, &softSigner.key.RSAKey, crypto.SHA256, digest[:], nil)
+	signature, err := rsa.SignPSS(rand.Reader, &softSigner.rsaKey.RSAKey, crypto.SHA256, digest[:], nil)
 
 	if err != nil {
 		return res, err
@@ -344,7 +346,7 @@ func (softSigner *ThresholdSignerSoft) SetEphemeralSecretPart(
 	}
 
 	// decrypt share
-	sharePart, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, &softSigner.key.RSAKey, req.EncryptedSharePart, nil)
+	sharePart, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, &softSigner.rsaKey.RSAKey, req.EncryptedSharePart, nil)
 	if err != nil {
 		return err
 	}

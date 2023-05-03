@@ -3,6 +3,7 @@ package signer
 import (
 	"time"
 
+	cometcrypto "github.com/cometbft/cometbft/crypto"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 )
 
@@ -136,6 +137,11 @@ type Cosigner interface {
 
 	// Get the P2P URL (GRPC and Raft)
 	GetAddress() string
+
+	// Get the combined public key
+	GetPubKey(chainID string) (cometcrypto.PubKey, error)
+
+	VerifySignature(chainID string, payload, signature []byte) bool
 
 	// Get ephemeral secret part for all peers
 	GetEphemeralSecretParts(chainID string, hrst HRSTKey) (*CosignerEphemeralSecretPartsResponse, error)

@@ -2,10 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
-	cometservice "github.com/cometbft/cometbft/libs/service"
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/signer"
 )
@@ -40,7 +38,9 @@ func startSignerCmd() *cobra.Command {
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			fmt.Fprintln(cmd.OutOrStdout(), singleSignerWarning)
+			out := cmd.OutOrStdout()
+
+			fmt.Fprintln(out, singleSignerWarning)
 
 			acceptRisk, _ := cmd.Flags().GetBool(flagAcceptRisk)
 			if !acceptRisk {
@@ -55,34 +55,19 @@ func startSignerCmd() *cobra.Command {
 				return err
 			}
 
-			var (
-				// services to stop on shutdown
-				services []cometservice.Service
-				logger   = cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)).With("module", "validator")
+			logger := cometlog.NewTMLogger(cometlog.NewSyncWriter(out)).With("module", "validator")
+
+			logger.Info(
+				"CometBFT Validator",
+				"mode", "single-signer",
+				"priv-state-dir", config.StateDir,
 			)
 
-			_, err = config.KeyFileExistsSingleSigner()
-			if err != nil {
-				return err
-			}
+			pv := signer.NewSingleSignerValidator(&config)
 
-			logger.Info("CometBFT Validator", "mode", "single-signer",
-				"priv-key", config.Config.PrivValKeyFile, "priv-state-dir", config.StateDir)
+			go EnableDebugAndMetrics(cmd.Context(), out)
 
-			pv, err := signer.NewSingleSignerValidator(&config)
-			if err != nil {
-				return fmt.Errorf("failed to construct single signer validator: %w", err)
-			}
-
-			pubkey, err := pv.GetPubKey()
-			if err != nil {
-				return fmt.Errorf("failed to get public key: %w", err)
-			}
-			logger.Info("Signer", "pubkey", pubkey)
-
-			go EnableDebugAndMetrics(cmd.Context())
-
-			services, err = signer.StartRemoteSigners(services, logger, pv, config.Config.Nodes())
+			services, err := signer.StartRemoteSigners(nil, logger, pv, config.Config.Nodes())
 			if err != nil {
 				return fmt.Errorf("failed to start remote signer(s): %w", err)
 			}

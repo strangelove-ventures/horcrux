@@ -74,7 +74,7 @@ func Genesis(
 			bech32Prefix = chain.Bech32Prefix
 		}
 
-		pubKey, err := signer.PubKey(bech32Prefix, v.PubKey)
+		pubKey, err := signer.PubKey(bech32Prefix, v.PubKeys[chain.ChainID])
 		if err != nil {
 			return err
 		}

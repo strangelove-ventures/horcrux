@@ -68,15 +68,15 @@ After that is done, initialize the configuration for each node using the `horcru
 ```bash
 # Run this command on the signer-1 VM
 # signer-1 connects to sentry-1
-$ horcrux config init {my_chain_id} "tcp://10.168.0.1:1234" -c -p "tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3" -l "tcp://10.168.1.1:2222" -t 2 --timeout 1500ms
+$ horcrux config init "tcp://10.168.0.1:1234" -c -p "tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3" -l "tcp://10.168.1.1:2222" -t 2
 
 # Run this command on the signer-2 VM
 # signer-2 connects to sentry-2
-$ horcrux config init {my_chain_id} "tcp://10.168.0.2:1234" -c -p "tcp://10.168.1.1:2222|1,tcp://10.168.1.3:2222|3" -l "tcp://10.168.1.2:2222" -t 2 --timeout 1500ms
+$ horcrux config init "tcp://10.168.0.2:1234" -c -p "tcp://10.168.1.1:2222|1,tcp://10.168.1.3:2222|3" -l "tcp://10.168.1.2:2222" -t 2
 
 # Run this command on the signer-3 VM
 # signer-3 connects to sentry-3
-$ horcrux config init {my_chain_id} "tcp://10.168.0.3:1234" -c -p "tcp://10.168.1.1:2222|1,tcp://10.168.1.2:2222|2" -l "tcp://10.168.1.3:2222" -t 2 --timeout 1500ms
+$ horcrux config init "tcp://10.168.0.3:1234" -c -p "tcp://10.168.1.1:2222|1,tcp://10.168.1.2:2222|2" -l "tcp://10.168.1.3:2222" -t 2
 ```
 
 > **Note** 
@@ -97,27 +97,41 @@ $ horcrux config init {my_chain_id} "tcp://10.168.0.3:1234" -c -p "tcp://10.168.
 
 > **CAUTION:** **The security of any key material is outside the scope of this guide. The suggested procedure here is not necessarily the one you will use. We aim to make this guide easy to understand, not necessarily the most secure. The tooling here is all written in go and can be compiled and used in an airgapped setup if needed. Please open issues if you have questions about how to fit `horcrux` into your infra.**
 
-On some computer that contains your `priv_validator_key.json` create a folder to split the key through the following command. This may take a moment o complete:
+On some computer that contains your `priv_validator_key.json` create a folder to split the key through the following command. This may take a moment to complete:
 
 ```bash
 $ ls
 priv_validator_key.json
 
-$ horcrux create-shares priv_validator_key.json 2 3
-Created Share 1
-Created Share 2
-Created Share 3
+$ horcrux create-ed25519-shares --chain-id cosmoshub-4 --key-file priv_validator_key.json --threshold 2 --shares 3
+Created Ed25519 Share cosigner_1/cosmoshub-4_share.json
+Created Ed25519 Share cosigner_2/cosmoshub-4_share.json
+Created Ed25519 Share cosigner_3/cosmoshub-4_share.json
 
-$ ls
-priv_validator_key.json
-private_share_1.json
-private_share_2.json
-private_share_3.json
+$ horcrux create-rsa-shares --shares 3
+Created RSA Share cosigner_1/rsa_keys.json
+Created RSA Share cosigner_2/rsa_keys.json
+Created RSA Share cosigner_3/rsa_keys.json
+
+$ ls -R
+.:
+cosigner_1  cosigner_2  cosigner_3 priv_validator_key.json
+
+./cosigner_1:
+cosmoshub-4_share.json  rsa_keys.json
+
+./cosigner_2:
+cosmoshub-4_share.json  rsa_keys.json
+
+./cosigner_3:
+cosmoshub-4_share.json  rsa_keys.json
 ```
 
-The shares need to be moved their co-responding signer nodes at `~/.horcrux/share.json`. It is very important to make sure the share id (in `private_share_<id>.json`) is on the corresponding cosigner node otherwise your signer cluster won't communicate properly and will not sign blocks. If you have named your nodes with their index as the signer index, as in this guide, this operation should be easy to check.
+The files need to be moved their corresponding signer nodes in the `~/.horcrux/` directory. It is important to make sure the files for the cosigner `{id}` (in `cosigner_{id}`) are placed on the corresponding cosigner node. If not, the cluster will not produce valid signatures. If you have named your nodes with their index as the signer index, as in this guide, this operation should be easy to check.
 
-At the end of this step, each of your horcrux nodes will have a `~/.horcrux/share.json` file with the contents matching the appropriate `private_share_<id>.json` file corresponding to the node number.
+At the end of this step, each of your horcrux nodes will have a `~/.horcrux/{chain-id}_share.json` file with the contents matching the appropriate `cosigner_{id}/share.json` file corresponding to the node number. Additionally, each of your horcrux nodes will have a `~/.horcrux/rsa_keys.json` file with the contents matching the appropriate `cosigner_{id}/rsa_keys.json` file corresponding to the node number.
+
+If you will be signing for multiple chains with this single horcrux cluster, repeat the `horcrux create-ed25519-shares` command with the `priv_validator_key.json` for each additional chain ID, and again place on the corresponding horcrux nodes.
 
 ### 4. Halt your validator node and supply signer state data `horcrux` nodes
 
