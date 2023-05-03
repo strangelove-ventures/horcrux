@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
+	"fmt"
 	"path/filepath"
 	"time"
 
 	"os"
 	"testing"
 
+	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/crypto/tmhash"
 	cometlog "github.com/cometbft/cometbft/libs/log"
@@ -19,6 +21,22 @@ import (
 	"github.com/stretchr/testify/require"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
+
+func TestThresholdValidator2of2(t *testing.T) {
+	testThresholdValidator(t, 2, 2)
+}
+
+func TestThresholdValidator3of3(t *testing.T) {
+	testThresholdValidator(t, 3, 3)
+}
+
+func TestThresholdValidator2of3(t *testing.T) {
+	testThresholdValidator(t, 2, 3)
+}
+
+func TestThresholdValidator3of5(t *testing.T) {
+	testThresholdValidator(t, 3, 5)
+}
 
 func getMockRaftStore(cosigner Cosigner, tmpDir string) *RaftStore {
 	return &RaftStore{
@@ -33,322 +51,98 @@ func getMockRaftStore(cosigner Cosigner, tmpDir string) *RaftStore {
 	}
 }
 
-func TestThresholdValidator2of2(t *testing.T) {
-	total := uint8(2)
-	threshold := uint8(2)
-
-	tmpDir := t.TempDir()
-	stateDir := filepath.Join(tmpDir, "state")
-
-	err := os.MkdirAll(stateDir, 0777)
-	require.NoError(t, err)
-
-	runtimeConfig := &RuntimeConfig{
-		HomeDir:  tmpDir,
-		StateDir: filepath.Join(tmpDir, "state"),
+func loadKeyForLocalCosigner(
+	cosigner *LocalCosigner,
+	pubKey cometcrypto.PubKey,
+	chainID string,
+	secretShare []byte,
+) error {
+	key := CosignerKey{
+		PubKey:   pubKey,
+		ShareKey: secretShare,
+		ID:       cosigner.GetID(),
 	}
 
-	bitSize := 4096
-	rsaKey1, err := rsa.GenerateKey(rand.Reader, bitSize)
-	require.NoError(t, err)
-
-	rsaKey2, err := rsa.GenerateKey(rand.Reader, bitSize)
-	require.NoError(t, err)
-
-	peers := []CosignerPeer{{
-		ID:        1,
-		PublicKey: rsaKey1.PublicKey,
-	}, {
-		ID:        2,
-		PublicKey: rsaKey2.PublicKey,
-	}}
-
-	privateKey := cometcryptoed25519.GenPrivKey()
-
-	privKeyBytes := privateKey[:]
-	secretShares := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
-
-	key1 := CosignerKey{
-		PubKey:   privateKey.PubKey(),
-		ShareKey: secretShares[0],
-		ID:       1,
-	}
-
-	key2 := CosignerKey{
-		PubKey:   privateKey.PubKey(),
-		ShareKey: secretShares[1],
-		ID:       2,
-	}
-
-	var cosigner1, cosigner2 Cosigner
-
-	cosigner1 = NewLocalCosigner(
-		runtimeConfig,
-		key1, *rsaKey1,
-		peers, "", total, threshold,
-	)
-	cosigner2 = NewLocalCosigner(
-		runtimeConfig,
-		key2, *rsaKey2,
-		peers, "", total, threshold,
-	)
-
-	require.Equal(t, cosigner1.GetID(), 1)
-	require.Equal(t, cosigner2.GetID(), 2)
-
-	thresholdPeers := []Cosigner{cosigner2}
-
-	raftStore := getMockRaftStore(cosigner1, tmpDir)
-
-	validator := NewThresholdValidator(
-		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
-		runtimeConfig,
-		privateKey.PubKey(),
-		int(threshold),
-		cosigner1,
-		thresholdPeers,
-		raftStore,
-	)
-	defer validator.Stop()
-
-	raftStore.SetThresholdValidator(validator)
-
-	_, err = raftStore.Open()
-	require.NoError(t, err)
-
-	time.Sleep(3 * time.Second) // Ensure there is a leader
-
-	proposal := cometproto.Proposal{
-		Height: 1,
-		Round:  0,
-		Type:   cometproto.ProposalType,
-	}
-
-	signBytes := comet.ProposalSignBytes(testChainID, &proposal)
-
-	err = validator.SignProposal(testChainID, &proposal)
-	require.NoError(t, err)
-
-	require.True(t, privateKey.PubKey().VerifySignature(signBytes, proposal.Signature))
-}
-
-func TestThresholdValidator3of3(t *testing.T) {
-	total := uint8(3)
-	threshold := uint8(3)
-
-	tmpDir := t.TempDir()
-	stateDir := filepath.Join(tmpDir, "state")
-
-	err := os.MkdirAll(stateDir, 0777)
-	require.NoError(t, err)
-
-	runtimeConfig := &RuntimeConfig{
-		HomeDir:  tmpDir,
-		StateDir: filepath.Join(tmpDir, "state"),
-	}
-
-	bitSize := 4096
-	rsaKey1, err := rsa.GenerateKey(rand.Reader, bitSize)
-	require.NoError(t, err)
-
-	rsaKey2, err := rsa.GenerateKey(rand.Reader, bitSize)
-	require.NoError(t, err)
-
-	rsaKey3, err := rsa.GenerateKey(rand.Reader, bitSize)
-	require.NoError(t, err)
-
-	peers := []CosignerPeer{{
-		ID:        1,
-		PublicKey: rsaKey1.PublicKey,
-	}, {
-		ID:        2,
-		PublicKey: rsaKey2.PublicKey,
-	}, {
-		ID:        3,
-		PublicKey: rsaKey3.PublicKey,
-	}}
-
-	privateKey := cometcryptoed25519.GenPrivKey()
-
-	privKeyBytes := privateKey[:]
-	secretShares := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
-
-	key1 := CosignerKey{
-		PubKey:   privateKey.PubKey(),
-		ShareKey: secretShares[0],
-		ID:       1,
-	}
-
-	key2 := CosignerKey{
-		PubKey:   privateKey.PubKey(),
-		ShareKey: secretShares[1],
-		ID:       2,
-	}
-
-	key3 := CosignerKey{
-		PubKey:   privateKey.PubKey(),
-		ShareKey: secretShares[2],
-		ID:       3,
-	}
-
-	var cosigner1, cosigner2, cosigner3 Cosigner
-
-	cosigner1 = NewLocalCosigner(
-		runtimeConfig,
-		key1, *rsaKey1,
-		peers, "", total, threshold,
-	)
-	cosigner2 = NewLocalCosigner(
-		runtimeConfig,
-		key2, *rsaKey2,
-		peers, "", total, threshold,
-	)
-	cosigner3 = NewLocalCosigner(
-		runtimeConfig,
-		key3, *rsaKey3,
-		peers, "", total, threshold,
-	)
-
-	require.Equal(t, cosigner1.GetID(), 1)
-	require.Equal(t, cosigner2.GetID(), 2)
-	require.Equal(t, cosigner3.GetID(), 3)
-
-	thresholdPeers := []Cosigner{cosigner2, cosigner3}
-
-	raftStore := getMockRaftStore(cosigner1, tmpDir)
-
-	validator := NewThresholdValidator(
-		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
-		runtimeConfig,
-		privateKey.PubKey(),
-		int(threshold),
-		cosigner1,
-		thresholdPeers,
-		raftStore,
-	)
-	defer validator.Stop()
-
-	raftStore.SetThresholdValidator(validator)
-
-	_, err = raftStore.Open()
-	require.NoError(t, err)
-
-	time.Sleep(3 * time.Second) // Ensure there is a leader
-
-	proposal := cometproto.Proposal{
-		Height: 1,
-		Round:  0,
-		Type:   cometproto.ProposalType,
-	}
-
-	signBytes := comet.ProposalSignBytes(testChainID, &proposal)
-
-	err = validator.SignProposal(testChainID, &proposal)
+	keyBz, err := key.MarshalJSON()
 	if err != nil {
-		t.Logf("%v", err)
+		return err
 	}
-	require.NoError(t, err)
 
-	require.True(t, privateKey.PubKey().VerifySignature(signBytes, proposal.Signature))
+	return os.WriteFile(cosigner.config.KeyFilePathCosigner(chainID), keyBz, 0600)
 }
 
-func TestThresholdValidator2of3(t *testing.T) {
-	total := uint8(3)
-	threshold := uint8(2)
+func testThresholdValidator(t *testing.T, threshold, total uint8) {
+	rsaKeys := make([]*rsa.PrivateKey, total)
+	peers := make([]CosignerPeer, total)
+	cosigners := make([]*LocalCosigner, total)
 
-	tmpDir := t.TempDir()
-	stateDir := filepath.Join(tmpDir, "state")
+	for i := uint8(0); i < total; i++ {
+		rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
+		require.NoError(t, err)
 
-	err := os.MkdirAll(stateDir, 0777)
-	require.NoError(t, err)
+		rsaKeys[i] = rsaKey
 
-	runtimeConfig := &RuntimeConfig{
-		HomeDir:  tmpDir,
-		StateDir: filepath.Join(tmpDir, "state"),
+		peers[i] = CosignerPeer{
+			ID:        int(i) + 1,
+			PublicKey: rsaKey.PublicKey,
+		}
 	}
 
-	bitSize := 4096
-	rsaKey1, err := rsa.GenerateKey(rand.Reader, bitSize)
-	require.NoError(t, err)
-
-	rsaKey2, err := rsa.GenerateKey(rand.Reader, bitSize)
-	require.NoError(t, err)
-
-	rsaKey3, err := rsa.GenerateKey(rand.Reader, bitSize)
-	require.NoError(t, err)
-
-	peers := []CosignerPeer{{
-		ID:        1,
-		PublicKey: rsaKey1.PublicKey,
-	}, {
-		ID:        2,
-		PublicKey: rsaKey2.PublicKey,
-	}, {
-		ID:        3,
-		PublicKey: rsaKey3.PublicKey,
-	}}
-
 	privateKey := cometcryptoed25519.GenPrivKey()
-
 	privKeyBytes := privateKey[:]
 	secretShares := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
 
-	key1 := CosignerKey{
-		PubKey:   privateKey.PubKey(),
-		ShareKey: secretShares[0],
-		ID:       1,
+	tmpDir := t.TempDir()
+
+	for i, peer := range peers {
+		cosignerDir := filepath.Join(tmpDir, fmt.Sprintf("cosigner_%d", peer.ID))
+		err := os.MkdirAll(cosignerDir, 0777)
+		require.NoError(t, err)
+
+		cosignerConfig := &RuntimeConfig{
+			HomeDir:  cosignerDir,
+			StateDir: cosignerDir,
+		}
+
+		cosigner := NewLocalCosigner(
+			cosignerConfig,
+			peer.ID, *rsaKeys[i],
+			peers, "", total, threshold,
+		)
+		require.NoError(t, err)
+
+		cosigners[i] = cosigner
+
+		err = loadKeyForLocalCosigner(cosigner, privateKey.PubKey(), testChainID, secretShares[i])
+		require.NoError(t, err)
+
+		err = loadKeyForLocalCosigner(cosigner, privateKey.PubKey(), testChainID2, secretShares[i])
+		require.NoError(t, err)
 	}
 
-	key2 := CosignerKey{
-		PubKey:   privateKey.PubKey(),
-		ShareKey: secretShares[1],
-		ID:       2,
+	thresholdPeers := make([]Cosigner, 0, threshold-1)
+
+	for i, cosigner := range cosigners {
+		require.Equal(t, i+1, cosigner.GetID())
+
+		if i != 0 && len(thresholdPeers) != int(threshold)-1 {
+			thresholdPeers = append(thresholdPeers, cosigner)
+		}
 	}
 
-	key3 := CosignerKey{
-		PubKey:   privateKey.PubKey(),
-		ShareKey: secretShares[2],
-		ID:       3,
-	}
-
-	var cosigner1, cosigner2, cosigner3 Cosigner
-
-	cosigner1 = NewLocalCosigner(
-		runtimeConfig,
-		key1, *rsaKey1,
-		peers, "", total, threshold,
-	)
-	cosigner2 = NewLocalCosigner(
-		runtimeConfig,
-		key2, *rsaKey2,
-		peers, "", total, threshold,
-	)
-	cosigner3 = NewLocalCosigner(
-		runtimeConfig,
-		key3, *rsaKey3,
-		peers, "", total, threshold,
-	)
-
-	require.Equal(t, cosigner1.GetID(), 1)
-	require.Equal(t, cosigner2.GetID(), 2)
-	require.Equal(t, cosigner3.GetID(), 3)
-
-	thresholdPeers := []Cosigner{cosigner2, cosigner3}
-
-	raftStore := getMockRaftStore(cosigner1, tmpDir)
+	raftStore := getMockRaftStore(cosigners[0], tmpDir)
 
 	validator := NewThresholdValidator(
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
-		runtimeConfig,
-		privateKey.PubKey(),
+		cosigners[0].config,
 		int(threshold),
-		cosigner1,
+		cosigners[0],
 		thresholdPeers,
 		raftStore,
 	)
 	defer validator.Stop()
 
-	err = validator.LoadSignStateIfNecessary(testChainID)
+	err := validator.LoadSignStateIfNecessary(testChainID)
 	require.NoError(t, err)
 
 	raftStore.SetThresholdValidator(validator)
@@ -416,16 +210,15 @@ func TestThresholdValidator2of3(t *testing.T) {
 	require.Error(t, err, "double sign!")
 
 	// lower LSS should sign for different chain ID
-	err = validator.SignProposal("different", &proposal)
+	err = validator.SignProposal(testChainID2, &proposal)
 	require.NoError(t, err)
 
 	// reinitialize validator to make sure new runtime will not allow double sign
 	newValidator := NewThresholdValidator(
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
-		runtimeConfig,
-		privateKey.PubKey(),
+		cosigners[0].config,
 		int(threshold),
-		cosigner1,
+		cosigners[0],
 		thresholdPeers,
 		raftStore,
 	)

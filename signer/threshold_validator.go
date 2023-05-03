@@ -17,14 +17,14 @@ import (
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
+var _ PrivValidator = &ThresholdValidator{}
+
 type ThresholdValidator struct {
 	config *RuntimeConfig
 
 	threshold int
 
-	pubKey crypto.PubKey
-
-	chainState map[string]ChainSignState
+	chainState sync.Map
 
 	// our own cosigner
 	cosigner Cosigner
@@ -54,21 +54,18 @@ type ChainSignState struct {
 func NewThresholdValidator(
 	logger log.Logger,
 	config *RuntimeConfig,
-	pubKey crypto.PubKey,
 	threshold int,
 	cosigner Cosigner,
 	peers []Cosigner,
 	raftStore *RaftStore,
 ) *ThresholdValidator {
 	return &ThresholdValidator{
-		logger:     logger,
-		config:     config,
-		pubKey:     pubKey,
-		threshold:  threshold,
-		cosigner:   cosigner,
-		peers:      peers,
-		raftStore:  raftStore,
-		chainState: make(map[string]ChainSignState),
+		logger:    logger,
+		config:    config,
+		threshold: threshold,
+		cosigner:  cosigner,
+		peers:     peers,
+		raftStore: raftStore,
 	}
 }
 
@@ -77,9 +74,25 @@ func NewThresholdValidator(
 // state updates. The disk write is scheduled in a separate goroutine which will perform an atomic write.
 // pendingDiskWG is used upon termination in pendingDiskWG to ensure all writes have completed.
 func (pv *ThresholdValidator) SaveLastSignedState(chainID string, signState SignStateConsensus) error {
-	pv.chainState[chainID].lastSignStateMutex.Lock()
-	defer pv.chainState[chainID].lastSignStateMutex.Unlock()
-	return pv.chainState[chainID].lastSignState.Save(signState, &pv.pendingDiskWG)
+	css := pv.mustLoadChainState(chainID)
+
+	css.lastSignStateMutex.Lock()
+	defer css.lastSignStateMutex.Unlock()
+	return css.lastSignState.Save(signState, &pv.pendingDiskWG)
+}
+
+func (pv *ThresholdValidator) mustLoadChainState(chainID string) ChainSignState {
+	cs, ok := pv.chainState.Load(chainID)
+	if !ok {
+		panic(fmt.Errorf("failed to load chain state for %s", chainID))
+	}
+
+	css, ok := cs.(ChainSignState)
+	if !ok {
+		panic(fmt.Errorf("expected: (ChainSignState), actual: (%T)", cs))
+	}
+
+	return css
 }
 
 // SaveLastSignedStateInitiated updates the high watermark height/round/step (HRS) for an initiated
@@ -87,9 +100,11 @@ func (pv *ThresholdValidator) SaveLastSignedState(chainID string, signState Sign
 // state updates. The disk write is scheduled in a separate goroutine which will perform an atomic write.
 // pendingDiskWG is used upon termination in pendingDiskWG to ensure all writes have completed.
 func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, signState SignStateConsensus) error {
-	pv.chainState[chainID].lastSignStateInitiatedMutex.Lock()
-	defer pv.chainState[chainID].lastSignStateInitiatedMutex.Unlock()
-	return pv.chainState[chainID].lastSignStateInitiated.Save(signState, &pv.pendingDiskWG)
+	css := pv.mustLoadChainState(chainID)
+
+	css.lastSignStateInitiatedMutex.Lock()
+	defer css.lastSignStateInitiatedMutex.Unlock()
+	return css.lastSignStateInitiated.Save(signState, &pv.pendingDiskWG)
 }
 
 // Stop safely shuts down the ThresholdValidator.
@@ -110,8 +125,8 @@ func (pv *ThresholdValidator) waitForSignStatesToFlushToDisk() {
 
 // GetPubKey returns the public key of the validator.
 // Implements PrivValidator.
-func (pv *ThresholdValidator) GetPubKey() (crypto.PubKey, error) {
-	return pv.pubKey, nil
+func (pv *ThresholdValidator) GetPubKey(chainID string) (crypto.PubKey, error) {
+	return pv.cosigner.GetPubKey(chainID)
 }
 
 // SignVote signs a canonical representation of the vote, along with the
@@ -124,6 +139,7 @@ func (pv *ThresholdValidator) SignVote(chainID string, vote *cometproto.Vote) er
 		Timestamp: vote.Timestamp,
 		SignBytes: comet.VoteSignBytes(chainID, vote),
 	}
+
 	sig, stamp, err := pv.SignBlock(chainID, block)
 
 	vote.Signature = sig
@@ -142,6 +158,7 @@ func (pv *ThresholdValidator) SignProposal(chainID string, proposal *cometproto.
 		Timestamp: proposal.Timestamp,
 		SignBytes: comet.ProposalSignBytes(chainID, proposal),
 	}
+
 	sig, stamp, err := pv.SignBlock(chainID, block)
 
 	proposal.Signature = sig
@@ -175,7 +192,9 @@ type BeyondBlockError struct {
 func (e *BeyondBlockError) Error() string { return e.msg }
 
 func (pv *ThresholdValidator) newBeyondBlockError(chainID string, hrs HRSKey) *BeyondBlockError {
-	lss := pv.chainState[chainID].lastSignStateInitiated
+	css := pv.mustLoadChainState(chainID)
+
+	lss := css.lastSignStateInitiated
 	return &BeyondBlockError{
 		msg: fmt.Sprintf("[%s] Progress already started on block %d.%d.%d, skipping %d.%d.%d",
 			chainID,
@@ -319,7 +338,7 @@ func waitUntilCompleteOrTimeout(wg *sync.WaitGroup, timeout time.Duration) bool 
 }
 
 func (pv *ThresholdValidator) LoadSignStateIfNecessary(chainID string) error {
-	if _, ok := pv.chainState[chainID]; ok {
+	if _, ok := pv.chainState.Load(chainID); ok {
 		return nil
 	}
 
@@ -328,13 +347,13 @@ func (pv *ThresholdValidator) LoadSignStateIfNecessary(chainID string) error {
 		return err
 	}
 
-	pv.chainState[chainID] = ChainSignState{
+	pv.chainState.Store(chainID, ChainSignState{
 		lastSignState:          signState,
 		lastSignStateInitiated: signState.FreshCache(),
 
 		lastSignStateMutex:          &sync.Mutex{},
 		lastSignStateInitiatedMutex: &sync.Mutex{},
-	}
+	})
 
 	switch cosigner := pv.cosigner.(type) {
 	case *LocalCosigner:
@@ -351,9 +370,12 @@ func (pv *ThresholdValidator) getExistingBlockSignature(chainID string, block *B
 		round,
 		step,
 	}
-	latestBlock, existingSignature := pv.chainState[chainID].lastSignState.GetFromCache(
+
+	css := pv.mustLoadChainState(chainID)
+
+	latestBlock, existingSignature := css.lastSignState.GetFromCache(
 		hrs,
-		pv.chainState[chainID].lastSignStateMutex,
+		css.lastSignStateMutex,
 	)
 	if existingSignature != nil {
 		// If a proposal has already been signed for this HRS, return that
@@ -573,7 +595,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	signature = append(signature, combinedSig...)
 
 	// verify the combined signature before saving to watermark
-	if !pv.pubKey.VerifySignature(signBytes, signature) {
+	if !pv.cosigner.VerifySignature(chainID, signBytes, signature) {
 		totalInvalidSignature.Inc()
 		return nil, stamp, errors.New("combined signature is not valid")
 	}
@@ -588,10 +610,13 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 			SignBytes: signBytes,
 		},
 	}
+
+	css := pv.mustLoadChainState(chainID)
+
 	// Err will be present if newLss is not above high watermark
-	pv.chainState[chainID].lastSignStateMutex.Lock()
-	err = pv.chainState[chainID].lastSignState.Save(newLss.SignStateConsensus, &pv.pendingDiskWG)
-	pv.chainState[chainID].lastSignStateMutex.Unlock()
+	css.lastSignStateMutex.Lock()
+	err = css.lastSignState.Save(newLss.SignStateConsensus, &pv.pendingDiskWG)
+	css.lastSignStateMutex.Unlock()
 	if err != nil {
 		if _, isSameHRSError := err.(*SameHRSError); !isSameHRSError {
 			return nil, stamp, err

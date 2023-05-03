@@ -22,7 +22,8 @@ func rootCmd() *cobra.Command {
 
 	cmd.AddCommand(configCmd())
 	cmd.AddCommand(cosignerCmd())
-	cmd.AddCommand(createCosignerSharesCmd())
+	cmd.AddCommand(createCosignerEd25519SharesCmd())
+	cmd.AddCommand(createCosignerRSASharesCmd())
 	cmd.AddCommand(leaderElectionCmd())
 	cmd.AddCommand(getLeaderCmd())
 	cmd.AddCommand(signerCmd())

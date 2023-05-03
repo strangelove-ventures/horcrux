@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testChainID = "test"
+
 func TestNodes(t *testing.T) {
 	c := signer.Config{
 		ChainNodes: signer.ChainNodes{
@@ -304,8 +306,12 @@ func TestRuntimeConfigKeyFilePath(t *testing.T) {
 		HomeDir: dir,
 	}
 
-	require.Equal(t, filepath.Join(dir, "share.json"), c.KeyFilePathCosigner())
-	require.Equal(t, filepath.Join(dir, "priv_validator_key.json"), c.KeyFilePathSingleSigner())
+	require.Equal(t, filepath.Join(dir, fmt.Sprintf("%s_share.json", testChainID)), c.KeyFilePathCosigner(testChainID))
+	require.Equal(
+		t,
+		filepath.Join(dir, fmt.Sprintf("%s_priv_validator_key.json", testChainID)),
+		c.KeyFilePathSingleSigner(testChainID),
+	)
 }
 
 func TestRuntimeConfigPrivValStateFile(t *testing.T) {
@@ -389,7 +395,7 @@ func TestRuntimeConfigKeyFileExists(t *testing.T) {
 	}
 
 	// Test cosigner
-	keyFile, err := c.KeyFileExistsCosigner()
+	keyFile, err := c.KeyFileExistsCosigner(testChainID)
 	require.Error(t, err)
 
 	require.Equal(t, fmt.Errorf(
@@ -405,11 +411,11 @@ func TestRuntimeConfigKeyFileExists(t *testing.T) {
 	err = os.WriteFile(keyFile, []byte{}, 0600)
 	require.NoError(t, err)
 
-	_, err = c.KeyFileExistsCosigner()
+	_, err = c.KeyFileExistsCosigner(testChainID)
 	require.NoError(t, err)
 
 	// Test single signer
-	keyFile, err = c.KeyFileExistsSingleSigner()
+	keyFile, err = c.KeyFileExistsSingleSigner(testChainID)
 	require.Error(t, err)
 
 	require.Equal(t, fmt.Errorf(
@@ -425,7 +431,7 @@ func TestRuntimeConfigKeyFileExists(t *testing.T) {
 	err = os.WriteFile(keyFile, []byte{}, 0600)
 	require.NoError(t, err)
 
-	_, err = c.KeyFileExistsSingleSigner()
+	_, err = c.KeyFileExistsSingleSigner(testChainID)
 	require.NoError(t, err)
 }
 

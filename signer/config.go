@@ -28,7 +28,7 @@ type NodeConfig struct {
 
 // Config maps to the on-disk JSON format
 type Config struct {
-	PrivValKeyFile *string         `json:"key-file,omitempty" yaml:"key-file,omitempty"`
+	PrivValKeyDir  *string         `json:"key-dir,omitempty" yaml:"key-dir,omitempty"`
 	CosignerConfig *CosignerConfig `json:"cosigner,omitempty" yaml:"cosigner,omitempty"`
 	ChainNodes     ChainNodes      `json:"chain-nodes,omitempty" yaml:"chain-nodes,omitempty"`
 	DebugAddr      string          `json:"debug-addr,omitempty" yaml:"debug-addr,omitempty"`
@@ -100,25 +100,35 @@ type RuntimeConfig struct {
 	Config     Config
 }
 
-func (c RuntimeConfig) cachedKeyFile() string {
-	if c.Config.PrivValKeyFile != nil {
-		return *c.Config.PrivValKeyFile
+func (c RuntimeConfig) cachedKeyDirectory() string {
+	if c.Config.PrivValKeyDir != nil {
+		return *c.Config.PrivValKeyDir
 	}
 	return ""
 }
 
-func (c RuntimeConfig) KeyFilePathSingleSigner() string {
-	if kf := c.cachedKeyFile(); kf != "" {
-		return kf
+func (c RuntimeConfig) KeyFilePathSingleSigner(chainID string) string {
+	keyDir := c.HomeDir
+	if kd := c.cachedKeyDirectory(); kd != "" {
+		keyDir = kd
 	}
-	return filepath.Join(c.HomeDir, "priv_validator_key.json")
+	return filepath.Join(keyDir, fmt.Sprintf("%s_priv_validator_key.json", chainID))
 }
 
-func (c RuntimeConfig) KeyFilePathCosigner() string {
-	if kf := c.cachedKeyFile(); kf != "" {
-		return kf
+func (c RuntimeConfig) KeyFilePathCosigner(chainID string) string {
+	keyDir := c.HomeDir
+	if kd := c.cachedKeyDirectory(); kd != "" {
+		keyDir = kd
 	}
-	return filepath.Join(c.HomeDir, "share.json")
+	return filepath.Join(keyDir, fmt.Sprintf("%s_share.json", chainID))
+}
+
+func (c RuntimeConfig) KeyFilePathCosignerRSA() string {
+	keyDir := c.HomeDir
+	if kd := c.cachedKeyDirectory(); kd != "" {
+		keyDir = kd
+	}
+	return filepath.Join(keyDir, "rsa_keys.json")
 }
 
 func (c RuntimeConfig) PrivValStateFile(chainID string) string {
@@ -148,13 +158,18 @@ func fileExists(file string) error {
 	return nil
 }
 
-func (c RuntimeConfig) KeyFileExistsSingleSigner() (string, error) {
-	keyFile := c.KeyFilePathSingleSigner()
+func (c RuntimeConfig) KeyFileExistsSingleSigner(chainID string) (string, error) {
+	keyFile := c.KeyFilePathSingleSigner(chainID)
 	return keyFile, fileExists(keyFile)
 }
 
-func (c RuntimeConfig) KeyFileExistsCosigner() (string, error) {
-	keyFile := c.KeyFilePathCosigner()
+func (c RuntimeConfig) KeyFileExistsCosigner(chainID string) (string, error) {
+	keyFile := c.KeyFilePathCosigner(chainID)
+	return keyFile, fileExists(keyFile)
+}
+
+func (c RuntimeConfig) KeyFileExistsCosignerRSA() (string, error) {
+	keyFile := c.KeyFilePathCosignerRSA()
 	return keyFile, fileExists(keyFile)
 }
 

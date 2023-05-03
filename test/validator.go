@@ -13,14 +13,13 @@ import (
 )
 
 type Validator struct {
-	Index         int
-	Sentries      Nodes
-	Signers       Signers
-	tl            Logger
-	Home          string
-	PubKey        cometcrypto.PubKey
-	PrivKeyShares []signer.CosignerKey
-	Threshold     int
+	Index     int
+	Sentries  Nodes
+	Signers   Signers
+	tl        Logger
+	Home      string
+	PubKeys   map[string]cometcrypto.PubKey
+	Threshold uint8
 }
 
 func NewHorcruxValidator(
@@ -30,10 +29,11 @@ func NewHorcruxValidator(
 	home string,
 	index int,
 	numSigners int,
-	threshold int,
+	threshold uint8,
 	chains ...*ChainType,
 ) (*Validator, error) {
 	var sentries Nodes
+	chainIDs := make([]string, 0, len(chains))
 	for _, chain := range chains {
 		sentries = append(sentries,
 			MakeNodes(
@@ -47,6 +47,7 @@ func NewHorcruxValidator(
 				tl,
 			)...,
 		)
+		chainIDs = append(chainIDs, chain.ChainID)
 	}
 	testValidator := &Validator{
 		Index:     index,
@@ -55,8 +56,9 @@ func NewHorcruxValidator(
 		tl:        tl,
 		Home:      home,
 		Threshold: threshold,
+		PubKeys:   make(map[string]cometcrypto.PubKey),
 	}
-	if err := testValidator.genPrivKeyAndShares(); err != nil {
+	if err := testValidator.genPrivKeyAndShares(nil, chainIDs...); err != nil {
 		return nil, err
 	}
 	return testValidator, nil
@@ -71,7 +73,7 @@ func NewHorcruxValidatorWithPrivValKey(
 	index int,
 	numSentries int,
 	numSigners int,
-	threshold int,
+	threshold uint8,
 	chainType *ChainType,
 	privValKey privval.FilePVKey,
 ) (*Validator, error) {
@@ -82,8 +84,9 @@ func NewHorcruxValidatorWithPrivValKey(
 		tl:        tl,
 		Home:      home,
 		Threshold: threshold,
+		PubKeys:   make(map[string]cometcrypto.PubKey),
 	}
-	if err := testValidator.generateShares(privValKey); err != nil {
+	if err := testValidator.genPrivKeyAndShares(&privValKey, chainID); err != nil {
 		return nil, err
 	}
 	return testValidator, nil
@@ -99,31 +102,71 @@ func (tv *Validator) Dir() string {
 	return filepath.Join(tv.Home, tv.Name())
 }
 
-// Generate Ed25519 Private Key
-func (tv *Validator) genPrivKeyAndShares() error {
-	privKey := cometcryptoed25519.GenPrivKey()
-	pubKey := privKey.PubKey()
-	filePVKey := privval.FilePVKey{
-		Address: pubKey.Address(),
-		PubKey:  pubKey,
-		PrivKey: privKey,
-	}
-	return tv.generateShares(filePVKey)
-}
-
-func (tv *Validator) generateShares(filePVKey privval.FilePVKey) error {
-	tv.PubKey = filePVKey.PubKey
-	shares, err := signer.CreateCosignerShares(filePVKey, int64(tv.Threshold), int64(len(tv.Signers)))
+func (tv *Validator) genRSAShares() error {
+	rsaShares, err := signer.CreateCosignerSharesRSA(len(tv.Signers))
 	if err != nil {
 		return err
 	}
-	tv.PrivKeyShares = shares
+
 	for i, s := range tv.Signers {
-		tv.tl.Logf("{%s} -> Writing Key Share To File... ", s.Name())
+		tv.tl.Logf("{%s} -> Writing RSA Key Share To File... ", s.Name())
 		if err := os.MkdirAll(s.Dir(), 0700); err != nil {
 			return err
 		}
-		privateFilename := filepath.Join(s.Dir(), "share.json")
+
+		cosignerFilename := filepath.Join(s.Dir(), "rsa_keys.json")
+		if err := signer.WriteCosignerShareRSAFile(rsaShares[i], cosignerFilename); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// genPrivKeyAndShares generates cosigner RSA shares.
+// If existingKey is nil, generates Ed25519 key shares, otherwise shards existing key.
+func (tv *Validator) genPrivKeyAndShares(existingKey *privval.FilePVKey, chainIDs ...string) error {
+	if err := tv.genRSAShares(); err != nil {
+		return err
+	}
+
+	for _, chainID := range chainIDs {
+		if err := tv.genEd25519Shares(existingKey, chainID); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (tv *Validator) genEd25519Shares(
+	existingKey *privval.FilePVKey,
+	chainID string,
+) error {
+	var key privval.FilePVKey
+	if existingKey != nil {
+		key = *existingKey
+	} else {
+		privKey := cometcryptoed25519.GenPrivKey()
+		pubKey := privKey.PubKey()
+		key = privval.FilePVKey{
+			Address: pubKey.Address(),
+			PubKey:  pubKey,
+			PrivKey: privKey,
+		}
+	}
+
+	tv.PubKeys[chainID] = key.PubKey
+
+	shares, err := signer.CreateCosignerShares(key, tv.Threshold, uint8(len(tv.Signers)))
+	if err != nil {
+		return err
+	}
+
+	for i, s := range tv.Signers {
+		tv.tl.Logf("{%s} -> Writing Ed25519 Key Share To File... ", s.Name())
+
+		privateFilename := filepath.Join(s.Dir(), fmt.Sprintf("%s_share.json", chainID))
 		if err := signer.WriteCosignerShareFile(shares[i], privateFilename); err != nil {
 			return err
 		}
@@ -141,7 +184,7 @@ func (tv *Validator) StartHorcruxCluster(
 func (tv *Validator) WaitForConsecutiveBlocks(chainID string, blocks int64) error {
 	for _, n := range tv.Sentries {
 		if n.ChainID == chainID {
-			return n.WaitForConsecutiveBlocks(blocks, tv.PubKey.Address())
+			return n.WaitForConsecutiveBlocks(blocks, tv.PubKeys[chainID].Address())
 		}
 	}
 	return fmt.Errorf("no sentry found with chain id: %s", chainID)
@@ -150,7 +193,7 @@ func (tv *Validator) WaitForConsecutiveBlocks(chainID string, blocks int64) erro
 func (tv *Validator) EnsureNotSlashed(chainID string) error {
 	for _, n := range tv.Sentries {
 		if n.ChainID == chainID {
-			return n.EnsureNotSlashed(tv.PubKey.Address())
+			return n.EnsureNotSlashed(tv.PubKeys[chainID].Address())
 		}
 	}
 	return fmt.Errorf("no sentry found with chain id: %s", chainID)

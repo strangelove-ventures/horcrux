@@ -18,6 +18,7 @@ func configCmd() *cobra.Command {
 	}
 
 	cmd.AddCommand(initCmd())
+	cmd.AddCommand(migrateCmd())
 
 	return cmd
 }
@@ -51,10 +52,10 @@ func initCmd() *cobra.Command {
 			var cfg signer.Config
 
 			cs, _ := cmdFlags.GetBool("cosigner")
-			keyFileFlag, _ := cmdFlags.GetString("keyfile")
-			var keyFile *string
-			if keyFileFlag != "" {
-				keyFile = &keyFileFlag
+			keyDirFlag, _ := cmdFlags.GetString("key-dir")
+			var keyDir *string
+			if keyDirFlag != "" {
+				keyDir = &keyDirFlag
 			}
 			debugAddr, _ := cmdFlags.GetString("debug-addr")
 			if cs {
@@ -84,7 +85,7 @@ func initCmd() *cobra.Command {
 				}
 
 				cfg = signer.Config{
-					PrivValKeyFile: keyFile,
+					PrivValKeyDir: keyDir,
 					CosignerConfig: &signer.CosignerConfig{
 						Threshold: threshold,
 						Shares:    len(peers) + 1,
@@ -101,9 +102,9 @@ func initCmd() *cobra.Command {
 			} else {
 				// Single Signer Config
 				cfg = signer.Config{
-					PrivValKeyFile: keyFile,
-					ChainNodes:     cn,
-					DebugAddr:      debugAddr,
+					PrivValKeyDir: keyDir,
+					ChainNodes:    cn,
+					DebugAddr:     debugAddr,
 				}
 				if err = cfg.ValidateSingleSignerConfig(); err != nil {
 					return err
@@ -134,8 +135,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().IntP("threshold", "t", 0, "indicate number of signatures required for threshold signature")
 	cmd.Flags().StringP("listen", "l", "", "listen address of the signer")
 	cmd.Flags().StringP("debug-addr", "d", "", "listen address for Debug and Prometheus metrics in format localhost:8543")
-	cmd.Flags().StringP("keyfile", "k", "",
-		"priv val key file path (full key for single signer, or key share for cosigner)")
+	cmd.Flags().StringP("key-dir", "k", "", "priv val key directory")
 	cmd.Flags().String("timeout", "1500ms", "configure cosigner rpc server timeout value, \n"+
 		"accepts valid duration strings for Go's time.ParseDuration() e.g. 1s, 1000ms, 1.5m")
 	cmd.Flags().BoolP("overwrite", "o", false, "set to overwrite an existing config.yaml")

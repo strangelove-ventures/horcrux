@@ -13,25 +13,15 @@ import (
 	amino "github.com/tendermint/go-amino"
 )
 
-// CosignerKey is a single key for an m-of-n threshold signer.
+// CosignerKey is a single Ed255219 key shard for an m-of-n threshold signer.
 type CosignerKey struct {
-	PubKey       cometcrypto.PubKey `json:"pub_key"`
-	ShareKey     []byte             `json:"secret_share"`
-	RSAKey       rsa.PrivateKey     `json:"rsa_key"`
-	ID           int                `json:"id"`
-	CosignerKeys []*rsa.PublicKey   `json:"rsa_pubs"`
+	PubKey   cometcrypto.PubKey `json:"pub_key"`
+	ShareKey []byte             `json:"secret_share"`
+	ID       int                `json:"id"`
 }
 
 func (cosignerKey *CosignerKey) MarshalJSON() ([]byte, error) {
 	type Alias CosignerKey
-
-	// marshal our private key and all public keys
-	privateBytes := x509.MarshalPKCS1PrivateKey(&cosignerKey.RSAKey)
-	rsaPubKeysBytes := make([][]byte, 0)
-	for _, pubKey := range cosignerKey.CosignerKeys {
-		publicBytes := x509.MarshalPKCS1PublicKey(pubKey)
-		rsaPubKeysBytes = append(rsaPubKeysBytes, publicBytes)
-	}
 
 	protoPubkey, err := cometcryptoencoding.PubKeyToProto(cosignerKey.PubKey)
 	if err != nil {
@@ -44,15 +34,11 @@ func (cosignerKey *CosignerKey) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(&struct {
-		RSAKey       []byte   `json:"rsa_key"`
-		Pubkey       []byte   `json:"pub_key"`
-		CosignerKeys [][]byte `json:"rsa_pubs"`
+		Pubkey []byte `json:"pub_key"`
 		*Alias
 	}{
-		Pubkey:       protoBytes,
-		RSAKey:       privateBytes,
-		CosignerKeys: rsaPubKeysBytes,
-		Alias:        (*Alias)(cosignerKey),
+		Pubkey: protoBytes,
+		Alias:  (*Alias)(cosignerKey),
 	})
 }
 
@@ -60,9 +46,7 @@ func (cosignerKey *CosignerKey) UnmarshalJSON(data []byte) error {
 	type Alias CosignerKey
 
 	aux := &struct {
-		RSAKey       []byte   `json:"rsa_key"`
-		PubkeyBytes  []byte   `json:"pub_key"`
-		CosignerKeys [][]byte `json:"rsa_pubs"`
+		PubkeyBytes []byte `json:"pub_key"`
 		*Alias
 	}{
 		Alias: (*Alias)(cosignerKey),
@@ -70,14 +54,10 @@ func (cosignerKey *CosignerKey) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
-	privateKey, err := x509.ParsePKCS1PrivateKey(aux.RSAKey)
-	if err != nil {
-		return err
-	}
 
 	var pubkey cometcrypto.PubKey
 	var protoPubkey cometprotocrypto.PublicKey
-	err = protoPubkey.Unmarshal(aux.PubkeyBytes)
+	err := protoPubkey.Unmarshal(aux.PubkeyBytes)
 
 	// Prior to the tendermint protobuf migration, the public key bytes in key files
 	// were encoded using the go-amino libraries via
@@ -102,6 +82,73 @@ func (cosignerKey *CosignerKey) UnmarshalJSON(data []byte) error {
 		}
 	}
 
+	cosignerKey.PubKey = pubkey
+	return nil
+}
+
+// LoadCosignerKey loads a CosignerKey from file.
+func LoadCosignerKey(file string) (CosignerKey, error) {
+	pvKey := CosignerKey{}
+	keyJSONBytes, err := os.ReadFile(file)
+	if err != nil {
+		return pvKey, err
+	}
+
+	err = json.Unmarshal(keyJSONBytes, &pvKey)
+	if err != nil {
+		return pvKey, err
+	}
+
+	return pvKey, nil
+}
+
+// CosignerKey is a single RSA key for an m-of-n threshold signer.
+type CosignerKeyRSA struct {
+	RSAKey       rsa.PrivateKey   `json:"rsa_key"`
+	ID           int              `json:"id"`
+	CosignerKeys []*rsa.PublicKey `json:"rsa_pubs"`
+}
+
+func (cosignerKey *CosignerKeyRSA) MarshalJSON() ([]byte, error) {
+	type Alias CosignerKeyRSA
+
+	// marshal our private key and all public keys
+	privateBytes := x509.MarshalPKCS1PrivateKey(&cosignerKey.RSAKey)
+	rsaPubKeysBytes := make([][]byte, 0)
+	for _, pubKey := range cosignerKey.CosignerKeys {
+		publicBytes := x509.MarshalPKCS1PublicKey(pubKey)
+		rsaPubKeysBytes = append(rsaPubKeysBytes, publicBytes)
+	}
+
+	return json.Marshal(&struct {
+		RSAKey       []byte   `json:"rsa_key"`
+		CosignerKeys [][]byte `json:"rsa_pubs"`
+		*Alias
+	}{
+		RSAKey:       privateBytes,
+		CosignerKeys: rsaPubKeysBytes,
+		Alias:        (*Alias)(cosignerKey),
+	})
+}
+
+func (cosignerKey *CosignerKeyRSA) UnmarshalJSON(data []byte) error {
+	type Alias CosignerKeyRSA
+
+	aux := &struct {
+		RSAKey       []byte   `json:"rsa_key"`
+		CosignerKeys [][]byte `json:"rsa_pubs"`
+		*Alias
+	}{
+		Alias: (*Alias)(cosignerKey),
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	privateKey, err := x509.ParsePKCS1PrivateKey(aux.RSAKey)
+	if err != nil {
+		return err
+	}
+
 	// unmarshal the public key bytes for each cosigner
 	cosignerKey.CosignerKeys = make([]*rsa.PublicKey, 0)
 	for _, bytes := range aux.CosignerKeys {
@@ -113,13 +160,12 @@ func (cosignerKey *CosignerKey) UnmarshalJSON(data []byte) error {
 	}
 
 	cosignerKey.RSAKey = *privateKey
-	cosignerKey.PubKey = pubkey
 	return nil
 }
 
-// LoadCosignerKey loads a CosignerKey from file.
-func LoadCosignerKey(file string) (CosignerKey, error) {
-	pvKey := CosignerKey{}
+// LoadCosignerKeyRSA loads a CosignerKeyRSA from file.
+func LoadCosignerKeyRSA(file string) (CosignerKeyRSA, error) {
+	pvKey := CosignerKeyRSA{}
 	keyJSONBytes, err := os.ReadFile(file)
 	if err != nil {
 		return pvKey, err

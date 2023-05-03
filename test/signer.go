@@ -94,7 +94,14 @@ func StartSingleSignerContainers(
 		return err
 	}
 
-	err = os.WriteFile(filepath.Join(testSigners[0].Dir(), "priv_validator_key.json"), pvFile, 0600)
+	err = os.WriteFile(
+		filepath.Join(
+			testSigners[0].Dir(),
+			fmt.Sprintf("%s_priv_validator_key.json", validator.ChainID),
+		),
+		pvFile,
+		0600,
+	)
 	if err != nil {
 		return err
 	}
@@ -128,7 +135,7 @@ func StartSingleSignerContainers(
 func StartCosignerContainers(
 	signers Signers,
 	sentries Nodes,
-	threshold,
+	threshold uint8,
 	sentriesPerSigner int,
 ) error {
 	eg := new(errgroup.Group)
@@ -382,7 +389,7 @@ func (ts *Signer) InitSingleSignerConfig(ctx context.Context, listenNodes Nodes)
 // InitCosignerConfig creates and runs a container to init a signer nodes config files
 // blocks until the container exits
 func (ts *Signer) InitCosignerConfig(
-	ctx context.Context, listenNodes Nodes, peers Signers, skip, threshold int) error {
+	ctx context.Context, listenNodes Nodes, peers Signers, skip int, threshold uint8) error {
 	return ts.ExecHorcruxCmd(ctx,
 		"config", "init", listenNodes.ListenAddrs(),
 		"--cosigner",
