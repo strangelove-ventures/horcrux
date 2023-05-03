@@ -161,7 +161,7 @@ func StartCosignerContainers(
 				peers = sentries[i : i+1]
 			}
 
-			eg.Go(func() error { return s.InitCosignerConfig(ctx, peers, signers, s.Index, threshold) })
+			eg.Go(func() error { return s.InitCosignerConfig(ctx, peers, signers, threshold) })
 		}
 
 	// Each node in the signer cluster is connected to the number of sentry nodes specified by sentriesPerSigner
@@ -195,14 +195,14 @@ func StartCosignerContainers(
 				sentriesIndex++
 			}
 
-			eg.Go(func() error { return s.InitCosignerConfig(ctx, peers, signers, s.Index, threshold) })
+			eg.Go(func() error { return s.InitCosignerConfig(ctx, peers, signers, threshold) })
 		}
 
 	// All nodes in the signer cluster are connected to all sentry nodes
 	default:
 		for _, s := range signers {
 			s := s
-			eg.Go(func() error { return s.InitCosignerConfig(ctx, sentries, signers, s.Index, threshold) })
+			eg.Go(func() error { return s.InitCosignerConfig(ctx, sentries, signers, threshold) })
 		}
 	}
 	err := eg.Wait()
@@ -233,14 +233,10 @@ func StartCosignerContainers(
 }
 
 // PeerString returns a string representing a Signer's connectable private peers
-// skip is the calling Signer's index
-func (ts Signers) PeerString(skip int) string {
+func (ts Signers) PeerString() string {
 	var out strings.Builder
 	for _, s := range ts {
-		// Skip over the calling signer so its peer list does not include itself
-		if s.Index != skip {
-			out.WriteString(fmt.Sprintf("tcp://%s:%s|%d,", s.Name(), signerPort, s.Index))
-		}
+		out.WriteString(fmt.Sprintf("tcp://%s:%s|%d,", s.Name(), signerPort, s.Index))
 	}
 	return strings.TrimSuffix(out.String(), ",")
 }
@@ -389,13 +385,12 @@ func (ts *Signer) InitSingleSignerConfig(ctx context.Context, listenNodes Nodes)
 // InitCosignerConfig creates and runs a container to init a signer nodes config files
 // blocks until the container exits
 func (ts *Signer) InitCosignerConfig(
-	ctx context.Context, listenNodes Nodes, peers Signers, skip int, threshold uint8) error {
+	ctx context.Context, listenNodes Nodes, peers Signers, threshold uint8) error {
 	return ts.ExecHorcruxCmd(ctx,
 		"config", "init", listenNodes.ListenAddrs(),
 		"--cosigner",
-		fmt.Sprintf("--peers=%s", peers.PeerString(skip)),
+		fmt.Sprintf("--peers=%s", peers.PeerString()),
 		fmt.Sprintf("--threshold=%d", threshold),
-		fmt.Sprintf("--listen=%s", ts.GRPCAddress()),
 	)
 }
 
