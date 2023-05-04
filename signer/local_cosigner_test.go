@@ -35,14 +35,15 @@ func TestLocalCosignerGetID(t *testing.T) {
 
 	cosigner := NewLocalCosigner(
 		&RuntimeConfig{},
-		key.ID,
-		*rsaKey,
+		CosignerKeyRSA{
+			ID:     key.ID,
+			RSAKey: *rsaKey,
+		},
 		[]CosignerPeer{{
 			ID:        1,
 			PublicKey: rsaKey.PublicKey,
 		}},
 		"",
-		0,
 		0,
 	)
 
@@ -101,11 +102,12 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 			HomeDir:  cosigner1Dir,
 			StateDir: cosigner1Dir,
 		},
-		key1.ID,
-		*rsaKey1,
+		CosignerKeyRSA{
+			ID:     key1.ID,
+			RSAKey: *rsaKey1,
+		},
 		peers,
 		"",
-		total,
 		threshold,
 	)
 
@@ -121,11 +123,12 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 			HomeDir:  cosigner2Dir,
 			StateDir: cosigner2Dir,
 		},
-		key2.ID,
-		*rsaKey2,
+		CosignerKeyRSA{
+			ID:     key2.ID,
+			RSAKey: *rsaKey2,
+		},
 		peers,
 		"",
-		total,
 		threshold,
 	)
 

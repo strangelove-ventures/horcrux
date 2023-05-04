@@ -93,19 +93,12 @@ type CosignerGetEphemeralSecretPartRequest struct {
 //
 // LocalCosigner signing is thread saafe
 type LocalCosigner struct {
-	config *RuntimeConfig
-
-	id        int
-	rsaKey    rsa.PrivateKey
-	total     uint8
-	threshold uint8
-
-	chainState sync.Map
-
-	peers map[int]CosignerPeer
-
-	address string
-
+	config        *RuntimeConfig
+	key           CosignerKeyRSA
+	threshold     uint8
+	chainState    sync.Map
+	peers         map[int]CosignerPeer
+	address       string
 	pendingDiskWG sync.WaitGroup
 }
 
@@ -140,19 +133,15 @@ func (cosigner *LocalCosigner) waitForSignStatesToFlushToDisk() {
 
 func NewLocalCosigner(
 	config *RuntimeConfig,
-	id int,
-	rsaKey rsa.PrivateKey,
+	key CosignerKeyRSA,
 	peers []CosignerPeer,
 	address string,
-	total uint8,
 	threshold uint8,
 ) *LocalCosigner {
 	cosigner := &LocalCosigner{
 		config:    config,
-		id:        id,
-		rsaKey:    rsaKey,
+		key:       key,
 		peers:     make(map[int]CosignerPeer),
-		total:     total,
 		threshold: threshold,
 		address:   address,
 	}
@@ -167,7 +156,7 @@ func NewLocalCosigner(
 // GetID returns the id of the cosigner
 // Implements Cosigner interface
 func (cosigner *LocalCosigner) GetID() int {
-	return cosigner.id
+	return cosigner.key.ID
 }
 
 // GetAddress returns the RPC URL of the cosigner
@@ -365,14 +354,16 @@ func (cosigner *LocalCosigner) dealShares(req CosignerGetEphemeralSecretPartRequ
 		return HrsMetadata{}, err
 	}
 
+	total := len(cosigner.peers)
+
 	meta = HrsMetadata{
 		Secret: secret,
-		Peers:  make([]PeerMetadata, cosigner.total),
+		Peers:  make([]PeerMetadata, total),
 	}
 
 	// split this secret with shamirs
 	// !! dealt shares need to be saved because dealing produces different shares each time!
-	meta.DealtShares = tsed25519.DealShares(meta.Secret, cosigner.threshold, cosigner.total)
+	meta.DealtShares = tsed25519.DealShares(meta.Secret, cosigner.threshold, uint8(total))
 
 	ccs.hrsMeta[hrsKey] = meta
 
@@ -404,8 +395,8 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 		return fmt.Errorf("error reading cosigner key: %s", err)
 	}
 
-	if key.ID != cosigner.id {
-		return fmt.Errorf("key shard ID (%d) in (%s) does not match cosigner ID (%d)", key.ID, keyFile, cosigner.id)
+	if key.ID != cosigner.GetID() {
+		return fmt.Errorf("key shard ID (%d) in (%s) does not match cosigner ID (%d)", key.ID, keyFile, cosigner.GetID())
 	}
 
 	cosigner.chainState.Store(chainID, &ChainState{
@@ -541,7 +532,7 @@ func (cosigner *LocalCosigner) getEphemeralSecretPart(
 		}
 
 		digest := sha256.Sum256(jsonBytes)
-		signature, err := rsa.SignPSS(rand.Reader, &cosigner.rsaKey, crypto.SHA256, digest[:], nil)
+		signature, err := rsa.SignPSS(rand.Reader, &cosigner.key.RSAKey, crypto.SHA256, digest[:], nil)
 		if err != nil {
 			return res, err
 		}
@@ -627,7 +618,7 @@ func (cosigner *LocalCosigner) setEphemeralSecretPart(req CosignerSetEphemeralSe
 	}
 
 	// decrypt share
-	sharePart, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, &cosigner.rsaKey, req.EncryptedSharePart, nil)
+	sharePart, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, &cosigner.key.RSAKey, req.EncryptedSharePart, nil)
 	if err != nil {
 		return err
 	}

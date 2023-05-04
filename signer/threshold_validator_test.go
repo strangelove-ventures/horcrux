@@ -106,8 +106,11 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 		cosigner := NewLocalCosigner(
 			cosignerConfig,
-			peer.ID, *rsaKeys[i],
-			peers, "", total, threshold,
+			CosignerKeyRSA{
+				ID:     peer.ID,
+				RSAKey: *rsaKeys[i],
+			},
+			peers, "", threshold,
 		)
 		require.NoError(t, err)
 

@@ -22,7 +22,7 @@ func CreateCosignerSharesFromFile(priv string, threshold, shares uint8) ([]Cosig
 
 // CreateCosignerShares creates cosigner key objects from a privval.FilePVKey
 func CreateCosignerShares(pv privval.FilePVKey, threshold, shares uint8) (out []CosignerKey, err error) {
-	privshares := tsed25519.DealShares(tsed25519.ExpandSecret(pv.PrivKey.Bytes()[:32]), uint8(threshold), uint8(shares))
+	privshares := tsed25519.DealShares(tsed25519.ExpandSecret(pv.PrivKey.Bytes()[:32]), threshold, shares)
 	for idx, share := range privshares {
 		out = append(out, CosignerKey{
 			PubKey:   pv.PubKey,

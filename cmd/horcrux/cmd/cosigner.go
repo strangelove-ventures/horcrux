@@ -145,22 +145,24 @@ func startCosignerCmd() *cobra.Command {
 
 			cosignerConfig := config.Config.CosignerConfig
 
-			cosigners := make([]signer.Cosigner, 0, len(cosignerConfig.Peers))
+			remoteCosigners := make([]signer.Cosigner, 0, len(cosignerConfig.Peers)-1)
 			peers := make([]signer.CosignerPeer, len(cosignerConfig.Peers))
 
 			var p2pListen string
 
 			for i, cosignerParams := range cosignerConfig.Peers {
 				if cosignerParams.ShareID != key.ID {
-					cosigner := signer.NewRemoteCosigner(cosignerParams.ShareID, cosignerParams.P2PAddr)
-					cosigners = append(cosigners, cosigner)
+					remoteCosigners = append(
+						remoteCosigners,
+						signer.NewRemoteCosigner(cosignerParams.ShareID, cosignerParams.P2PAddr),
+					)
 				} else {
 					p2pListen = cosignerParams.P2PAddr
 				}
 
 				pubKey := key.CosignerKeys[cosignerParams.ShareID-1]
 				peers[i] = signer.CosignerPeer{
-					ID:        key.ID,
+					ID:        cosignerParams.ShareID,
 					PublicKey: *pubKey,
 				}
 			}
@@ -169,15 +171,11 @@ func startCosignerCmd() *cobra.Command {
 				return fmt.Errorf("peer config does not exist for our share ID %d", key.ID)
 			}
 
-			total := len(cosignerConfig.Peers) + 1
-
 			localCosigner := signer.NewLocalCosigner(
 				&config,
-				key.ID,
-				key.RSAKey,
+				key,
 				peers,
 				p2pListen,
-				uint8(total),
 				uint8(cosignerConfig.Threshold),
 			)
 
@@ -196,7 +194,7 @@ func startCosignerCmd() *cobra.Command {
 
 			// Start RAFT store listener
 			raftStore := signer.NewRaftStore(nodeID,
-				raftDir, p2pListen, timeout, logger, localCosigner, cosigners)
+				raftDir, p2pListen, timeout, logger, localCosigner, remoteCosigners)
 			if err := raftStore.Start(); err != nil {
 				return fmt.Errorf("error starting raft store: %w", err)
 			}
@@ -207,7 +205,7 @@ func startCosignerCmd() *cobra.Command {
 				&config,
 				cosignerConfig.Threshold,
 				localCosigner,
-				cosigners,
+				remoteCosigners,
 				raftStore,
 			)
 

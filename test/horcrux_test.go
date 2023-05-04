@@ -42,6 +42,8 @@ func testChainSingleNodeAndHorcrux(
 	// Wait for all nodes to get to given block height
 	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5))
 
+	require.NoError(t, ourValidator.WaitForConsecutiveBlocks(chainID, 10))
+
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
 	require.NoError(t, ourValidator.EnsureNotSlashed(chainID))
 }
