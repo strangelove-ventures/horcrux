@@ -144,7 +144,8 @@ func StartCosignerContainers(
 	peers := make([]Nodes, len(signers))
 
 	for _, sentries := range sentryMap {
-		// init config files, for each node in the signer cluster, with the appropriate number of sentries in front of the node
+		// init config files, for each node in the signer cluster,
+		// with the appropriate number of sentries in front of the node
 		switch {
 		// Each node in the signer cluster is connected to a unique sentry node
 		case sentriesPerSigner == 1:
