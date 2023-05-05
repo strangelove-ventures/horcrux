@@ -1,3 +1,4 @@
+signMode: threshold
 thresholdMode:
   threshold: 2
   cosigners:

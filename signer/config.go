@@ -21,12 +21,20 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// Config maps to the on-disk JSON format
+type SignMode string
+
+const (
+	SignModeThreshold SignMode = "threshold"
+	SignModeSingle    SignMode = "single"
+)
+
+// Config maps to the on-disk yaml format
 type Config struct {
-	PrivValKeyDir       *string              `json:"keyDir,omitempty" yaml:"keyDir,omitempty"`
-	ThresholdModeConfig *ThresholdModeConfig `json:"thresholdMode,omitempty" yaml:"thresholdMode,omitempty"`
-	ChainNodes          ChainNodes           `json:"chainNodes,omitempty" yaml:"chainNodes,omitempty"`
-	DebugAddr           string               `json:"debugAddr,omitempty" yaml:"debugAddr,omitempty"`
+	PrivValKeyDir       *string              `yaml:"keyDir,omitempty"`
+	SignMode            SignMode             `yaml:"signMode"`
+	ThresholdModeConfig *ThresholdModeConfig `yaml:"thresholdMode,omitempty"`
+	ChainNodes          ChainNodes           `yaml:"chainNodes,omitempty"`
+	DebugAddr           string               `yaml:"debugAddr,omitempty"`
 }
 
 func (c *Config) Nodes() (out []string) {
@@ -176,11 +184,12 @@ func (c RuntimeConfig) KeyFileExistsCosignerRSA() (string, error) {
 	return keyFile, fileExists(keyFile)
 }
 
+// ThresholdModeConfig is the on disk config format for threshold sign mode.
 type ThresholdModeConfig struct {
-	Threshold   int             `json:"threshold" yaml:"threshold"`
-	Cosigners   CosignersConfig `json:"cosigners" yaml:"cosigners"`
-	GRPCTimeout string          `json:"grpcTimeout" yaml:"grpcTimeout"`
-	RaftTimeout string          `json:"raftTimeout" yaml:"raftTimeout"`
+	Threshold   int             `yaml:"threshold"`
+	Cosigners   CosignersConfig `yaml:"cosigners"`
+	GRPCTimeout string          `yaml:"grpcTimeout"`
+	RaftTimeout string          `yaml:"raftTimeout"`
 }
 
 func (cfg *ThresholdModeConfig) LeaderElectMultiAddress() (string, error) {
@@ -191,9 +200,10 @@ func (cfg *ThresholdModeConfig) LeaderElectMultiAddress() (string, error) {
 	return client.MultiAddress(addresses)
 }
 
+// CosignerConfig is the on disk format representing a cosigner for threshold sign mode.
 type CosignerConfig struct {
-	ShardID int    `json:"shardID" yaml:"shardID"`
-	P2PAddr string `json:"p2pAddr" yaml:"p2pAddr"`
+	ShardID int    `yaml:"shardID"`
+	P2PAddr string `yaml:"p2pAddr"`
 }
 
 type CosignersConfig []CosignerConfig

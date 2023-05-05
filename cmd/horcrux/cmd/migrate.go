@@ -19,24 +19,47 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+func legacyConfig() (*v2Config, error) {
+	configFile, err := os.ReadFile(config.ConfigFile)
+	if err != nil {
+		return nil, err
+	}
+
+	legacyConfig := new(v2Config)
+
+	if err := yaml.Unmarshal(configFile, &legacyConfig); err != nil {
+		return nil, fmt.Errorf("failed to read config file as legacy: %w", err)
+	}
+
+	if err := legacyConfig.validate(); err != nil {
+		return nil, err
+	}
+
+	return legacyConfig, nil
+}
+
 type (
 	v2Config struct {
-		ChainID        string  `json:"chain-id" yaml:"chain-id"`
-		PrivValKeyFile *string `json:"key-file,omitempty" yaml:"key-file,omitempty"`
-		Cosigner       *struct {
-			Threshold int    `json:"threshold"   yaml:"threshold"`
-			Shares    int    `json:"shares" yaml:"shares"`
-			P2PListen string `json:"p2p-listen"  yaml:"p2p-listen"`
-			Peers     []struct {
-				ShareID int    `json:"share-id" yaml:"share-id"`
-				P2PAddr string `json:"p2p-addr" yaml:"p2p-addr"`
-			} `json:"peers"       yaml:"peers"`
-			Timeout string `json:"rpc-timeout" yaml:"rpc-timeout"`
-		} `json:"cosigner"  yaml:"cosigner"`
-		ChainNodes []struct {
-			PrivValAddr string `json:"priv-val-addr" yaml:"priv-val-addr"`
-		} `json:"chain-nodes,omitempty" yaml:"chain-nodes,omitempty"`
-		DebugAddr string `json:"debug-addr,omitempty" yaml:"debug-addr,omitempty"`
+		ChainID        string              `json:"chain-id" yaml:"chain-id"`
+		PrivValKeyFile *string             `json:"key-file,omitempty" yaml:"key-file,omitempty"`
+		Cosigner       *v2CosignerConfig   `json:"cosigner"  yaml:"cosigner"`
+		ChainNodes     []v2ChainNodeConfig `json:"chain-nodes,omitempty" yaml:"chain-nodes,omitempty"`
+		DebugAddr      string              `json:"debug-addr,omitempty" yaml:"debug-addr,omitempty"`
+	}
+
+	v2CosignerConfig struct {
+		Threshold int    `json:"threshold"   yaml:"threshold"`
+		Shares    int    `json:"shares" yaml:"shares"`
+		P2PListen string `json:"p2p-listen"  yaml:"p2p-listen"`
+		Peers     []struct {
+			ShareID int    `json:"share-id" yaml:"share-id"`
+			P2PAddr string `json:"p2p-addr" yaml:"p2p-addr"`
+		} `json:"peers"       yaml:"peers"`
+		Timeout string `json:"rpc-timeout" yaml:"rpc-timeout"`
+	}
+
+	v2ChainNodeConfig struct {
+		PrivValAddr string `json:"priv-val-addr" yaml:"priv-val-addr"`
 	}
 
 	v2CosignerKey struct {
@@ -47,6 +70,14 @@ type (
 		RSAPubs  []*rsa.PublicKey   `json:"rsa_pubs"`
 	}
 )
+
+func (c *v2Config) validate() error {
+	if c.ChainID == "" {
+		return fmt.Errorf("chain-id is empty")
+	}
+
+	return nil
+}
 
 func (key *v2CosignerKey) UnmarshalJSON(data []byte) error {
 	type Alias v2CosignerKey
@@ -139,33 +170,31 @@ func migrateCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			configFile, err := os.ReadFile(config.ConfigFile)
-			if err != nil {
-				return err
+			legacyCfg, legacyCfgErr := legacyConfig()
+			if legacyCfgErr != nil {
+				fmt.Fprintf(
+					cmd.OutOrStderr(),
+					"failed to load legacy config: %v, proceeding to attempt key migration",
+					legacyCfgErr,
+				)
 			}
 
 			var chainID string
 
-			var legacyConfig v2Config
-
-			if err := yaml.Unmarshal(configFile, &legacyConfig); err != nil {
-				return fmt.Errorf("failed to read config file as legacy: %w", err)
-			}
-
 			if len(args) == 1 {
 				chainID = args[0]
 			} else {
-				if legacyConfig.ChainID == "" {
+				if legacyCfgErr != nil {
 					return fmt.Errorf("unable to migrate v2 config without chain-id. please provide [chain-id] argument")
 				}
 
-				chainID = legacyConfig.ChainID
+				chainID = legacyCfg.ChainID
 			}
 
 			var legacyCosignerKeyFile string
 
-			if legacyConfig.PrivValKeyFile != nil && *legacyConfig.PrivValKeyFile != "" {
-				legacyCosignerKeyFile = *legacyConfig.PrivValKeyFile
+			if legacyCfgErr == nil && legacyCfg.PrivValKeyFile != nil && *legacyCfg.PrivValKeyFile != "" {
+				legacyCosignerKeyFile = *legacyCfg.PrivValKeyFile
 				dir := filepath.Dir(legacyCosignerKeyFile)
 				config.Config.PrivValKeyDir = &dir
 			} else {
@@ -223,47 +252,56 @@ func migrateCmd() *cobra.Command {
 				return fmt.Errorf("failed to write new RSA key to %s: %w", newRSAPath, err)
 			}
 
-			var migratedNodes signer.ChainNodes
+			// only attempt config migration if legacy config exists
+			if legacyCfgErr == nil {
+				var migratedNodes signer.ChainNodes
 
-			for _, n := range legacyConfig.ChainNodes {
-				migratedNodes = append(migratedNodes, signer.ChainNode{
-					PrivValAddr: n.PrivValAddr,
-				})
-			}
-
-			config.Config.ChainNodes = migratedNodes
-			config.Config.DebugAddr = legacyConfig.DebugAddr
-
-			if legacyConfig.Cosigner != nil {
-				var migratedCosigners signer.CosignersConfig
-
-				if legacyConfig.Cosigner.P2PListen != "" {
-					migratedCosigners = append(
-						migratedCosigners,
-						signer.CosignerConfig{
-							ShardID: legacyCosignerKey.ID,
-							P2PAddr: legacyConfig.Cosigner.P2PListen,
-						},
-					)
-				}
-
-				for _, c := range legacyConfig.Cosigner.Peers {
-					migratedCosigners = append(migratedCosigners, signer.CosignerConfig{
-						ShardID: c.ShareID,
-						P2PAddr: c.P2PAddr,
+				for _, n := range legacyCfg.ChainNodes {
+					migratedNodes = append(migratedNodes, signer.ChainNode{
+						PrivValAddr: n.PrivValAddr,
 					})
 				}
 
-				config.Config.ThresholdModeConfig = &signer.ThresholdModeConfig{
-					Threshold:   legacyConfig.Cosigner.Threshold,
-					Cosigners:   migratedCosigners,
-					GRPCTimeout: legacyConfig.Cosigner.Timeout,
-					RaftTimeout: legacyConfig.Cosigner.Timeout,
-				}
-			}
+				config.Config.ChainNodes = migratedNodes
+				config.Config.DebugAddr = legacyCfg.DebugAddr
 
-			if err := config.WriteConfigFile(); err != nil {
-				return err
+				signMode := signer.SignModeSingle
+
+				if legacyCfg.Cosigner != nil {
+					signMode = signer.SignModeThreshold
+
+					var migratedCosigners signer.CosignersConfig
+
+					if legacyCfg.Cosigner.P2PListen != "" {
+						migratedCosigners = append(
+							migratedCosigners,
+							signer.CosignerConfig{
+								ShardID: legacyCosignerKey.ID,
+								P2PAddr: legacyCfg.Cosigner.P2PListen,
+							},
+						)
+					}
+
+					for _, c := range legacyCfg.Cosigner.Peers {
+						migratedCosigners = append(migratedCosigners, signer.CosignerConfig{
+							ShardID: c.ShareID,
+							P2PAddr: c.P2PAddr,
+						})
+					}
+
+					config.Config.ThresholdModeConfig = &signer.ThresholdModeConfig{
+						Threshold:   legacyCfg.Cosigner.Threshold,
+						Cosigners:   migratedCosigners,
+						GRPCTimeout: legacyCfg.Cosigner.Timeout,
+						RaftTimeout: legacyCfg.Cosigner.Timeout,
+					}
+				}
+
+				config.Config.SignMode = signMode
+
+				if err := config.WriteConfigFile(); err != nil {
+					return err
+				}
 			}
 
 			if err := os.Remove(legacyCosignerKeyFile); err != nil {

@@ -382,6 +382,7 @@ func TestRuntimeConfigWriteConfigFile(t *testing.T) {
 	c := signer.RuntimeConfig{
 		ConfigFile: configFile,
 		Config: signer.Config{
+			SignMode: signer.SignModeThreshold,
 			ThresholdModeConfig: &signer.ThresholdModeConfig{
 				Threshold:   2,
 				RaftTimeout: "1000ms",
@@ -418,7 +419,8 @@ func TestRuntimeConfigWriteConfigFile(t *testing.T) {
 	require.NoError(t, c.WriteConfigFile())
 	configYamlBz, err := os.ReadFile(configFile)
 	require.NoError(t, err)
-	require.Equal(t, `thresholdMode:
+	require.Equal(t, `signMode: threshold
+thresholdMode:
   threshold: 2
   cosigners:
   - shardID: 1

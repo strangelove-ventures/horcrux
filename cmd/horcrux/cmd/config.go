@@ -8,12 +8,7 @@ import (
 	"github.com/strangelove-ventures/horcrux/signer"
 )
 
-type SignMode string
-
 const (
-	SignModeThreshold SignMode = "threshold"
-	SignModeSingle    SignMode = "single"
-
 	flagSignMode    = "mode"
 	flagNode        = "node"
 	flagCosigner    = "cosigner"
@@ -71,7 +66,7 @@ func initCmd() *cobra.Command {
 				keyDir = &keyDirFlag
 			}
 			debugAddr, _ := cmdFlags.GetString("debug-addr")
-			if signMode == string(SignModeThreshold) {
+			if signMode == string(signer.SignModeThreshold) {
 				// Threshold Mode Config
 				cosignersFlag, _ := cmdFlags.GetStringSlice(flagCosigner)
 				threshold, _ := cmdFlags.GetInt(flagThreshold)
@@ -83,6 +78,7 @@ func initCmd() *cobra.Command {
 				}
 
 				cfg = signer.Config{
+					SignMode:      signer.SignModeThreshold,
 					PrivValKeyDir: keyDir,
 					ThresholdModeConfig: &signer.ThresholdModeConfig{
 						Threshold:   threshold,
@@ -99,6 +95,7 @@ func initCmd() *cobra.Command {
 			} else {
 				// Single Signer Config
 				cfg = signer.Config{
+					SignMode:      signer.SignModeSingle,
 					PrivValKeyDir: keyDir,
 					ChainNodes:    cn,
 					DebugAddr:     debugAddr,
@@ -125,7 +122,7 @@ func initCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringP(flagSignMode, "m", string(SignModeThreshold),
+	cmd.Flags().StringP(flagSignMode, "m", string(signer.SignModeThreshold),
 		`sign mode, "threshold" (recommended) or "single" (unsupported). threshold mode requires --cosigners and --threshold`,
 	)
 	cmd.Flags().StringSliceP(flagNode, "n", []string{}, "chain nodes in format tcp://{p2p-addr}:{port}")

@@ -19,8 +19,8 @@ func TestConfigInitCmd(t *testing.T) {
 		expectConfig string
 	}{
 		{
-			name: "valid init",
-			home: tmpHome + "_valid_init",
+			name: "valid init threshold",
+			home: tmpHome + "_valid_init_threshold",
 			args: []string{
 				"-n", "tcp://10.168.0.1:1234",
 				"-n", "tcp://10.168.0.2:1234",
@@ -31,7 +31,8 @@ func TestConfigInitCmd(t *testing.T) {
 				"--raft-timeout", "1500ms",
 				"--grpc-timeout", "1500ms",
 			},
-			expectConfig: `thresholdMode:
+			expectConfig: `signMode: threshold
+thresholdMode:
   threshold: 2
   cosigners:
   - shardID: 1
@@ -42,6 +43,20 @@ func TestConfigInitCmd(t *testing.T) {
     p2pAddr: tcp://10.168.1.3:2222
   grpcTimeout: 1500ms
   raftTimeout: 1500ms
+chainNodes:
+- privValAddr: tcp://10.168.0.1:1234
+- privValAddr: tcp://10.168.0.2:1234
+`,
+		},
+		{
+			name: "valid init single signer",
+			home: tmpHome + "_valid_init_single",
+			args: []string{
+				"-m", "single",
+				"-n", "tcp://10.168.0.1:1234",
+				"-n", "tcp://10.168.0.2:1234",
+			},
+			expectConfig: `signMode: single
 chainNodes:
 - privValAddr: tcp://10.168.0.1:1234
 - privValAddr: tcp://10.168.0.2:1234

@@ -213,6 +213,6 @@ You now can sleep much better at night because you are much less likely to have 
 
 ### 8. Administration Commands
 
-`horcrux elect` - Elect a new cluster leader. Pass an optional argument with the intended leader ID to elect that cosigner as the new leader, e.g. `horcrux elect 3` to elect cosigner with `ID: 3` as leader. This is an optimistic leader election, it is not guaranteed that the exact requested leader will be elected.
+`horcrux elect` - Elect a new cluster leader. Pass an optional argument with the intended leader ID to elect that cosigner as the new leader, e.g. `horcrux elect 3` to elect cosigner with `shardID: 3` as leader. This is an optimistic leader election, it is not guaranteed that the exact requested leader will be elected.
 
-`horcrux cosigner address` - Get the public key address as both hex and optionally the validator consensus bech32 address. To retrieve the valcons bech32 address, pass an optional argument with the chain's bech32 valcons prefix, e.g. `horcrux cosigner address cosmosvalcons`
+`horcrux address` - Get the public key address as both hex and optionally the validator consensus bech32 address. To retrieve the valcons bech32 address, pass an optional argument with the chain's bech32 prefix, e.g. `horcrux address cosmos`

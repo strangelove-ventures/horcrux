@@ -434,7 +434,7 @@ func (ts *Signer) CreateSingleSignerContainer() error {
 		Name: ts.Name(),
 		Config: &docker.Config{
 			User:     getDockerUserString(),
-			Cmd:      []string{binary, "signer", "start", "--accept-risk", fmt.Sprintf("--home=%s", ts.Dir())},
+			Cmd:      []string{binary, "start", "--accept-risk", fmt.Sprintf("--home=%s", ts.Dir())},
 			Hostname: ts.Name(),
 			ExposedPorts: map[docker.Port]struct{}{
 				docker.Port(signerPortDocker): {},
@@ -476,7 +476,7 @@ func (ts *Signer) CreateCosignerContainer() error {
 		Name: ts.Name(),
 		Config: &docker.Config{
 			User:     getDockerUserString(),
-			Cmd:      []string{binary, "cosigner", "start", fmt.Sprintf("--home=%s", ts.Dir())},
+			Cmd:      []string{binary, "start", fmt.Sprintf("--home=%s", ts.Dir())},
 			Hostname: ts.Name(),
 			ExposedPorts: map[docker.Port]struct{}{
 				docker.Port(signerPortDocker): {},
