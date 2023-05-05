@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"testing"
 
 	"github.com/strangelove-ventures/horcrux/signer"
@@ -588,26 +587,8 @@ func TestCosignersFromFlag(t *testing.T) {
 	testCases := []testCase{
 		{
 			name:      "valid cosigners flag",
-			cosigners: []string{"tcp://127.0.0.1:2222|1", "tcp://127.0.0.1:2223|2"},
+			cosigners: []string{"tcp://127.0.0.1:2222", "tcp://127.0.0.1:2223"},
 			expectErr: nil,
-		},
-		{
-			name:      "missing shard id",
-			cosigners: []string{"tcp://127.0.0.1:2222|1", "tcp://127.0.0.1:2223"},
-			expectErr: fmt.Errorf(
-				"invalid cosigner string tcp://127.0.0.1:2223, expected format: tcp://{addr}:{port}|{shard-id}",
-			),
-		},
-		{
-			name:      "invalid shard id",
-			cosigners: []string{"tcp://127.0.0.1:2222|1", "tcp://127.0.0.1:2223|a"},
-			expectErr: fmt.Errorf("failed to parse shard ID: %w",
-				&strconv.NumError{
-					Func: "ParseInt",
-					Num:  "a",
-					Err:  fmt.Errorf("invalid syntax"),
-				},
-			),
 		},
 	}
 
