@@ -143,7 +143,7 @@ type Cosigner interface {
 
 	VerifySignature(chainID string, payload, signature []byte) bool
 
-	// Get ephemeral secret part for all peers
+	// Get ephemeral secret part for all cosigner shards
 	GetEphemeralSecretParts(chainID string, hrst HRSTKey) (*CosignerEphemeralSecretPartsResponse, error)
 
 	// Sign the requested bytes

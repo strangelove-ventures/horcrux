@@ -23,30 +23,41 @@ type (
 	v2Config struct {
 		ChainID        string  `json:"chain-id" yaml:"chain-id"`
 		PrivValKeyFile *string `json:"key-file,omitempty" yaml:"key-file,omitempty"`
-		Cosigner       struct {
+		Cosigner       *struct {
+			Threshold int    `json:"threshold"   yaml:"threshold"`
+			Shares    int    `json:"shares" yaml:"shares"`
 			P2PListen string `json:"p2p-listen"  yaml:"p2p-listen"`
+			Peers     []struct {
+				ShareID int    `json:"share-id" yaml:"share-id"`
+				P2PAddr string `json:"p2p-addr" yaml:"p2p-addr"`
+			} `json:"peers"       yaml:"peers"`
+			Timeout string `json:"rpc-timeout" yaml:"rpc-timeout"`
 		} `json:"cosigner"  yaml:"cosigner"`
+		ChainNodes []struct {
+			PrivValAddr string `json:"priv-val-addr" yaml:"priv-val-addr"`
+		} `json:"chain-nodes,omitempty" yaml:"chain-nodes,omitempty"`
+		DebugAddr string `json:"debug-addr,omitempty" yaml:"debug-addr,omitempty"`
 	}
 
 	v2CosignerKey struct {
-		PubKey       cometcrypto.PubKey `json:"pub_key"`
-		ShareKey     []byte             `json:"secret_share"`
-		RSAKey       rsa.PrivateKey     `json:"rsa_key"`
-		ID           int                `json:"id"`
-		CosignerKeys []*rsa.PublicKey   `json:"rsa_pubs"`
+		PubKey   cometcrypto.PubKey `json:"pub_key"`
+		ShareKey []byte             `json:"secret_share"`
+		RSAKey   rsa.PrivateKey     `json:"rsa_key"`
+		ID       int                `json:"id"`
+		RSAPubs  []*rsa.PublicKey   `json:"rsa_pubs"`
 	}
 )
 
-func (cosignerKey *v2CosignerKey) UnmarshalJSON(data []byte) error {
+func (key *v2CosignerKey) UnmarshalJSON(data []byte) error {
 	type Alias v2CosignerKey
 
 	aux := &struct {
-		RSAKey       []byte   `json:"rsa_key"`
-		PubkeyBytes  []byte   `json:"pub_key"`
-		CosignerKeys [][]byte `json:"rsa_pubs"`
+		RSAKey      []byte   `json:"rsa_key"`
+		PubkeyBytes []byte   `json:"pub_key"`
+		RSAPubs     [][]byte `json:"rsa_pubs"`
 		*Alias
 	}{
-		Alias: (*Alias)(cosignerKey),
+		Alias: (*Alias)(key),
 	}
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
@@ -62,7 +73,7 @@ func (cosignerKey *v2CosignerKey) UnmarshalJSON(data []byte) error {
 
 	// Prior to the tendermint protobuf migration, the public key bytes in key files
 	// were encoded using the go-amino libraries via
-	// cdc.MarshalBinaryBare(cosignerKey.PubKey)
+	// cdc.MarshalBinaryBare(CosignerEd25519Key.PubKey)
 	//
 	// To support reading the public key bytes from these key files, we fallback to
 	// amino unmarshalling if the protobuf unmarshalling fails
@@ -84,35 +95,35 @@ func (cosignerKey *v2CosignerKey) UnmarshalJSON(data []byte) error {
 	}
 
 	// unmarshal the public key bytes for each cosigner
-	cosignerKey.CosignerKeys = make([]*rsa.PublicKey, 0)
-	for _, bytes := range aux.CosignerKeys {
+	key.RSAPubs = make([]*rsa.PublicKey, 0)
+	for _, bytes := range aux.RSAPubs {
 		cosignerRsaPubkey, err := x509.ParsePKCS1PublicKey(bytes)
 		if err != nil {
 			return err
 		}
-		cosignerKey.CosignerKeys = append(cosignerKey.CosignerKeys, cosignerRsaPubkey)
+		key.RSAPubs = append(key.RSAPubs, cosignerRsaPubkey)
 	}
 
-	cosignerKey.RSAKey = *privateKey
-	cosignerKey.PubKey = pubkey
+	key.RSAKey = *privateKey
+	key.PubKey = pubkey
 	return nil
 }
 
-func (cosignerKey *v2CosignerKey) validate() error {
+func (key *v2CosignerKey) validate() error {
 	var errs []error
-	if cosignerKey.PubKey == nil || len(cosignerKey.PubKey.Bytes()) == 0 {
+	if key.PubKey == nil || len(key.PubKey.Bytes()) == 0 {
 		errs = append(errs, fmt.Errorf("pub_key cannot be empty"))
 	}
-	if len(cosignerKey.ShareKey) == 0 {
+	if len(key.ShareKey) == 0 {
 		errs = append(errs, fmt.Errorf("secret_share cannot be empty"))
 	}
-	if err := cosignerKey.RSAKey.Validate(); err != nil {
+	if err := key.RSAKey.Validate(); err != nil {
 		errs = append(errs, fmt.Errorf("rsa_key is invalid: %w", err))
 	}
-	if cosignerKey.ID == 0 {
+	if key.ID == 0 {
 		errs = append(errs, fmt.Errorf("id cannot be zero"))
 	}
-	if len(cosignerKey.CosignerKeys) == 0 {
+	if len(key.RSAPubs) == 0 {
 		errs = append(errs, fmt.Errorf("cosigner keys cannot be empty"))
 	}
 
@@ -180,10 +191,10 @@ func migrateCmd() *cobra.Command {
 				return err
 			}
 
-			newEd25519Key := signer.CosignerKey{
-				PubKey:   legacyCosignerKey.PubKey,
-				ShareKey: legacyCosignerKey.ShareKey,
-				ID:       legacyCosignerKey.ID,
+			newEd25519Key := signer.CosignerEd25519Key{
+				PubKey:       legacyCosignerKey.PubKey,
+				PrivateShard: legacyCosignerKey.ShareKey,
+				ID:           legacyCosignerKey.ID,
 			}
 
 			newEd25519KeyBz, err := newEd25519Key.MarshalJSON()
@@ -196,10 +207,10 @@ func migrateCmd() *cobra.Command {
 				return fmt.Errorf("failed to write new Ed25519 key to %s: %w", newEd25519Path, err)
 			}
 
-			newRSAKey := signer.CosignerKeyRSA{
-				RSAKey:       legacyCosignerKey.RSAKey,
-				ID:           legacyCosignerKey.ID,
-				CosignerKeys: legacyCosignerKey.CosignerKeys,
+			newRSAKey := signer.CosignerRSAKey{
+				RSAKey:  legacyCosignerKey.RSAKey,
+				ID:      legacyCosignerKey.ID,
+				RSAPubs: legacyCosignerKey.RSAPubs,
 			}
 
 			newRSAKeyBz, err := newRSAKey.MarshalJSON()
@@ -212,11 +223,43 @@ func migrateCmd() *cobra.Command {
 				return fmt.Errorf("failed to write new RSA key to %s: %w", newRSAPath, err)
 			}
 
-			if legacyConfig.Cosigner.P2PListen != "" {
-				config.Config.CosignerConfig.Peers = append(config.Config.CosignerConfig.Peers, signer.CosignerPeerConfig{
-					ShareID: legacyCosignerKey.ID,
-					P2PAddr: legacyConfig.Cosigner.P2PListen,
+			var migratedNodes signer.ChainNodes
+
+			for _, n := range legacyConfig.ChainNodes {
+				migratedNodes = append(migratedNodes, signer.ChainNode{
+					PrivValAddr: n.PrivValAddr,
 				})
+			}
+
+			config.Config.ChainNodes = migratedNodes
+			config.Config.DebugAddr = legacyConfig.DebugAddr
+
+			if legacyConfig.Cosigner != nil {
+				var migratedCosigners signer.CosignersConfig
+
+				if legacyConfig.Cosigner.P2PListen != "" {
+					migratedCosigners = append(
+						migratedCosigners,
+						signer.CosignerConfig{
+							ShardID: legacyCosignerKey.ID,
+							P2PAddr: legacyConfig.Cosigner.P2PListen,
+						},
+					)
+				}
+
+				for _, c := range legacyConfig.Cosigner.Peers {
+					migratedCosigners = append(migratedCosigners, signer.CosignerConfig{
+						ShardID: c.ShareID,
+						P2PAddr: c.P2PAddr,
+					})
+				}
+
+				config.Config.ThresholdModeConfig = &signer.ThresholdModeConfig{
+					Threshold:   legacyConfig.Cosigner.Threshold,
+					Cosigners:   migratedCosigners,
+					GRPCTimeout: legacyConfig.Cosigner.Timeout,
+					RaftTimeout: legacyConfig.Cosigner.Timeout,
+				}
 			}
 
 			if err := config.WriteConfigFile(); err != nil {

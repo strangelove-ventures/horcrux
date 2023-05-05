@@ -47,7 +47,6 @@ func getMockRaftStore(cosigner Cosigner, tmpDir string) *RaftStore {
 		m:           make(map[string]string),
 		logger:      nil,
 		cosigner:    cosigner.(*LocalCosigner),
-		Peers:       []Cosigner{},
 	}
 }
 
@@ -55,12 +54,12 @@ func loadKeyForLocalCosigner(
 	cosigner *LocalCosigner,
 	pubKey cometcrypto.PubKey,
 	chainID string,
-	secretShare []byte,
+	privateShard []byte,
 ) error {
-	key := CosignerKey{
-		PubKey:   pubKey,
-		ShareKey: secretShare,
-		ID:       cosigner.GetID(),
+	key := CosignerEd25519Key{
+		PubKey:       pubKey,
+		PrivateShard: privateShard,
+		ID:           cosigner.GetID(),
 	}
 
 	keyBz, err := key.MarshalJSON()
@@ -73,7 +72,7 @@ func loadKeyForLocalCosigner(
 
 func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	rsaKeys := make([]*rsa.PrivateKey, total)
-	peers := make([]CosignerPeer, total)
+	pubKeys := make([]CosignerRSAPubKey, total)
 	cosigners := make([]*LocalCosigner, total)
 
 	for i := uint8(0); i < total; i++ {
@@ -82,7 +81,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 		rsaKeys[i] = rsaKey
 
-		peers[i] = CosignerPeer{
+		pubKeys[i] = CosignerRSAPubKey{
 			ID:        int(i) + 1,
 			PublicKey: rsaKey.PublicKey,
 		}
@@ -90,12 +89,12 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 	privateKey := cometcryptoed25519.GenPrivKey()
 	privKeyBytes := privateKey[:]
-	secretShares := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
+	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
 
 	tmpDir := t.TempDir()
 
-	for i, peer := range peers {
-		cosignerDir := filepath.Join(tmpDir, fmt.Sprintf("cosigner_%d", peer.ID))
+	for i, pubKey := range pubKeys {
+		cosignerDir := filepath.Join(tmpDir, fmt.Sprintf("cosigner_%d", pubKey.ID))
 		err := os.MkdirAll(cosignerDir, 0777)
 		require.NoError(t, err)
 
@@ -106,30 +105,30 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 		cosigner := NewLocalCosigner(
 			cosignerConfig,
-			CosignerKeyRSA{
-				ID:     peer.ID,
+			CosignerRSAKey{
+				ID:     pubKey.ID,
 				RSAKey: *rsaKeys[i],
 			},
-			peers, "", threshold,
+			pubKeys, "", threshold,
 		)
 		require.NoError(t, err)
 
 		cosigners[i] = cosigner
 
-		err = loadKeyForLocalCosigner(cosigner, privateKey.PubKey(), testChainID, secretShares[i])
+		err = loadKeyForLocalCosigner(cosigner, privateKey.PubKey(), testChainID, privShards[i])
 		require.NoError(t, err)
 
-		err = loadKeyForLocalCosigner(cosigner, privateKey.PubKey(), testChainID2, secretShares[i])
+		err = loadKeyForLocalCosigner(cosigner, privateKey.PubKey(), testChainID2, privShards[i])
 		require.NoError(t, err)
 	}
 
-	thresholdPeers := make([]Cosigner, 0, threshold-1)
+	thresholdCosigners := make([]Cosigner, 0, threshold-1)
 
 	for i, cosigner := range cosigners {
 		require.Equal(t, i+1, cosigner.GetID())
 
-		if i != 0 && len(thresholdPeers) != int(threshold)-1 {
-			thresholdPeers = append(thresholdPeers, cosigner)
+		if i != 0 && len(thresholdCosigners) != int(threshold)-1 {
+			thresholdCosigners = append(thresholdCosigners, cosigner)
 		}
 	}
 
@@ -139,8 +138,9 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
 		cosigners[0].config,
 		int(threshold),
+		time.Second,
 		cosigners[0],
-		thresholdPeers,
+		thresholdCosigners,
 		raftStore,
 	)
 	defer validator.Stop()
@@ -221,8 +221,9 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
 		cosigners[0].config,
 		int(threshold),
+		time.Second,
 		cosigners[0],
-		thresholdPeers,
+		thresholdCosigners,
 		raftStore,
 	)
 	defer newValidator.Stop()

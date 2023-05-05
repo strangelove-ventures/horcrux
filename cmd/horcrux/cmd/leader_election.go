@@ -27,12 +27,12 @@ To choose a specific leader, pass that leader's ID as an argument.
 horcrux elect 2 # elect specific leader`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			if config.Config.CosignerConfig == nil {
-				return fmt.Errorf("cosigner configuration is not present in config file")
+			if config.Config.ThresholdModeConfig == nil {
+				return fmt.Errorf("threshold mode configuration is not present in config file")
 			}
 
-			if len(config.Config.CosignerConfig.Peers) == 0 {
-				return fmt.Errorf("cosigner configuration has no peers")
+			if len(config.Config.ThresholdModeConfig.Cosigners) == 0 {
+				return fmt.Errorf("threshold mode configuration has no cosigners")
 			}
 
 			serviceConfig := `{"healthCheckConfig": {"serviceName": "Leader"}, "loadBalancingConfig": [ { "round_robin": {} } ]}`
@@ -41,7 +41,7 @@ horcrux elect 2 # elect specific leader`,
 				grpcretry.WithMax(5),
 			}
 
-			grpcAddress, err := config.Config.CosignerConfig.LeaderElectMultiAddress()
+			grpcAddress, err := config.Config.ThresholdModeConfig.LeaderElectMultiAddress()
 			if err != nil {
 				return err
 			}
@@ -94,13 +94,13 @@ func getLeaderCmd() *cobra.Command {
 		Example:      `horcrux leader`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			cosignerConfig := config.Config.CosignerConfig
-			if cosignerConfig == nil {
-				return fmt.Errorf("cosigner configuration is not present in config file")
+			thresholdCfg := config.Config.ThresholdModeConfig
+			if thresholdCfg == nil {
+				return fmt.Errorf("threshold mode configuration is not present in config file")
 			}
 
-			if len(cosignerConfig.Peers) == 0 {
-				return fmt.Errorf("cosigner configuration has no peers")
+			if len(thresholdCfg.Cosigners) == 0 {
+				return fmt.Errorf("threshold mode configuration has no cosigners")
 			}
 
 			keyFile, err := config.KeyFileExistsCosignerRSA()
@@ -108,21 +108,21 @@ func getLeaderCmd() *cobra.Command {
 				return err
 			}
 
-			key, err := signer.LoadCosignerKeyRSA(keyFile)
+			key, err := signer.LoadCosignerRSAKey(keyFile)
 			if err != nil {
 				return fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
 			}
 
 			var p2pListen string
 
-			for _, peer := range cosignerConfig.Peers {
-				if peer.ShareID == key.ID {
-					p2pListen = peer.P2PAddr
+			for _, c := range thresholdCfg.Cosigners {
+				if c.ShardID == key.ID {
+					p2pListen = c.P2PAddr
 				}
 			}
 
 			if p2pListen == "" {
-				return fmt.Errorf("peer config does not exist for our share ID %d", key.ID)
+				return fmt.Errorf("cosigner config does not exist for our shard ID %d", key.ID)
 			}
 
 			retryOpts := []grpcretry.CallOption{

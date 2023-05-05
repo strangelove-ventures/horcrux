@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -40,7 +41,7 @@ func showStateCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:          "show [chain-id]",
 		Aliases:      []string{"s"},
-		Short:        "Show the priv validator and share sign state for a specific chain-id",
+		Short:        "Show the sign state for a specific chain-id",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -56,15 +57,16 @@ func showStateCmd() *cobra.Command {
 				return err
 			}
 
-			share, err := signer.LoadSignState(config.ShareStateFile(chainID))
+			cs, err := signer.LoadSignState(config.CosignerStateFile(chainID))
 			if err != nil {
 				return err
 			}
 
-			fmt.Println("Private Validator State:")
-			printSignState(*pv)
-			fmt.Println("Share Sign State:")
-			printSignState(*share)
+			out := cmd.OutOrStdout()
+			fmt.Fprintln(out, "Private Validator State:")
+			printSignState(out, pv)
+			fmt.Fprintln(out, "Share Sign State:")
+			printSignState(out, cs)
 			return nil
 		},
 	}
@@ -74,7 +76,7 @@ func setStateCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:          "set [chain-id] [height]",
 		Aliases:      []string{"s"},
-		Short:        "Set the height for both the priv validator and the share sign state",
+		Short:        "Set the height for the sign state of a specific chain-id",
 		Args:         cobra.ExactArgs(2),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -96,7 +98,7 @@ func setStateCmd() *cobra.Command {
 				return err
 			}
 
-			share, err := signer.LoadOrCreateSignState(config.ShareStateFile(chainID))
+			cs, err := signer.LoadOrCreateSignState(config.CosignerStateFile(chainID))
 			if err != nil {
 				return err
 			}
@@ -109,7 +111,7 @@ func setStateCmd() *cobra.Command {
 
 			fmt.Fprintf(cmd.OutOrStdout(), "Setting height %d\n", height)
 
-			pv.EphemeralPublic, share.EphemeralPublic = nil, nil
+			pv.EphemeralPublic, cs.EphemeralPublic = nil, nil
 			signState := signer.SignStateConsensus{
 				Height:    height,
 				Round:     0,
@@ -122,7 +124,7 @@ func setStateCmd() *cobra.Command {
 				fmt.Printf("error saving privval sign state")
 				return err
 			}
-			err = share.Save(signState, nil)
+			err = cs.Save(signState, nil)
 			if err != nil {
 				fmt.Printf("error saving share sign state")
 				return err
@@ -161,7 +163,7 @@ func importStateCmd() *cobra.Command {
 			}
 
 			// shareStateFile does not exist during default config init, so create if necessary
-			share, err := signer.LoadOrCreateSignState(config.ShareStateFile(chainID))
+			cs, err := signer.LoadOrCreateSignState(config.CosignerStateFile(chainID))
 			if err != nil {
 				return err
 			}
@@ -212,7 +214,7 @@ func importStateCmd() *cobra.Command {
 				fmt.Printf("error saving privval sign state")
 				return err
 			}
-			err = share.Save(signState, nil)
+			err = cs.Save(signState, nil)
 			if err != nil {
 				fmt.Printf("error saving share sign state")
 				return err
@@ -223,19 +225,19 @@ func importStateCmd() *cobra.Command {
 	}
 }
 
-func printSignState(ss signer.SignState) {
-	fmt.Printf("  Height:    %v\n"+
+func printSignState(out io.Writer, ss *signer.SignState) {
+	fmt.Fprintf(out, "  Height:    %v\n"+
 		"  Round:     %v\n"+
 		"  Step:      %v\n",
 		ss.Height, ss.Round, ss.Step)
 
 	if ss.EphemeralPublic != nil {
-		fmt.Println("  Ephemeral Public Key:", base64.StdEncoding.EncodeToString(ss.EphemeralPublic))
+		fmt.Fprintln(out, "  Ephemeral Public Key:", base64.StdEncoding.EncodeToString(ss.EphemeralPublic))
 	}
 	if ss.Signature != nil {
-		fmt.Println("  Signature:", base64.StdEncoding.EncodeToString(ss.Signature))
+		fmt.Fprintln(out, "  Signature:", base64.StdEncoding.EncodeToString(ss.Signature))
 	}
 	if ss.SignBytes != nil {
-		fmt.Println("  SignBytes:", ss.SignBytes)
+		fmt.Fprintln(out, "  SignBytes:", ss.SignBytes)
 	}
 }

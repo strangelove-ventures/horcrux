@@ -43,7 +43,7 @@ func addressCmd() *cobra.Command {
 		SilenceUsage: true,
 		Args:         cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			err := config.Config.ValidateCosignerConfig()
+			err := config.Config.ValidateThresholdModeConfig()
 			if err != nil {
 				return err
 			}
@@ -53,7 +53,7 @@ func addressCmd() *cobra.Command {
 				return err
 			}
 
-			key, err := signer.LoadCosignerKey(keyFile)
+			key, err := signer.LoadCosignerEd25519Key(keyFile)
 			if err != nil {
 				return fmt.Errorf("error reading cosigner key: %s", err)
 			}
@@ -113,7 +113,7 @@ func startCosignerCmd() *cobra.Command {
 				return err
 			}
 
-			if err := config.Config.ValidateCosignerConfig(); err != nil {
+			if err := config.Config.ValidateThresholdModeConfig(); err != nil {
 				return err
 			}
 
@@ -138,51 +138,49 @@ func startCosignerCmd() *cobra.Command {
 				"priv-state-dir", config.StateDir,
 			)
 
-			key, err := signer.LoadCosignerKeyRSA(keyFile)
+			key, err := signer.LoadCosignerRSAKey(keyFile)
 			if err != nil {
 				return fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
 			}
 
-			cosignerConfig := config.Config.CosignerConfig
+			thresholdCfg := config.Config.ThresholdModeConfig
 
-			remoteCosigners := make([]signer.Cosigner, 0, len(cosignerConfig.Peers)-1)
-			peers := make([]signer.CosignerPeer, len(cosignerConfig.Peers))
+			remoteCosigners := make([]signer.Cosigner, 0, len(thresholdCfg.Cosigners)-1)
+			pubKeys := make([]signer.CosignerRSAPubKey, len(thresholdCfg.Cosigners))
 
 			var p2pListen string
 
-			for i, cosignerParams := range cosignerConfig.Peers {
-				if cosignerParams.ShareID != key.ID {
+			for i, c := range thresholdCfg.Cosigners {
+				if c.ShardID != key.ID {
 					remoteCosigners = append(
 						remoteCosigners,
-						signer.NewRemoteCosigner(cosignerParams.ShareID, cosignerParams.P2PAddr),
+						signer.NewRemoteCosigner(c.ShardID, c.P2PAddr),
 					)
 				} else {
-					p2pListen = cosignerParams.P2PAddr
+					p2pListen = c.P2PAddr
 				}
 
-				pubKey := key.CosignerKeys[cosignerParams.ShareID-1]
-				peers[i] = signer.CosignerPeer{
-					ID:        cosignerParams.ShareID,
-					PublicKey: *pubKey,
+				pubKeys[i] = signer.CosignerRSAPubKey{
+					ID:        c.ShardID,
+					PublicKey: *key.RSAPubs[c.ShardID-1],
 				}
 			}
 
 			if p2pListen == "" {
-				return fmt.Errorf("peer config does not exist for our share ID %d", key.ID)
+				return fmt.Errorf("cosigner config does not exist for our shard ID %d", key.ID)
 			}
 
 			localCosigner := signer.NewLocalCosigner(
 				&config,
 				key,
-				peers,
+				pubKeys,
 				p2pListen,
-				uint8(cosignerConfig.Threshold),
+				uint8(thresholdCfg.Threshold),
 			)
 
-			timeout, err := time.ParseDuration(cosignerConfig.Timeout)
-			if err != nil {
-				return fmt.Errorf("error parsing configured timeout: %s. %w", cosignerConfig.Timeout, err)
-			}
+			// Validated prior in ValidateThresholdModeConfig
+			grpcTimeout, _ := time.ParseDuration(thresholdCfg.GRPCTimeout)
+			raftTimeout, _ := time.ParseDuration(thresholdCfg.RaftTimeout)
 
 			raftDir := filepath.Join(config.HomeDir, "raft")
 			if err := os.MkdirAll(raftDir, 0700); err != nil {
@@ -194,7 +192,7 @@ func startCosignerCmd() *cobra.Command {
 
 			// Start RAFT store listener
 			raftStore := signer.NewRaftStore(nodeID,
-				raftDir, p2pListen, timeout, logger, localCosigner, remoteCosigners)
+				raftDir, p2pListen, raftTimeout, logger, localCosigner, remoteCosigners)
 			if err := raftStore.Start(); err != nil {
 				return fmt.Errorf("error starting raft store: %w", err)
 			}
@@ -203,7 +201,8 @@ func startCosignerCmd() *cobra.Command {
 			val := signer.NewThresholdValidator(
 				logger,
 				&config,
-				cosignerConfig.Threshold,
+				thresholdCfg.Threshold,
+				grpcTimeout,
 				localCosigner,
 				remoteCosigners,
 				raftStore,

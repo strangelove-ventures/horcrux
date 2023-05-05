@@ -13,20 +13,20 @@ debug-addr: 0.0.0.0:6001
 Resulting in a configuration like the following:
 
 ```
-chain-id: testnet-1
-cosigner:
+thresholdMode:
   threshold: 2
-  shares: 3
-  p2p-listen: tcp://localhost:5001
-  peers:
-  - share-id: 2
-    p2p-addr: tcp://localhost:5002
-  - share-id: 3
-    p2p-addr: tcp://localhost:5003
-  rpc-timeout: 1500ms
-chain-nodes:
-- priv-val-addr: tcp://localhost:2300
-debug-addr: 0.0.0.0:6001
+  cosigners:
+  - shardID: 1
+    p2pAddr: tcp://localhost:5001
+  - shardID: 2
+    p2pAddr: tcp://localhost:5002
+  - shardID: 3
+    p2pAddr: tcp://localhost:5003
+  grpcTimeout: 1500ms
+  raftTimeout: 1500ms
+chainNodes:
+- privValAddr: tcp://localhost:2300
+debugAddr: 0.0.0.0:6001
 ```
 
 ## Prometheus Cautions

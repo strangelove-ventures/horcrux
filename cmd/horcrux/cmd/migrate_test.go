@@ -33,21 +33,21 @@ func TestMigrateV2toV3(t *testing.T) {
 
 	require.NoFileExists(t, keyShareFile)
 
-	newKeyShareFile := filepath.Join(tmp, "test_share.json")
-	require.FileExists(t, newKeyShareFile)
+	newKeyShardFile := filepath.Join(tmp, "test_shard.json")
+	require.FileExists(t, newKeyShardFile)
 
 	newRSAKeyFile := filepath.Join(tmp, "rsa_keys.json")
 	require.FileExists(t, newRSAKeyFile)
 
-	newKeyShareFileBz, err := os.ReadFile(newKeyShareFile)
+	newKeyShardFileBz, err := os.ReadFile(newKeyShardFile)
 	require.NoError(t, err)
 
-	require.Equal(t, testdata.CosignerKeyMigratedEd25519, string(newKeyShareFileBz))
+	require.Equal(t, testdata.CosignerEd25519KeyMigrated, string(newKeyShardFileBz))
 
 	newRSAKeyFileBz, err := os.ReadFile(newRSAKeyFile)
 	require.NoError(t, err)
 
-	require.Equal(t, testdata.CosignerKeyMigratedRSA, string(newRSAKeyFileBz))
+	require.Equal(t, testdata.CosignerEd25519KeyMigratedRSA, string(newRSAKeyFileBz))
 
 	newConfigFileBz, err := os.ReadFile(configFile)
 	require.NoError(t, err)
@@ -95,24 +95,24 @@ func TestMigrateV2toV3DifferentKeyFilePath(t *testing.T) {
 
 	require.NoFileExists(t, keyShareFile)
 
-	newKeyShareFile := filepath.Join(keyDir, "test_share.json")
-	require.FileExists(t, newKeyShareFile)
+	newKeyShardFile := filepath.Join(keyDir, "test_shard.json")
+	require.FileExists(t, newKeyShardFile)
 
 	newRSAKeyFile := filepath.Join(keyDir, "rsa_keys.json")
 	require.FileExists(t, newRSAKeyFile)
 
-	newKeyShareFileBz, err := os.ReadFile(newKeyShareFile)
+	newKeyShardFileBz, err := os.ReadFile(newKeyShardFile)
 	require.NoError(t, err)
 
-	require.Equal(t, testdata.CosignerKeyMigratedEd25519, string(newKeyShareFileBz))
+	require.Equal(t, testdata.CosignerEd25519KeyMigrated, string(newKeyShardFileBz))
 
 	newRSAKeyFileBz, err := os.ReadFile(newRSAKeyFile)
 	require.NoError(t, err)
 
-	require.Equal(t, testdata.CosignerKeyMigratedRSA, string(newRSAKeyFileBz))
+	require.Equal(t, testdata.CosignerEd25519KeyMigratedRSA, string(newRSAKeyFileBz))
 
 	newConfigFileBz, err := os.ReadFile(configFile)
 	require.NoError(t, err)
 
-	require.Equal(t, fmt.Sprintf("key-dir: %s\n", keyDir)+testdata.ConfigMigrated, string(newConfigFileBz))
+	require.Equal(t, fmt.Sprintf("keyDir: %s\n", keyDir)+testdata.ConfigMigrated, string(newConfigFileBz))
 }

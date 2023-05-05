@@ -78,13 +78,13 @@ func (rpc *CosignerGRPCServer) TransferLeadership(
 ) (*proto.CosignerGRPCTransferLeadershipResponse, error) {
 	leaderID := req.GetLeaderID()
 	if leaderID != "" {
-		for _, peer := range rpc.raftStore.Peers {
-			thisPeerID := fmt.Sprint(peer.GetID())
-			if thisPeerID == leaderID {
-				peerRaftAddress := p2pURLToRaftAddress(peer.GetAddress())
-				fmt.Printf("Transferring leadership to ID: %s - Address: %s\n", thisPeerID, peerRaftAddress)
-				rpc.raftStore.raft.LeadershipTransferToServer(raft.ServerID(thisPeerID), raft.ServerAddress(peerRaftAddress))
-				return &proto.CosignerGRPCTransferLeadershipResponse{LeaderID: thisPeerID, LeaderAddress: peerRaftAddress}, nil
+		for _, c := range rpc.raftStore.Cosigners {
+			shardID := fmt.Sprint(c.GetID())
+			if shardID == leaderID {
+				raftAddress := p2pURLToRaftAddress(c.GetAddress())
+				fmt.Printf("Transferring leadership to ID: %s - Address: %s\n", shardID, raftAddress)
+				rpc.raftStore.raft.LeadershipTransferToServer(raft.ServerID(shardID), raft.ServerAddress(raftAddress))
+				return &proto.CosignerGRPCTransferLeadershipResponse{LeaderID: shardID, LeaderAddress: raftAddress}, nil
 			}
 		}
 	}
