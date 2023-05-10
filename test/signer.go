@@ -37,7 +37,7 @@ type Signer struct {
 	Pool           *dockertest.Pool
 	networkID      string
 	Container      *docker.Container
-	Key            signer.CosignerKey
+	Key            signer.CosignerEd25519Key
 	tl             Logger
 }
 
@@ -128,82 +128,82 @@ func StartSingleSignerContainers(
 }
 
 // StartCosignerContainers will generate the necessary config files for the nodes in the signer cluster,
-// shard the validator's priv_validator_key.json key, write the sharded key shares to the appropriate
+// shard the validator's priv_validator_key.json key, write the sharded key shards to the appropriate
 // signer nodes directory and start the signer cluster.
 // NOTE: Zero or negative values for sentriesPerSigner configures the nodes in the signer cluster to connect to the
 // same sentry node.
 func StartCosignerContainers(
 	signers Signers,
-	sentries Nodes,
+	sentryMap map[string]Nodes,
 	threshold uint8,
 	sentriesPerSigner int,
 ) error {
 	eg := new(errgroup.Group)
 	ctx := context.Background()
 
-	// init config files, for each node in the signer cluster, with the appropriate number of sentries in front of the node
-	switch {
-	// Each node in the signer cluster is connected to a unique sentry node
-	case sentriesPerSigner == 1:
-		singleSentryIndex := 0
-		for i, s := range signers {
-			s := s
+	peers := make([]Nodes, len(signers))
 
-			var peers Nodes
-
-			if len(sentries) == 1 || len(signers) > len(sentries) {
-				peers = sentries[singleSentryIndex : singleSentryIndex+1]
-				singleSentryIndex++
-				if singleSentryIndex >= len(sentries) {
-					singleSentryIndex = 0
+	for _, sentries := range sentryMap {
+		// init config files, for each node in the signer cluster,
+		// with the appropriate number of sentries in front of the node
+		switch {
+		// Each node in the signer cluster is connected to a unique sentry node
+		case sentriesPerSigner == 1:
+			singleSentryIndex := 0
+			for i := range signers {
+				if len(sentries) == 1 || len(signers) > len(sentries) {
+					peers[i] = append(peers[i], sentries[singleSentryIndex:singleSentryIndex+1]...)
+					singleSentryIndex++
+					if singleSentryIndex >= len(sentries) {
+						singleSentryIndex = 0
+					}
+				} else {
+					peers[i] = append(peers[i], sentries[i:i+1]...)
 				}
-			} else {
-				peers = sentries[i : i+1]
 			}
 
-			eg.Go(func() error { return s.InitCosignerConfig(ctx, peers, signers, s.Index, threshold) })
-		}
+		// Each node in the signer cluster is connected to the number of sentry nodes specified by sentriesPerSigner
+		case sentriesPerSigner > 1:
+			sentriesIndex := 0
+			for i := range signers {
+				// if we are indexing sentries up to the end of the slice
+				switch {
+				case sentriesIndex+sentriesPerSigner == len(sentries):
+					peers[i] = append(peers[i], sentries[sentriesIndex:]...)
+					sentriesIndex++
 
-	// Each node in the signer cluster is connected to the number of sentry nodes specified by sentriesPerSigner
-	case sentriesPerSigner > 1:
-		sentriesIndex := 0
-		for _, s := range signers {
-			s := s
-			var peers Nodes
-			// if we are indexing sentries up to the end of the slice
-			switch {
-			case sentriesIndex+sentriesPerSigner == len(sentries):
-				peers = sentries[sentriesIndex:]
-				sentriesIndex++
+					// if there aren't enough sentries left in the slice use the sentries left in slice,
+					// calculate how many more are needed, then start back at the beginning of
+					// the slice to grab the rest. After, check if index into slice of sentries needs reset
+				case sentriesIndex+sentriesPerSigner > len(sentries):
+					remainingSentries := sentries[sentriesIndex:]
+					peers[i] = append(peers[i], remainingSentries...)
 
-				// if there aren't enough sentries left in the slice use the sentries left in slice,
-				// calculate how many more are needed, then start back at the beginning of
-				// the slice to grab the rest. After, check if index into slice of sentries needs reset
-			case sentriesIndex+sentriesPerSigner > len(sentries):
-				remainingSentries := sentries[sentriesIndex:]
-				peers = append(peers, remainingSentries...)
+					neededSentries := sentriesPerSigner - len(remainingSentries)
+					peers[i] = append(peers[i], sentries[0:neededSentries]...)
 
-				neededSentries := sentriesPerSigner - len(remainingSentries)
-				peers = append(peers, sentries[0:neededSentries]...)
-
-				sentriesIndex++
-				if sentriesIndex >= len(sentries) {
-					sentriesIndex = 0
+					sentriesIndex++
+					if sentriesIndex >= len(sentries) {
+						sentriesIndex = 0
+					}
+				default:
+					peers[i] = append(peers[i], sentries[sentriesIndex:sentriesIndex+sentriesPerSigner]...)
+					sentriesIndex++
 				}
-			default:
-				peers = sentries[sentriesIndex : sentriesIndex+sentriesPerSigner]
-				sentriesIndex++
 			}
 
-			eg.Go(func() error { return s.InitCosignerConfig(ctx, peers, signers, s.Index, threshold) })
+		// All nodes in the signer cluster are connected to all sentry nodes
+		default:
+			for i := range signers {
+				peers[i] = append(peers[i], sentries...)
+			}
 		}
+	}
 
-	// All nodes in the signer cluster are connected to all sentry nodes
-	default:
-		for _, s := range signers {
-			s := s
-			eg.Go(func() error { return s.InitCosignerConfig(ctx, sentries, signers, s.Index, threshold) })
-		}
+	for i, s := range signers {
+		i := i
+		s := s
+		eg.Go(func() error { return s.InitThresholdModeConfig(ctx, peers[i], signers, threshold) })
 	}
 	err := eg.Wait()
 	if err != nil {
@@ -232,17 +232,12 @@ func StartCosignerContainers(
 	return eg.Wait()
 }
 
-// PeerString returns a string representing a Signer's connectable private peers
-// skip is the calling Signer's index
-func (ts Signers) PeerString(skip int) string {
-	var out strings.Builder
+// CosignerFlags returns a string slice representing Signers' connectable private peers
+func (ts Signers) ConfigInitFlags() (out []string) {
 	for _, s := range ts {
-		// Skip over the calling signer so its peer list does not include itself
-		if s.Index != skip {
-			out.WriteString(fmt.Sprintf("tcp://%s:%s|%d,", s.Name(), signerPort, s.Index))
-		}
+		out = append(out, "--cosigner", fmt.Sprintf("tcp://%s:%s", s.Name(), signerPort))
 	}
-	return strings.TrimSuffix(out.String(), ",")
+	return out
 }
 
 // MakeSigners creates the Signer objects required for bootstrapping tests
@@ -262,7 +257,6 @@ func MakeSigners(
 			Pool:           pool,
 			networkID:      networkID,
 			Container:      nil,
-			Key:            signer.CosignerKey{},
 			tl:             tl,
 		}
 		out = append(out, ts)
@@ -382,21 +376,20 @@ func (ts *Signer) ExecHorcruxCmd(ctx context.Context, cmd ...string) error {
 // InitSingleSignerConfig creates and runs a container to init a single signers config files
 // blocks until the container exits
 func (ts *Signer) InitSingleSignerConfig(ctx context.Context, listenNodes Nodes) error {
-	return ts.ExecHorcruxCmd(ctx,
-		"config", "init", listenNodes.ListenAddrs())
+	cmd := []string{"config", "init", "--mode", "single"}
+	cmd = append(cmd, listenNodes.ConfigInitFlags()...)
+	return ts.ExecHorcruxCmd(ctx, cmd...)
 }
 
-// InitCosignerConfig creates and runs a container to init a signer nodes config files
+// InitThresholdModeConfig creates and runs a container to init a signer nodes config files
 // blocks until the container exits
-func (ts *Signer) InitCosignerConfig(
-	ctx context.Context, listenNodes Nodes, peers Signers, skip int, threshold uint8) error {
-	return ts.ExecHorcruxCmd(ctx,
-		"config", "init", listenNodes.ListenAddrs(),
-		"--cosigner",
-		fmt.Sprintf("--peers=%s", peers.PeerString(skip)),
-		fmt.Sprintf("--threshold=%d", threshold),
-		fmt.Sprintf("--listen=%s", ts.GRPCAddress()),
-	)
+func (ts *Signer) InitThresholdModeConfig(
+	ctx context.Context, listenNodes Nodes, cosigners Signers, threshold uint8) error {
+	cmd := []string{"config", "init"}
+	cmd = append(cmd, listenNodes.ConfigInitFlags()...)
+	cmd = append(cmd, cosigners.ConfigInitFlags()...)
+	cmd = append(cmd, "--threshold", fmt.Sprint(threshold))
+	return ts.ExecHorcruxCmd(ctx, cmd...)
 }
 
 // StartContainer starts a Signers container and assigns the new running container to replace the old one
@@ -441,7 +434,7 @@ func (ts *Signer) CreateSingleSignerContainer() error {
 		Name: ts.Name(),
 		Config: &docker.Config{
 			User:     getDockerUserString(),
-			Cmd:      []string{binary, "signer", "start", "--accept-risk", fmt.Sprintf("--home=%s", ts.Dir())},
+			Cmd:      []string{binary, "start", "--accept-risk", fmt.Sprintf("--home=%s", ts.Dir())},
 			Hostname: ts.Name(),
 			ExposedPorts: map[docker.Port]struct{}{
 				docker.Port(signerPortDocker): {},
@@ -483,7 +476,7 @@ func (ts *Signer) CreateCosignerContainer() error {
 		Name: ts.Name(),
 		Config: &docker.Config{
 			User:     getDockerUserString(),
-			Cmd:      []string{binary, "cosigner", "start", fmt.Sprintf("--home=%s", ts.Dir())},
+			Cmd:      []string{binary, "start", fmt.Sprintf("--home=%s", ts.Dir())},
 			Hostname: ts.Name(),
 			ExposedPorts: map[docker.Port]struct{}{
 				docker.Port(signerPortDocker): {},

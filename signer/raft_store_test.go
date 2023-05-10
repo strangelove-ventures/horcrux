@@ -22,22 +22,24 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 	rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(t, err)
 
-	key := CosignerKey{
-		PubKey:   dummyPub,
-		ShareKey: []byte{},
-		ID:       1,
+	key := CosignerEd25519Key{
+		PubKey:       dummyPub,
+		PrivateShard: []byte{},
+		ID:           1,
 	}
 
 	cosigner := NewLocalCosigner(
 		&RuntimeConfig{},
-		key.ID,
-		*rsaKey,
-		[]CosignerPeer{{
+		CosignerRSAKey{
+			ID:     key.ID,
+			RSAKey: *rsaKey,
+		},
+		[]CosignerRSAPubKey{{
 			ID:        1,
 			PublicKey: rsaKey.PublicKey,
 		}},
 		"",
-		0, 0,
+		0,
 	)
 
 	s := &RaftStore{
@@ -48,7 +50,6 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 		m:           make(map[string]string),
 		logger:      nil,
 		cosigner:    cosigner,
-		Peers:       []Cosigner{},
 	}
 
 	if _, err := s.Open(); err != nil {

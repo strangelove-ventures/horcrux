@@ -17,16 +17,16 @@ var config signer.RuntimeConfig
 func rootCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "horcrux",
-		Short: "A tendermint remote signer with both single signer and threshold signer modes",
+		Short: "A tendermint remote signer with both threshold signer and single signer modes",
 	}
 
 	cmd.AddCommand(configCmd())
-	cmd.AddCommand(cosignerCmd())
-	cmd.AddCommand(createCosignerEd25519SharesCmd())
-	cmd.AddCommand(createCosignerRSASharesCmd())
+	cmd.AddCommand(startCmd())
+	cmd.AddCommand(addressCmd())
+	cmd.AddCommand(createCosignerEd25519ShardsCmd())
+	cmd.AddCommand(createCosignerRSAShardsCmd())
 	cmd.AddCommand(leaderElectionCmd())
 	cmd.AddCommand(getLeaderCmd())
-	cmd.AddCommand(signerCmd())
 	cmd.AddCommand(stateCmd())
 	cmd.AddCommand(versionCmd())
 

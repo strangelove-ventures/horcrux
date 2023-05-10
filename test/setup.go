@@ -56,9 +56,11 @@ func Genesis(
 ) error {
 	var eg errgroup.Group
 
+	chainID := chain.ChainID
+
 	// sign gentx for each validator
 	for _, v := range nonHorcruxValidators {
-		if v.ChainID != chain.ChainID {
+		if v.ChainID != chainID {
 			continue
 		}
 		v := v
@@ -80,29 +82,16 @@ func Genesis(
 		}
 
 		i := 0
-		var firstSentry *Node
-
-		for ; i < len(v.Sentries); i++ {
-			if v.Sentries[i].ChainID == chain.ChainID {
-				firstSentry = v.Sentries[i]
-				break
-			}
-		}
-
-		if firstSentry == nil {
-			return fmt.Errorf("no sentry found for chain id: %s", chain.ChainID)
-		}
+		firstSentry := v.Sentries[chainID][0]
 
 		// using the first sentry for each horcrux validator as the keyring for the account key (not consensus key)
 		// to sign gentx
 		eg.Go(func() error {
 			return firstSentry.InitValidatorFiles(ctx, pubKey)
 		})
-		for i++; i < len(v.Sentries); i++ {
-			s := v.Sentries[i]
-			if s.ChainID != chain.ChainID {
-				continue
-			}
+		for i++; i < len(v.Sentries[chainID]); i++ {
+			s := v.Sentries[chainID][i]
+
 			eg.Go(func() error { return s.InitFullNodeFiles(ctx) })
 		}
 	}
@@ -134,25 +123,12 @@ func Genesis(
 
 	for _, horcruxValidator := range horcruxValidators {
 		if len(horcruxValidator.Sentries) > 0 {
-			var firstSentry *Node
-			for _, n := range horcruxValidator.Sentries {
-				if n.ChainID == chain.ChainID {
-					firstSentry = n
-					break
-				}
-			}
-			if firstSentry == nil {
-				return fmt.Errorf("no sentry found for chain id: %s", chain.ChainID)
-			}
+			firstSentry := horcruxValidator.Sentries[chain.ChainID][0]
 			// for test purposes, account key (not consensus key) will come from first sentry
 			validators = append(validators, firstSentry)
 		}
 
-		for _, n := range horcruxValidator.Sentries {
-			if n.ChainID == chain.ChainID {
-				nodes = append(nodes, n)
-			}
-		}
+		nodes = append(nodes, horcruxValidator.Sentries[chain.ChainID]...)
 	}
 
 	for _, n := range fullnodes {
@@ -220,11 +196,8 @@ func Genesis(
 
 	// start horcrux sentries. privval listener enabled
 	for _, v := range horcruxValidators {
-		for _, sentry := range v.Sentries {
-			if sentry.ChainID != chain.ChainID {
-				continue
-			}
-			s := sentry
+		for _, s := range v.Sentries[chainID] {
+			s := s
 			tl.Logf("{%s} => starting container...", s.Name())
 			eg.Go(func() error {
 				return s.Start(ctx, func() {

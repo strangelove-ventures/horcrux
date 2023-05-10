@@ -3,5 +3,7 @@
 build
 data
 private_share_*
+*_shard.json
+rsa_keys.json
 priv_validator_key.json
 dist/

@@ -9,7 +9,7 @@ import (
 func SanitizeAddress(address string) (string, error) {
 	u, err := url.Parse(address)
 	if err != nil {
-		return "", fmt.Errorf("error parsing peer URL: %w", err)
+		return "", fmt.Errorf("error parsing URL: %w", err)
 	}
 
 	return u.Host, nil

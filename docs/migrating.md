@@ -63,35 +63,29 @@ $ sudo nano /etc/systemd/system/horcrux.service
 $ sudo systemctl daemon-reload
 ```
 
-After that is done, initialize the configuration for each node using the `horcrux` cli. Each node will require a slightly different command. Below are the commands for each of the 3 signer nodes given the private IPs above. Input your own data here:
+After that is done, initialize the configuration for the cosigners using the `horcrux` cli. If you would like different cosigners to connect to different sentry node(s), modify the `--node` flag values for each cosigner.
 
 ```bash
-# Run this command on the signer-1 VM
-# signer-1 connects to sentry-1
-$ horcrux config init "tcp://10.168.0.1:1234" -c -p "tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3" -l "tcp://10.168.1.1:2222" -t 2
+# Run this command to generate a config file that can be used on all config nodes.
 
-# Run this command on the signer-2 VM
-# signer-2 connects to sentry-2
-$ horcrux config init "tcp://10.168.0.2:1234" -c -p "tcp://10.168.1.1:2222|1,tcp://10.168.1.3:2222|3" -l "tcp://10.168.1.2:2222" -t 2
 
-# Run this command on the signer-3 VM
-# signer-3 connects to sentry-3
-$ horcrux config init "tcp://10.168.0.3:1234" -c -p "tcp://10.168.1.1:2222|1,tcp://10.168.1.2:2222|2" -l "tcp://10.168.1.3:2222" -t 2
+$ horcrux config init --node "tcp://10.168.0.1:1234" --node "tcp://10.168.0.2:1234" --node "tcp://10.168.0.3:1234" --cosigner "tcp://10.168.1.1:2222" --cosigner "tcp://10.168.1.2:2222" --cosigner "tcp://10.168.1.3:2222" --threshold 2 --grpc-timeout 1000ms --raft-timeout 1000ms
 ```
 
 > **Note** 
-> Note the node address (e.g. "tcp://10.168.0.1:1234") of each command. In this example, each horcrux node is communicating with a corresponding sentry. It is also possible to include a comma separated list of node addresses (e.g. "tcp://chain-node-1:1234,tcp://chain-node-2:1234", etc), allowing all horcrux nodes to communicate with all sentries.
-
-> **Warning**
-> SINGLE-SIGNER MODE SHOULD NOT BE USED FOR MAINNET! Horcrux single-signer mode does not give the level of improved key security and fault tolerance that Horcrux MPC/cosigner mode provides. While it is a simpler deployment configuration, single-signer should only be used for experimentation as it is not officially supported by Strangelove.
+> Note the use of multiple `--node` and `--cosigner` flags. In this example, there are 3 sentry(chain) nodes that each horcrux cosigner will connect to. There are 3 horcrux cosigners, with a threshold of 2 cosigners required to sign a valid block signature.
 
 #### Flags
 
-- `-c`/`--cosigner`: this flag instructs horcrux to configure the signer for MPC cosigner operations. This is the officially-supported configuration. The signer can also be run in single signer configuration for experimental, non-mainnet deployments. To enable single-signer mode, exclude the `-c`, `-p`, `-t`, and `--timeout` flags.
-- `-p`/`--peers`: configures the addresses of the other signer nodes in the config. Two ports are required, the P2P port for RCP traffic, and the Raft port for key-value sharing. Note that each signer also has an index. This index corresponds to the shard of the private key it will sign with. Keeping the node names and the indexes the same helps avoid errors and allows you to work more quickly
-- `-l`/`--listen`: configures the listen address for the cosigner, which is used for communication between cosigners, Raft and GRPC. The DNS/IP used for this must be reachable by the other peers, i.e. do not use 0.0.0.0 for the hostname.
-- `-k`/`--keyfile`: configures the file path for the private key share file if you would like to use a different path than the default, `~/.horcrux/share.json`.
-- `--timeout`: configures the timeout for cosigner-to-cosigner GRPC communication. This value defaults to `1000ms`. If you are running in disconnected data centers (i.e. across amazon AZs or gcp zones) increasing the timeout slightly helps to avoid missed blocks especially around proposals.
+- `-c`/`--cosigner`: configures the P2P address and shard ID for cosigner nodes. Keeping the node names and the IDs the same helps avoid errors. The DNS/IP used for all of these must be reachable by the other cosigners, i.e. do not use 0.0.0.0 for the hostname.
+- `-n`/`--node`: configures the priv-val interface listen address for the chain sentry nodes.
+- `-k`/`--key-dir`: configures the directory for the RSA and Ed25519 private key files if you would like to use a different path than the default, `~/.horcrux`.
+- `--grpc-timeout`: configures the timeout for cosigner-to-cosigner GRPC communication. This value defaults to `1000ms`.
+- `--raft-timeout`: configures the timeout for cosigner-to-cosigner Raft consensus. This value defaults to `1000ms`.
+- `-m`/`--mode`: this flag allows changing the sign mode. By default, horcrux uses `threshold` mode for MPC cosigner operations. This is the officially-supported configuration. The signer can also be run in single signer configuration for experimental, non-mainnet deployments. To enable single-signer mode, use `single` for this flag, exclude the `-c`, `-t`, `--grpc-timeout`, and `--raft-timeout` flags, and pass the `--accept-risk` flag to accept the elevated risk of running in single signer mode.
+
+> **Warning**
+> SINGLE-SIGNER MODE SHOULD NOT BE USED FOR MAINNET! Horcrux single-signer mode does not give the level of improved key security and fault tolerance that Horcrux MPC/cosigner mode provides. While it is a simpler deployment configuration, single-signer should only be used for experimentation as it is not officially supported by Strangelove.
 
 ### 3. Split `priv_validator_key.json` and distribute key material
 
@@ -103,35 +97,35 @@ On some computer that contains your `priv_validator_key.json` create a folder to
 $ ls
 priv_validator_key.json
 
-$ horcrux create-ed25519-shares --chain-id cosmoshub-4 --key-file priv_validator_key.json --threshold 2 --shares 3
-Created Ed25519 Share cosigner_1/cosmoshub-4_share.json
-Created Ed25519 Share cosigner_2/cosmoshub-4_share.json
-Created Ed25519 Share cosigner_3/cosmoshub-4_share.json
+$ horcrux create-ed25519-shards --chain-id cosmoshub-4 --key-file priv_validator_key.json --threshold 2 --shards 3
+Created Ed25519 Shard cosigner_1/cosmoshub-4_shard.json
+Created Ed25519 Shard cosigner_2/cosmoshub-4_shard.json
+Created Ed25519 Shard cosigner_3/cosmoshub-4_shard.json
 
-$ horcrux create-rsa-shares --shares 3
-Created RSA Share cosigner_1/rsa_keys.json
-Created RSA Share cosigner_2/rsa_keys.json
-Created RSA Share cosigner_3/rsa_keys.json
+$ horcrux create-rsa-shards --shards 3
+Created RSA Shard cosigner_1/rsa_keys.json
+Created RSA Shard cosigner_2/rsa_keys.json
+Created RSA Shard cosigner_3/rsa_keys.json
 
 $ ls -R
 .:
 cosigner_1  cosigner_2  cosigner_3 priv_validator_key.json
 
 ./cosigner_1:
-cosmoshub-4_share.json  rsa_keys.json
+cosmoshub-4_shard.json  rsa_keys.json
 
 ./cosigner_2:
-cosmoshub-4_share.json  rsa_keys.json
+cosmoshub-4_shard.json  rsa_keys.json
 
 ./cosigner_3:
-cosmoshub-4_share.json  rsa_keys.json
+cosmoshub-4_shard.json  rsa_keys.json
 ```
 
 The files need to be moved their corresponding signer nodes in the `~/.horcrux/` directory. It is important to make sure the files for the cosigner `{id}` (in `cosigner_{id}`) are placed on the corresponding cosigner node. If not, the cluster will not produce valid signatures. If you have named your nodes with their index as the signer index, as in this guide, this operation should be easy to check.
 
-At the end of this step, each of your horcrux nodes will have a `~/.horcrux/{chain-id}_share.json` file with the contents matching the appropriate `cosigner_{id}/share.json` file corresponding to the node number. Additionally, each of your horcrux nodes will have a `~/.horcrux/rsa_keys.json` file with the contents matching the appropriate `cosigner_{id}/rsa_keys.json` file corresponding to the node number.
+At the end of this step, each of your horcrux nodes should have a `~/.horcrux/{chain-id}_shard.json` file with the contents matching the appropriate `cosigner_{id}/{chain-id}_shard.json` file corresponding to the node number. Additionally, each of your horcrux nodes should have a `~/.horcrux/rsa_keys.json` file with the contents matching the appropriate `cosigner_{id}/rsa_keys.json` file corresponding to the node number.
 
-If you will be signing for multiple chains with this single horcrux cluster, repeat the `horcrux create-ed25519-shares` command with the `priv_validator_key.json` for each additional chain ID, and again place on the corresponding horcrux nodes.
+If you will be signing for multiple chains with this single horcrux cluster, repeat the `horcrux create-ed25519-shards` command with the `priv_validator_key.json` for each additional chain ID, and again place on the corresponding horcrux nodes.
 
 ### 4. Halt your validator node and supply signer state data `horcrux` nodes
 
@@ -153,7 +147,7 @@ Once the validator has been stopped, you will need the contents of the `$NODE_HO
 }
 ```
 
-You will need to replace the contents of the `~/.horcrux/state/{chain-id}_priv_validator_state.json` and `~/.horcrux/state/{chain-id}_share_sign_state.json` on each signer node with a truncated and slightly modified version of the file. Note the `""` especially on the `"round"` value:
+You will need to replace the contents of the `~/.horcrux/state/{chain-id}_priv_validator_state.json` on each signer node with a truncated and slightly modified version of the file. Note the `""` especially on the `"round"` value:
 
 ```json
 {
@@ -163,7 +157,7 @@ You will need to replace the contents of the `~/.horcrux/state/{chain-id}_priv_v
 }
 ```
 
-> **NOTE:** This step can be error prone. We will be [adding a feature](https://github.com/strangelove-ventures/horcrux/issues/18) to allow using the CLI to set these values but for now `nano`/`vi`, `cat` and [`jq`](https://stedolan.github.io/jq/) are your friends.
+`horcrux state import` can be used to import an existing `priv_validator_state.json`
 
 ### 5. Start the signer cluster
 
@@ -188,7 +182,7 @@ I[2021-09-24|02:10:09.027] Retrying                                     module=v
 The signer will continue retrying attempts to reach the sentries until we turn the sentry `priv_validator` listener on in the next step. Any panic causing errors are likely due to one of the two following issues:
 
 - Misnaming or incorrect structure of the files in `~/.horcrux/state`. Double check these if you see errors
-- Misnaming or misplacement of the `~/.horcrux/share.json` file
+- Misnaming or misplacement of the `~/.horcrux/{chain-id}_shard.json` file
 
 > **NOTE:** leaving these logs streaming in seperate terminal windows will enable you to watch the cluster connect to the sentries.
 
@@ -219,6 +213,6 @@ You now can sleep much better at night because you are much less likely to have 
 
 ### 8. Administration Commands
 
-`horcrux elect` - Elect a new cluster leader. Pass an optional argument with the intended leader ID to elect that cosigner as the new leader, e.g. `horcrux elect 3` to elect cosigner with `ID: 3` as leader
+`horcrux elect` - Elect a new cluster leader. Pass an optional argument with the intended leader ID to elect that cosigner as the new leader, e.g. `horcrux elect 3` to elect cosigner with `shardID: 3` as leader. This is an optimistic leader election, it is not guaranteed that the exact requested leader will be elected.
 
-`horcrux cosigner address` - Get the public key address as both hex and optionally the validator consensus bech32 address. To retrieve the valcons bech32 address, pass an optional argument with the chain's bech32 valcons prefix, e.g. `horcrux cosigner address cosmosvalcons`
+`horcrux address` - Get the public key address as both hex and optionally the validator consensus bech32 address. To retrieve the valcons bech32 address, pass an optional argument with the chain's bech32 prefix, e.g. `horcrux address cosmos`

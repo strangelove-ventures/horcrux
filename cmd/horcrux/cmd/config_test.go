@@ -12,49 +12,130 @@ import (
 func TestConfigInitCmd(t *testing.T) {
 	tmpHome := t.TempDir()
 	tcs := []struct {
-		name      string
-		home      string
-		args      []string
-		expectErr bool
+		name         string
+		home         string
+		args         []string
+		expectErr    string
+		expectConfig string
 	}{
 		{
-			name: "valid init",
-			home: tmpHome + "_valid_init",
+			name: "valid init threshold",
+			home: tmpHome + "_valid_init_threshold",
 			args: []string{
-				"tcp://10.168.0.1:1234",
-				"-c",
-				"-p", "tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3",
+				"-n", "tcp://10.168.0.1:1234",
+				"-n", "tcp://10.168.0.2:1234",
+				"-c", "tcp://10.168.1.1:2222",
+				"-c", "tcp://10.168.1.2:2222",
+				"-c", "tcp://10.168.1.3:2222",
 				"-t", "2",
-				"-l", "tcp://10.168.1.1:2222",
-				"--timeout", "1500ms",
+				"--raft-timeout", "1500ms",
+				"--grpc-timeout", "1500ms",
 			},
-			expectErr: false,
+			expectConfig: `signMode: threshold
+thresholdMode:
+  threshold: 2
+  cosigners:
+  - shardID: 1
+    p2pAddr: tcp://10.168.1.1:2222
+  - shardID: 2
+    p2pAddr: tcp://10.168.1.2:2222
+  - shardID: 3
+    p2pAddr: tcp://10.168.1.3:2222
+  grpcTimeout: 1500ms
+  raftTimeout: 1500ms
+chainNodes:
+- privValAddr: tcp://10.168.0.1:1234
+- privValAddr: tcp://10.168.0.2:1234
+`,
 		},
 		{
-			name: "invalid chain-nodes",
-			home: tmpHome + "_invalid_chain-nodes",
+			name: "valid init single signer",
+			home: tmpHome + "_valid_init_single",
 			args: []string{
-				"://10.168.0.1:1234", // Missing/malformed protocol scheme
-				"-c",
-				"-p", "tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3",
-				"-t", "2",
-				"-l", "tcp://10.168.1.1:2222",
-				"--timeout", "1500ms",
+				"-m", "single",
+				"-n", "tcp://10.168.0.1:1234",
+				"-n", "tcp://10.168.0.2:1234",
 			},
-			expectErr: true,
+			expectConfig: `signMode: single
+chainNodes:
+- privValAddr: tcp://10.168.0.1:1234
+- privValAddr: tcp://10.168.0.2:1234
+`,
 		},
 		{
-			name: "invalid peer-nodes",
-			home: tmpHome + "_invalid_peer-nodes",
+			name: "invalid chain-node",
+			home: tmpHome + "_invalid_chain-node",
 			args: []string{
-				"tcp://10.168.0.1:1234",
-				"-c",
-				"-p", "tcp://10.168.1.2:2222,tcp://10.168.1.3:2222", // Missing share IDs
+				"-n", "://10.168.0.1:1234",
+				"-n", "tcp://10.168.0.2:1234",
+				"-c", "tcp://10.168.1.1:2222",
+				"-c", "tcp://10.168.1.2:2222",
+				"-c", "tcp://10.168.1.3:2222",
 				"-t", "2",
-				"-l", "tcp://10.168.1.1:2222",
-				"--timeout", "1500ms",
+				"--raft-timeout", "1500ms",
+				"--grpc-timeout", "1500ms",
 			},
-			expectErr: true,
+			expectErr: `parse "://10.168.0.1:1234": missing protocol scheme`,
+		},
+		{
+			name: "invalid cosigner node",
+			home: tmpHome + "_invalid_cosigner-node",
+			args: []string{
+				"-n", "tcp://10.168.0.1:1234",
+				"-n", "tcp://10.168.0.2:1234",
+				"-c", "://10.168.1.1:2222",
+				"-c", "tcp://10.168.1.2:2222",
+				"-c", "tcp://10.168.1.3:2222",
+				"-t", "2",
+				"--raft-timeout", "1500ms",
+				"--grpc-timeout", "1500ms",
+			},
+			expectErr: `failed to parse cosigner (shard ID: 1) p2p address: parse "://10.168.1.1:2222": missing protocol scheme`,
+		},
+		{
+			name: "invalid threshold",
+			home: tmpHome + "_invalid_threshold",
+			args: []string{
+				"-n", "tcp://10.168.0.1:1234",
+				"-n", "tcp://10.168.0.2:1234",
+				"-c", "tcp://10.168.1.1:2222",
+				"-c", "tcp://10.168.1.2:2222",
+				"-c", "tcp://10.168.1.3:2222",
+				"-t", "1",
+				"--raft-timeout", "1500ms",
+				"--grpc-timeout", "1500ms",
+			},
+			expectErr: "threshold (1) must be greater than number of shards (3) / 2",
+		},
+		{
+			name: "invalid raft timeout",
+			home: tmpHome + "_invalid_raft-timeout",
+			args: []string{
+				"-n", "tcp://10.168.0.1:1234",
+				"-n", "tcp://10.168.0.2:1234",
+				"-c", "tcp://10.168.1.1:2222",
+				"-c", "tcp://10.168.1.2:2222",
+				"-c", "tcp://10.168.1.3:2222",
+				"-t", "2",
+				"--raft-timeout", "1500",
+				"--grpc-timeout", "1500ms",
+			},
+			expectErr: `invalid raftTimeout: time: missing unit in duration "1500"`,
+		},
+		{
+			name: "invalid grpc timeout",
+			home: tmpHome + "_invalid_grpc-timeout",
+			args: []string{
+				"-n", "tcp://10.168.0.1:1234",
+				"-n", "tcp://10.168.0.2:1234",
+				"-c", "tcp://10.168.1.1:2222",
+				"-c", "tcp://10.168.1.2:2222",
+				"-c", "tcp://10.168.1.3:2222",
+				"-t", "2",
+				"--raft-timeout", "1500ms",
+				"--grpc-timeout", "1500",
+			},
+			expectErr: `invalid grpcTimeout: time: missing unit in duration "1500"`,
 		},
 	}
 
@@ -72,10 +153,16 @@ func TestConfigInitCmd(t *testing.T) {
 			cmd.SetArgs(args)
 			err = cmd.Execute()
 
-			if tc.expectErr {
+			if tc.expectErr != "" {
 				require.Error(t, err)
+				require.EqualError(t, err, tc.expectErr)
 			} else {
 				require.NoError(t, err)
+
+				actualConfig, err := os.ReadFile(filepath.Join(tmpConfig, "config.yaml"))
+				require.NoError(t, err)
+
+				require.Equal(t, tc.expectConfig, string(actualConfig))
 			}
 		})
 	}

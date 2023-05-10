@@ -23,12 +23,9 @@ func TestStateSetCmd(t *testing.T) {
 	cmd.SetArgs([]string{
 		"--home", tmpConfig,
 		"config", "init",
-		"tcp://10.168.0.1:1234",
-		"-c",
+		"-n", "tcp://10.168.0.1:1234",
 		"-t", "2",
-		"-p", "tcp://10.168.1.2:2222|2,tcp://10.168.1.3:2222|3",
-		"-l", "tcp://10.168.1.1:2222",
-		"--timeout", "1500ms",
+		"-c", "tcp://10.168.1.1:2222,tcp://10.168.1.2:2222,tcp://10.168.1.3:2222",
 	})
 	err := cmd.Execute()
 	require.NoError(t, err)
