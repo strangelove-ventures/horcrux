@@ -1,14 +1,22 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
-	"net"
-	"net/url"
 	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/signer"
+)
+
+const (
+	flagSignMode    = "mode"
+	flagNode        = "node"
+	flagCosigner    = "cosigner"
+	flagDebugAddr   = "debug-addr"
+	flagKeyDir      = "key-dir"
+	flagRaftTimeout = "raft-timeout"
+	flagGRPCTimeout = "grpc-timeout"
+	flagOverwrite   = "overwrite"
 )
 
 func configCmd() *cobra.Command {
@@ -31,18 +39,18 @@ func initCmd() *cobra.Command {
 		Long: "initialize configuration file, use flags for cosigner configuration.\n\n" +
 			"[chain-nodes] is a comma separated array of chain node addresses i.e.\n" +
 			"tcp://chain-node-1:1234,tcp://chain-node-2:1234",
-		Args: cobra.RangeArgs(0, 1),
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			var cn signer.ChainNodes
-			if len(args) == 1 {
-				cn, err = signer.ChainNodesFromArg(args[0])
-				if err != nil {
-					return err
-				}
+			cmdFlags := cmd.Flags()
+
+			nodes, _ := cmdFlags.GetStringSlice(flagNode)
+
+			cn, err := signer.ChainNodesFromFlag(nodes)
+			if err != nil {
+				return err
 			}
 
-			cmdFlags := cmd.Flags()
-			overwrite, _ := cmdFlags.GetBool("overwrite")
+			overwrite, _ := cmdFlags.GetBool(flagOverwrite)
 
 			if _, err := os.Stat(config.ConfigFile); !os.IsNotExist(err) && !overwrite {
 				return fmt.Errorf("%s already exists. Provide the -o flag to overwrite the existing config",
@@ -51,57 +59,43 @@ func initCmd() *cobra.Command {
 
 			var cfg signer.Config
 
-			cs, _ := cmdFlags.GetBool("cosigner")
-			keyDirFlag, _ := cmdFlags.GetString("key-dir")
+			signMode, _ := cmdFlags.GetString(flagSignMode)
+			keyDirFlag, _ := cmdFlags.GetString(flagKeyDir)
 			var keyDir *string
 			if keyDirFlag != "" {
 				keyDir = &keyDirFlag
 			}
 			debugAddr, _ := cmdFlags.GetString("debug-addr")
-			if cs {
-				// Cosigner Config
-				p, _ := cmdFlags.GetStringSlice("peers")
-				threshold, _ := cmdFlags.GetInt("threshold")
-				timeout, _ := cmdFlags.GetString("timeout")
-				peers, err := signer.PeersFromFlag(p)
+			if signMode == string(signer.SignModeThreshold) {
+				// Threshold Mode Config
+				cosignersFlag, _ := cmdFlags.GetStringSlice(flagCosigner)
+				threshold, _ := cmdFlags.GetInt(flagThreshold)
+				raftTimeout, _ := cmdFlags.GetString(flagRaftTimeout)
+				grpcTimeout, _ := cmdFlags.GetString(flagGRPCTimeout)
+				cosigners, err := signer.CosignersFromFlag(cosignersFlag)
 				if err != nil {
 					return err
-				}
-
-				listen, _ := cmdFlags.GetString("listen")
-				if listen == "" {
-					return errors.New("must input at least one node")
-				}
-				url, err := url.Parse(listen)
-				if err != nil {
-					return fmt.Errorf("error parsing listen address: %s, %v", listen, err)
-				}
-				host, _, err := net.SplitHostPort(url.Host)
-				if err != nil {
-					return err
-				}
-				if host == "0.0.0.0" {
-					return errors.New("host cannot be 0.0.0.0, must be reachable from other peers")
 				}
 
 				cfg = signer.Config{
+					SignMode:      signer.SignModeThreshold,
 					PrivValKeyDir: keyDir,
-					CosignerConfig: &signer.CosignerConfig{
-						Threshold: threshold,
-						Shares:    len(peers) + 1,
-						P2PListen: listen,
-						Peers:     peers,
-						Timeout:   timeout,
+					ThresholdModeConfig: &signer.ThresholdModeConfig{
+						Threshold:   threshold,
+						Cosigners:   cosigners,
+						GRPCTimeout: grpcTimeout,
+						RaftTimeout: raftTimeout,
 					},
 					ChainNodes: cn,
 					DebugAddr:  debugAddr,
 				}
-				if err = cfg.ValidateCosignerConfig(); err != nil {
+				if err = cfg.ValidateThresholdModeConfig(); err != nil {
 					return err
 				}
 			} else {
 				// Single Signer Config
 				cfg = signer.Config{
+					SignMode:      signer.SignModeSingle,
 					PrivValKeyDir: keyDir,
 					ChainNodes:    cn,
 					DebugAddr:     debugAddr,
@@ -128,16 +122,23 @@ func initCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().BoolP("cosigner", "c", false, "set to initialize a cosigner node, requires --peers and --threshold")
-	cmd.Flags().StringSliceP("peers", "p", []string{},
-		"cosigner peer addresses in format tcp://{addr}:{port}|{share-id} \n"+
-			"(i.e. \"tcp://node-1:2222|2,tcp://node-2:2222|3\")")
-	cmd.Flags().IntP("threshold", "t", 0, "indicate number of signatures required for threshold signature")
-	cmd.Flags().StringP("listen", "l", "", "listen address of the signer")
-	cmd.Flags().StringP("debug-addr", "d", "", "listen address for Debug and Prometheus metrics in format localhost:8543")
-	cmd.Flags().StringP("key-dir", "k", "", "priv val key directory")
-	cmd.Flags().String("timeout", "1500ms", "configure cosigner rpc server timeout value, \n"+
+	cmd.Flags().StringP(flagSignMode, "m", string(signer.SignModeThreshold),
+		`sign mode, "threshold" (recommended) or "single" (unsupported). threshold mode requires --cosigners and --threshold`,
+	)
+	cmd.Flags().StringSliceP(flagNode, "n", []string{}, "chain nodes in format tcp://{p2p-addr}:{port}")
+	cmd.Flags().StringSliceP(flagCosigner, "c", []string{},
+		"cosigners in format tcp://{p2p-addr}:{port}|{shard-id} \n"+
+			"(i.e. \"tcp://node-1:2222|1,tcp://node-2:2222|2,tcp://node-3:2222|3\")")
+	cmd.Flags().IntP(flagThreshold, "t", 0, "number of shards required for threshold signature")
+	cmd.Flags().StringP(
+		flagDebugAddr, "d", "",
+		"listen address for debug server and prometheus metrics in format localhost:8543",
+	)
+	cmd.Flags().StringP(flagKeyDir, "k", "", "key directory if other than home directory")
+	cmd.Flags().String(flagRaftTimeout, "1500ms", "cosigner raft timeout value, \n"+
 		"accepts valid duration strings for Go's time.ParseDuration() e.g. 1s, 1000ms, 1.5m")
-	cmd.Flags().BoolP("overwrite", "o", false, "set to overwrite an existing config.yaml")
+	cmd.Flags().String(flagGRPCTimeout, "1500ms", "cosigner grpc timeout value, \n"+
+		"accepts valid duration strings for Go's time.ParseDuration() e.g. 1s, 1000ms, 1.5m")
+	cmd.Flags().BoolP(flagOverwrite, "o", false, "overwrite an existing config.yaml")
 	return cmd
 }

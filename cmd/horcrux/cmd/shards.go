@@ -46,7 +46,7 @@ func createCosignerDirectoryIfNecessary(out string, id int) (string, error) {
 const (
 	flagOutputDir = "out"
 	flagThreshold = "threshold"
-	flagShares    = "shares"
+	flagShards    = "shards"
 	flagKeyFile   = "key-file"
 	flagChainID   = "chain-id"
 )
@@ -55,31 +55,31 @@ func addOutputDirFlag(cmd *cobra.Command) {
 	cmd.Flags().StringP(flagOutputDir, "", "", "output directory")
 }
 
-func addShareFlag(cmd *cobra.Command) {
-	cmd.Flags().Uint8(flagShares, 0, "total key shares")
+func addShardsFlag(cmd *cobra.Command) {
+	cmd.Flags().Uint8(flagShards, 0, "total key shards")
 }
 
 func addShardFlags(cmd *cobra.Command) {
-	addShareFlag(cmd)
-	cmd.Flags().Uint8(flagThreshold, 0, "threshold number of shares required to successfully sign")
+	addShardsFlag(cmd)
+	cmd.Flags().Uint8(flagThreshold, 0, "threshold number of shards required to successfully sign")
 	cmd.Flags().String(flagKeyFile, "", "priv_validator_key.json file to shard")
 	cmd.Flags().String(flagChainID, "", "key shards will sign for this chain ID")
 }
 
-// CreateCosignerSharesCmd is a cobra command for creating cosigner shares from a priv validator
-func createCosignerEd25519SharesCmd() *cobra.Command {
+// createCosignerEd25519ShardsCmd is a cobra command for creating
+// cosigner shards from a full priv validator key.
+func createCosignerEd25519ShardsCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "create-ed25519-shares chain-id priv-validator-key-file threshold shares",
-		Aliases: []string{"shard", "shares"},
-		Args:    cobra.NoArgs,
-		Short:   "Create cosigner Ed25519 shares",
+		Use:   "create-ed25519-shards chain-id priv-validator-key-file threshold shards",
+		Args:  cobra.NoArgs,
+		Short: "Create cosigner Ed25519 shards",
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			flags := cmd.Flags()
 
 			chainID, _ := flags.GetString(flagChainID)
 			keyFile, _ := flags.GetString(flagKeyFile)
 			threshold, _ := flags.GetUint8(flagThreshold)
-			shares, _ := flags.GetUint8(flagShares)
+			shards, _ := flags.GetUint8(flagShards)
 
 			var errs []error
 
@@ -95,31 +95,31 @@ func createCosignerEd25519SharesCmd() *cobra.Command {
 				errs = append(errs, fmt.Errorf("threshold flag must be provided and non-zero"))
 			}
 
-			if shares == 0 {
-				errs = append(errs, fmt.Errorf("shares flag must be provided and non-zero"))
+			if shards == 0 {
+				errs = append(errs, fmt.Errorf("shards flag must be provided and non-zero"))
 			}
 
 			if _, err := os.Stat(keyFile); err != nil {
 				errs = append(errs, fmt.Errorf("error accessing priv_validator_key file(%s): %w", keyFile, err))
 			}
 
-			if threshold > shares {
+			if threshold > shards {
 				errs = append(errs, fmt.Errorf(
-					"threshold cannot be greater than total shares, got [threshold](%d) > [shares](%d)",
-					threshold, shares,
+					"threshold cannot be greater than total shards, got [threshold](%d) > [shards](%d)",
+					threshold, shards,
 				))
 			}
 
-			if threshold <= shares/2 {
-				errs = append(errs, fmt.Errorf("threshold must be greater than total shares "+
-					"divided by 2, got [threshold](%d) <= [shares](%d) / 2", threshold, shares))
+			if threshold <= shards/2 {
+				errs = append(errs, fmt.Errorf("threshold must be greater than total shards "+
+					"divided by 2, got [threshold](%d) <= [shards](%d) / 2", threshold, shards))
 			}
 
 			if len(errs) > 0 {
 				return errors.Join(errs...)
 			}
 
-			csKeys, err := signer.CreateCosignerSharesFromFile(keyFile, threshold, shares)
+			csKeys, err := signer.CreateCosignerEd25519ShardsFromFile(keyFile, threshold, shards)
 			if err != nil {
 				return err
 			}
@@ -139,11 +139,11 @@ func createCosignerEd25519SharesCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				filename := filepath.Join(dir, fmt.Sprintf("%s_share.json", chainID))
-				if err = signer.WriteCosignerShareFile(c, filename); err != nil {
+				filename := filepath.Join(dir, fmt.Sprintf("%s_shard.json", chainID))
+				if err = signer.WriteCosignerEd25519ShardFile(c, filename); err != nil {
 					return err
 				}
-				fmt.Fprintf(cmd.OutOrStdout(), "Created Ed25519 Share %s\n", filename)
+				fmt.Fprintf(cmd.OutOrStdout(), "Created Ed25519 Shard %s\n", filename)
 			}
 			return nil
 		},
@@ -153,22 +153,21 @@ func createCosignerEd25519SharesCmd() *cobra.Command {
 	return cmd
 }
 
-// CreateCosignerSharesCmd is a cobra command for creating cosigner shares from a priv validator
-func createCosignerRSASharesCmd() *cobra.Command {
+// createCosignerRSAShardsCmd is a cobra command for creating cosigner shards from a priv validator
+func createCosignerRSAShardsCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "create-rsa-shares shares",
-		Aliases: []string{"shard", "shares"},
-		Args:    cobra.NoArgs,
-		Short:   "Create cosigner RSA shares",
+		Use:   "create-rsa-shards shards",
+		Args:  cobra.NoArgs,
+		Short: "Create cosigner RSA shards",
 
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			shares, _ := cmd.Flags().GetUint8(flagShares)
+			shards, _ := cmd.Flags().GetUint8(flagShards)
 
-			if shares <= 0 {
-				return fmt.Errorf("shares must be greater than zero (%d): %w", shares, err)
+			if shards <= 0 {
+				return fmt.Errorf("shards must be greater than zero (%d): %w", shards, err)
 			}
 
-			csKeys, err := signer.CreateCosignerSharesRSA(int(shares))
+			csKeys, err := signer.CreateCosignerRSAShards(int(shards))
 			if err != nil {
 				return err
 			}
@@ -189,15 +188,15 @@ func createCosignerRSASharesCmd() *cobra.Command {
 					return err
 				}
 				filename := filepath.Join(dir, "rsa_keys.json")
-				if err = signer.WriteCosignerShareRSAFile(c, filename); err != nil {
+				if err = signer.WriteCosignerRSAShardFile(c, filename); err != nil {
 					return err
 				}
-				fmt.Fprintf(cmd.OutOrStdout(), "Created RSA Share %s\n", filename)
+				fmt.Fprintf(cmd.OutOrStdout(), "Created RSA Shard %s\n", filename)
 			}
 			return nil
 		},
 	}
-	addShareFlag(cmd)
+	addShardsFlag(cmd)
 	addOutputDirFlag(cmd)
 	return cmd
 }

@@ -1,14 +1,16 @@
-cosigner:
+signMode: threshold
+thresholdMode:
   threshold: 2
-  shares: 3
-  p2p-listen: tcp://127.0.0.1:2222
-  peers:
-  - share-id: 2
-    p2p-addr: tcp://127.0.0.1:2223
-  - share-id: 3
-    p2p-addr: tcp://127.0.0.1:2224
-  rpc-timeout: 1000ms
-chain-nodes:
-- priv-val-addr: tcp://127.0.0.1:1234
-- priv-val-addr: tcp://127.0.0.1:2345
-- priv-val-addr: tcp://127.0.0.1:3456
+  cosigners:
+  - shardID: 3
+    p2pAddr: tcp://127.0.0.1:2224
+  - shardID: 1
+    p2pAddr: tcp://127.0.0.1:2222
+  - shardID: 2
+    p2pAddr: tcp://127.0.0.1:2223
+  grpcTimeout: 1000ms
+  raftTimeout: 1000ms
+chainNodes:
+- privValAddr: tcp://127.0.0.1:1234
+- privValAddr: tcp://127.0.0.1:2345
+- privValAddr: tcp://127.0.0.1:3456

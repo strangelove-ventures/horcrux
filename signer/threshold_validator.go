@@ -24,13 +24,15 @@ type ThresholdValidator struct {
 
 	threshold int
 
+	grpcTimeout time.Duration
+
 	chainState sync.Map
 
 	// our own cosigner
-	cosigner Cosigner
+	myCosigner Cosigner
 
 	// peer cosigners
-	peers []Cosigner
+	peerCosigners []Cosigner
 
 	raftStore *RaftStore
 
@@ -55,17 +57,19 @@ func NewThresholdValidator(
 	logger log.Logger,
 	config *RuntimeConfig,
 	threshold int,
-	cosigner Cosigner,
-	peers []Cosigner,
+	grpcTimeout time.Duration,
+	myCosigner Cosigner,
+	peerCosigners []Cosigner,
 	raftStore *RaftStore,
 ) *ThresholdValidator {
 	return &ThresholdValidator{
-		logger:    logger,
-		config:    config,
-		threshold: threshold,
-		cosigner:  cosigner,
-		peers:     peers,
-		raftStore: raftStore,
+		logger:        logger,
+		config:        config,
+		threshold:     threshold,
+		grpcTimeout:   grpcTimeout,
+		myCosigner:    myCosigner,
+		peerCosigners: peerCosigners,
+		raftStore:     raftStore,
 	}
 }
 
@@ -116,7 +120,7 @@ func (pv *ThresholdValidator) Stop() {
 func (pv *ThresholdValidator) waitForSignStatesToFlushToDisk() {
 	pv.pendingDiskWG.Wait()
 
-	switch cosigner := pv.cosigner.(type) {
+	switch cosigner := pv.myCosigner.(type) {
 	case *LocalCosigner:
 		cosigner.waitForSignStatesToFlushToDisk()
 	default:
@@ -126,7 +130,7 @@ func (pv *ThresholdValidator) waitForSignStatesToFlushToDisk() {
 // GetPubKey returns the public key of the validator.
 // Implements PrivValidator.
 func (pv *ThresholdValidator) GetPubKey(chainID string) (crypto.PubKey, error) {
-	return pv.cosigner.GetPubKey(chainID)
+	return pv.myCosigner.GetPubKey(chainID)
 }
 
 // SignVote signs a canonical representation of the vote, along with the
@@ -222,7 +226,7 @@ func (pv *ThresholdValidator) waitForPeerEphemeralShares(
 	peer Cosigner,
 	hrst HRSTKey,
 	wg *sync.WaitGroup,
-	encryptedEphemeralSharesThresholdMap *map[Cosigner][]CosignerEphemeralSecretPart,
+	encryptedEphemeralSharesThresholdMap map[Cosigner][]CosignerEphemeralSecretPart,
 	thresholdPeersMutex *sync.Mutex,
 ) {
 	peerStartTime := time.Now()
@@ -241,8 +245,8 @@ func (pv *ThresholdValidator) waitForPeerEphemeralShares(
 
 	// Check so that getEphemeralWaitGroup.Done is not called more than (threshold - 1) times which causes hardlock
 	thresholdPeersMutex.Lock()
-	if len(*encryptedEphemeralSharesThresholdMap) < pv.threshold-1 {
-		(*encryptedEphemeralSharesThresholdMap)[peer] = ephemeralSecretParts.EncryptedSecrets
+	if len(encryptedEphemeralSharesThresholdMap) < pv.threshold-1 {
+		(encryptedEphemeralSharesThresholdMap)[peer] = ephemeralSecretParts.EncryptedSecrets
 		defer wg.Done()
 	}
 	thresholdPeersMutex.Unlock()
@@ -253,7 +257,7 @@ func (pv *ThresholdValidator) waitForPeerSetEphemeralSharesAndSign(
 	ourID int,
 	peer Cosigner,
 	hrst HRSTKey,
-	encryptedEphemeralSharesThresholdMap *map[Cosigner][]CosignerEphemeralSecretPart,
+	encryptedEphemeralSharesThresholdMap map[Cosigner][]CosignerEphemeralSecretPart,
 	signBytes []byte,
 	shareSignatures *[][]byte,
 	shareSignaturesMutex *sync.Mutex,
@@ -263,11 +267,12 @@ func (pv *ThresholdValidator) waitForPeerSetEphemeralSharesAndSign(
 	peerStartTime := time.Now()
 	defer wg.Done()
 	peerEphemeralSecretParts := make([]CosignerEphemeralSecretPart, 0, pv.threshold-1)
-	for _, EncryptedSecrets := range *encryptedEphemeralSharesThresholdMap {
-		for _, ephemeralSecretPart := range EncryptedSecrets {
+
+	for _, encryptedSecrets := range encryptedEphemeralSharesThresholdMap {
+		for _, ephemeralSecretPart := range encryptedSecrets {
 			// if share is intended for peer, check to make sure source peer is included in threshold
 			if ephemeralSecretPart.DestinationID == peer.GetID() {
-				for thresholdPeer := range *encryptedEphemeralSharesThresholdMap {
+				for thresholdPeer := range encryptedEphemeralSharesThresholdMap {
 					if thresholdPeer.GetID() == ephemeralSecretPart.SourceID {
 						// source peer is included in threshold signature, include in sharing
 						peerEphemeralSecretParts = append(peerEphemeralSecretParts, ephemeralSecretPart)
@@ -355,7 +360,7 @@ func (pv *ThresholdValidator) LoadSignStateIfNecessary(chainID string) error {
 		lastSignStateInitiatedMutex: &sync.Mutex{},
 	})
 
-	switch cosigner := pv.cosigner.(type) {
+	switch cosigner := pv.myCosigner.(type) {
 	case *LocalCosigner:
 		return cosigner.LoadSignStateIfNecessary(chainID)
 	default:
@@ -492,7 +497,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 		}
 	}
 
-	numPeers := len(pv.peers)
+	numPeers := len(pv.peerCosigners)
 	total := uint8(numPeers + 1)
 	getEphemeralWaitGroup := sync.WaitGroup{}
 
@@ -500,17 +505,17 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	getEphemeralWaitGroup.Add(pv.threshold - 1)
 	// Used to track how close we are to threshold
 
-	ourID := pv.cosigner.GetID()
+	ourID := pv.myCosigner.GetID()
 
-	encryptedEphemeralSharesThresholdMap := make(map[Cosigner][]CosignerEphemeralSecretPart)
+	ephSecrets := make(map[Cosigner][]CosignerEphemeralSecretPart)
 	thresholdPeersMutex := sync.Mutex{}
 
-	for _, peer := range pv.peers {
-		go pv.waitForPeerEphemeralShares(chainID, peer, hrst, &getEphemeralWaitGroup,
-			&encryptedEphemeralSharesThresholdMap, &thresholdPeersMutex)
+	for _, c := range pv.peerCosigners {
+		go pv.waitForPeerEphemeralShares(chainID, c, hrst, &getEphemeralWaitGroup,
+			ephSecrets, &thresholdPeersMutex)
 	}
 
-	ourEphemeralSecretParts, err := pv.cosigner.GetEphemeralSecretParts(chainID, hrst)
+	myEphSecrets, err := pv.myCosigner.GetEphemeralSecretParts(chainID, hrst)
 	if err != nil {
 		// Our ephemeral secret parts are required, cannot proceed
 		return nil, stamp, err
@@ -518,12 +523,12 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 
 	// Wait for threshold cosigners to be complete
 	// A Cosigner will either respond in time, or be cancelled with timeout
-	if waitUntilCompleteOrTimeout(&getEphemeralWaitGroup, 4*time.Second) {
+	if waitUntilCompleteOrTimeout(&getEphemeralWaitGroup, pv.grpcTimeout) {
 		return nil, stamp, errors.New("timed out waiting for ephemeral shares")
 	}
 
 	thresholdPeersMutex.Lock()
-	encryptedEphemeralSharesThresholdMap[pv.cosigner] = ourEphemeralSecretParts.EncryptedSecrets
+	ephSecrets[pv.myCosigner] = myEphSecrets.EncryptedSecrets
 	thresholdPeersMutex.Unlock()
 
 	timedSignBlockThresholdLag.Observe(time.Since(timeStartSignBlock).Seconds())
@@ -548,9 +553,9 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 
 	var ephemeralPublic []byte
 
-	for peer := range encryptedEphemeralSharesThresholdMap {
+	for cosigner := range ephSecrets {
 		// set peerEphemeralSecretParts and sign in single rpc call.
-		go pv.waitForPeerSetEphemeralSharesAndSign(chainID, ourID, peer, hrst, &encryptedEphemeralSharesThresholdMap,
+		go pv.waitForPeerSetEphemeralSharesAndSign(chainID, ourID, cosigner, hrst, ephSecrets,
 			signBytes, &shareSignatures, &shareSignaturesMutex, &ephemeralPublic, &setEphemeralAndSignWaitGroup)
 	}
 
@@ -595,7 +600,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	signature = append(signature, combinedSig...)
 
 	// verify the combined signature before saving to watermark
-	if !pv.cosigner.VerifySignature(chainID, signBytes, signature) {
+	if !pv.myCosigner.VerifySignature(chainID, signBytes, signature) {
 		totalInvalidSignature.Inc()
 		return nil, stamp, errors.New("combined signature is not valid")
 	}

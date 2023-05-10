@@ -40,7 +40,9 @@ func testChainSingleNodeAndHorcrux(
 	require.NoError(t, Genesis(ctx, t, chain, otherValidatorNodes, []*Node{}, []*Validator{ourValidator}))
 
 	// Wait for all nodes to get to given block height
-	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5))
+	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries[chainID]).WaitForHeight(5))
+
+	require.NoError(t, ourValidator.WaitForConsecutiveBlocks(chainID, 10))
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
 	require.NoError(t, ourValidator.EnsureNotSlashed(chainID))
@@ -185,7 +187,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 
 	// create horcrux validator with same consensus key
 	ourValidatorUpgradedToHorcrux, err := NewHorcruxValidatorWithPrivValKey(t, pool, network, home,
-		chainID, 0, 0, totalSigners, threshold, chain, ourValidatorPrivValKey)
+		0, 0, totalSigners, threshold, chain, ourValidatorPrivValKey)
 	require.NoError(t, err)
 
 	// stop our validator node before upgrading to horcrux
@@ -195,7 +197,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	time.Sleep(5 * time.Second) // wait for all containers to stop
 
 	// bring in single signer node as a sentry for horcrux
-	ourValidatorUpgradedToHorcrux.Sentries = []*Node{ourValidatorNode}
+	ourValidatorUpgradedToHorcrux.Sentries[chainID] = []*Node{ourValidatorNode}
 
 	// modify node config to listen for private validator connections
 	ourValidatorNode.SetPrivValListen(validators.PeerString())
@@ -245,7 +247,7 @@ func TestDownedSigners2of3(t *testing.T) {
 	require.NoError(t, Genesis(ctx, t, chain, otherValidatorNodes, []*Node{}, []*Validator{ourValidator}))
 
 	// Wait for all nodes to get to given block height
-	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5))
+	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries[chainID]).WaitForHeight(5))
 
 	// Test taking down each node in the signer cluster for a period of time
 	for _, signer := range ourValidator.Signers {
@@ -294,7 +296,7 @@ func TestLeaderElection2of3(t *testing.T) {
 	require.NoError(t, Genesis(ctx, t, chain, otherValidatorNodes, []*Node{}, []*Validator{ourValidator}))
 
 	// Wait for all nodes to get to given block height
-	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5))
+	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries[chainID]).WaitForHeight(5))
 
 	// Test electing each node in the signer cluster for a period of time
 	for _, signer := range ourValidator.Signers {
@@ -367,7 +369,7 @@ func TestDownedSigners3of5(t *testing.T) {
 	require.NoError(t, Genesis(ctx, t, chain, otherValidatorNodes, []*Node{}, []*Validator{ourValidator}))
 
 	// Wait for all nodes to get to given block height
-	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5))
+	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries[chainID]).WaitForHeight(5))
 
 	// Test taking down 2 nodes at a time in the signer cluster for a period of time
 	for i := 0; i < len(ourValidator.Signers); i++ {
@@ -433,7 +435,7 @@ func TestChainPureHorcrux(t *testing.T) {
 			signersPerValidator, threshold, chain)
 		require.NoError(t, err)
 		validators = append(validators, validator)
-		allNodes = append(allNodes, validator.Sentries...)
+		allNodes = append(allNodes, validator.Sentries[chainID]...)
 		startValidatorsErrGroup.Go(func() error {
 			return validator.StartHorcruxCluster(sentriesPerSigner)
 		})
@@ -490,7 +492,8 @@ func TestMultipleChainHorcrux(t *testing.T) {
 			signersPerValidator, threshold, chain1, chain2)
 		require.NoError(t, err)
 		validators = append(validators, validator)
-		allNodes = append(allNodes, validator.Sentries...)
+		allNodes = append(allNodes, validator.Sentries[chainID1]...)
+		allNodes = append(allNodes, validator.Sentries[chainID2]...)
 		startValidatorsErrGroup.Go(func() error {
 			return validator.StartHorcruxCluster(sentriesPerSigner)
 		})

@@ -3,11 +3,10 @@ package signer
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/cometbft/cometbft/crypto"
@@ -22,16 +21,20 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-type NodeConfig struct {
-	Address string
-}
+type SignMode string
 
-// Config maps to the on-disk JSON format
+const (
+	SignModeThreshold SignMode = "threshold"
+	SignModeSingle    SignMode = "single"
+)
+
+// Config maps to the on-disk yaml format
 type Config struct {
-	PrivValKeyDir  *string         `json:"key-dir,omitempty" yaml:"key-dir,omitempty"`
-	CosignerConfig *CosignerConfig `json:"cosigner,omitempty" yaml:"cosigner,omitempty"`
-	ChainNodes     ChainNodes      `json:"chain-nodes,omitempty" yaml:"chain-nodes,omitempty"`
-	DebugAddr      string          `json:"debug-addr,omitempty" yaml:"debug-addr,omitempty"`
+	PrivValKeyDir       *string              `yaml:"keyDir,omitempty"`
+	SignMode            SignMode             `yaml:"signMode"`
+	ThresholdModeConfig *ThresholdModeConfig `yaml:"thresholdMode,omitempty"`
+	ChainNodes          ChainNodes           `yaml:"chainNodes,omitempty"`
+	DebugAddr           string               `yaml:"debugAddr,omitempty"`
 }
 
 func (c *Config) Nodes() (out []string) {
@@ -52,7 +55,7 @@ func (c *Config) MustMarshalYaml() []byte {
 func (c *Config) ValidateSingleSignerConfig() error {
 	var errs []error
 	if len(c.ChainNodes) == 0 {
-		errs = append(errs, fmt.Errorf("need to have chain-nodes configured for priv-val connection"))
+		errs = append(errs, fmt.Errorf("need to have chainNodes configured for priv-val connection"))
 	}
 	if err := c.ChainNodes.Validate(); err != nil {
 		errs = append(errs, err)
@@ -60,35 +63,43 @@ func (c *Config) ValidateSingleSignerConfig() error {
 	return errors.Join(errs...)
 }
 
-func (c *Config) ValidateCosignerConfig() error {
+func (c *Config) ValidateThresholdModeConfig() error {
 	var errs []error
+
 	if err := c.ValidateSingleSignerConfig(); err != nil {
 		errs = append(errs, err)
 	}
-	if c.CosignerConfig == nil {
+
+	if c.ThresholdModeConfig == nil {
 		errs = append(errs, fmt.Errorf("cosigner config can't be empty"))
-		// the rest of the checks depend on non-nil c.CosignerConfig
+		// the rest of the checks depend on non-nil c.ThresholdModeConfig
 		return errors.Join(errs...)
 	}
-	if c.CosignerConfig.Threshold <= c.CosignerConfig.Shares/2 {
-		errs = append(errs, fmt.Errorf("threshold (%d) must be greater than number of shares (%d) / 2",
-			c.CosignerConfig.Threshold, c.CosignerConfig.Shares))
-	}
-	if c.CosignerConfig.Shares < c.CosignerConfig.Threshold {
-		errs = append(errs, fmt.Errorf("number of shares (%d) must be greater or equal to threshold (%d)",
-			c.CosignerConfig.Shares, c.CosignerConfig.Threshold))
+
+	numShards := len(c.ThresholdModeConfig.Cosigners)
+
+	if c.ThresholdModeConfig.Threshold <= numShards/2 {
+		errs = append(errs, fmt.Errorf("threshold (%d) must be greater than number of shards (%d) / 2",
+			c.ThresholdModeConfig.Threshold, numShards))
 	}
 
-	_, err := time.ParseDuration(c.CosignerConfig.Timeout)
-	if err != nil {
-		errs = append(errs, fmt.Errorf("invalid --timeout: %w", err))
+	if numShards < c.ThresholdModeConfig.Threshold {
+		errs = append(errs, fmt.Errorf("number of shards (%d) must be greater or equal to threshold (%d)",
+			numShards, c.ThresholdModeConfig.Threshold))
 	}
-	if _, err := url.Parse(c.CosignerConfig.P2PListen); err != nil {
-		errs = append(errs, fmt.Errorf("failed to parse p2p listen address: %w", err))
+
+	if _, err := time.ParseDuration(c.ThresholdModeConfig.RaftTimeout); err != nil {
+		errs = append(errs, fmt.Errorf("invalid raftTimeout: %w", err))
 	}
-	if err := c.CosignerConfig.Peers.Validate(c.CosignerConfig.Shares); err != nil {
+
+	if _, err := time.ParseDuration(c.ThresholdModeConfig.GRPCTimeout); err != nil {
+		errs = append(errs, fmt.Errorf("invalid grpcTimeout: %w", err))
+	}
+
+	if err := c.ThresholdModeConfig.Cosigners.Validate(); err != nil {
 		errs = append(errs, err)
 	}
+
 	return errors.Join(errs...)
 }
 
@@ -120,7 +131,7 @@ func (c RuntimeConfig) KeyFilePathCosigner(chainID string) string {
 	if kd := c.cachedKeyDirectory(); kd != "" {
 		keyDir = kd
 	}
-	return filepath.Join(keyDir, fmt.Sprintf("%s_share.json", chainID))
+	return filepath.Join(keyDir, fmt.Sprintf("%s_shard.json", chainID))
 }
 
 func (c RuntimeConfig) KeyFilePathCosignerRSA() string {
@@ -135,7 +146,7 @@ func (c RuntimeConfig) PrivValStateFile(chainID string) string {
 	return filepath.Join(c.StateDir, fmt.Sprintf("%s_priv_validator_state.json", chainID))
 }
 
-func (c RuntimeConfig) ShareStateFile(chainID string) string {
+func (c RuntimeConfig) CosignerStateFile(chainID string) string {
 	return filepath.Join(c.StateDir, fmt.Sprintf("%s_share_sign_state.json", chainID))
 }
 
@@ -173,64 +184,82 @@ func (c RuntimeConfig) KeyFileExistsCosignerRSA() (string, error) {
 	return keyFile, fileExists(keyFile)
 }
 
-type CosignerConfig struct {
-	Threshold int                 `json:"threshold"   yaml:"threshold"`
-	Shares    int                 `json:"shares" yaml:"shares"`
-	P2PListen string              `json:"p2p-listen"  yaml:"p2p-listen"`
-	Peers     CosignerPeersConfig `json:"peers"       yaml:"peers"`
-	Timeout   string              `json:"rpc-timeout" yaml:"rpc-timeout"`
+// ThresholdModeConfig is the on disk config format for threshold sign mode.
+type ThresholdModeConfig struct {
+	Threshold   int             `yaml:"threshold"`
+	Cosigners   CosignersConfig `yaml:"cosigners"`
+	GRPCTimeout string          `yaml:"grpcTimeout"`
+	RaftTimeout string          `yaml:"raftTimeout"`
 }
 
-func (cfg *CosignerConfig) LeaderElectMultiAddress() (string, error) {
-	addresses := make([]string, 1+len(cfg.Peers))
-	addresses[0] = cfg.P2PListen
-	for i, peer := range cfg.Peers {
-		addresses[i+1] = peer.P2PAddr
+func (cfg *ThresholdModeConfig) LeaderElectMultiAddress() (string, error) {
+	addresses := make([]string, len(cfg.Cosigners))
+	for i, c := range cfg.Cosigners {
+		addresses[i] = c.P2PAddr
 	}
 	return client.MultiAddress(addresses)
 }
 
-type CosignerPeerConfig struct {
-	ShareID int    `json:"share-id" yaml:"share-id"`
-	P2PAddr string `json:"p2p-addr" yaml:"p2p-addr"`
+// CosignerConfig is the on disk format representing a cosigner for threshold sign mode.
+type CosignerConfig struct {
+	ShardID int    `yaml:"shardID"`
+	P2PAddr string `yaml:"p2pAddr"`
 }
 
-type CosignerPeersConfig []CosignerPeerConfig
+type CosignersConfig []CosignerConfig
 
-func (peers CosignerPeersConfig) Validate(shares int) error {
+func (cosigners CosignersConfig) Validate() error {
+	var errs []error
 	// Check IDs to make sure none are duplicated
-	if dupl := duplicatePeers(peers); len(dupl) != 0 {
-		return fmt.Errorf("found duplicate share IDs in args: %v", dupl)
+	if dupl := duplicateCosigners(cosigners); len(dupl) != 0 {
+		errs = append(errs, fmt.Errorf("found duplicate cosigner shard ID(s) in args: %v", dupl))
 	}
 
-	// Make sure that the peers' IDs match the number of shares.
-	for _, peer := range peers {
-		if peer.ShareID < 1 || peer.ShareID > shares {
-			return fmt.Errorf("peer ID %v in args is out of range, must be between 1 and %v, inclusive",
-				peer.ShareID, shares)
+	shards := len(cosigners)
+
+	// Make sure that the cosigner IDs match the number of cosigners.
+	for _, cosigner := range cosigners {
+		if cosigner.ShardID < 1 || cosigner.ShardID > shards {
+			errs = append(errs, fmt.Errorf("cosigner shard ID %d in args is out of range, must be between 1 and %d, inclusive",
+				cosigner.ShardID, shards))
+		}
+
+		url, err := url.Parse(cosigner.P2PAddr)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to parse cosigner (shard ID: %d) p2p address: %w", cosigner.ShardID, err))
+			continue
+		}
+
+		host, _, err := net.SplitHostPort(url.Host)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to parse cosigner (shard ID: %d) host port: %w", cosigner.ShardID, err))
+			continue
+		}
+		if host == "0.0.0.0" {
+			errs = append(errs, fmt.Errorf("host cannot be 0.0.0.0, must be reachable from other cosigners"))
 		}
 	}
 
-	// Check that exactly {num-shares}-1 peers are in the peer list, assuming
-	// the remaining peer ID is the ID the local node is configured with.
-	if len(peers) != shares-1 {
-		return fmt.Errorf("incorrect number of peers. expected (%d shares - local node = %d peers)",
-			shares, shares-1)
+	// Check that exactly {num-shards} cosigners are in the list
+	if len(cosigners) != shards {
+		errs = append(errs, fmt.Errorf("incorrect number of cosigners. expected (%d shards = %d cosigners)",
+			shards, shards))
 	}
-	return nil
+
+	return errors.Join(errs...)
 }
 
-func duplicatePeers(peers []CosignerPeerConfig) (duplicates map[int][]string) {
+func duplicateCosigners(cosigners []CosignerConfig) (duplicates map[int][]string) {
 	idAddrs := make(map[int][]string)
-	for _, peer := range peers {
-		// Collect all addresses assigned to each share ID.
-		idAddrs[peer.ShareID] = append(idAddrs[peer.ShareID], peer.P2PAddr)
+	for _, cosigner := range cosigners {
+		// Collect all addresses assigned to each cosigner.
+		idAddrs[cosigner.ShardID] = append(idAddrs[cosigner.ShardID], cosigner.P2PAddr)
 	}
 
-	for shareID, peers := range idAddrs {
-		if len(peers) == 1 {
+	for shardID, cosigners := range idAddrs {
+		if len(cosigners) == 1 {
 			// One address per ID is correct.
-			delete(idAddrs, shareID)
+			delete(idAddrs, shardID)
 		}
 	}
 
@@ -243,20 +272,10 @@ func duplicatePeers(peers []CosignerPeerConfig) (duplicates map[int][]string) {
 	return idAddrs
 }
 
-func PeersFromFlag(peers []string) (out []CosignerPeerConfig, err error) {
+func CosignersFromFlag(cosigners []string) (out []CosignerConfig, err error) {
 	var errs []error
-	for _, p := range peers {
-		ps := strings.Split(p, "|")
-		if len(ps) != 2 {
-			errs = append(errs, fmt.Errorf("invalid peer string %s, expected format: tcp://{addr}:{port}|{share-id}", p))
-			continue
-		}
-		shareid, err := strconv.ParseInt(ps[1], 10, 64)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to parse share ID: %w", err))
-			continue
-		}
-		out = append(out, CosignerPeerConfig{ShareID: int(shareid), P2PAddr: ps[0]})
+	for i, c := range cosigners {
+		out = append(out, CosignerConfig{ShardID: i + 1, P2PAddr: c})
 	}
 	if len(errs) > 0 {
 		return nil, errors.Join(errs...)
@@ -265,7 +284,7 @@ func PeersFromFlag(peers []string) (out []CosignerPeerConfig, err error) {
 }
 
 type ChainNode struct {
-	PrivValAddr string `json:"priv-val-addr" yaml:"priv-val-addr"`
+	PrivValAddr string `json:"privValAddr" yaml:"privValAddr"`
 }
 
 func (cn ChainNode) Validate() error {
@@ -285,8 +304,8 @@ func (cns ChainNodes) Validate() error {
 	return errors.Join(errs...)
 }
 
-func ChainNodesFromArg(arg string) (out ChainNodes, err error) {
-	for _, n := range strings.Split(arg, ",") {
+func ChainNodesFromFlag(nodes []string) (out ChainNodes, err error) {
+	for _, n := range nodes {
 		cn := ChainNode{PrivValAddr: n}
 		out = append(out, cn)
 	}

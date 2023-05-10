@@ -12,7 +12,7 @@ import (
 
 const testChainID = "test"
 
-func TestKey2Shares(t *testing.T) {
+func TestEd25519Shards(t *testing.T) {
 	tmp := t.TempDir()
 
 	privValidatorKeyFile := filepath.Join(tmp, "priv_validator_key.json")
@@ -26,62 +26,62 @@ func TestKey2Shares(t *testing.T) {
 		expectErr bool
 	}{
 		{
-			name: "valid threshold and shares",
+			name: "valid threshold and shards",
 			args: []string{
 				"--chain-id", testChainID,
 				"--key-file", privValidatorKeyFile,
 				"--threshold", "2",
-				"--shares", "3",
+				"--shards", "3",
 			},
 			expectErr: false,
 		},
 		{
-			name: "valid threshold and shares 2",
+			name: "valid threshold and shards 2",
 			args: []string{
 				"--chain-id", testChainID,
 				"--key-file", privValidatorKeyFile,
 				"--threshold", "3",
-				"--shares", "5",
+				"--shards", "5",
 			},
 			expectErr: false,
 		},
 		{
-			name: "threshold exactly half of shares",
+			name: "threshold exactly half of shards",
 			args: []string{
 				"--chain-id", testChainID,
 				"--key-file", privValidatorKeyFile,
 				"--threshold", "2",
-				"--shares", "4",
+				"--shards", "4",
 			},
 			expectErr: true,
 		},
 		{
-			name: "threshold less than half of shares",
+			name: "threshold less than half of shards",
 			args: []string{
 				"--chain-id", testChainID,
 				"--key-file", privValidatorKeyFile,
 				"--threshold", "1",
-				"--shares", "3",
+				"--shards", "3",
 			},
 			expectErr: true,
 		},
 		{
-			name: "threshold exceeds shares",
+			name: "threshold exceeds shards",
 			args: []string{
 				"--chain-id", testChainID,
 				"--key-file", privValidatorKeyFile,
 				"--threshold", "4",
-				"--shares", "3",
+				"--shards", "3",
 			},
 			expectErr: true,
 		},
 		{
-			name: "non-numeric threshold and shares",
+			name: "non-numeric threshold and shards",
 			args: []string{
 				"--chain-id", testChainID,
 				"--key-file", privValidatorKeyFile,
 				"--threshold", "two",
-				"--shares", "three",
+				"--shards", "three",
 			},
 			expectErr: true,
 		},
@@ -92,7 +92,7 @@ func TestKey2Shares(t *testing.T) {
 
 			cmd := rootCmd()
 			cmd.SetOutput(io.Discard)
-			args := append([]string{"create-ed25519-shares", "--home", tmp, "--out", tmp}, tc.args...)
+			args := append([]string{"create-ed25519-shards", "--home", tmp, "--out", tmp}, tc.args...)
 			cmd.SetArgs(args)
 			err := cmd.Execute()
 			if tc.expectErr {
@@ -104,7 +104,7 @@ func TestKey2Shares(t *testing.T) {
 	}
 }
 
-func TestRSAShares(t *testing.T) {
+func TestRSAShards(t *testing.T) {
 	tmp := t.TempDir()
 
 	tcs := []struct {
@@ -113,13 +113,13 @@ func TestRSAShares(t *testing.T) {
 		expectErr bool
 	}{
 		{
-			name:      "valid shares",
-			args:      []string{"--shares", "3"},
+			name:      "valid shards",
+			args:      []string{"--shards", "3"},
 			expectErr: false,
 		},
 		{
-			name:      "invalid shares",
-			args:      []string{"--shares", "0"},
+			name:      "invalid shards",
+			args:      []string{"--shards", "0"},
 			expectErr: true,
 		},
 	}
@@ -128,7 +128,7 @@ func TestRSAShares(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			cmd := rootCmd()
 			cmd.SetOutput(io.Discard)
-			args := append([]string{"create-rsa-shares", "--home", tmp, "--out", tmp}, tc.args...)
+			args := append([]string{"create-rsa-shards", "--home", tmp, "--out", tmp}, tc.args...)
 			cmd.SetArgs(args)
 			err := cmd.Execute()
 			if tc.expectErr {

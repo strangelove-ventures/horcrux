@@ -27,22 +27,23 @@ func TestLocalCosignerGetID(t *testing.T) {
 	rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(t, err)
 
-	key := CosignerKey{
-		PubKey:   dummyPub,
-		ShareKey: []byte{},
-		ID:       1,
+	key := CosignerEd25519Key{
+		PubKey:       dummyPub,
+		PrivateShard: []byte{},
+		ID:           1,
 	}
 
 	cosigner := NewLocalCosigner(
 		&RuntimeConfig{},
-		key.ID,
-		*rsaKey,
-		[]CosignerPeer{{
+		CosignerRSAKey{
+			ID:     key.ID,
+			RSAKey: *rsaKey,
+		},
+		[]CosignerRSAPubKey{{
 			ID:        1,
 			PublicKey: rsaKey.PublicKey,
 		}},
 		"",
-		0,
 		0,
 	)
 
@@ -61,7 +62,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	rsaKey2, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(t, err)
 
-	peers := []CosignerPeer{{
+	pubKeys := []CosignerRSAPubKey{{
 		ID:        1,
 		PublicKey: rsaKey1.PublicKey,
 	}, {
@@ -73,18 +74,18 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 
 	privKeyBytes := [64]byte{}
 	copy(privKeyBytes[:], privateKey[:])
-	secretShares := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
+	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
 
-	key1 := CosignerKey{
-		PubKey:   privateKey.PubKey(),
-		ShareKey: secretShares[0],
-		ID:       1,
+	key1 := CosignerEd25519Key{
+		PubKey:       privateKey.PubKey(),
+		PrivateShard: privShards[0],
+		ID:           1,
 	}
 
-	key2 := CosignerKey{
-		PubKey:   privateKey.PubKey(),
-		ShareKey: secretShares[1],
-		ID:       2,
+	key2 := CosignerEd25519Key{
+		PubKey:       privateKey.PubKey(),
+		PrivateShard: privShards[1],
+		ID:           2,
 	}
 
 	tmpDir := t.TempDir()
@@ -101,11 +102,12 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 			HomeDir:  cosigner1Dir,
 			StateDir: cosigner1Dir,
 		},
-		key1.ID,
-		*rsaKey1,
-		peers,
+		CosignerRSAKey{
+			ID:     key1.ID,
+			RSAKey: *rsaKey1,
+		},
+		pubKeys,
 		"",
-		total,
 		threshold,
 	)
 
@@ -121,11 +123,12 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 			HomeDir:  cosigner2Dir,
 			StateDir: cosigner2Dir,
 		},
-		key2.ID,
-		*rsaKey2,
-		peers,
+		CosignerRSAKey{
+			ID:     key2.ID,
+			RSAKey: *rsaKey2,
+		},
+		pubKeys,
 		"",
-		total,
 		threshold,
 	)
 

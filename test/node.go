@@ -912,12 +912,11 @@ func (tn Nodes) Peers(node *Node) (out Nodes) {
 	return
 }
 
-func (tn Nodes) ListenAddrs() string {
-	out := []string{}
+func (tn Nodes) ConfigInitFlags() (out []string) {
 	for _, n := range tn {
-		out = append(out, fmt.Sprintf("%s:%s", n.Name(), "1234"))
+		out = append(out, "--node", fmt.Sprintf("%s:%s", n.Name(), "1234"))
 	}
-	return strings.Join(out, ",")
+	return out
 }
 
 // LogGenesisHashes logs the genesis hashes for the various nodes

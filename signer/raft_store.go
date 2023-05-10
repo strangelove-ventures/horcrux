@@ -49,7 +49,7 @@ type RaftStore struct {
 	RaftDir     string
 	RaftBind    string
 	RaftTimeout time.Duration
-	Peers       []Cosigner
+	Cosigners   []Cosigner
 
 	mu sync.Mutex
 	m  map[string]string // The key-value store for the system.
@@ -64,7 +64,7 @@ type RaftStore struct {
 // New returns a new Store.
 func NewRaftStore(
 	nodeID string, directory string, bindAddress string, timeout time.Duration,
-	logger log.Logger, cosigner *LocalCosigner, raftPeers []Cosigner) *RaftStore {
+	logger log.Logger, cosigner *LocalCosigner, cosigners []Cosigner) *RaftStore {
 	cosignerRaftStore := &RaftStore{
 		NodeID:      nodeID,
 		RaftDir:     directory,
@@ -73,7 +73,7 @@ func NewRaftStore(
 		m:           make(map[string]string),
 		logger:      logger,
 		cosigner:    cosigner,
-		Peers:       raftPeers,
+		Cosigners:   cosigners,
 	}
 
 	cosignerRaftStore.BaseService = *service.NewBaseService(logger, "CosignerRaftStore", cosignerRaftStore)
@@ -182,10 +182,10 @@ func (s *RaftStore) Open() (*raftgrpctransport.Manager, error) {
 			},
 		},
 	}
-	for _, peer := range s.Peers {
+	for _, c := range s.Cosigners {
 		configuration.Servers = append(configuration.Servers, raft.Server{
-			ID:      raft.ServerID(fmt.Sprint(peer.GetID())),
-			Address: raft.ServerAddress(p2pURLToRaftAddress(peer.GetAddress())),
+			ID:      raft.ServerID(fmt.Sprint(c.GetID())),
+			Address: raft.ServerAddress(p2pURLToRaftAddress(c.GetAddress())),
 		})
 	}
 	s.raft.BootstrapCluster(configuration)
