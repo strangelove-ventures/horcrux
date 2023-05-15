@@ -70,7 +70,7 @@ func addShardFlags(cmd *cobra.Command) {
 // cosigner shards from a full priv validator key.
 func createCosignerEd25519ShardsCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "create-ed25519-shards chain-id priv-validator-key-file threshold shards",
+		Use:   "create-ed25519-shards",
 		Args:  cobra.NoArgs,
 		Short: "Create cosigner Ed25519 shards",
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
