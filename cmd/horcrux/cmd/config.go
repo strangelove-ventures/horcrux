@@ -125,16 +125,15 @@ for threshold signer mode, --cosigner flags and --threshold flag are required.
 
 	f := cmd.Flags()
 	f.StringP(flagSignMode, "m", string(signer.SignModeThreshold),
-		"sign mode, \"threshold\" (recommended) or \"single\" (unsupported). "+
-			"threshold mode requires --cosigner flags and --threshold flag",
+		`sign mode, "threshold" (recommended) or "single" (unsupported). threshold mode requires --cosigner (multiple) and --threshold`, //nolint
 	)
 	f.StringSliceP(flagNode, "n", []string{}, "chain nodes in format tcp://{node-addr}:{privval-port} \n"+
 		"(e.g. --node tcp://sentry-1:1234 --node tcp://sentry-2:1234 --node tcp://sentry-3:1234 )")
 	_ = cmd.MarkFlagRequired(flagNode)
 
 	f.StringSliceP(flagCosigner, "c", []string{},
-		"cosigners in format tcp://{cosigner-addr}:{p2p-port} \n"+
-			"(e.g. --cosigner tcp://horcrux-1:2222 --cosigner tcp://horcrux-2:2222 --cosigner tcp://horcrux-3:2222 )")
+		`cosigners in format tcp://{cosigner-addr}:{p2p-port}
+(e.g. --cosigner tcp://horcrux-1:2222 --cosigner tcp://horcrux-2:2222 --cosigner tcp://horcrux-3:2222)`)
 
 	f.IntP(flagThreshold, "t", 0, "number of shards required for threshold signature")
 
