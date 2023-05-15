@@ -33,8 +33,8 @@ type Config struct {
 	PrivValKeyDir       *string              `yaml:"keyDir,omitempty"`
 	SignMode            SignMode             `yaml:"signMode"`
 	ThresholdModeConfig *ThresholdModeConfig `yaml:"thresholdMode,omitempty"`
-	ChainNodes          ChainNodes           `yaml:"chainNodes,omitempty"`
-	DebugAddr           string               `yaml:"debugAddr,omitempty"`
+	ChainNodes          ChainNodes           `yaml:"chainNodes"`
+	DebugAddr           string               `yaml:"debugAddr"`
 }
 
 func (c *Config) Nodes() (out []string) {
@@ -304,10 +304,11 @@ func (cns ChainNodes) Validate() error {
 	return errors.Join(errs...)
 }
 
-func ChainNodesFromFlag(nodes []string) (out ChainNodes, err error) {
-	for _, n := range nodes {
+func ChainNodesFromFlag(nodes []string) (ChainNodes, error) {
+	out := make(ChainNodes, len(nodes))
+	for i, n := range nodes {
 		cn := ChainNode{PrivValAddr: n}
-		out = append(out, cn)
+		out[i] = cn
 	}
 	if err := out.Validate(); err != nil {
 		return nil, err

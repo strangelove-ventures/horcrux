@@ -74,7 +74,7 @@ func showStateCmd() *cobra.Command {
 
 func setStateCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:          "set [chain-id] [height]",
+		Use:          "set chain-id height",
 		Aliases:      []string{"s"},
 		Short:        "Set the height for the sign state of a specific chain-id",
 		Args:         cobra.ExactArgs(2),
@@ -136,7 +136,7 @@ func setStateCmd() *cobra.Command {
 
 func importStateCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:     "import [chain-id]",
+		Use:     "import chain-id",
 		Aliases: []string{"i"},
 		Short: "Read the old priv_validator_state.json and set the height, round and step" +
 			"(good for migrations but NOT shared state update)",
