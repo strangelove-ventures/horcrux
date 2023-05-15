@@ -5,15 +5,19 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/Jille/grpc-multi-resolver" // required to register resolver
 	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/client"
 	"github.com/strangelove-ventures/horcrux/signer"
+	"github.com/strangelove-ventures/horcrux/signer/multiresolver"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
+
+func init() {
+	multiresolver.Register()
+}
 
 func leaderElectionCmd() *cobra.Command {
 	return &cobra.Command{
