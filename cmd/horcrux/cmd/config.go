@@ -33,12 +33,12 @@ func configCmd() *cobra.Command {
 
 func initCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "init [chain-nodes]",
+		Use:     "init",
 		Aliases: []string{"i"},
 		Short:   "initialize configuration file and home directory if one doesn't already exist",
-		Long: "initialize configuration file, use flags for cosigner configuration.\n\n" +
-			"[chain-nodes] is a comma separated array of chain node addresses i.e.\n" +
-			"tcp://chain-node-1:1234,tcp://chain-node-2:1234",
+		Long: `initialize configuration file.
+for threshold signer mode, --cosigner flags and --threshold flag are required.
+		`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			cmdFlags := cmd.Flags()
@@ -122,23 +122,30 @@ func initCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringP(flagSignMode, "m", string(signer.SignModeThreshold),
+
+	f := cmd.Flags()
+	f.StringP(flagSignMode, "m", string(signer.SignModeThreshold),
 		`sign mode, "threshold" (recommended) or "single" (unsupported). threshold mode requires --cosigners and --threshold`,
 	)
-	cmd.Flags().StringSliceP(flagNode, "n", []string{}, "chain nodes in format tcp://{p2p-addr}:{port}")
-	cmd.Flags().StringSliceP(flagCosigner, "c", []string{},
-		"cosigners in format tcp://{p2p-addr}:{port}|{shard-id} \n"+
-			"(i.e. \"tcp://node-1:2222|1,tcp://node-2:2222|2,tcp://node-3:2222|3\")")
-	cmd.Flags().IntP(flagThreshold, "t", 0, "number of shards required for threshold signature")
-	cmd.Flags().StringP(
+	f.StringSliceP(flagNode, "n", []string{}, "chain nodes in format tcp://{node-addr}:{privval-port} \n"+
+		"(e.g. --node tcp://sentry-1:1234 --node tcp://sentry-2:1234 --node tcp://sentry-3:1234 )")
+	_ = cmd.MarkFlagRequired(flagNode)
+
+	f.StringSliceP(flagCosigner, "c", []string{},
+		"cosigners in format tcp://{cosigner-addr}:{p2p-port} \n"+
+			"(e.g. --cosigner tcp://horcrux-1:2222 --cosigner tcp://horcrux-2:2222 --cosigner tcp://horcrux-3:2222 )")
+
+	f.IntP(flagThreshold, "t", 0, "number of shards required for threshold signature")
+
+	f.StringP(
 		flagDebugAddr, "d", "",
 		"listen address for debug server and prometheus metrics in format localhost:8543",
 	)
-	cmd.Flags().StringP(flagKeyDir, "k", "", "key directory if other than home directory")
-	cmd.Flags().String(flagRaftTimeout, "1500ms", "cosigner raft timeout value, \n"+
+	f.StringP(flagKeyDir, "k", "", "key directory if other than home directory")
+	f.String(flagRaftTimeout, "1500ms", "cosigner raft timeout value, \n"+
 		"accepts valid duration strings for Go's time.ParseDuration() e.g. 1s, 1000ms, 1.5m")
-	cmd.Flags().String(flagGRPCTimeout, "1500ms", "cosigner grpc timeout value, \n"+
+	f.String(flagGRPCTimeout, "1500ms", "cosigner grpc timeout value, \n"+
 		"accepts valid duration strings for Go's time.ParseDuration() e.g. 1s, 1000ms, 1.5m")
-	cmd.Flags().BoolP(flagOverwrite, "o", false, "overwrite an existing config.yaml")
+	f.BoolP(flagOverwrite, "o", false, "overwrite an existing config.yaml")
 	return cmd
 }
