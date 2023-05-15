@@ -435,6 +435,7 @@ chainNodes:
 - privValAddr: tcp://127.0.0.1:1234
 - privValAddr: tcp://127.0.0.1:2345
 - privValAddr: tcp://127.0.0.1:3456
+debugAddr: ""
 `, string(configYamlBz))
 }
 

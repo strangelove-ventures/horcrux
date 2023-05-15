@@ -17,6 +17,7 @@ const (
 	flagRaftTimeout = "raft-timeout"
 	flagGRPCTimeout = "grpc-timeout"
 	flagOverwrite   = "overwrite"
+	flagBare        = "bare"
 )
 
 func configCmd() *cobra.Command {
@@ -43,6 +44,7 @@ for threshold signer mode, --cosigner flags and --threshold flag are required.
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			cmdFlags := cmd.Flags()
 
+			bare, _ := cmdFlags.GetBool(flagBare)
 			nodes, _ := cmdFlags.GetStringSlice(flagNode)
 
 			cn, err := signer.ChainNodesFromFlag(nodes)
@@ -89,8 +91,11 @@ for threshold signer mode, --cosigner flags and --threshold flag are required.
 					ChainNodes: cn,
 					DebugAddr:  debugAddr,
 				}
-				if err = cfg.ValidateThresholdModeConfig(); err != nil {
-					return err
+
+				if !bare {
+					if err = cfg.ValidateThresholdModeConfig(); err != nil {
+						return err
+					}
 				}
 			} else {
 				// Single Signer Config
@@ -100,8 +105,10 @@ for threshold signer mode, --cosigner flags and --threshold flag are required.
 					ChainNodes:    cn,
 					DebugAddr:     debugAddr,
 				}
-				if err = cfg.ValidateSingleSignerConfig(); err != nil {
-					return err
+				if !bare {
+					if err = cfg.ValidateSingleSignerConfig(); err != nil {
+						return err
+					}
 				}
 			}
 
@@ -129,7 +136,6 @@ for threshold signer mode, --cosigner flags and --threshold flag are required.
 	)
 	f.StringSliceP(flagNode, "n", []string{}, "chain nodes in format tcp://{node-addr}:{privval-port} \n"+
 		"(e.g. --node tcp://sentry-1:1234 --node tcp://sentry-2:1234 --node tcp://sentry-3:1234 )")
-	_ = cmd.MarkFlagRequired(flagNode)
 
 	f.StringSliceP(flagCosigner, "c", []string{},
 		`cosigners in format tcp://{cosigner-addr}:{p2p-port}
@@ -147,5 +153,10 @@ for threshold signer mode, --cosigner flags and --threshold flag are required.
 	f.String(flagGRPCTimeout, "1500ms", "cosigner grpc timeout value, \n"+
 		"accepts valid duration strings for Go's time.ParseDuration() e.g. 1s, 1000ms, 1.5m")
 	f.BoolP(flagOverwrite, "o", false, "overwrite an existing config.yaml")
+	f.Bool(
+		flagBare,
+		false,
+		"allows initialization without providing any flags. If flags are provided, will not perform final validation",
+	)
 	return cmd
 }
