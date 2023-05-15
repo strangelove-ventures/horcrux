@@ -46,6 +46,7 @@ thresholdMode:
 chainNodes:
 - privValAddr: tcp://10.168.0.1:1234
 - privValAddr: tcp://10.168.0.2:1234
+debugAddr: ""
 `,
 		},
 		{
@@ -60,6 +61,7 @@ chainNodes:
 chainNodes:
 - privValAddr: tcp://10.168.0.1:1234
 - privValAddr: tcp://10.168.0.2:1234
+debugAddr: ""
 `,
 		},
 		{

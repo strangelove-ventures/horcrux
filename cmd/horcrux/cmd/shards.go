@@ -55,15 +55,9 @@ func addOutputDirFlag(cmd *cobra.Command) {
 	cmd.Flags().StringP(flagOutputDir, "", "", "output directory")
 }
 
-func addShardsFlag(cmd *cobra.Command) {
+func addTotalShardsFlag(cmd *cobra.Command) {
 	cmd.Flags().Uint8(flagShards, 0, "total key shards")
-}
-
-func addShardFlags(cmd *cobra.Command) {
-	addShardsFlag(cmd)
-	cmd.Flags().Uint8(flagThreshold, 0, "threshold number of shards required to successfully sign")
-	cmd.Flags().String(flagKeyFile, "", "priv_validator_key.json file to shard")
-	cmd.Flags().String(flagChainID, "", "key shards will sign for this chain ID")
+	_ = cmd.MarkFlagRequired(flagShards)
 }
 
 // createCosignerEd25519ShardsCmd is a cobra command for creating
@@ -84,19 +78,19 @@ func createCosignerEd25519ShardsCmd() *cobra.Command {
 			var errs []error
 
 			if keyFile == "" {
-				errs = append(errs, fmt.Errorf("key-file flag must be provided and non-empty"))
+				errs = append(errs, fmt.Errorf("key-file flag must not be empty"))
 			}
 
 			if chainID == "" {
-				errs = append(errs, fmt.Errorf("chain-id flag must be provided and non-empty"))
+				errs = append(errs, fmt.Errorf("chain-id flag must not be empty"))
 			}
 
 			if threshold == 0 {
-				errs = append(errs, fmt.Errorf("threshold flag must be provided and non-zero"))
+				errs = append(errs, fmt.Errorf("threshold flag must be > 0, <= --shards, and > --shards/2"))
 			}
 
 			if shards == 0 {
-				errs = append(errs, fmt.Errorf("shards flag must be provided and non-zero"))
+				errs = append(errs, fmt.Errorf("shards flag must be greater than zero"))
 			}
 
 			if _, err := os.Stat(keyFile); err != nil {
@@ -148,15 +142,25 @@ func createCosignerEd25519ShardsCmd() *cobra.Command {
 			return nil
 		},
 	}
-	addShardFlags(cmd)
+
 	addOutputDirFlag(cmd)
+	addTotalShardsFlag(cmd)
+
+	f := cmd.Flags()
+	f.Uint8(flagThreshold, 0, "threshold number of shards required to successfully sign")
+	_ = cmd.MarkFlagRequired(flagThreshold)
+	f.String(flagKeyFile, "", "priv_validator_key.json file to shard")
+	_ = cmd.MarkFlagRequired(flagKeyFile)
+	f.String(flagChainID, "", "key shards will sign for this chain ID")
+	_ = cmd.MarkFlagRequired(flagChainID)
+
 	return cmd
 }
 
 // createCosignerRSAShardsCmd is a cobra command for creating cosigner shards from a priv validator
 func createCosignerRSAShardsCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "create-rsa-shards shards",
+		Use:   "create-rsa-shards",
 		Args:  cobra.NoArgs,
 		Short: "Create cosigner RSA shards",
 
@@ -196,7 +200,7 @@ func createCosignerRSAShardsCmd() *cobra.Command {
 			return nil
 		},
 	}
-	addShardsFlag(cmd)
+	addTotalShardsFlag(cmd)
 	addOutputDirFlag(cmd)
 	return cmd
 }
