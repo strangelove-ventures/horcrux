@@ -9,6 +9,8 @@ import (
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 )
 
+var _ proto.CosignerGRPCServer = &GRPCServer{}
+
 type GRPCServer struct {
 	cosigner           *LocalCosigner
 	thresholdValidator *ThresholdValidator
@@ -91,6 +93,9 @@ func (rpc *GRPCServer) TransferLeadership(
 	_ context.Context,
 	req *proto.CosignerGRPCTransferLeadershipRequest,
 ) (*proto.CosignerGRPCTransferLeadershipResponse, error) {
+	if rpc.raftStore.raft.State() != raft.Leader {
+		return &proto.CosignerGRPCTransferLeadershipResponse{}, nil
+	}
 	leaderID := req.GetLeaderID()
 	if leaderID != "" {
 		for _, c := range rpc.raftStore.Cosigners {
