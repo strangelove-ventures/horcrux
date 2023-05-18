@@ -79,23 +79,32 @@ func testThresholdValidatorDKG(t *testing.T, threshold, total uint8) {
 	cosigners, err := keygen.LocalDKG(threshold, total)
 	require.NoError(t, err)
 
-	privShards := make([]tsed25519.Scalar, 0, total)
+	privShards := make([]tsed25519.Scalar, total)
 
-	for _, c := range cosigners {
-		privShards = append(privShards, c.Secret().Secret.Bytes())
+	for i := uint8(1); i <= total; i++ {
+		c := cosigners[i]
+
+		privShards[c.ID-1] = c.Secret().Secret.Bytes()
 	}
 
-	testThresholdValidatorWithShards(t, threshold, total, privShards)
+	testThresholdValidatorWithShards(t, threshold, total,
+		cometcryptoed25519.PubKey(cosigners[1].Public().GroupKey.ToEd25519()), privShards)
 }
 
 func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	privateKey := cometcryptoed25519.GenPrivKey()
 	privKeyBytes := privateKey[:]
 	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
-	testThresholdValidatorWithShards(t, threshold, total, privShards)
+	testThresholdValidatorWithShards(t, threshold, total, privateKey.PubKey(), privShards)
 }
 
-func testThresholdValidatorWithShards(t *testing.T, threshold, total uint8, shards []tsed25519.Scalar) {
+func testThresholdValidatorWithShards(
+	t *testing.T,
+	threshold uint8,
+	total uint8,
+	publicKey cometcrypto.PubKey,
+	shards []tsed25519.Scalar,
+) {
 	rsaKeys := make([]*rsa.PrivateKey, total)
 	pubKeys := make([]CosignerRSAPubKey, total)
 	cosigners := make([]*LocalCosigner, total)
@@ -111,10 +120,6 @@ func testThresholdValidatorWithShards(t *testing.T, threshold, total uint8, shar
 			PublicKey: rsaKey.PublicKey,
 		}
 	}
-
-	privateKey := cometcryptoed25519.GenPrivKey()
-	privKeyBytes := privateKey[:]
-	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
 
 	tmpDir := t.TempDir()
 
@@ -140,10 +145,10 @@ func testThresholdValidatorWithShards(t *testing.T, threshold, total uint8, shar
 
 		cosigners[i] = cosigner
 
-		err = loadKeyForLocalCosigner(cosigner, privateKey.PubKey(), testChainID, privShards[i])
+		err = loadKeyForLocalCosigner(cosigner, publicKey, testChainID, shards[i])
 		require.NoError(t, err)
 
-		err = loadKeyForLocalCosigner(cosigner, privateKey.PubKey(), testChainID2, privShards[i])
+		err = loadKeyForLocalCosigner(cosigner, publicKey, testChainID2, shards[i])
 		require.NoError(t, err)
 	}
 
@@ -191,7 +196,7 @@ func testThresholdValidatorWithShards(t *testing.T, threshold, total uint8, shar
 	err = validator.SignProposal(testChainID, &proposal)
 	require.NoError(t, err)
 
-	require.True(t, privateKey.PubKey().VerifySignature(signBytes, proposal.Signature))
+	require.True(t, publicKey.VerifySignature(signBytes, proposal.Signature))
 
 	firstSignature := proposal.Signature
 
