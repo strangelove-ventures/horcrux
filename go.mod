@@ -21,6 +21,7 @@ require (
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.14.0
 	github.com/stretchr/testify v1.8.2
+	github.com/taurusgroup/frost-ed25519 v0.0.0-20210707140332-5abc84a4dba7
 	github.com/tendermint/go-amino v0.16.0
 	gitlab.com/unit410/edwards25519 v0.0.0-20220725154547-61980033348e
 	gitlab.com/unit410/threshold-ed25519 v0.0.0-20220725172740-6ee731f539ac

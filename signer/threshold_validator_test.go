@@ -18,6 +18,7 @@ import (
 	cometrand "github.com/cometbft/cometbft/libs/rand"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	comet "github.com/cometbft/cometbft/types"
+	"github.com/strangelove-ventures/horcrux/signer/keygen"
 	"github.com/stretchr/testify/require"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
@@ -32,6 +33,10 @@ func TestThresholdValidator3of3(t *testing.T) {
 
 func TestThresholdValidator2of3(t *testing.T) {
 	testThresholdValidator(t, 2, 3)
+}
+
+func TestThresholdValidator2of3DKG(t *testing.T) {
+	testThresholdValidatorDKG(t, 2, 3)
 }
 
 func TestThresholdValidator3of5(t *testing.T) {
@@ -70,7 +75,27 @@ func loadKeyForLocalCosigner(
 	return os.WriteFile(cosigner.config.KeyFilePathCosigner(chainID), keyBz, 0600)
 }
 
+func testThresholdValidatorDKG(t *testing.T, threshold, total uint8) {
+	cosigners, err := keygen.LocalDKG(threshold, total)
+	require.NoError(t, err)
+
+	privShards := make([]tsed25519.Scalar, 0, total)
+
+	for _, c := range cosigners {
+		privShards = append(privShards, c.Secret().Secret.Bytes())
+	}
+
+	testThresholdValidatorWithShards(t, threshold, total, privShards)
+}
+
 func testThresholdValidator(t *testing.T, threshold, total uint8) {
+	privateKey := cometcryptoed25519.GenPrivKey()
+	privKeyBytes := privateKey[:]
+	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
+	testThresholdValidatorWithShards(t, threshold, total, privShards)
+}
+
+func testThresholdValidatorWithShards(t *testing.T, threshold, total uint8, shards []tsed25519.Scalar) {
 	rsaKeys := make([]*rsa.PrivateKey, total)
 	pubKeys := make([]CosignerRSAPubKey, total)
 	cosigners := make([]*LocalCosigner, total)
