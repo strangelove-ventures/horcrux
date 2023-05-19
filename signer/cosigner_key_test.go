@@ -19,7 +19,7 @@ func TestLoadCosignerEd25519Key(t *testing.T) {
 
 	key, err := LoadCosignerRSAKey(rsaKeyFile)
 	require.NoError(t, err)
-	require.Equal(t, key.ID, 3)
+	require.Equal(t, uint8(3), key.ID)
 
 	// public key from cosigner pubs array should match public key from our private key
 	require.Equal(t, &key.RSAKey.PublicKey, key.RSAPubs[key.ID-1])

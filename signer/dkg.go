@@ -2,8 +2,11 @@ package signer
 
 import (
 	"context"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -15,7 +18,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/strangelove-ventures/horcrux/signer/keygen"
-	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -32,7 +34,7 @@ func NetworkDKG(
 	ctx context.Context,
 	cosigners CosignersConfig,
 	id uint8,
-	p2pPrivateKey crypto.PrivKey,
+	rsaKeys CosignerRSAKey,
 	threshold uint8,
 ) (*CosignerEd25519Key, error) {
 	cosigner, err := cosigners.MyCosigner(id)
@@ -41,6 +43,13 @@ func NetworkDKG(
 	}
 
 	hostAddr, err := cosigner.LibP2PHostAddr()
+	if err != nil {
+		return nil, err
+	}
+
+	x509Bz := x509.MarshalPKCS1PrivateKey(&rsaKeys.RSAKey)
+
+	p2pPrivateKey, err := crypto.UnmarshalRsaPrivateKey(x509Bz)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +63,7 @@ func NetworkDKG(
 
 	fmt.Println("Starting cosigner discovery")
 
-	if err := waitForAllCosigners(ctx, h, cosigners.OtherCosigners(id)); err != nil {
+	if err := waitForAllCosigners(ctx, h, id, cosigners.OtherCosigners(id), rsaKeys.RSAPubs); err != nil {
 		return nil, err
 	}
 
@@ -72,22 +81,6 @@ func NetworkDKG(
 		return nil, err
 	}
 
-	round1, err := keygenCosigner.Round1()
-	if err != nil {
-		return nil, err
-	}
-
-	round1Msgs := RoundMessages{
-		Round:    1,
-		ID:       id,
-		Messages: round1,
-	}
-
-	round1MsgsBz, err := json.Marshal(round1Msgs)
-	if err != nil {
-		return nil, err
-	}
-
 	dkgTopic, err := ps.Join(topicDKG)
 	if err != nil {
 		return nil, fmt.Errorf("failed to join topic: %w", err)
@@ -98,16 +91,7 @@ func NetworkDKG(
 		return nil, fmt.Errorf("failed to subscribe to topic: %w", err)
 	}
 
-	var eg errgroup.Group
-	eg.Go(func() error {
-		return processRounds(ctx, dkgTopic, sub, keygenCosigner, uint8(total), round1[0])
-	})
-
-	if err := dkgTopic.Publish(ctx, round1MsgsBz); err != nil {
-		return nil, err
-	}
-
-	if err := eg.Wait(); err != nil {
+	if err := processRounds(ctx, dkgTopic, sub, keygenCosigner, uint8(total)); err != nil {
 		return nil, err
 	}
 
@@ -118,23 +102,61 @@ func NetworkDKG(
 	}, nil
 }
 
+func publishUntilRoundDone(
+	ctx context.Context,
+	topic *pubsub.Topic,
+	msg []byte,
+	doneCh chan struct{},
+) {
+	for {
+		nextPublish := rand.Intn(1000) + 2000 //nolint
+		select {
+		case <-ctx.Done():
+			return
+		case <-doneCh:
+			return
+		case <-time.After(time.Duration(nextPublish) * time.Millisecond):
+			if err := topic.Publish(ctx, msg); err != nil {
+				fmt.Printf("Failed to publish msg to topic: %v\n", err)
+			}
+		}
+	}
+}
+
 func processRounds(
 	ctx context.Context,
 	dkgTopic *pubsub.Topic,
 	sub *pubsub.Subscription,
 	keygenCosigner keygen.Cosigner,
 	total uint8,
-	myRound1Msg []byte,
 ) error {
 	id := uint8(keygenCosigner.ID)
 
 	allRound1Msgs := make([][]byte, total)
-
-	allRound1Msgs[id-1] = myRound1Msg
-
 	allRound2Msgs := make([][]byte, total*(total-1))
-
 	allRound3Msgs := make([][]byte, total)
+
+	round1DoneCh := make(chan struct{}, 1)
+	round2DoneCh := make(chan struct{}, 1)
+	round3DoneCh := make(chan struct{}, 1)
+
+	round1, err := keygenCosigner.Round1()
+	if err != nil {
+		return err
+	}
+
+	round1Msgs := RoundMessages{
+		Round:    1,
+		ID:       id,
+		Messages: round1,
+	}
+
+	round1MsgsBz, err := json.Marshal(round1Msgs)
+	if err != nil {
+		return err
+	}
+
+	go publishUntilRoundDone(ctx, dkgTopic, round1MsgsBz, round1DoneCh)
 
 RecvRoundMsgsLoop:
 	for {
@@ -143,7 +165,7 @@ RecvRoundMsgsLoop:
 			fmt.Printf("Failed to retrieve next message from topic subscription: %v\n", err)
 			continue RecvRoundMsgsLoop
 		}
-		fmt.Println(m.ReceivedFrom, ": ", string(m.Message.Data))
+		fmt.Printf("Received data on cosigner %d - %s\n", id, string(m.Message.Data))
 
 		var cosignerRoundMsgs RoundMessages
 		if err := json.Unmarshal(m.Message.Data, &cosignerRoundMsgs); err != nil {
@@ -156,11 +178,19 @@ RecvRoundMsgsLoop:
 		case 1:
 			allRound1Msgs[cID-1] = cosignerRoundMsgs.Messages[0]
 
-			for _, m := range allRound1Msgs {
+			shouldContinue := false
+			for i, m := range allRound1Msgs {
 				if len(m) == 0 {
-					continue RecvRoundMsgsLoop
+					fmt.Printf("Still waiting on msgs for round 1 on cosigner %d from cosigner %d\n", id, i+1)
+					shouldContinue = true
 				}
 			}
+
+			if shouldContinue {
+				continue RecvRoundMsgsLoop
+			}
+
+			round1DoneCh <- struct{}{}
 
 			// have messages from all cosigners for round 1
 			round2, err := keygenCosigner.Round2(allRound1Msgs)
@@ -179,20 +209,24 @@ RecvRoundMsgsLoop:
 				return err
 			}
 
-			copy(allRound2Msgs[(id-1)*(total-1):id*(total-1)], round2)
-
-			if err := dkgTopic.Publish(ctx, round2MsgsBz); err != nil {
-				fmt.Printf("Failed to publish round 2 messages: %v\n", err)
-			}
+			go publishUntilRoundDone(ctx, dkgTopic, round2MsgsBz, round2DoneCh)
 
 		case 2:
 			copy(allRound2Msgs[(cID-1)*(total-1):cID*(total-1)], cosignerRoundMsgs.Messages)
 
-			for _, m := range allRound2Msgs {
+			shouldContinue := false
+			for i, m := range allRound2Msgs {
 				if len(m) == 0 {
-					continue RecvRoundMsgsLoop
+					fmt.Printf("Still waiting on msgs for round 2 on cosigner %d from cosigner %d\n", id, i+1)
+					shouldContinue = true
 				}
 			}
+
+			if shouldContinue {
+				continue RecvRoundMsgsLoop
+			}
+
+			round2DoneCh <- struct{}{}
 
 			// have messages from all cosigners for round 2
 			if err := keygenCosigner.Round3(allRound2Msgs); err != nil {
@@ -213,17 +247,23 @@ RecvRoundMsgsLoop:
 				return err
 			}
 
-			if err := dkgTopic.Publish(ctx, round3MsgsBz); err != nil {
-				fmt.Printf("Failed to publish round 3 result: %v\n", err)
-			}
-
+			go publishUntilRoundDone(ctx, dkgTopic, round3MsgsBz, round3DoneCh)
 		case 3:
 			allRound3Msgs[cID-1] = []byte{0x01}
-			for _, m := range allRound3Msgs {
+
+			shouldContinue := false
+			for i, m := range allRound3Msgs {
 				if len(m) == 0 {
-					continue RecvRoundMsgsLoop
+					fmt.Printf("Still waiting on msgs for round 3 on cosigner %d from cosigner %d\n", id, i+1)
+					shouldContinue = true
 				}
 			}
+
+			if shouldContinue {
+				continue RecvRoundMsgsLoop
+			}
+
+			round3DoneCh <- struct{}{}
 
 			// have success from all cosigners, sharding complete
 			return nil
@@ -233,7 +273,13 @@ RecvRoundMsgsLoop:
 	}
 }
 
-func waitForAllCosigners(ctx context.Context, h host.Host, cosigners CosignersConfig) error {
+func waitForAllCosigners(
+	ctx context.Context,
+	h host.Host,
+	id uint8,
+	cosigners CosignersConfig,
+	rsaPubs []*rsa.PublicKey,
+) error {
 	var wg sync.WaitGroup
 	for _, c := range cosigners {
 		peerAddr, err := c.LibP2PAddr()
@@ -241,7 +287,22 @@ func waitForAllCosigners(ctx context.Context, h host.Host, cosigners CosignersCo
 			return err
 		}
 
-		peerinfo, err := peer.AddrInfoFromString(peerAddr + "/p2p/" + c.DKGID)
+		x509Bz, err := x509.MarshalPKIXPublicKey(rsaPubs[c.ShardID-1])
+		if err != nil {
+			return err
+		}
+
+		pubKey, err := crypto.UnmarshalRsaPublicKey(x509Bz)
+		if err != nil {
+			return err
+		}
+
+		peerID, err := peer.IDFromPublicKey(pubKey)
+		if err != nil {
+			return err
+		}
+
+		peerinfo, err := peer.AddrInfoFromString(peerAddr + "/p2p/" + peerID.String())
 		if err != nil {
 			return err
 		}
@@ -261,7 +322,7 @@ func waitForAllCosigners(ctx context.Context, h host.Host, cosigners CosignersCo
 				retry.Delay(time.Second),
 			)
 
-			fmt.Printf("Connection established with bootstrap node: %s\n", *peerinfo)
+			fmt.Printf("Connection established with bootstrap node from cosigner %d: %s\n", id, *peerinfo)
 		}()
 	}
 	wg.Wait()

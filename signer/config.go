@@ -204,7 +204,6 @@ func (cfg *ThresholdModeConfig) LeaderElectMultiAddress() (string, error) {
 type CosignerConfig struct {
 	ShardID uint8  `yaml:"shardID"`
 	P2PAddr string `yaml:"p2pAddr"`
-	DKGID   string `yaml:"dkgID,omitempty"`
 }
 
 func (c CosignerConfig) HostPort() (string, string, error) {

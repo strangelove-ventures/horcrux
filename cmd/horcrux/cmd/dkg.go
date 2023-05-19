@@ -1,100 +1,23 @@
 package cmd
 
 import (
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/signer"
 )
 
 const flagID = "id"
 
+// dkgCmd is a cobra command for performing
+// a DKG key ceremony as a participating cosigner.
 func dkgCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dkg",
-		Short: "Commands for DKG trustless key generation",
-	}
-
-	cmd.AddCommand(dkgInitCmd())
-	cmd.AddCommand(dkgRunCmd())
-
-	return cmd
-}
-
-func dkgInitCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "init",
-		Args:  cobra.NoArgs,
-		Short: `Command to initialize peer private key for libp2p communication during DKG`,
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			flags := cmd.Flags()
-
-			id, _ := flags.GetUint8(flagID)
-
-			// This ed25519 key is used for libp2p communication during DKG.
-			// i.e. this key is not used for consensus.
-			privKey, _, err := crypto.GenerateEd25519Key(rand.Reader)
-			if err != nil {
-				return err
-			}
-
-			rawKey, err := privKey.Raw()
-			if err != nil {
-				return err
-			}
-
-			filename := filepath.Join(config.HomeDir, "libp2p.key")
-
-			if err := os.WriteFile(filename, rawKey, 0600); err != nil {
-				return err
-			}
-
-			p2pID, err := peer.IDFromPrivateKey(privKey)
-			if err != nil {
-				return err
-			}
-
-			for i, cosigner := range config.Config.ThresholdModeConfig.Cosigners {
-				if cosigner.ShardID == id {
-					config.Config.ThresholdModeConfig.Cosigners[i].DKGID = p2pID.String()
-				} else if cosigner.DKGID == "" {
-					config.Config.ThresholdModeConfig.Cosigners[i].DKGID = "REPLACE ME"
-				}
-			}
-
-			if err := config.WriteConfigFile(); err != nil {
-				return err
-			}
-
-			fmt.Fprintf(
-				cmd.OutOrStdout(),
-				"libp2p key generated for DKG. `dkgID` to share with other members:\n%s\n",
-				p2pID.String(),
-			)
-
-			return nil
-		},
-	}
-
-	f := cmd.Flags()
-	f.Uint8(flagID, 0, "cosigner shard ID as participant in DKG ceremony")
-	_ = cmd.MarkFlagRequired(flagID)
-
-	return cmd
-}
-
-// dkgCmd is a cobra command for performing
-// a DKG key ceremony as a participating cosigner.
-func dkgRunCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "run",
 		Args:  cobra.NoArgs,
 		Short: `Perform DKG key sharding ceremony (no trusted "dealer")`,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
@@ -150,21 +73,20 @@ func dkgRunCmd() *cobra.Command {
 				}
 			}
 
-			libp2pKeyFile := filepath.Join(config.HomeDir, "libp2p.key")
-			p2pKeyBz, err := os.ReadFile(libp2pKeyFile)
-			if err != nil {
-				return fmt.Errorf("failed to read libp2p.key. Did you run horcrux dkg init first?: %w", err)
-			}
-
-			p2pKey, err := crypto.UnmarshalEd25519PrivateKey(p2pKeyBz)
+			keyFile, err := config.KeyFileExistsCosignerRSA()
 			if err != nil {
 				return err
+			}
+
+			key, err := signer.LoadCosignerRSAKey(keyFile)
+			if err != nil {
+				return fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
 			}
 
 			// silence usage after all input has been validated
 			cmd.SilenceUsage = true
 
-			shard, err := signer.NetworkDKG(cmd.Context(), config.Config.ThresholdModeConfig.Cosigners, id, p2pKey, threshold)
+			shard, err := signer.NetworkDKG(cmd.Context(), config.Config.ThresholdModeConfig.Cosigners, id, key, threshold)
 			if err != nil {
 				return err
 			}
