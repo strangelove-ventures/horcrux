@@ -61,14 +61,6 @@ func NetworkDKG(
 
 	defer h.Close()
 
-	fmt.Println("Starting cosigner discovery")
-
-	if err := waitForAllCosigners(ctx, h, id, cosigners.OtherCosigners(id), rsaKeys.RSAPubs); err != nil {
-		return nil, err
-	}
-
-	fmt.Println("Cosigner discovery complete")
-
 	ps, err := pubsub.NewGossipSub(ctx, h)
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup libp2p pub sub: %w", err)
@@ -90,6 +82,14 @@ func NetworkDKG(
 	if err != nil {
 		return nil, fmt.Errorf("failed to subscribe to topic: %w", err)
 	}
+
+	fmt.Println("Starting cosigner discovery")
+
+	if err := waitForAllCosigners(ctx, h, id, cosigners.OtherCosigners(id), rsaKeys.RSAPubs); err != nil {
+		return nil, err
+	}
+
+	fmt.Println("Cosigner discovery complete")
 
 	if err := processRounds(ctx, dkgTopic, sub, keygenCosigner, uint8(total)); err != nil {
 		return nil, err

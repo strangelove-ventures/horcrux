@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	cometcrypto "github.com/cometbft/cometbft/crypto"
+	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
@@ -294,6 +296,15 @@ func (ts *Signer) Dir() string {
 // GetConfigFile returns the direct path to the signers config file as a string
 func (ts *Signer) GetConfigFile() string {
 	return filepath.Join(ts.Dir(), "config.yaml")
+}
+
+// PubKey returns the public key representing all cosigners for a chain ID.
+func (ts *Signer) PubKey(chainID string) (cometcrypto.PubKey, error) {
+	key, err := signer.LoadCosignerEd25519Key(filepath.Join(ts.Dir(), fmt.Sprintf("%s_shard.json", chainID)))
+	if err != nil {
+		return nil, err
+	}
+	return cometcryptoed25519.PubKey(key.PubKey.Bytes()), nil
 }
 
 // Name is the hostname of the Signer container

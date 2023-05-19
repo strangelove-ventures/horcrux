@@ -34,7 +34,7 @@ func TestNetworkDKG(t *testing.T) {
 		},
 		{
 			ShardID: 2,
-			P2PAddr: "tcp://127.0.0.1:8063",
+			P2PAddr: "tcp://localhost:8063",
 		},
 		{
 			ShardID: 3,

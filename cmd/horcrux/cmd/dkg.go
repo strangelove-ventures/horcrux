@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -66,13 +65,6 @@ func dkgCmd() *cobra.Command {
 				return errors.Join(errs...)
 			}
 
-			out, _ := cmd.Flags().GetString(flagOutputDir)
-			if out != "" {
-				if err := os.MkdirAll(out, 0700); err != nil {
-					return err
-				}
-			}
-
 			keyFile, err := config.KeyFileExistsCosignerRSA()
 			if err != nil {
 				return err
@@ -91,9 +83,15 @@ func dkgCmd() *cobra.Command {
 				return err
 			}
 
-			shardBz, err := json.Marshal(shard)
+			shardBz, err := shard.MarshalJSON()
 			if err != nil {
 				return err
+			}
+
+			out := config.HomeDir
+
+			if config.Config.PrivValKeyDir != nil {
+				out = *config.Config.PrivValKeyDir
 			}
 
 			filename := filepath.Join(out, fmt.Sprintf("%s_shard.json", chainID))
@@ -107,8 +105,6 @@ func dkgCmd() *cobra.Command {
 			return nil
 		},
 	}
-
-	addOutputDirFlag(cmd)
 
 	f := cmd.Flags()
 	f.Uint8(flagID, 0, "cosigner shard ID as participant in DKG ceremony")

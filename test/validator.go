@@ -146,7 +146,18 @@ func (tv *Validator) performDKG(ctx context.Context, chainID string) error {
 			return s.ExecHorcruxCmd(ctx, s.Name(), "dkg", "--chain-id", chainID, "--id", fmt.Sprint(i+1))
 		})
 	}
-	return eg.Wait()
+	if err := eg.Wait(); err != nil {
+		return err
+	}
+
+	pubKey, err := tv.Signers[0].PubKey(chainID)
+	if err != nil {
+		return err
+	}
+
+	tv.PubKeys[chainID] = pubKey
+
+	return nil
 }
 
 // genPrivKeyAndShards generates cosigner RSA shards.
