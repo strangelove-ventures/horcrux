@@ -18,7 +18,6 @@ import (
 	cometrand "github.com/cometbft/cometbft/libs/rand"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	comet "github.com/cometbft/cometbft/types"
-	"github.com/strangelove-ventures/horcrux/signer/keygen"
 	"github.com/stretchr/testify/require"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
@@ -76,7 +75,7 @@ func loadKeyForLocalCosigner(
 }
 
 func testThresholdValidatorDKG(t *testing.T, threshold, total uint8) {
-	cosigners, err := keygen.LocalDKG(threshold, total)
+	cosigners, err := LocalDKG(threshold, total)
 	require.NoError(t, err)
 
 	privShards := make([]tsed25519.Scalar, total)
@@ -116,7 +115,7 @@ func testThresholdValidatorWithShards(
 		rsaKeys[i] = rsaKey
 
 		pubKeys[i] = CosignerRSAPubKey{
-			ID:        int(i) + 1,
+			ID:        i + 1,
 			PublicKey: rsaKey.PublicKey,
 		}
 	}
@@ -155,7 +154,7 @@ func testThresholdValidatorWithShards(
 	thresholdCosigners := make([]Cosigner, 0, threshold-1)
 
 	for i, cosigner := range cosigners {
-		require.Equal(t, i+1, cosigner.GetID())
+		require.Equal(t, uint8(i)+1, cosigner.GetID())
 
 		if i != 0 && len(thresholdCosigners) != int(threshold)-1 {
 			thresholdCosigners = append(thresholdCosigners, cosigner)
@@ -167,7 +166,7 @@ func testThresholdValidatorWithShards(
 	validator := NewThresholdValidator(
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
 		cosigners[0].config,
-		int(threshold),
+		threshold,
 		time.Second,
 		cosigners[0],
 		thresholdCosigners,
@@ -250,7 +249,7 @@ func testThresholdValidatorWithShards(
 	newValidator := NewThresholdValidator(
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
 		cosigners[0].config,
-		int(threshold),
+		threshold,
 		time.Second,
 		cosigners[0],
 		thresholdCosigners,

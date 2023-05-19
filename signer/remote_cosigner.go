@@ -14,12 +14,12 @@ import (
 
 // RemoteCosigner uses CosignerGRPC to request signing from a remote cosigner
 type RemoteCosigner struct {
-	id      int
+	id      uint8
 	address string
 }
 
 // NewRemoteCosigner returns a newly initialized RemoteCosigner
-func NewRemoteCosigner(id int, address string) *RemoteCosigner {
+func NewRemoteCosigner(id uint8, address string) *RemoteCosigner {
 
 	cosigner := &RemoteCosigner{
 		id:      id,
@@ -38,7 +38,7 @@ func getContext() (context.Context, context.CancelFunc) {
 
 // GetID returns the ID of the remote cosigner
 // Implements the cosigner interface
-func (cosigner *RemoteCosigner) GetID() int {
+func (cosigner *RemoteCosigner) GetID() uint8 {
 	return cosigner.id
 }
 

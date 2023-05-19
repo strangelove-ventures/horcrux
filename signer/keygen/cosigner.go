@@ -12,7 +12,7 @@ import (
 )
 
 // Cosigner corresponds to a horcrux cosigner, but in this case strictly for the purposes of
-// DKG key combination (sharding without a trusted "dealer").
+// distributed key generation (DKG) (sharding without a trusted "dealer").
 type Cosigner struct {
 	ID           party.ID
 	allCosigners party.IDSlice

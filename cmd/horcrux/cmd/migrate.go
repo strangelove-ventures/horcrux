@@ -48,11 +48,11 @@ type (
 	}
 
 	v2CosignerConfig struct {
-		Threshold int    `json:"threshold"   yaml:"threshold"`
+		Threshold uint8  `json:"threshold"   yaml:"threshold"`
 		Shares    int    `json:"shares" yaml:"shares"`
 		P2PListen string `json:"p2p-listen"  yaml:"p2p-listen"`
 		Peers     []struct {
-			ShareID int    `json:"share-id" yaml:"share-id"`
+			ShareID uint8  `json:"share-id" yaml:"share-id"`
 			P2PAddr string `json:"p2p-addr" yaml:"p2p-addr"`
 		} `json:"peers"       yaml:"peers"`
 		Timeout string `json:"rpc-timeout" yaml:"rpc-timeout"`
@@ -66,7 +66,7 @@ type (
 		PubKey   cometcrypto.PubKey `json:"pub_key"`
 		ShareKey []byte             `json:"secret_share"`
 		RSAKey   rsa.PrivateKey     `json:"rsa_key"`
-		ID       int                `json:"id"`
+		ID       uint8              `json:"id"`
 		RSAPubs  []*rsa.PublicKey   `json:"rsa_pubs"`
 	}
 )

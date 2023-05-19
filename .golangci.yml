@@ -86,6 +86,8 @@ linters-settings:
         alias: grpcretry
       - pkg : github.com/kraken-hpc/go-fork
         alias: fork
+      - pkg: github.com/libp2p/go-libp2p-pubsub
+        alias: pubsub
       - pkg: github.com/armon/go-metrics/prometheus
         alias: gmprometheus
       - pkg: github.com/mitchellh/go-homedir

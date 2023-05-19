@@ -1,10 +1,10 @@
-package keygen_test
+package signer_test
 
 import (
 	"errors"
 	"testing"
 
-	"github.com/strangelove-ventures/horcrux/signer/keygen"
+	"github.com/strangelove-ventures/horcrux/signer"
 	"github.com/stretchr/testify/require"
 	"github.com/taurusgroup/frost-ed25519/pkg/eddsa"
 	"github.com/taurusgroup/frost-ed25519/pkg/frost/party"
@@ -17,7 +17,7 @@ func TestKeygenCosigner(t *testing.T) {
 		total     = 3
 	)
 
-	cosigners, err := keygen.LocalDKG(threshold, total)
+	cosigners, err := signer.LocalDKG(threshold, total)
 	require.NoError(t, err)
 
 	var pubCmp *eddsa.Public

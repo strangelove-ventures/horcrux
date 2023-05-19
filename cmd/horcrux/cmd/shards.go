@@ -25,7 +25,7 @@ import (
 	"github.com/strangelove-ventures/horcrux/signer"
 )
 
-func createCosignerDirectoryIfNecessary(out string, id int) (string, error) {
+func createCosignerDirectoryIfNecessary(out string, id uint8) (string, error) {
 	dir := filepath.Join(out, fmt.Sprintf("cosigner_%d", id))
 	dirStat, err := os.Stat(dir)
 	if err != nil {

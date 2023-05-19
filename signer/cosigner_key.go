@@ -17,7 +17,7 @@ import (
 type CosignerEd25519Key struct {
 	PubKey       cometcrypto.PubKey `json:"pubKey"`
 	PrivateShard []byte             `json:"privateShard"`
-	ID           int                `json:"id"`
+	ID           uint8              `json:"id"`
 }
 
 func (key *CosignerEd25519Key) MarshalJSON() ([]byte, error) {
@@ -105,7 +105,7 @@ func LoadCosignerEd25519Key(file string) (CosignerEd25519Key, error) {
 // CosignerEd25519Key is a single RSA key for an m-of-n threshold signer.
 type CosignerRSAKey struct {
 	RSAKey  rsa.PrivateKey   `json:"rsaKey"`
-	ID      int              `json:"id"`
+	ID      uint8            `json:"id"`
 	RSAPubs []*rsa.PublicKey `json:"rsaPubs"`
 }
 

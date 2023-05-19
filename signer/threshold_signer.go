@@ -16,14 +16,14 @@ type ThresholdSigner interface {
 	DealShares(req CosignerGetEphemeralSecretPartRequest) (HrsMetadata, error)
 
 	GetEphemeralSecretPart(req CosignerGetEphemeralSecretPartRequest, m *LastSignStateWrapper,
-		pubKeys map[int]CosignerRSAPubKey) (CosignerEphemeralSecretPart, error)
+		pubKeys map[uint8]CosignerRSAPubKey) (CosignerEphemeralSecretPart, error)
 
 	SetEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest, m *LastSignStateWrapper,
-		pubKeys map[int]CosignerRSAPubKey) error
+		pubKeys map[uint8]CosignerRSAPubKey) error
 
 	Sign(req CosignerSignRequest, m *LastSignStateWrapper) (CosignerSignResponse, error)
 
-	GetID() (int, error)
+	GetID() (uint8, error)
 
 	// Stop performs any cleanup work, such as flushing state files to disk, then shut down.
 	Stop()

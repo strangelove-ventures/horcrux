@@ -76,7 +76,7 @@ func (c *Config) ValidateThresholdModeConfig() error {
 		return errors.Join(errs...)
 	}
 
-	numShards := len(c.ThresholdModeConfig.Cosigners)
+	numShards := uint8(len(c.ThresholdModeConfig.Cosigners))
 
 	if c.ThresholdModeConfig.Threshold <= numShards/2 {
 		errs = append(errs, fmt.Errorf("threshold (%d) must be greater than number of shards (%d) / 2",
@@ -186,7 +186,7 @@ func (c RuntimeConfig) KeyFileExistsCosignerRSA() (string, error) {
 
 // ThresholdModeConfig is the on disk config format for threshold sign mode.
 type ThresholdModeConfig struct {
-	Threshold   int             `yaml:"threshold"`
+	Threshold   uint8           `yaml:"threshold"`
 	Cosigners   CosignersConfig `yaml:"cosigners"`
 	GRPCTimeout string          `yaml:"grpcTimeout"`
 	RaftTimeout string          `yaml:"raftTimeout"`
@@ -202,11 +202,63 @@ func (cfg *ThresholdModeConfig) LeaderElectMultiAddress() (string, error) {
 
 // CosignerConfig is the on disk format representing a cosigner for threshold sign mode.
 type CosignerConfig struct {
-	ShardID int    `yaml:"shardID"`
+	ShardID uint8  `yaml:"shardID"`
 	P2PAddr string `yaml:"p2pAddr"`
+	DKGID   string `yaml:"dkgID,omitempty"`
+}
+
+func (c CosignerConfig) HostPort() (string, string, error) {
+	url, err := url.Parse(c.P2PAddr)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to parse cosigner (shard ID: %d) p2p address: %w", c.ShardID, err)
+	}
+
+	host, port, err := net.SplitHostPort(url.Host)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to parse cosigner (shard ID: %d) host port: %w", c.ShardID, err)
+	}
+
+	return host, port, nil
+}
+
+func (c CosignerConfig) LibP2PHostAddr() (string, error) {
+	_, port, err := c.HostPort()
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", port), nil
+}
+
+func (c CosignerConfig) LibP2PAddr() (string, error) {
+	host, port, err := c.HostPort()
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("/ip4/%s/tcp/%s", host, port), nil
 }
 
 type CosignersConfig []CosignerConfig
+
+func (cosigners CosignersConfig) MyCosigner(myID uint8) (CosignerConfig, error) {
+	for _, c := range cosigners {
+		if c.ShardID == myID {
+			return c, nil
+		}
+	}
+	return CosignerConfig{}, fmt.Errorf("cosigner with that id: %d cannot be found", myID)
+}
+
+func (cosigners CosignersConfig) OtherCosigners(myID uint8) CosignersConfig {
+	others := make(CosignersConfig, 0, len(cosigners)-1)
+	for _, c := range cosigners {
+		if c.ShardID != myID {
+			others = append(others, c)
+		}
+	}
+	return others
+}
 
 func (cosigners CosignersConfig) Validate() error {
 	var errs []error
@@ -219,22 +271,16 @@ func (cosigners CosignersConfig) Validate() error {
 
 	// Make sure that the cosigner IDs match the number of cosigners.
 	for _, cosigner := range cosigners {
-		if cosigner.ShardID < 1 || cosigner.ShardID > shards {
+		if cosigner.ShardID < 1 || cosigner.ShardID > uint8(shards) {
 			errs = append(errs, fmt.Errorf("cosigner shard ID %d in args is out of range, must be between 1 and %d, inclusive",
 				cosigner.ShardID, shards))
 		}
 
-		url, err := url.Parse(cosigner.P2PAddr)
+		host, _, err := cosigner.HostPort()
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to parse cosigner (shard ID: %d) p2p address: %w", cosigner.ShardID, err))
-			continue
+			errs = append(errs, err)
 		}
 
-		host, _, err := net.SplitHostPort(url.Host)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to parse cosigner (shard ID: %d) host port: %w", cosigner.ShardID, err))
-			continue
-		}
 		if host == "0.0.0.0" {
 			errs = append(errs, fmt.Errorf("host cannot be 0.0.0.0, must be reachable from other cosigners"))
 		}
@@ -249,8 +295,8 @@ func (cosigners CosignersConfig) Validate() error {
 	return errors.Join(errs...)
 }
 
-func duplicateCosigners(cosigners []CosignerConfig) (duplicates map[int][]string) {
-	idAddrs := make(map[int][]string)
+func duplicateCosigners(cosigners []CosignerConfig) (duplicates map[uint8][]string) {
+	idAddrs := make(map[uint8][]string)
 	for _, cosigner := range cosigners {
 		// Collect all addresses assigned to each cosigner.
 		idAddrs[cosigner.ShardID] = append(idAddrs[cosigner.ShardID], cosigner.P2PAddr)
@@ -275,7 +321,7 @@ func duplicateCosigners(cosigners []CosignerConfig) (duplicates map[int][]string
 func CosignersFromFlag(cosigners []string) (out []CosignerConfig, err error) {
 	var errs []error
 	for i, c := range cosigners {
-		out = append(out, CosignerConfig{ShardID: i + 1, P2PAddr: c})
+		out = append(out, CosignerConfig{ShardID: uint8(i) + 1, P2PAddr: c})
 	}
 	if len(errs) > 0 {
 		return nil, errors.Join(errs...)
