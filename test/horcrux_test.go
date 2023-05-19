@@ -26,7 +26,7 @@ func testChainSingleNodeAndHorcrux(
 	chain := getSimdChain(chainID, totalSentries)
 
 	// setup a horcrux validator for us
-	ourValidator, err := NewHorcruxValidator(t, pool, network, home, 0, totalSigners, threshold, chain)
+	ourValidator, err := NewHorcruxValidator(ctx, t, pool, network, home, 0, totalSigners, threshold, true, chain)
 	require.NoError(t, err)
 
 	// other vals are single node (non-horcrux)
@@ -186,7 +186,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	require.NoError(t, err)
 
 	// create horcrux validator with same consensus key
-	ourValidatorUpgradedToHorcrux, err := NewHorcruxValidatorWithPrivValKey(t, pool, network, home,
+	ourValidatorUpgradedToHorcrux, err := NewHorcruxValidatorWithPrivValKey(ctx, t, pool, network, home,
 		0, 0, totalSigners, threshold, chain, ourValidatorPrivValKey)
 	require.NoError(t, err)
 
@@ -232,8 +232,8 @@ func TestDownedSigners2of3(t *testing.T) {
 	chain := getSimdChain(chainID, sentriesPerSigner)
 
 	// setup a horcrux validator for us
-	ourValidator, err := NewHorcruxValidator(t, pool, network, home,
-		0, totalSigners, threshold, chain)
+	ourValidator, err := NewHorcruxValidator(ctx, t, pool, network, home,
+		0, totalSigners, threshold, true, chain)
 	require.NoError(t, err)
 
 	// remaining validators are single-node non-horcrux
@@ -281,8 +281,8 @@ func TestLeaderElection2of3(t *testing.T) {
 	chain := getSimdChain(chainID, totalSentries)
 
 	// setup a horcrux validator for us
-	ourValidator, err := NewHorcruxValidator(t, pool, network, home,
-		0, totalSigners, threshold, chain)
+	ourValidator, err := NewHorcruxValidator(ctx, t, pool, network, home,
+		0, totalSigners, threshold, true, chain)
 	require.NoError(t, err)
 
 	// remaining validators are single-node non-horcrux
@@ -354,8 +354,8 @@ func TestDownedSigners3of5(t *testing.T) {
 	chain := getSimdChain(chainID, totalSentries)
 
 	// setup a horcrux validator for us
-	ourValidator, err := NewHorcruxValidator(t, pool, network, home,
-		0, totalSigners, threshold, chain)
+	ourValidator, err := NewHorcruxValidator(ctx, t, pool, network, home,
+		0, totalSigners, threshold, true, chain)
 	require.NoError(t, err)
 
 	// remaining validators are single-node non-horcrux
@@ -431,8 +431,8 @@ func TestChainPureHorcrux(t *testing.T) {
 
 	// start horcrux cluster for each validator
 	for i := 0; i < totalValidators; i++ {
-		validator, err := NewHorcruxValidator(t, pool, network, home, i,
-			signersPerValidator, threshold, chain)
+		validator, err := NewHorcruxValidator(ctx, t, pool, network, home, i,
+			signersPerValidator, threshold, true, chain)
 		require.NoError(t, err)
 		validators = append(validators, validator)
 		allNodes = append(allNodes, validator.Sentries[chainID]...)
@@ -488,8 +488,8 @@ func TestMultipleChainHorcrux(t *testing.T) {
 
 	// start horcrux cluster for each validator
 	for i := 0; i < totalValidators; i++ {
-		validator, err := NewHorcruxValidator(t, pool, network, home, i,
-			signersPerValidator, threshold, chain1, chain2)
+		validator, err := NewHorcruxValidator(ctx, t, pool, network, home, i,
+			signersPerValidator, threshold, true, chain1, chain2)
 		require.NoError(t, err)
 		validators = append(validators, validator)
 		allNodes = append(allNodes, validator.Sentries[chainID1]...)

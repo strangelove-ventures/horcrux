@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"github.com/cometbft/cometbft/privval"
 	"github.com/ory/dockertest"
 	"github.com/strangelove-ventures/horcrux/signer"
+	"golang.org/x/sync/errgroup"
 )
 
 type Validator struct {
@@ -23,6 +25,7 @@ type Validator struct {
 }
 
 func NewHorcruxValidator(
+	ctx context.Context,
 	tl Logger,
 	pool *dockertest.Pool,
 	networkID string,
@@ -30,6 +33,7 @@ func NewHorcruxValidator(
 	index int,
 	numSigners int,
 	threshold uint8,
+	dkg bool,
 	chains ...*ChainType,
 ) (*Validator, error) {
 	chainIDs := make([]string, 0, len(chains))
@@ -56,13 +60,14 @@ func NewHorcruxValidator(
 		Threshold: threshold,
 		PubKeys:   make(map[string]cometcrypto.PubKey),
 	}
-	if err := testValidator.genPrivKeyAndShards(nil, chainIDs...); err != nil {
+	if err := testValidator.genPrivKeyAndShards(ctx, nil, dkg, chainIDs...); err != nil {
 		return nil, err
 	}
 	return testValidator, nil
 }
 
 func NewHorcruxValidatorWithPrivValKey(
+	ctx context.Context,
 	tl Logger,
 	pool *dockertest.Pool,
 	networkID string,
@@ -86,7 +91,7 @@ func NewHorcruxValidatorWithPrivValKey(
 		Threshold: threshold,
 		PubKeys:   make(map[string]cometcrypto.PubKey),
 	}
-	if err := testValidator.genPrivKeyAndShards(&privValKey, chainID); err != nil {
+	if err := testValidator.genPrivKeyAndShards(ctx, &privValKey, false, chainID); err != nil {
 		return nil, err
 	}
 	return testValidator, nil
@@ -123,14 +128,47 @@ func (tv *Validator) genRSAShares() error {
 	return nil
 }
 
+// performDKG runs the DKG keygen process via libp2p.
+func (tv *Validator) performDKG(ctx context.Context, chainID string) error {
+	var eg errgroup.Group
+	for _, s := range tv.Signers {
+		s := s
+		eg.Go(func() error { return s.InitThresholdModeConfig(ctx, tv.Sentries[chainID], tv.Signers, tv.Threshold) })
+	}
+	if err := eg.Wait(); err != nil {
+		return err
+	}
+
+	for i, s := range tv.Signers {
+		s := s
+		i := i
+		eg.Go(func() error {
+			return s.ExecHorcruxCmd(ctx, s.Name(), "dkg", "--chain-id", chainID, "--id", fmt.Sprint(i+1))
+		})
+	}
+	return eg.Wait()
+}
+
 // genPrivKeyAndShards generates cosigner RSA shards.
 // If existingKey is nil, generates Ed25519 key shards, otherwise shards existing key.
-func (tv *Validator) genPrivKeyAndShards(existingKey *privval.FilePVKey, chainIDs ...string) error {
+func (tv *Validator) genPrivKeyAndShards(
+	ctx context.Context,
+	existingKey *privval.FilePVKey,
+	dkg bool,
+	chainIDs ...string,
+) error {
 	if err := tv.genRSAShares(); err != nil {
 		return err
 	}
 
 	for _, chainID := range chainIDs {
+		if dkg {
+			if err := tv.performDKG(ctx, chainID); err != nil {
+				return err
+			}
+			continue
+		}
+
 		if err := tv.genEd25519Shards(existingKey, chainID); err != nil {
 			return err
 		}

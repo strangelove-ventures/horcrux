@@ -235,7 +235,12 @@ func (c CosignerConfig) LibP2PAddr() (string, error) {
 		return "", err
 	}
 
-	return fmt.Sprintf("/ip4/%s/tcp/%s", host, port), nil
+	protocol := "ip4"
+	if net.ParseIP(host) == nil {
+		protocol = "dns"
+	}
+
+	return fmt.Sprintf("/%s/%s/tcp/%s", protocol, host, port), nil
 }
 
 type CosignersConfig []CosignerConfig
