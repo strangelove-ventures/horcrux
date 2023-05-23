@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/cometbft/cometbft/libs/service"
@@ -28,6 +29,11 @@ func startCmd() *cobra.Command {
 			}
 
 			logger := cometlog.NewTMLogger(cometlog.NewSyncWriter(out)).With("module", "validator")
+
+			// create all directories up to the state directory
+			if err = os.MkdirAll(config.StateDir, 0700); err != nil {
+				return err
+			}
 
 			logger.Info(
 				"Horcrux Validator",

@@ -94,7 +94,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	tmpDir := t.TempDir()
 
 	for i, pubKey := range pubKeys {
-		cosignerDir := filepath.Join(tmpDir, fmt.Sprintf("cosigner_%d", pubKey.ID))
+		cosignerDir := filepath.Join(tmpDir, fmt.Sprintf("cosigner-%d", pubKey.ID))
 		err := os.MkdirAll(cosignerDir, 0777)
 		require.NoError(t, err)
 

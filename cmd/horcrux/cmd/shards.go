@@ -26,7 +26,7 @@ import (
 )
 
 func createCosignerDirectoryIfNecessary(out string, id int) (string, error) {
-	dir := filepath.Join(out, fmt.Sprintf("cosigner_%d", id))
+	dir := filepath.Join(out, fmt.Sprintf("cosigner-%d", id))
 	dirStat, err := os.Stat(dir)
 	if err != nil {
 		if !os.IsNotExist(err) {
