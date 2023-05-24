@@ -47,7 +47,7 @@ func TestLocalCosignerGetID(t *testing.T) {
 		0,
 	)
 
-	require.Equal(t, 1, cosigner.GetID())
+	require.Equal(t, uint8(1), cosigner.GetID())
 }
 
 func TestLocalCosignerSign2of2(t *testing.T) {
@@ -145,8 +145,8 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	err = cosigner2.LoadSignStateIfNecessary(testChainID)
 	require.NoError(t, err)
 
-	require.Equal(t, cosigner1.GetID(), 1)
-	require.Equal(t, cosigner2.GetID(), 2)
+	require.Equal(t, uint8(1), cosigner1.GetID())
+	require.Equal(t, uint8(2), cosigner2.GetID())
 
 	publicKeys := make([]tsed25519.Element, 0)
 

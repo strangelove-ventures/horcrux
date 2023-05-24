@@ -22,7 +22,7 @@ var _ PrivValidator = &ThresholdValidator{}
 type ThresholdValidator struct {
 	config *RuntimeConfig
 
-	threshold int
+	threshold uint8
 
 	grpcTimeout time.Duration
 
@@ -56,7 +56,7 @@ type ChainSignState struct {
 func NewThresholdValidator(
 	logger log.Logger,
 	config *RuntimeConfig,
-	threshold int,
+	threshold uint8,
 	grpcTimeout time.Duration,
 	myCosigner Cosigner,
 	peerCosigners []Cosigner,
@@ -245,7 +245,7 @@ func (pv *ThresholdValidator) waitForPeerEphemeralShares(
 
 	// Check so that getEphemeralWaitGroup.Done is not called more than (threshold - 1) times which causes hardlock
 	thresholdPeersMutex.Lock()
-	if len(encryptedEphemeralSharesThresholdMap) < pv.threshold-1 {
+	if len(encryptedEphemeralSharesThresholdMap) < int(pv.threshold)-1 {
 		(encryptedEphemeralSharesThresholdMap)[peer] = ephemeralSecretParts.EncryptedSecrets
 		defer wg.Done()
 	}
@@ -254,7 +254,7 @@ func (pv *ThresholdValidator) waitForPeerEphemeralShares(
 
 func (pv *ThresholdValidator) waitForPeerSetEphemeralSharesAndSign(
 	chainID string,
-	ourID int,
+	ourID uint8,
 	peer Cosigner,
 	hrst HRSTKey,
 	encryptedEphemeralSharesThresholdMap map[Cosigner][]CosignerEphemeralSecretPart,
@@ -502,7 +502,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	getEphemeralWaitGroup := sync.WaitGroup{}
 
 	// Only wait until we have threshold sigs
-	getEphemeralWaitGroup.Add(pv.threshold - 1)
+	getEphemeralWaitGroup.Add(int(pv.threshold) - 1)
 	// Used to track how close we are to threshold
 
 	ourID := pv.myCosigner.GetID()
@@ -543,7 +543,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	setEphemeralAndSignWaitGroup := sync.WaitGroup{}
 
 	// Only wait until we have threshold sigs
-	setEphemeralAndSignWaitGroup.Add(pv.threshold)
+	setEphemeralAndSignWaitGroup.Add(int(pv.threshold))
 
 	// destination for share signatures
 	shareSignatures := make([][]byte, total)
@@ -588,7 +588,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 		shareSigs = append(shareSigs, shareSig)
 	}
 
-	if len(sigIds) < pv.threshold {
+	if len(sigIds) < int(pv.threshold) {
 		totalInsufficientCosigners.Inc()
 		return nil, stamp, errors.New("not enough co-signers")
 	}

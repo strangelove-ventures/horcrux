@@ -75,13 +75,13 @@ func (hrst *HRSTKey) Less(other HRSTKey) bool {
 }
 
 type CosignerRSAPubKey struct {
-	ID        int
+	ID        uint8
 	PublicKey rsa.PublicKey
 }
 
 type CosignerGetEphemeralSecretPartRequest struct {
 	ChainID   string
-	ID        int
+	ID        uint8
 	Height    int64
 	Round     int64
 	Step      int8
@@ -97,7 +97,7 @@ type LocalCosigner struct {
 	key           CosignerRSAKey
 	threshold     uint8
 	chainState    sync.Map
-	rsaPubKeys    map[int]CosignerRSAPubKey
+	rsaPubKeys    map[uint8]CosignerRSAPubKey
 	address       string
 	pendingDiskWG sync.WaitGroup
 }
@@ -141,7 +141,7 @@ func NewLocalCosigner(
 	cosigner := &LocalCosigner{
 		config:     config,
 		key:        key,
-		rsaPubKeys: make(map[int]CosignerRSAPubKey),
+		rsaPubKeys: make(map[uint8]CosignerRSAPubKey),
 		threshold:  threshold,
 		address:    address,
 	}
@@ -155,7 +155,7 @@ func NewLocalCosigner(
 
 // GetID returns the id of the cosigner
 // Implements Cosigner interface
-func (cosigner *LocalCosigner) GetID() int {
+func (cosigner *LocalCosigner) GetID() uint8 {
 	return cosigner.key.ID
 }
 

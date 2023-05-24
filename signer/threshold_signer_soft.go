@@ -65,7 +65,7 @@ func (softSigner *ThresholdSignerSoft) Type() string {
 }
 
 // Implements ThresholdSigner
-func (softSigner *ThresholdSignerSoft) GetID() (int, error) {
+func (softSigner *ThresholdSignerSoft) GetID() (uint8, error) {
 	return softSigner.key.ID, nil
 }
 
@@ -201,7 +201,7 @@ func (softSigner *ThresholdSignerSoft) DealShares(
 // The ephemeral secret part is encrypted for the receiver
 // Implements ThresholdSigner
 func (softSigner *ThresholdSignerSoft) GetEphemeralSecretPart(
-	req CosignerGetEphemeralSecretPartRequest, m *LastSignStateWrapper, pubKeys map[int]CosignerRSAPubKey) (
+	req CosignerGetEphemeralSecretPartRequest, m *LastSignStateWrapper, pubKeys map[uint8]CosignerRSAPubKey) (
 	CosignerEphemeralSecretPart, error) {
 
 	res := CosignerEphemeralSecretPart{}
@@ -286,7 +286,7 @@ func (softSigner *ThresholdSignerSoft) GetEphemeralSecretPart(
 // Store an ephemeral secret share part provided by another cosigner (signer)
 // Implements ThresholdSigner
 func (softSigner *ThresholdSignerSoft) SetEphemeralSecretPart(
-	req CosignerSetEphemeralSecretPartRequest, m *LastSignStateWrapper, pubKeys map[int]CosignerRSAPubKey) error {
+	req CosignerSetEphemeralSecretPartRequest, m *LastSignStateWrapper, pubKeys map[uint8]CosignerRSAPubKey) error {
 
 	// Verify the source signature
 	if req.SourceSig == nil {

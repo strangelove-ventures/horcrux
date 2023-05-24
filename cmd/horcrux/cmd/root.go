@@ -25,6 +25,7 @@ func rootCmd() *cobra.Command {
 	cmd.AddCommand(addressCmd())
 	cmd.AddCommand(createCosignerEd25519ShardsCmd())
 	cmd.AddCommand(createCosignerRSAShardsCmd())
+	cmd.AddCommand(dkgCmd())
 	cmd.AddCommand(leaderElectionCmd())
 	cmd.AddCommand(getLeaderCmd())
 	cmd.AddCommand(stateCmd())

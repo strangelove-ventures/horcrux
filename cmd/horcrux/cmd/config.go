@@ -71,7 +71,7 @@ for threshold signer mode, --cosigner flags and --threshold flag are required.
 			if signMode == string(signer.SignModeThreshold) {
 				// Threshold Mode Config
 				cosignersFlag, _ := cmdFlags.GetStringSlice(flagCosigner)
-				threshold, _ := cmdFlags.GetInt(flagThreshold)
+				threshold, _ := cmdFlags.GetUint8(flagThreshold)
 				raftTimeout, _ := cmdFlags.GetString(flagRaftTimeout)
 				grpcTimeout, _ := cmdFlags.GetString(flagGRPCTimeout)
 				cosigners, err := signer.CosignersFromFlag(cosignersFlag)
@@ -141,7 +141,7 @@ for threshold signer mode, --cosigner flags and --threshold flag are required.
 		`cosigners in format tcp://{cosigner-addr}:{p2p-port}
 (e.g. --cosigner tcp://horcrux-1:2222 --cosigner tcp://horcrux-2:2222 --cosigner tcp://horcrux-3:2222)`)
 
-	f.IntP(flagThreshold, "t", 0, "number of shards required for threshold signature")
+	f.Uint8P(flagThreshold, "t", 0, "number of shards required for threshold signature")
 
 	f.StringP(
 		flagDebugAddr, "d", "",

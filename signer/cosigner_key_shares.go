@@ -27,7 +27,7 @@ func CreateCosignerEd25519Shards(pv privval.FilePVKey, threshold, shards uint8) 
 		out = append(out, CosignerEd25519Key{
 			PubKey:       pv.PubKey,
 			PrivateShard: shard,
-			ID:           i + 1,
+			ID:           uint8(i) + 1,
 		})
 	}
 	return out, nil
@@ -41,7 +41,7 @@ func CreateCosignerRSAShards(shards int) (out []CosignerRSAKey, err error) {
 	}
 	for i, key := range rsaKeys {
 		out = append(out, CosignerRSAKey{
-			ID:      i + 1,
+			ID:      uint8(i) + 1,
 			RSAKey:  *key,
 			RSAPubs: pubKeys,
 		})

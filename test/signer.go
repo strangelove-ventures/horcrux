@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	cometcrypto "github.com/cometbft/cometbft/crypto"
+	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
@@ -205,8 +207,7 @@ func StartCosignerContainers(
 		s := s
 		eg.Go(func() error { return s.InitThresholdModeConfig(ctx, peers[i], signers, threshold) })
 	}
-	err := eg.Wait()
-	if err != nil {
+	if err := eg.Wait(); err != nil {
 		return err
 	}
 
@@ -217,8 +218,7 @@ func StartCosignerContainers(
 			return s.CreateCosignerContainer()
 		})
 	}
-	err = eg.Wait()
-	if err != nil {
+	if err := eg.Wait(); err != nil {
 		return err
 	}
 
@@ -298,6 +298,15 @@ func (ts *Signer) GetConfigFile() string {
 	return filepath.Join(ts.Dir(), "config.yaml")
 }
 
+// PubKey returns the public key representing all cosigners for a chain ID.
+func (ts *Signer) PubKey(chainID string) (cometcrypto.PubKey, error) {
+	key, err := signer.LoadCosignerEd25519Key(filepath.Join(ts.Dir(), fmt.Sprintf("%s_shard.json", chainID)))
+	if err != nil {
+		return nil, err
+	}
+	return cometcryptoed25519.PubKey(key.PubKey.Bytes()), nil
+}
+
 // Name is the hostname of the Signer container
 func (ts *Signer) Name() string {
 	return fmt.Sprintf("val-%d-sgn-%d-%s", ts.ValidatorIndex, ts.Index, ts.tl.Name())
@@ -311,15 +320,20 @@ func (ts *Signer) GRPCAddress() string {
 
 // ExecHorcruxCmd executes a CLI subcommand for the horcrux binary for the specific cosigner.
 // The config home directory will be appended as a flag.
-func (ts *Signer) ExecHorcruxCmd(ctx context.Context, cmd ...string) error {
+func (ts *Signer) ExecHorcruxCmd(ctx context.Context, hostnameOverride string, cmd ...string) error {
 	cmd = ts.horcruxCmd(cmd)
 	container := RandLowerCaseLetterString(10)
 	ts.tl.Logf("{%s}[%s] -> '%s'", ts.Name(), container, strings.Join(cmd, " "))
+
+	hostname := container
+	if hostnameOverride != "" {
+		hostname = hostnameOverride
+	}
 	cont, err := ts.Pool.Client.CreateContainer(docker.CreateContainerOptions{
 		Name: container,
 		Config: &docker.Config{
 			User:     getDockerUserString(),
-			Hostname: container,
+			Hostname: hostname,
 			ExposedPorts: map[docker.Port]struct{}{
 				docker.Port(signerPortDocker): {},
 			},
@@ -378,7 +392,7 @@ func (ts *Signer) ExecHorcruxCmd(ctx context.Context, cmd ...string) error {
 func (ts *Signer) InitSingleSignerConfig(ctx context.Context, listenNodes Nodes) error {
 	cmd := []string{"config", "init", "--mode", "single"}
 	cmd = append(cmd, listenNodes.ConfigInitFlags()...)
-	return ts.ExecHorcruxCmd(ctx, cmd...)
+	return ts.ExecHorcruxCmd(ctx, "", cmd...)
 }
 
 // InitThresholdModeConfig creates and runs a container to init a signer nodes config files
@@ -388,8 +402,12 @@ func (ts *Signer) InitThresholdModeConfig(
 	cmd := []string{"config", "init"}
 	cmd = append(cmd, listenNodes.ConfigInitFlags()...)
 	cmd = append(cmd, cosigners.ConfigInitFlags()...)
-	cmd = append(cmd, "--threshold", fmt.Sprint(threshold))
-	return ts.ExecHorcruxCmd(ctx, cmd...)
+	cmd = append(cmd,
+		"--threshold", fmt.Sprint(threshold),
+		"--overwrite",
+	)
+
+	return ts.ExecHorcruxCmd(ctx, "", cmd...)
 }
 
 // StartContainer starts a Signers container and assigns the new running container to replace the old one
@@ -514,7 +532,7 @@ func (ts *Signer) CreateCosignerContainer() error {
 
 // TransferLeadership elects a new raft leader.
 func (ts *Signer) TransferLeadership(ctx context.Context, newLeaderID int) error {
-	return ts.ExecHorcruxCmd(ctx,
+	return ts.ExecHorcruxCmd(ctx, "",
 		"elect", strconv.FormatInt(int64(newLeaderID), 10),
 	)
 }

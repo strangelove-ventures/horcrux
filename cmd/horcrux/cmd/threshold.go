@@ -60,7 +60,7 @@ func NewThresholdValidator(
 		key,
 		pubKeys,
 		p2pListen,
-		uint8(thresholdCfg.Threshold),
+		thresholdCfg.Threshold,
 	)
 
 	// Validated prior in ValidateThresholdModeConfig

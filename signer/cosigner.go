@@ -52,8 +52,8 @@ type CosignerSignResponse struct {
 }
 
 type CosignerEphemeralSecretPart struct {
-	SourceID                       int
-	DestinationID                  int
+	SourceID                       uint8
+	DestinationID                  uint8
 	SourceEphemeralSecretPublicKey []byte
 	EncryptedSharePart             []byte
 	SourceSig                      []byte
@@ -80,8 +80,8 @@ func (secretParts CosignerEphemeralSecretParts) toProto() (out []*proto.Ephemera
 
 func CosignerEphemeralSecretPartFromProto(secretPart *proto.EphemeralSecretPart) CosignerEphemeralSecretPart {
 	return CosignerEphemeralSecretPart{
-		SourceID:                       int(secretPart.SourceID),
-		DestinationID:                  int(secretPart.DestinationID),
+		SourceID:                       uint8(secretPart.SourceID),
+		DestinationID:                  uint8(secretPart.DestinationID),
 		SourceEphemeralSecretPublicKey: secretPart.SourceEphemeralSecretPublicKey,
 		EncryptedSharePart:             secretPart.EncryptedSharePart,
 		SourceSig:                      secretPart.SourceSig,
@@ -98,7 +98,7 @@ func CosignerEphemeralSecretPartsFromProto(
 
 type CosignerSetEphemeralSecretPartRequest struct {
 	ChainID                        string
-	SourceID                       int
+	SourceID                       uint8
 	SourceEphemeralSecretPublicKey []byte
 	EncryptedSharePart             []byte
 	SourceSig                      []byte
@@ -133,7 +133,7 @@ type CosignerSetEphemeralSecretPartsAndSignRequest struct {
 type Cosigner interface {
 	// Get the ID of the cosigner
 	// The ID is the shamir index: 1, 2, etc...
-	GetID() int
+	GetID() uint8
 
 	// Get the P2P URL (GRPC and Raft)
 	GetAddress() string
