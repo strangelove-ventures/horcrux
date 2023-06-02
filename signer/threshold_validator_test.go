@@ -70,7 +70,7 @@ func loadKeyForLocalCosigner(
 	return os.WriteFile(cosigner.config.KeyFilePathCosigner(chainID), keyBz, 0600)
 }
 
-func testThresholdValidator(t *testing.T, threshold, total uint8) {
+func setupTestThresholdValidator(t testing.TB, threshold, total uint8) *ThresholdValidator {
 	rsaKeys := make([]*rsa.PrivateKey, total)
 	pubKeys := make([]CosignerRSAPubKey, total)
 	cosigners := make([]*LocalCosigner, total)
@@ -143,7 +143,6 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 		thresholdCosigners,
 		raftStore,
 	)
-	defer validator.Stop()
 
 	err := validator.LoadSignStateIfNecessary(testChainID)
 	require.NoError(t, err)
@@ -155,6 +154,13 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 	time.Sleep(3 * time.Second) // Ensure there is a leader
 
+	return validator
+}
+
+func testThresholdValidator(t testing.TB, threshold, total uint8) {
+	validator := setupTestThresholdValidator(t, threshold, total)
+	defer validator.Stop()
+
 	proposal := cometproto.Proposal{
 		Height: 1,
 		Round:  20,
@@ -163,10 +169,13 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 	signBytes := comet.ProposalSignBytes(testChainID, &proposal)
 
-	err = validator.SignProposal(testChainID, &proposal)
+	err := validator.SignProposal(testChainID, &proposal)
 	require.NoError(t, err)
 
-	require.True(t, privateKey.PubKey().VerifySignature(signBytes, proposal.Signature))
+	pubKey, err := validator.GetPubKey(testChainID)
+	require.NoError(t, err)
+
+	require.True(t, pubKey.VerifySignature(signBytes, proposal.Signature))
 
 	firstSignature := proposal.Signature
 
@@ -219,12 +228,12 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	// reinitialize validator to make sure new runtime will not allow double sign
 	newValidator := NewThresholdValidator(
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
-		cosigners[0].config,
+		validator.config,
 		int(threshold),
 		time.Second,
-		cosigners[0],
-		thresholdCosigners,
-		raftStore,
+		validator.myCosigner,
+		validator.peerCosigners,
+		validator.raftStore,
 	)
 	defer newValidator.Stop()
 
@@ -240,4 +249,58 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	// signing higher block now should succeed
 	err = newValidator.SignProposal(testChainID, &proposal)
 	require.NoError(t, err)
+}
+
+func BenchmarkThresholdValidatorProposal(b *testing.B) {
+	validator := setupTestThresholdValidator(b, 2, 3)
+	defer validator.Stop()
+
+	b.Run("sign proposal", func(b *testing.B) {
+		for i := 1; i <= b.N; i++ {
+			proposal := cometproto.Proposal{
+				Height: int64(i),
+				Round:  0,
+				Type:   cometproto.ProposalType,
+			}
+
+			err := validator.SignProposal(testChainID, &proposal)
+			require.NoError(b, err)
+		}
+	})
+}
+
+func BenchmarkThresholdValidatorPreVote(b *testing.B) {
+	validator := setupTestThresholdValidator(b, 2, 3)
+	defer validator.Stop()
+
+	b.Run("sign prevote", func(b *testing.B) {
+		for i := 1; i <= b.N; i++ {
+			vote := cometproto.Vote{
+				Height: int64(i),
+				Round:  0,
+				Type:   cometproto.PrevoteType,
+			}
+
+			err := validator.SignVote(testChainID, &vote)
+			require.NoError(b, err)
+		}
+	})
+}
+
+func BenchmarkThresholdValidatorPreCommit(b *testing.B) {
+	validator := setupTestThresholdValidator(b, 2, 3)
+	defer validator.Stop()
+
+	b.Run("sign precommit", func(b *testing.B) {
+		for i := 1; i <= b.N; i++ {
+			vote := cometproto.Vote{
+				Height: int64(i),
+				Round:  0,
+				Type:   cometproto.PrevoteType,
+			}
+
+			err := validator.SignVote(testChainID, &vote)
+			require.NoError(b, err)
+		}
+	})
 }
