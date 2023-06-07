@@ -8,12 +8,12 @@ import (
 	"os"
 	"sync"
 
+	cometbytes "github.com/cometbft/cometbft/libs/bytes"
+	cometjson "github.com/cometbft/cometbft/libs/json"
+	"github.com/cometbft/cometbft/libs/protoio"
+	"github.com/cometbft/cometbft/libs/tempfile"
+	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	"github.com/gogo/protobuf/proto"
-	tmBytes "github.com/tendermint/tendermint/libs/bytes"
-	tmJson "github.com/tendermint/tendermint/libs/json"
-	"github.com/tendermint/tendermint/libs/protoio"
-	"github.com/tendermint/tendermint/libs/tempfile"
-	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
 )
 
 const (
@@ -23,40 +23,40 @@ const (
 	blocksToCache      = 3
 )
 
-func CanonicalVoteToStep(vote *tmProto.CanonicalVote) int8 {
+func CanonicalVoteToStep(vote *cometproto.CanonicalVote) int8 {
 	switch vote.Type {
-	case tmProto.PrevoteType:
+	case cometproto.PrevoteType:
 		return stepPrevote
-	case tmProto.PrecommitType:
+	case cometproto.PrecommitType:
 		return stepPrecommit
 	default:
 		panic("Unknown vote type")
 	}
 }
 
-func VoteToStep(vote *tmProto.Vote) int8 {
+func VoteToStep(vote *cometproto.Vote) int8 {
 	switch vote.Type {
-	case tmProto.PrevoteType:
+	case cometproto.PrevoteType:
 		return stepPrevote
-	case tmProto.PrecommitType:
+	case cometproto.PrecommitType:
 		return stepPrecommit
 	default:
 		panic("Unknown vote type")
 	}
 }
 
-func ProposalToStep(_ *tmProto.Proposal) int8 {
+func ProposalToStep(_ *cometproto.Proposal) int8 {
 	return stepPropose
 }
 
 // SignState stores signing information for high level watermark management.
 type SignState struct {
-	Height          int64            `json:"height"`
-	Round           int64            `json:"round"`
-	Step            int8             `json:"step"`
-	EphemeralPublic []byte           `json:"ephemeral_public"`
-	Signature       []byte           `json:"signature,omitempty"`
-	SignBytes       tmBytes.HexBytes `json:"signbytes,omitempty"`
+	Height          int64               `json:"height"`
+	Round           int64               `json:"round"`
+	Step            int8                `json:"step"`
+	EphemeralPublic []byte              `json:"ephemeral_public"`
+	Signature       []byte              `json:"signature,omitempty"`
+	SignBytes       cometbytes.HexBytes `json:"signbytes,omitempty"`
 	cache           map[HRSKey]SignStateConsensus
 
 	filePath string
@@ -67,7 +67,12 @@ type SignStateConsensus struct {
 	Round     int64
 	Step      int8
 	Signature []byte
-	SignBytes tmBytes.HexBytes
+	SignBytes cometbytes.HexBytes
+}
+
+type ChainSignStateConsensus struct {
+	ChainID            string
+	SignStateConsensus SignStateConsensus
 }
 
 func NewSignStateConsensus(height int64, round int64, step int8) SignStateConsensus {
@@ -107,14 +112,14 @@ func (signState *SignState) GetFromCache(hrs HRSKey, lock *sync.Mutex) (HRSKey, 
 	return latestBlock, nil
 }
 
-func (signState *SignState) Save(ssc SignStateConsensus, lock *sync.Mutex, async bool) error {
-	// One lock/unlock for less/equal check and mutation.
-	// Setting nil for lock for getErrorIfLessOrEqual to avoid recursive lock
-	if lock != nil {
-		lock.Lock()
-		defer lock.Unlock()
-	}
-
+// Save updates the high watermark height/round/step (HRS) if it is greater
+// than the current high watermark. If pendingDiskWG is provided, the write operation
+// will be a separate goroutine (async). This allows pendingDiskWG to be used to .Wait()
+// for all pending SignState disk writes.
+func (signState *SignState) Save(
+	ssc SignStateConsensus,
+	pendingDiskWG *sync.WaitGroup,
+) error {
 	err := signState.GetErrorIfLessOrEqual(ssc.Height, ssc.Round, ssc.Step, nil)
 	if err != nil {
 		return err
@@ -133,8 +138,10 @@ func (signState *SignState) Save(ssc SignStateConsensus, lock *sync.Mutex, async
 	signState.Step = ssc.Step
 	signState.Signature = ssc.Signature
 	signState.SignBytes = ssc.SignBytes
-	if async {
+	if pendingDiskWG != nil {
+		pendingDiskWG.Add(1)
 		go func() {
+			defer pendingDiskWG.Done()
 			signState.save()
 		}()
 	} else {
@@ -153,7 +160,7 @@ func (signState *SignState) save() {
 	if outFile == "" {
 		panic("cannot save SignState: filePath not set")
 	}
-	jsonBytes, err := tmJson.MarshalIndent(signState, "", "  ")
+	jsonBytes, err := cometjson.MarshalIndent(signState, "", "  ")
 	if err != nil {
 		panic(err)
 	}
@@ -245,46 +252,73 @@ func (signState *SignState) GetErrorIfLessOrEqual(height int64, round int64, ste
 	return nil
 }
 
-// LoadSignState loads a sign state from disk.
-func LoadSignState(filepath string) (SignState, error) {
-	state := SignState{}
-	stateJSONBytes, err := os.ReadFile(filepath)
-	if err != nil {
-		return state, err
+// FreshCache returns a clone of a SignState with a new cache
+// including the most recent sign state.
+func (signState *SignState) FreshCache() *SignState {
+	newSignState := &SignState{
+		Height:          signState.Height,
+		Round:           signState.Round,
+		Step:            signState.Step,
+		EphemeralPublic: signState.EphemeralPublic,
+		Signature:       signState.Signature,
+		SignBytes:       signState.SignBytes,
+		cache:           make(map[HRSKey]SignStateConsensus),
+		filePath:        signState.filePath,
 	}
 
-	err = tmJson.Unmarshal(stateJSONBytes, &state)
+	newSignState.cache[HRSKey{
+		Height: signState.Height,
+		Round:  signState.Round,
+		Step:   signState.Step,
+	}] = SignStateConsensus{
+		Height:    signState.Height,
+		Round:     signState.Round,
+		Step:      signState.Step,
+		Signature: signState.Signature,
+		SignBytes: signState.SignBytes,
+	}
+
+	return newSignState
+}
+
+// LoadSignState loads a sign state from disk.
+func LoadSignState(filepath string) (*SignState, error) {
+	stateJSONBytes, err := os.ReadFile(filepath)
 	if err != nil {
-		return state, err
+		return nil, err
 	}
-	state.cache = make(map[HRSKey]SignStateConsensus)
-	state.cache[HRSKey{Height: state.Height, Round: state.Round, Step: state.Step}] = SignStateConsensus{
-		Height:    state.Height,
-		Round:     state.Round,
-		Step:      state.Step,
-		Signature: state.Signature,
-		SignBytes: state.SignBytes,
+
+	state := new(SignState)
+
+	err = cometjson.Unmarshal(stateJSONBytes, &state)
+	if err != nil {
+		return nil, err
 	}
+
 	state.filePath = filepath
-	return state, nil
+
+	return state.FreshCache(), nil
 }
 
 // LoadOrCreateSignState loads the sign state from filepath
 // If the sign state could not be loaded, an empty sign state is initialized
 // and saved to filepath.
-func LoadOrCreateSignState(filepath string) (SignState, error) {
-	existing, err := LoadSignState(filepath)
-	if err == nil {
-		return existing, nil
+func LoadOrCreateSignState(filepath string) (*SignState, error) {
+	if _, err := os.Stat(filepath); err != nil {
+		if !os.IsNotExist(err) {
+			return nil, fmt.Errorf("unexpected error checking file existence (%s): %w", filepath, err)
+		}
+		// the only scenario where we want to create a new sign state file is when the file does not exist.
+		// Make an empty sign state and save it.
+		state := &SignState{
+			filePath: filepath,
+			cache:    make(map[HRSKey]SignStateConsensus),
+		}
+		state.save()
+		return state, nil
 	}
 
-	// There was an error loading the sign state
-	// Make an empty sign state and save it
-	state := SignState{}
-	state.filePath = filepath
-	state.cache = make(map[HRSKey]SignStateConsensus)
-	state.save()
-	return state, nil
+	return LoadSignState(filepath)
 }
 
 // OnlyDifferByTimestamp returns true if the sign bytes of the sign state
@@ -308,7 +342,7 @@ func onlyDifferByTimestamp(step int8, signStateSignBytes, signBytes []byte) erro
 }
 
 func checkVoteOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) error {
-	var lastVote, newVote tmProto.CanonicalVote
+	var lastVote, newVote cometproto.CanonicalVote
 	if err := protoio.UnmarshalDelimited(lastSignBytes, &lastVote); err != nil {
 		return fmt.Errorf("lastSignBytes cannot be unmarshalled into vote: %v", err)
 	}
@@ -341,7 +375,7 @@ func checkVoteOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) error {
 }
 
 func checkProposalOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) error {
-	var lastProposal, newProposal tmProto.CanonicalProposal
+	var lastProposal, newProposal cometproto.CanonicalProposal
 	if err := protoio.UnmarshalDelimited(lastSignBytes, &lastProposal); err != nil {
 		return fmt.Errorf("lastSignBytes cannot be unmarshalled into proposal: %v", err)
 	}

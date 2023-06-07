@@ -6,8 +6,10 @@ import (
 	"time"
 
 	"github.com/hashicorp/raft"
-	proto "github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/strangelove-ventures/horcrux/signer/proto"
 )
+
+var _ proto.CosignerGRPCServer = &GRPCServer{}
 
 type GRPCServer struct {
 	cosigner           *LocalCosigner
@@ -17,7 +19,9 @@ type GRPCServer struct {
 }
 
 func (rpc *GRPCServer) SignBlock(
-	ctx context.Context, req *proto.CosignerGRPCSignBlockRequest) (*proto.CosignerGRPCSignBlockResponse, error) {
+	_ context.Context,
+	req *proto.CosignerGRPCSignBlockRequest,
+) (*proto.CosignerGRPCSignBlockResponse, error) {
 	block := &Block{
 		Height:    req.Block.GetHeight(),
 		Round:     req.Block.GetRound(),
@@ -35,19 +39,29 @@ func (rpc *GRPCServer) SignBlock(
 }
 
 func (rpc *GRPCServer) SetEphemeralSecretPartsAndSign(
-	ctx context.Context,
+	_ context.Context,
 	req *proto.CosignerGRPCSetEphemeralSecretPartsAndSignRequest,
 ) (*proto.CosignerGRPCSetEphemeralSecretPartsAndSignResponse, error) {
 	res, err := rpc.cosigner.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
+		ChainID:          req.ChainID,
 		EncryptedSecrets: CosignerEphemeralSecretPartsFromProto(req.GetEncryptedSecrets()),
 		HRST:             HRSTKeyFromProto(req.GetHrst()),
 		SignBytes:        req.GetSignBytes(),
 	})
 	if err != nil {
-		rpc.raftStore.logger.Error("Failed to sign with share", "error", err)
+		rpc.raftStore.logger.Error(
+			"Failed to sign with shard",
+			"chain_id", req.ChainID,
+			"height", req.Hrst.Height,
+			"round", req.Hrst.Round,
+			"step", req.Hrst.Step,
+			"error", err,
+		)
 		return nil, err
 	}
-	rpc.raftStore.logger.Info("Signed with share",
+	rpc.raftStore.logger.Info(
+		"Signed with shard",
+		"chain_id", req.ChainID,
 		"height", req.Hrst.Height,
 		"round", req.Hrst.Round,
 		"step", req.Hrst.Step,
@@ -60,10 +74,13 @@ func (rpc *GRPCServer) SetEphemeralSecretPartsAndSign(
 }
 
 func (rpc *GRPCServer) GetEphemeralSecretParts(
-	ctx context.Context,
+	_ context.Context,
 	req *proto.CosignerGRPCGetEphemeralSecretPartsRequest,
 ) (*proto.CosignerGRPCGetEphemeralSecretPartsResponse, error) {
-	res, err := rpc.cosigner.GetEphemeralSecretParts(HRSTKeyFromProto(req.GetHrst()))
+	res, err := rpc.cosigner.GetEphemeralSecretParts(
+		req.ChainID,
+		HRSTKeyFromProto(req.GetHrst()),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -73,18 +90,21 @@ func (rpc *GRPCServer) GetEphemeralSecretParts(
 }
 
 func (rpc *GRPCServer) TransferLeadership(
-	ctx context.Context,
+	_ context.Context,
 	req *proto.CosignerGRPCTransferLeadershipRequest,
 ) (*proto.CosignerGRPCTransferLeadershipResponse, error) {
+	if rpc.raftStore.raft.State() != raft.Leader {
+		return &proto.CosignerGRPCTransferLeadershipResponse{}, nil
+	}
 	leaderID := req.GetLeaderID()
 	if leaderID != "" {
-		for _, peer := range rpc.raftStore.Peers {
-			thisPeerID := fmt.Sprint(peer.GetID())
-			if thisPeerID == leaderID {
-				peerRaftAddress := p2pURLToRaftAddress(peer.GetAddress())
-				fmt.Printf("Transferring leadership to ID: %s - Address: %s\n", thisPeerID, peerRaftAddress)
-				rpc.raftStore.raft.LeadershipTransferToServer(raft.ServerID(thisPeerID), raft.ServerAddress(peerRaftAddress))
-				return &proto.CosignerGRPCTransferLeadershipResponse{LeaderID: thisPeerID, LeaderAddress: peerRaftAddress}, nil
+		for _, c := range rpc.raftStore.Cosigners {
+			shardID := fmt.Sprint(c.GetID())
+			if shardID == leaderID {
+				raftAddress := p2pURLToRaftAddress(c.GetAddress())
+				fmt.Printf("Transferring leadership to ID: %s - Address: %s\n", shardID, raftAddress)
+				rpc.raftStore.raft.LeadershipTransferToServer(raft.ServerID(shardID), raft.ServerAddress(raftAddress))
+				return &proto.CosignerGRPCTransferLeadershipResponse{LeaderID: shardID, LeaderAddress: raftAddress}, nil
 			}
 		}
 	}
@@ -94,8 +114,8 @@ func (rpc *GRPCServer) TransferLeadership(
 }
 
 func (rpc *GRPCServer) GetLeader(
-	ctx context.Context,
-	req *proto.CosignerGRPCGetLeaderRequest,
+	context.Context,
+	*proto.CosignerGRPCGetLeaderRequest,
 ) (*proto.CosignerGRPCGetLeaderResponse, error) {
 	leader := rpc.raftStore.GetLeader()
 	return &proto.CosignerGRPCGetLeaderResponse{Leader: string(leader)}, nil

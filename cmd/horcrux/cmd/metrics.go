@@ -4,19 +4,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/pprof"
-	"os"
 	"time"
 
 	"github.com/armon/go-metrics"
 	gmprometheus "github.com/armon/go-metrics/prometheus"
+	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	tmlog "github.com/tendermint/tendermint/libs/log"
 )
 
-func AddPrometheusMetrics(mux *http.ServeMux) {
-	logger := tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "metrics")
+func AddPrometheusMetrics(mux *http.ServeMux, out io.Writer) {
+	logger := cometlog.NewTMLogger(cometlog.NewSyncWriter(out)).With("module", "metrics")
 
 	// Add metrics from raft's implementation of go-metrics
 	cfg := gmprometheus.DefaultPrometheusOpts
@@ -36,8 +36,8 @@ func AddPrometheusMetrics(mux *http.ServeMux) {
 }
 
 // EnableDebugAndMetrics - Initialization errors are not fatal, only logged
-func EnableDebugAndMetrics(ctx context.Context) {
-	logger := tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)).With("module", "debugserver")
+func EnableDebugAndMetrics(ctx context.Context, out io.Writer) {
+	logger := cometlog.NewTMLogger(cometlog.NewSyncWriter(out)).With("module", "debugserver")
 
 	// Configure Shared Debug HTTP Server for pprof and prometheus
 	if len(config.Config.DebugAddr) == 0 {
@@ -59,7 +59,7 @@ func EnableDebugAndMetrics(ctx context.Context) {
 	mux.Handle("/", http.RedirectHandler("/debug/pprof", http.StatusSeeOther))
 
 	// Add prometheus metrics
-	AddPrometheusMetrics(mux)
+	AddPrometheusMetrics(mux, out)
 
 	// Configure Debug Server Network Parameters
 	srv := &http.Server{

@@ -2,10 +2,12 @@ package signer
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"time"
 
-	proto "github.com/strangelove-ventures/horcrux/signer/proto"
+	cometcrypto "github.com/cometbft/cometbft/crypto"
+	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -46,6 +48,18 @@ func (cosigner *RemoteCosigner) GetAddress() string {
 	return cosigner.address
 }
 
+// GetPubKey returns public key of the validator.
+// Implements Cosigner interface
+func (cosigner *RemoteCosigner) GetPubKey(_ string) (cometcrypto.PubKey, error) {
+	return nil, fmt.Errorf("unexpected call to RemoteCosigner.GetPubKey")
+}
+
+// VerifySignature validates a signed payload against the public key.
+// Implements Cosigner interface
+func (cosigner *RemoteCosigner) VerifySignature(_ string, _, _ []byte) bool {
+	return false
+}
+
 func (cosigner *RemoteCosigner) getGRPCClient() (proto.CosignerGRPCClient, *grpc.ClientConn, error) {
 	var grpcAddress string
 	url, err := url.Parse(cosigner.address)
@@ -63,7 +77,9 @@ func (cosigner *RemoteCosigner) getGRPCClient() (proto.CosignerGRPCClient, *grpc
 
 // Implements the cosigner interface
 func (cosigner *RemoteCosigner) GetEphemeralSecretParts(
-	req HRSTKey) (*CosignerEphemeralSecretPartsResponse, error) {
+	chainID string,
+	req HRSTKey,
+) (*CosignerEphemeralSecretPartsResponse, error) {
 	client, conn, err := cosigner.getGRPCClient()
 	if err != nil {
 		return nil, err
@@ -72,7 +88,8 @@ func (cosigner *RemoteCosigner) GetEphemeralSecretParts(
 	context, cancelFunc := getContext()
 	defer cancelFunc()
 	res, err := client.GetEphemeralSecretParts(context, &proto.CosignerGRPCGetEphemeralSecretPartsRequest{
-		Hrst: req.toProto(),
+		ChainID: chainID,
+		Hrst:    req.toProto(),
 	})
 	if err != nil {
 		return nil, err
@@ -93,6 +110,7 @@ func (cosigner *RemoteCosigner) SetEphemeralSecretPartsAndSign(
 	context, cancelFunc := getContext()
 	defer cancelFunc()
 	res, err := client.SetEphemeralSecretPartsAndSign(context, &proto.CosignerGRPCSetEphemeralSecretPartsAndSignRequest{
+		ChainID:          req.ChainID,
 		EncryptedSecrets: CosignerEphemeralSecretParts(req.EncryptedSecrets).toProto(),
 		Hrst:             req.HRST.toProto(),
 		SignBytes:        req.SignBytes,

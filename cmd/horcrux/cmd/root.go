@@ -8,23 +8,25 @@ import (
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/strangelove-ventures/horcrux/signer"
 	"gopkg.in/yaml.v2"
 )
 
-var config RuntimeConfig
+var config signer.RuntimeConfig
 
 func rootCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "horcrux",
-		Short: "A tendermint remote signer with both single signer and threshold signer modes",
+		Short: "A tendermint remote signer with both threshold signer and single signer modes",
 	}
 
 	cmd.AddCommand(configCmd())
-	cmd.AddCommand(cosignerCmd())
-	cmd.AddCommand(createCosignerSharesCmd())
+	cmd.AddCommand(startCmd())
+	cmd.AddCommand(addressCmd())
+	cmd.AddCommand(createCosignerEd25519ShardsCmd())
+	cmd.AddCommand(createCosignerRSAShardsCmd())
 	cmd.AddCommand(leaderElectionCmd())
 	cmd.AddCommand(getLeaderCmd())
-	cmd.AddCommand(signerCmd())
 	cmd.AddCommand(stateCmd())
 	cmd.AddCommand(versionCmd())
 
@@ -61,7 +63,7 @@ func initConfig() {
 	} else {
 		home = config.HomeDir
 	}
-	config = RuntimeConfig{
+	config = signer.RuntimeConfig{
 		HomeDir:    home,
 		ConfigFile: filepath.Join(home, "config.yaml"),
 		StateDir:   filepath.Join(home, "state"),

@@ -16,19 +16,22 @@ type ThresholdSigner interface {
 	DealShares(req CosignerGetEphemeralSecretPartRequest) (HrsMetadata, error)
 
 	GetEphemeralSecretPart(req CosignerGetEphemeralSecretPartRequest, m *LastSignStateWrapper,
-		peers map[int]CosignerPeer) (CosignerEphemeralSecretPart, error)
+		pubKeys map[int]CosignerRSAPubKey) (CosignerEphemeralSecretPart, error)
 
 	SetEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest, m *LastSignStateWrapper,
-		peers map[int]CosignerPeer) error
+		pubKeys map[int]CosignerRSAPubKey) error
 
 	Sign(req CosignerSignRequest, m *LastSignStateWrapper) (CosignerSignResponse, error)
 
 	GetID() (int, error)
+
+	// Stop performs any cleanup work, such as flushing state files to disk, then shut down.
+	Stop()
 }
 
-// PeerMetadata holds the share and the ephermeral secret public key
+// CosignerMetadata holds the share and the ephermeral secret public key
 // Moved from Local cosigner to threshold_ed25519
-type PeerMetadata struct {
+type CosignerMetadata struct {
 	Share                    []byte
 	EphemeralSecretPublicKey []byte
 }
@@ -39,5 +42,5 @@ type HrsMetadata struct {
 	// need to be _total_ entries per player
 	Secret      []byte
 	DealtShares []tsed25519.Scalar
-	Peers       []PeerMetadata
+	Cosigners   []CosignerMetadata
 }

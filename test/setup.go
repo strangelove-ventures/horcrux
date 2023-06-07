@@ -18,7 +18,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type TestLogger interface {
+type Logger interface {
 	Name() string
 	Log(...interface{})
 	Logf(string, ...interface{})
@@ -40,24 +40,29 @@ func SetupTestRun(t *testing.T) (context.Context, string, *dockertest.Pool, stri
 	require.NoError(t, err)
 
 	// build the horcrux image
-	require.NoError(t, BuildTestSignerImage(pool))
+	require.NoError(t, BuildSignerImage(pool))
 
 	return context.Background(), home, pool, network.ID
 }
 
 // assemble gentx, build genesis file, configure peering, and start chain
 func Genesis(
-	tl TestLogger,
 	ctx context.Context,
+	tl Logger,
 	chain *ChainType,
 	nonHorcruxValidators,
-	fullnodes []*TestNode,
-	horcruxValidators []*TestValidator,
+	fullnodes []*Node,
+	horcruxValidators []*Validator,
 ) error {
 	var eg errgroup.Group
 
+	chainID := chain.ChainID
+
 	// sign gentx for each validator
 	for _, v := range nonHorcruxValidators {
+		if v.ChainID != chainID {
+			continue
+		}
 		v := v
 		// passing empty pubkey to use the one from the validator after it is initialized
 		eg.Go(func() error { return v.InitValidatorFiles(ctx, "") })
@@ -71,19 +76,22 @@ func Genesis(
 			bech32Prefix = chain.Bech32Prefix
 		}
 
-		pubKey, err := signer.PubKey(bech32Prefix, v.PubKey)
+		pubKey, err := signer.PubKey(bech32Prefix, v.PubKeys[chain.ChainID])
 		if err != nil {
 			return err
 		}
 
+		i := 0
+		firstSentry := v.Sentries[chainID][0]
+
 		// using the first sentry for each horcrux validator as the keyring for the account key (not consensus key)
 		// to sign gentx
 		eg.Go(func() error {
-			return v.Sentries[0].InitValidatorFiles(ctx, pubKey)
+			return firstSentry.InitValidatorFiles(ctx, pubKey)
 		})
-		sentries := v.Sentries[1:]
-		for _, sentry := range sentries {
-			s := sentry
+		for i++; i < len(v.Sentries[chainID]); i++ {
+			s := v.Sentries[chainID][i]
+
 			eg.Go(func() error { return s.InitFullNodeFiles(ctx) })
 		}
 	}
@@ -91,6 +99,9 @@ func Genesis(
 	// just initialize folder for any full nodes
 	for _, n := range fullnodes {
 		n := n
+		if n.ChainID != chain.ChainID {
+			continue
+		}
 		eg.Go(func() error { return n.InitFullNodeFiles(ctx) })
 	}
 
@@ -99,21 +110,32 @@ func Genesis(
 		return err
 	}
 
-	var validators TestNodes
-	var nodes TestNodes
+	var validators Nodes
+	var nodes Nodes
 
-	validators = append(validators, nonHorcruxValidators...)
-	nodes = append(nodes, nonHorcruxValidators...)
+	for _, v := range nonHorcruxValidators {
+		if v.ChainID != chain.ChainID {
+			continue
+		}
+		validators = append(validators, v)
+		nodes = append(nodes, v)
+	}
 
 	for _, horcruxValidator := range horcruxValidators {
 		if len(horcruxValidator.Sentries) > 0 {
+			firstSentry := horcruxValidator.Sentries[chain.ChainID][0]
 			// for test purposes, account key (not consensus key) will come from first sentry
-			validators = append(validators, horcruxValidator.Sentries[0])
+			validators = append(validators, firstSentry)
 		}
-		nodes = append(nodes, horcruxValidator.Sentries...)
+
+		nodes = append(nodes, horcruxValidator.Sentries[chain.ChainID]...)
 	}
 
-	nodes = append(nodes, fullnodes...)
+	for _, n := range fullnodes {
+		if n.ChainID == chain.ChainID {
+			nodes = append(nodes, n)
+		}
+	}
 
 	// for the validators we need to collect the gentxs and the accounts
 	// to a single node's genesis file. We will use the first validator
@@ -126,7 +148,12 @@ func Genesis(
 			return err
 		}
 
-		bech32Address, err := types.Bech32ifyAddressBytes(chain.Bech32Prefix, n0key.GetAddress())
+		addr, err := n0key.GetAddress()
+		if err != nil {
+			return err
+		}
+
+		bech32Address, err := types.Bech32ifyAddressBytes(chain.Bech32Prefix, addr)
 		if err != nil {
 			return err
 		}
@@ -169,8 +196,8 @@ func Genesis(
 
 	// start horcrux sentries. privval listener enabled
 	for _, v := range horcruxValidators {
-		for _, sentry := range v.Sentries {
-			s := sentry
+		for _, s := range v.Sentries[chainID] {
+			s := s
 			tl.Logf("{%s} => starting container...", s.Name())
 			eg.Go(func() error {
 				return s.Start(ctx, func() {
@@ -182,6 +209,9 @@ func Genesis(
 
 	// start non-horcrux validators. privval listener disabled
 	for _, v := range nonHorcruxValidators {
+		if v.ChainID != chain.ChainID {
+			continue
+		}
 		v := v
 		tl.Logf("{%s} => starting container...", v.Name())
 		eg.Go(func() error {
@@ -193,6 +223,9 @@ func Genesis(
 
 	// start full nodes. privval listener disabled
 	for _, n := range fullnodes {
+		if n.ChainID != chain.ChainID {
+			continue
+		}
 		n := n
 		tl.Logf("{%s} => starting container...", n.Name())
 		eg.Go(func() error {

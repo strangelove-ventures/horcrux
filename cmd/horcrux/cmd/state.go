@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -12,10 +13,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/signer"
 
-	tmjson "github.com/tendermint/tendermint/libs/json"
+	cometjson "github.com/cometbft/cometbft/libs/json"
 )
 
-// Snippet Taken from https://raw.githubusercontent.com/tendermint/tendermint/main/privval/file.go
+// Snippet Taken from https://raw.githubusercontent.com/cometbft/cometbft/main/privval/file.go
 // FilePVLastSignState stores the mutable part of PrivValidator.
 type FilePVLastSignState struct {
 	Height int64 `json:"height"`
@@ -38,30 +39,34 @@ func stateCmd() *cobra.Command {
 
 func showStateCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:          "show",
+		Use:          "show [chain-id]",
 		Aliases:      []string{"s"},
-		Short:        "Show the priv validator and share sign state",
-		Args:         cobra.ExactArgs(0),
+		Short:        "Show the sign state for a specific chain-id",
+		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+
+			chainID := args[0]
+
 			if _, err := os.Stat(config.HomeDir); os.IsNotExist(err) {
 				return fmt.Errorf("%s does not exist, initialize config with horcrux config init and try again", config.HomeDir)
 			}
 
-			pv, err := signer.LoadSignState(config.privValStateFile(config.Config.ChainID))
+			pv, err := signer.LoadSignState(config.PrivValStateFile(chainID))
 			if err != nil {
 				return err
 			}
 
-			share, err := signer.LoadSignState(config.shareStateFile(config.Config.ChainID))
+			cs, err := signer.LoadSignState(config.CosignerStateFile(chainID))
 			if err != nil {
 				return err
 			}
 
-			fmt.Println("Private Validator State:")
-			printSignState(pv)
-			fmt.Println("Share Sign State:")
-			printSignState(share)
+			out := cmd.OutOrStdout()
+			fmt.Fprintln(out, "Private Validator State:")
+			printSignState(out, pv)
+			fmt.Fprintln(out, "Share Sign State:")
+			printSignState(out, cs)
 			return nil
 		},
 	}
@@ -69,12 +74,14 @@ func showStateCmd() *cobra.Command {
 
 func setStateCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:          "set [height]",
+		Use:          "set chain-id height",
 		Aliases:      []string{"s"},
-		Short:        "Set the height for both the priv validator and the share sign state",
-		Args:         cobra.ExactArgs(1),
+		Short:        "Set the height for the sign state of a specific chain-id",
+		Args:         cobra.ExactArgs(2),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			chainID := args[0]
+
 			if _, err := os.Stat(config.HomeDir); os.IsNotExist(err) {
 				cmd.SilenceUsage = false
 				return fmt.Errorf("%s does not exist, initialize config with horcrux config init and try again", config.HomeDir)
@@ -86,17 +93,17 @@ func setStateCmd() *cobra.Command {
 				return err
 			}
 
-			pv, err := signer.LoadSignState(config.privValStateFile(config.Config.ChainID))
+			pv, err := signer.LoadOrCreateSignState(config.PrivValStateFile(chainID))
 			if err != nil {
 				return err
 			}
 
-			share, err := signer.LoadSignState(config.shareStateFile(config.Config.ChainID))
+			cs, err := signer.LoadOrCreateSignState(config.CosignerStateFile(chainID))
 			if err != nil {
 				return err
 			}
 
-			height, err := strconv.ParseInt(args[0], 10, 64)
+			height, err := strconv.ParseInt(args[1], 10, 64)
 			if err != nil {
 				cmd.SilenceUsage = false
 				return err
@@ -104,7 +111,7 @@ func setStateCmd() *cobra.Command {
 
 			fmt.Fprintf(cmd.OutOrStdout(), "Setting height %d\n", height)
 
-			pv.EphemeralPublic, share.EphemeralPublic = nil, nil
+			pv.EphemeralPublic, cs.EphemeralPublic = nil, nil
 			signState := signer.SignStateConsensus{
 				Height:    height,
 				Round:     0,
@@ -112,12 +119,12 @@ func setStateCmd() *cobra.Command {
 				Signature: nil,
 				SignBytes: nil,
 			}
-			err = pv.Save(signState, nil, false)
+			err = pv.Save(signState, nil)
 			if err != nil {
 				fmt.Printf("error saving privval sign state")
 				return err
 			}
-			err = share.Save(signState, nil, false)
+			err = cs.Save(signState, nil)
 			if err != nil {
 				fmt.Printf("error saving share sign state")
 				return err
@@ -129,13 +136,15 @@ func setStateCmd() *cobra.Command {
 
 func importStateCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:     "import [height]",
+		Use:     "import chain-id",
 		Aliases: []string{"i"},
 		Short: "Read the old priv_validator_state.json and set the height, round and step" +
 			"(good for migrations but NOT shared state update)",
-		Args:         cobra.ExactArgs(0),
+		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			chainID := args[0]
+
 			if _, err := os.Stat(config.HomeDir); os.IsNotExist(err) {
 				cmd.SilenceUsage = false
 				return fmt.Errorf("%s does not exist, initialize config with horcrux config init and try again", config.HomeDir)
@@ -148,13 +157,13 @@ func importStateCmd() *cobra.Command {
 			}
 
 			// Recreate privValStateFile if necessary
-			pv, err := signer.LoadOrCreateSignState(config.privValStateFile(config.Config.ChainID))
+			pv, err := signer.LoadOrCreateSignState(config.PrivValStateFile(chainID))
 			if err != nil {
 				return err
 			}
 
 			// shareStateFile does not exist during default config init, so create if necessary
-			share, err := signer.LoadOrCreateSignState(config.shareStateFile(config.Config.ChainID))
+			cs, err := signer.LoadOrCreateSignState(config.CosignerStateFile(chainID))
 			if err != nil {
 				return err
 			}
@@ -180,7 +189,7 @@ func importStateCmd() *cobra.Command {
 
 			pvState := &FilePVLastSignState{}
 
-			err = tmjson.Unmarshal([]byte(finalJSON), &pvState)
+			err = cometjson.Unmarshal([]byte(finalJSON), &pvState)
 			if err != nil {
 				fmt.Println("Error parsing priv_validator_state.json")
 				return err
@@ -200,12 +209,12 @@ func importStateCmd() *cobra.Command {
 				"  Step:      %v\n",
 				signState.Height, signState.Round, signState.Step)
 
-			err = pv.Save(signState, nil, false)
+			err = pv.Save(signState, nil)
 			if err != nil {
 				fmt.Printf("error saving privval sign state")
 				return err
 			}
-			err = share.Save(signState, nil, false)
+			err = cs.Save(signState, nil)
 			if err != nil {
 				fmt.Printf("error saving share sign state")
 				return err
@@ -216,19 +225,19 @@ func importStateCmd() *cobra.Command {
 	}
 }
 
-func printSignState(ss signer.SignState) {
-	fmt.Printf("  Height:    %v\n"+
+func printSignState(out io.Writer, ss *signer.SignState) {
+	fmt.Fprintf(out, "  Height:    %v\n"+
 		"  Round:     %v\n"+
 		"  Step:      %v\n",
 		ss.Height, ss.Round, ss.Step)
 
 	if ss.EphemeralPublic != nil {
-		fmt.Println("  Ephemeral Public Key:", base64.StdEncoding.EncodeToString(ss.EphemeralPublic))
+		fmt.Fprintln(out, "  Ephemeral Public Key:", base64.StdEncoding.EncodeToString(ss.EphemeralPublic))
 	}
 	if ss.Signature != nil {
-		fmt.Println("  Signature:", base64.StdEncoding.EncodeToString(ss.Signature))
+		fmt.Fprintln(out, "  Signature:", base64.StdEncoding.EncodeToString(ss.Signature))
 	}
 	if ss.SignBytes != nil {
-		fmt.Println("  SignBytes:", ss.SignBytes)
+		fmt.Fprintln(out, "  SignBytes:", ss.SignBytes)
 	}
 }

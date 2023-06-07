@@ -19,13 +19,13 @@ import (
 	"time"
 
 	"github.com/Jille/raft-grpc-leader-rpc/leaderhealth"
-	gRPCTransport "github.com/Jille/raft-grpc-transport"
+	raftgrpctransport "github.com/Jille/raft-grpc-transport"
 	"github.com/Jille/raftadmin"
+	"github.com/cometbft/cometbft/libs/log"
+	"github.com/cometbft/cometbft/libs/service"
 	"github.com/hashicorp/raft"
 	boltdb "github.com/hashicorp/raft-boltdb/v2"
-	proto "github.com/strangelove-ventures/horcrux/signer/proto"
-	"github.com/tendermint/tendermint/libs/log"
-	"github.com/tendermint/tendermint/libs/service"
+	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
@@ -49,7 +49,7 @@ type RaftStore struct {
 	RaftDir     string
 	RaftBind    string
 	RaftTimeout time.Duration
-	Peers       []Cosigner
+	Cosigners   []Cosigner
 
 	mu sync.Mutex
 	m  map[string]string // The key-value store for the system.
@@ -64,7 +64,7 @@ type RaftStore struct {
 // New returns a new Store.
 func NewRaftStore(
 	nodeID string, directory string, bindAddress string, timeout time.Duration,
-	logger log.Logger, cosigner *LocalCosigner, raftPeers []Cosigner) *RaftStore {
+	logger log.Logger, cosigner *LocalCosigner, cosigners []Cosigner) *RaftStore {
 	cosignerRaftStore := &RaftStore{
 		NodeID:      nodeID,
 		RaftDir:     directory,
@@ -73,7 +73,7 @@ func NewRaftStore(
 		m:           make(map[string]string),
 		logger:      logger,
 		cosigner:    cosigner,
-		Peers:       raftPeers,
+		Cosigners:   cosigners,
 	}
 
 	cosignerRaftStore.BaseService = *service.NewBaseService(logger, "CosignerRaftStore", cosignerRaftStore)
@@ -109,10 +109,7 @@ func (s *RaftStore) init() error {
 	leaderhealth.Setup(s.raft, grpcServer, []string{"Leader"})
 	raftadmin.Register(grpcServer, s.raft)
 	reflection.Register(grpcServer)
-	if err := grpcServer.Serve(sock); err != nil {
-		return err
-	}
-	return nil
+	return grpcServer.Serve(sock)
 }
 
 // OnStart starts the raft server
@@ -138,7 +135,7 @@ func p2pURLToRaftAddress(p2pURL string) string {
 // Open opens the store. If enableSingle is set, and there are no existing peers,
 // then this node becomes the first node, and therefore leader, of the cluster.
 // localID should be the server identifier for this node.
-func (s *RaftStore) Open() (*gRPCTransport.Manager, error) {
+func (s *RaftStore) Open() (*raftgrpctransport.Manager, error) {
 	// Setup Raft configuration.
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(s.NodeID)
@@ -166,7 +163,7 @@ func (s *RaftStore) Open() (*gRPCTransport.Manager, error) {
 	raftAddress := raft.ServerAddress(p2pURLToRaftAddress(s.RaftBind))
 
 	// Setup Raft communication.
-	transportManager := gRPCTransport.New(raftAddress, []grpc.DialOption{
+	transportManager := raftgrpctransport.New(raftAddress, []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	})
 
@@ -185,10 +182,10 @@ func (s *RaftStore) Open() (*gRPCTransport.Manager, error) {
 			},
 		},
 	}
-	for _, peer := range s.Peers {
+	for _, c := range s.Cosigners {
 		configuration.Servers = append(configuration.Servers, raft.Server{
-			ID:      raft.ServerID(fmt.Sprint(peer.GetID())),
-			Address: raft.ServerAddress(p2pURLToRaftAddress(peer.GetAddress())),
+			ID:      raft.ServerID(fmt.Sprint(c.GetID())),
+			Address: raft.ServerAddress(p2pURLToRaftAddress(c.GetAddress())),
 		})
 	}
 	s.raft.BootstrapCluster(configuration)

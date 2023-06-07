@@ -3,17 +3,21 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
-	_ "github.com/Jille/grpc-multi-resolver"
-	grpc_retry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
+	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/client"
+	"github.com/strangelove-ventures/horcrux/signer"
+	"github.com/strangelove-ventures/horcrux/signer/multiresolver"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
+
+func init() {
+	multiresolver.Register()
+}
 
 func leaderElectionCmd() *cobra.Command {
 	return &cobra.Command{
@@ -27,21 +31,21 @@ To choose a specific leader, pass that leader's ID as an argument.
 horcrux elect 2 # elect specific leader`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			if config.Config.CosignerConfig == nil {
-				return fmt.Errorf("cosigner configuration is not present in config file")
+			if config.Config.ThresholdModeConfig == nil {
+				return fmt.Errorf("threshold mode configuration is not present in config file")
 			}
 
-			if len(config.Config.CosignerConfig.Peers) == 0 {
-				return fmt.Errorf("cosigner configuration has no peers")
+			if len(config.Config.ThresholdModeConfig.Cosigners) == 0 {
+				return fmt.Errorf("threshold mode configuration has no cosigners")
 			}
 
 			serviceConfig := `{"healthCheckConfig": {"serviceName": "Leader"}, "loadBalancingConfig": [ { "round_robin": {} } ]}`
-			retryOpts := []grpc_retry.CallOption{
-				grpc_retry.WithBackoff(grpc_retry.BackoffExponential(100 * time.Millisecond)),
-				grpc_retry.WithMax(5),
+			retryOpts := []grpcretry.CallOption{
+				grpcretry.WithBackoff(grpcretry.BackoffExponential(100 * time.Millisecond)),
+				grpcretry.WithMax(5),
 			}
 
-			grpcAddress, err := config.Config.CosignerConfig.LeaderElectMultiAddress()
+			grpcAddress, err := config.Config.ThresholdModeConfig.LeaderElectMultiAddress()
 			if err != nil {
 				return err
 			}
@@ -50,9 +54,9 @@ horcrux elect 2 # elect specific leader`,
 			conn, err := grpc.Dial(grpcAddress,
 				grpc.WithDefaultServiceConfig(serviceConfig), grpc.WithTransportCredentials(insecure.NewCredentials()),
 				grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
-				grpc.WithUnaryInterceptor(grpc_retry.UnaryClientInterceptor(retryOpts...)))
+				grpc.WithUnaryInterceptor(grpcretry.UnaryClientInterceptor(retryOpts...)))
 			if err != nil {
-				log.Fatalf("dialing failed: %v", err)
+				return fmt.Errorf("dialing failed: %v", err)
 			}
 			defer conn.Close()
 
@@ -94,20 +98,43 @@ func getLeaderCmd() *cobra.Command {
 		Example:      `horcrux leader`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			if config.Config.CosignerConfig == nil {
-				return fmt.Errorf("cosigner configuration is not present in config file")
+			thresholdCfg := config.Config.ThresholdModeConfig
+			if thresholdCfg == nil {
+				return fmt.Errorf("threshold mode configuration is not present in config file")
 			}
 
-			if len(config.Config.CosignerConfig.Peers) == 0 {
-				return fmt.Errorf("cosigner configuration has no peers")
+			if len(thresholdCfg.Cosigners) == 0 {
+				return fmt.Errorf("threshold mode configuration has no cosigners")
 			}
 
-			retryOpts := []grpc_retry.CallOption{
-				grpc_retry.WithBackoff(grpc_retry.BackoffExponential(100 * time.Millisecond)),
-				grpc_retry.WithMax(5),
+			keyFile, err := config.KeyFileExistsCosignerRSA()
+			if err != nil {
+				return err
 			}
 
-			grpcAddress, err := client.SanitizeAddress(config.Config.CosignerConfig.P2PListen)
+			key, err := signer.LoadCosignerRSAKey(keyFile)
+			if err != nil {
+				return fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
+			}
+
+			var p2pListen string
+
+			for _, c := range thresholdCfg.Cosigners {
+				if c.ShardID == key.ID {
+					p2pListen = c.P2PAddr
+				}
+			}
+
+			if p2pListen == "" {
+				return fmt.Errorf("cosigner config does not exist for our shard ID %d", key.ID)
+			}
+
+			retryOpts := []grpcretry.CallOption{
+				grpcretry.WithBackoff(grpcretry.BackoffExponential(100 * time.Millisecond)),
+				grpcretry.WithMax(5),
+			}
+
+			grpcAddress, err := client.SanitizeAddress(p2pListen)
 			if err != nil {
 				return err
 			}
@@ -116,9 +143,9 @@ func getLeaderCmd() *cobra.Command {
 			conn, err := grpc.Dial(grpcAddress,
 				grpc.WithTransportCredentials(insecure.NewCredentials()),
 				grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
-				grpc.WithUnaryInterceptor(grpc_retry.UnaryClientInterceptor(retryOpts...)))
+				grpc.WithUnaryInterceptor(grpcretry.UnaryClientInterceptor(retryOpts...)))
 			if err != nil {
-				log.Fatalf("dialing failed: %v", err)
+				return fmt.Errorf("dialing failed: %v", err)
 			}
 			defer conn.Close()
 

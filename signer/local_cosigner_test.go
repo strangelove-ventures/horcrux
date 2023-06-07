@@ -4,46 +4,50 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
+	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	comet "github.com/cometbft/cometbft/types"
 	"github.com/stretchr/testify/require"
-	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
-	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
-	tm "github.com/tendermint/tendermint/types"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
-func TestLocalCosignerGetID(t *testing.T) {
-	dummyPub := tmCryptoEd25519.PubKey{}
+const (
+	testChainID  = "chain-1"
+	testChainID2 = "chain-2"
+	bitSize      = 4096
+)
 
-	bitSize := 4096
+func TestLocalCosignerGetID(t *testing.T) {
+	dummyPub := cometcryptoed25519.PubKey{}
+
 	rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(t, err)
 
-	key := CosignerKey{
-		PubKey:   dummyPub,
-		ShareKey: []byte{},
-		ID:       1,
-	}
-	signState := SignState{
-		Height: 0,
-		Round:  0,
-		Step:   0,
+	key := CosignerEd25519Key{
+		PubKey:       dummyPub,
+		PrivateShard: []byte{},
+		ID:           1,
 	}
 
-	config := LocalCosignerConfig{
-		CosignerKey: key,
-		SignState:   &signState,
-		RsaKey:      *rsaKey,
-		Peers: []CosignerPeer{{
+	cosigner := NewLocalCosigner(
+		&RuntimeConfig{},
+		CosignerRSAKey{
+			ID:     key.ID,
+			RSAKey: *rsaKey,
+		},
+		[]CosignerRSAPubKey{{
 			ID:        1,
 			PublicKey: rsaKey.PublicKey,
 		}},
-	}
+		"",
+		0,
+	)
 
-	cosigner := NewLocalCosigner(config)
-	require.Equal(t, cosigner.GetID(), 1)
+	require.Equal(t, 1, cosigner.GetID())
 }
 
 func TestLocalCosignerSign2of2(t *testing.T) {
@@ -52,14 +56,13 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	total := uint8(2)
 	threshold := uint8(2)
 
-	bitSize := 4096
 	rsaKey1, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(t, err)
 
 	rsaKey2, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(t, err)
 
-	peers := []CosignerPeer{{
+	pubKeys := []CosignerRSAPubKey{{
 		ID:        1,
 		PublicKey: rsaKey1.PublicKey,
 	}, {
@@ -67,60 +70,80 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		PublicKey: rsaKey2.PublicKey,
 	}}
 
-	privateKey := tmCryptoEd25519.GenPrivKey()
+	privateKey := cometcryptoed25519.GenPrivKey()
 
 	privKeyBytes := [64]byte{}
 	copy(privKeyBytes[:], privateKey[:])
-	secretShares := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
+	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
 
-	key1 := CosignerKey{
-		PubKey:   privateKey.PubKey(),
-		ShareKey: secretShares[0],
-		ID:       1,
+	key1 := CosignerEd25519Key{
+		PubKey:       privateKey.PubKey(),
+		PrivateShard: privShards[0],
+		ID:           1,
 	}
 
-	stateFile1, err := os.CreateTemp("", "state1.json")
-	require.NoError(t, err)
-	defer os.Remove(stateFile1.Name())
-
-	signState1, err := LoadOrCreateSignState(stateFile1.Name())
-	require.NoError(t, err)
-
-	key2 := CosignerKey{
-		PubKey:   privateKey.PubKey(),
-		ShareKey: secretShares[1],
-		ID:       2,
+	key2 := CosignerEd25519Key{
+		PubKey:       privateKey.PubKey(),
+		PrivateShard: privShards[1],
+		ID:           2,
 	}
 
-	stateFile2, err := os.CreateTemp("", "state2.json")
+	tmpDir := t.TempDir()
+
+	cosigner1Dir, cosigner2Dir := filepath.Join(tmpDir, "cosigner1"), filepath.Join(tmpDir, "cosigner2")
+	err = os.Mkdir(cosigner1Dir, 0700)
 	require.NoError(t, err)
-	defer os.Remove(stateFile2.Name())
-	signState2, err := LoadOrCreateSignState(stateFile2.Name())
+
+	err = os.Mkdir(cosigner2Dir, 0700)
 	require.NoError(t, err)
 
-	config1 := LocalCosignerConfig{
-		CosignerKey: key1,
-		SignState:   &signState1,
-		RsaKey:      *rsaKey1,
-		Peers:       peers,
-		Total:       total,
-		Threshold:   threshold,
-	}
+	cosigner1 := NewLocalCosigner(
+		&RuntimeConfig{
+			HomeDir:  cosigner1Dir,
+			StateDir: cosigner1Dir,
+		},
+		CosignerRSAKey{
+			ID:     key1.ID,
+			RSAKey: *rsaKey1,
+		},
+		pubKeys,
+		"",
+		threshold,
+	)
 
-	config2 := LocalCosignerConfig{
-		CosignerKey: key2,
-		SignState:   &signState2,
-		RsaKey:      *rsaKey2,
-		Peers:       peers,
-		Total:       total,
-		Threshold:   threshold,
-	}
+	key1Bz, err := key1.MarshalJSON()
+	require.NoError(t, err)
+	err = os.WriteFile(cosigner1.config.KeyFilePathCosigner(testChainID), key1Bz, 0600)
+	require.NoError(t, err)
 
-	var cosigner1 Cosigner
-	var cosigner2 Cosigner
+	defer cosigner1.waitForSignStatesToFlushToDisk()
 
-	cosigner1 = NewLocalCosigner(config1)
-	cosigner2 = NewLocalCosigner(config2)
+	cosigner2 := NewLocalCosigner(
+		&RuntimeConfig{
+			HomeDir:  cosigner2Dir,
+			StateDir: cosigner2Dir,
+		},
+		CosignerRSAKey{
+			ID:     key2.ID,
+			RSAKey: *rsaKey2,
+		},
+		pubKeys,
+		"",
+		threshold,
+	)
+
+	key2Bz, err := key2.MarshalJSON()
+	require.NoError(t, err)
+	err = os.WriteFile(cosigner2.config.KeyFilePathCosigner(testChainID), key2Bz, 0600)
+	require.NoError(t, err)
+
+	defer cosigner2.waitForSignStatesToFlushToDisk()
+
+	err = cosigner1.LoadSignStateIfNecessary(testChainID)
+	require.NoError(t, err)
+
+	err = cosigner2.LoadSignStateIfNecessary(testChainID)
+	require.NoError(t, err)
 
 	require.Equal(t, cosigner1.GetID(), 1)
 	require.Equal(t, cosigner2.GetID(), 2)
@@ -136,12 +159,12 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		Timestamp: now.UnixNano(),
 	}
 
-	ephemeralSharesFor2, err := cosigner1.GetEphemeralSecretParts(hrst)
+	ephemeralSharesFor2, err := cosigner1.GetEphemeralSecretParts(testChainID, hrst)
 	require.NoError(t, err)
 
 	publicKeys = append(publicKeys, ephemeralSharesFor2.EncryptedSecrets[0].SourceEphemeralSecretPublicKey)
 
-	ephemeralSharesFor1, err := cosigner2.GetEphemeralSecretParts(hrst)
+	ephemeralSharesFor1, err := cosigner2.GetEphemeralSecretParts(testChainID, hrst)
 	require.NoError(t, err)
 
 	t.Logf("Shares from 2: %d", len(ephemeralSharesFor1.EncryptedSecrets))
@@ -153,15 +176,16 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	t.Logf("public keys: %x", publicKeys)
 	t.Logf("eph pub: %x", ephemeralPublic)
 	// pack a vote into sign bytes
-	var vote tmProto.Vote
+	var vote cometproto.Vote
 	vote.Height = 1
 	vote.Round = 0
-	vote.Type = tmProto.PrevoteType
+	vote.Type = cometproto.PrevoteType
 	vote.Timestamp = now
 
-	signBytes := tm.VoteSignBytes("chain-id", &vote)
+	signBytes := comet.VoteSignBytes("chain-id", &vote)
 
 	sigRes1, err := cosigner1.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
+		ChainID:          testChainID,
 		EncryptedSecrets: ephemeralSharesFor1.EncryptedSecrets,
 		HRST:             hrst,
 		SignBytes:        signBytes,
@@ -169,6 +193,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	require.NoError(t, err)
 
 	sigRes2, err := cosigner2.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
+		ChainID:          testChainID,
 		EncryptedSecrets: ephemeralSharesFor2.EncryptedSecrets,
 		HRST:             hrst,
 		SignBytes:        signBytes,
@@ -186,53 +211,4 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 
 	t.Logf("signature: %x", signature)
 	require.True(t, privateKey.PubKey().VerifySignature(signBytes, signature))
-}
-
-func TestLocalCosignerWatermark(t *testing.T) {
-	/*
-		privateKey := tm_ed25519.GenPrivKey()
-
-		privKeyBytes := [64]byte{}
-		copy(privKeyBytes[:], privateKey[:])
-		secretShares := tsed25519.DealShares(privKeyBytes[:32], 2, 2)
-
-		key1 := CosignerKey{
-			PubKey:   privateKey.PubKey(),
-			ShareKey: secretShares[0],
-			ID:       1,
-		}
-
-		stateFile1, err := os.CreateTemp("", "state1.json")
-		require.NoError(t, err)
-		defer os.Remove(stateFile1.Name())
-
-		signState1, err := LoadOrCreateSignState(stateFile1.Name())
-
-		cosigner1 := NewLocalCosigner(key1, &signState1)
-
-		ephPublicKey, ephPrivateKey, err := ed25519.GenerateKey(rand.Reader)
-		require.NoError(t, err)
-
-		ephShares := tsed25519.DealShares(ephPrivateKey.Seed(), 2, 2)
-
-		signReq1 := CosignerSignRequest{
-			EphemeralPublic:      ephPublicKey,
-			EphemeralShareSecret: ephShares[0],
-			Height:               2,
-			Round:                0,
-			Step:                 0,
-			SignBytes:            []byte("Hello World!"),
-		}
-
-		_, err = cosigner1.Sign(signReq1)
-		require.NoError(t, err)
-
-		// watermark should have increased after signing
-		require.Equal(t, signState1.Height, int64(2))
-
-		// revert the height to a lower number and check if signing is rejected
-		signReq1.Height = 1
-		_, err = cosigner1.Sign(signReq1)
-		require.Error(t, err, "height regression. Got 1, last height 2")
-	*/
 }

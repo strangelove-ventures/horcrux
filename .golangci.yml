@@ -1,61 +1,104 @@
 linters:
   enable:
     - bodyclose
-    - deadcode
     - depguard
     - dogsled
-    # - errcheck
-    # - funlen
-    # - gochecknoglobals
-    # - gochecknoinits
     - goconst
     - gocritic
-    # - gocyclo
-    # - godox
     - gofmt
     - goimports
-    # - golint
     - gosec
     - gosimple
     - govet
+    - importas
     - ineffassign
-    # - interfacer
     - lll
     - misspell
-    # - maligned
     - nakedret
     - prealloc
-    # - scopelint
+    - revive
     - staticcheck
-    - structcheck
     - stylecheck
     - typecheck
     - unconvert
-    # - unparam
     - unused
-    - varcheck
-    # - whitespace
-    # - wsl
-    # - gocognit
     - nolintlint
-
-issues:
-  exclude-rules:
-    - linters:
-        - lll
-      source: "https://"
-  max-same-issues: 50
 
 linters-settings:
   dogsled:
     max-blank-identifiers: 3
+  importas:
+    no-extra-aliases: true
+    alias:
+      - pkg: github.com/cosmos/cosmos-sdk/crypto/codec
+        alias: cryptocodec
+      - pkg: github.com/cosmos/cosmos-sdk/crypto/types
+        alias: cryptotypes
+      - pkg: github.com/cosmos/cosmos-sdk/x/slashing/types
+        alias: slashingtypes
+      - pkg: github.com/cometbft/cometbft/types
+        alias: comet
+      - pkg: github.com/cometbft/cometbft/config
+        alias: cometconfig
+      - pkg: github.com/cometbft/cometbft/crypto
+        alias: cometcrypto
+      - pkg: github.com/cometbft/cometbft/crypto/ed25519
+        alias: cometcryptoed25519
+      - pkg: github.com/cometbft/cometbft/crypto/encoding
+        alias: cometcryptoencoding
+      - pkg: github.com/tendermint/go-amino
+        alias: amino
+      - pkg: github.com/cometbft/cometbft/libs/bytes
+        alias: cometbytes
+      - pkg: github.com/cometbft/cometbft/libs/json
+        alias: cometjson
+      - pkg: github.com/cometbft/cometbft/libs/log
+        alias: cometlog
+      - pkg: github.com/cometbft/cometbft/libs/net
+        alias: cometnet
+      - pkg: github.com/cometbft/cometbft/libs/os
+        alias: cometos
+      - pkg: github.com/cometbft/cometbft/libs/rand
+        alias: cometrand
+      - pkg: github.com/cometbft/cometbft/libs/service
+        alias: cometservice
+      - pkg: github.com/cometbft/cometbft/p2p/conn
+        alias: cometp2pconn
+      - pkg: github.com/cometbft/cometbft/privval
+        alias: cometprivval
+      - pkg: github.com/cometbft/cometbft/proto/tendermint/types
+        alias: cometproto
+      - pkg: github.com/cometbft/cometbft/proto/tendermint/crypto
+        alias: cometprotocrypto
+      - pkg: github.com/cometbft/cometbft/proto/tendermint/privval
+        alias: cometprotoprivval
+      - pkg: github.com/cometbft/cometbft/rpc/client
+        alias: cometrpcclient
+      - pkg: github.com/cometbft/cometbft/rpc/client/http
+        alias: cometrpchttp
+      - pkg: github.com/cometbft/cometbft/rpc/jsonrpc/client
+        alias: cometrpcjsonclient
+      - pkg: github.com/cometbft/cometbft/rpc/jsonrpc/types
+        alias: cometrpcjsontypes
+      - pkg: github.com/cometbft/cometbft/rpc/core/types
+        alias: cometrpctypes
+      - pkg: github.com/grpc-ecosystem/go-grpc-middleware/retry
+        alias: grpcretry
+      - pkg : github.com/kraken-hpc/go-fork
+        alias: fork
+      - pkg: github.com/armon/go-metrics/prometheus
+        alias: gmprometheus
+      - pkg: github.com/mitchellh/go-homedir
+        alias: homedir
+      - pkg: gitlab.com/unit410/threshold-ed25519/pkg
+        alias: tsed25519
+      - pkg: github.com/Jille/raft-grpc-transport
+        alias: raftgrpctransport
+      - pkg: github.com/hashicorp/raft-boltdb/v2
+        alias: boltdb
+
   maligned:
     suggest-new: true
-  # govet:
-  #   check-shadowing: true
-  # golint:
-  #   min-confidence: 0
-  #   gocyclo:
-  #     min-complexity: 10
+  govet:
     misspell:
       locale: US

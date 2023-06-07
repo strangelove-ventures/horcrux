@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
+	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/stretchr/testify/require"
-	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
 )
 
 // Test_StoreInMemOpenSingleNode tests that a command can be applied to the log
@@ -17,34 +17,30 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 	tmpDir, _ := os.MkdirTemp("", "store_test")
 	defer os.RemoveAll(tmpDir)
 
-	dummyPub := tmCryptoEd25519.PubKey{}
+	dummyPub := cometcryptoed25519.PubKey{}
 
-	bitSize := 4096
 	rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
 	require.NoError(t, err)
 
-	key := CosignerKey{
-		PubKey:   dummyPub,
-		ShareKey: []byte{},
-		ID:       1,
-	}
-	signState := SignState{
-		Height: 0,
-		Round:  0,
-		Step:   0,
+	key := CosignerEd25519Key{
+		PubKey:       dummyPub,
+		PrivateShard: []byte{},
+		ID:           1,
 	}
 
-	config := LocalCosignerConfig{
-		CosignerKey: key,
-		SignState:   &signState,
-		RsaKey:      *rsaKey,
-		Peers: []CosignerPeer{{
+	cosigner := NewLocalCosigner(
+		&RuntimeConfig{},
+		CosignerRSAKey{
+			ID:     key.ID,
+			RSAKey: *rsaKey,
+		},
+		[]CosignerRSAPubKey{{
 			ID:        1,
 			PublicKey: rsaKey.PublicKey,
 		}},
-	}
-
-	cosigner := NewLocalCosigner(config)
+		"",
+		0,
+	)
 
 	s := &RaftStore{
 		NodeID:      "1",
@@ -54,7 +50,6 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 		m:           make(map[string]string),
 		logger:      nil,
 		cosigner:    cosigner,
-		Peers:       []Cosigner{},
 	}
 
 	if _, err := s.Open(); err != nil {
