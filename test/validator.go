@@ -1,9 +1,11 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
@@ -179,6 +181,29 @@ func (tv *Validator) StartHorcruxCluster(
 ) error {
 	return StartCosignerContainers(tv.Signers, tv.Sentries,
 		tv.Threshold, sentriesPerSigner)
+}
+
+func (tv *Validator) CaptureCosignerMetrics(ctx context.Context) {
+	for _, s := range tv.Signers {
+		s := s
+		ticker := time.NewTicker(time.Second)
+
+		go func() {
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					m, err := s.GetMetrics(ctx)
+					if err != nil {
+						tv.tl.Logf("{%s} -> Error getting metrics : %v", s.Name(), err)
+					}
+					fmt.Println("Got Metrics", m)
+				}
+			}
+		}()
+	}
 }
 
 func (tv *Validator) WaitForConsecutiveBlocks(chainID string, blocks int64) error {

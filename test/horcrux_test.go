@@ -42,9 +42,13 @@ func testChainSingleNodeAndHorcrux(
 	// Wait for all nodes to get to given block height
 	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries[chainID]).WaitForHeight(5))
 
+	//Get Metrics in separate go routine
+	go ourValidator.CaptureCosignerMetrics(ctx)
+
 	require.NoError(t, ourValidator.WaitForConsecutiveBlocks(chainID, 10))
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
+
 	require.NoError(t, ourValidator.EnsureNotSlashed(chainID))
 }
 
@@ -71,6 +75,8 @@ func Test2Of3SignerUniqueSentry(t *testing.T) {
 	t.Parallel()
 	testChainSingleNodeAndHorcrux(t, 4, 3, 2, 1, 1)
 }
+
+//
 
 // TestSingleSignerTwoSentries will spin up a chain with four validators & one sentry node, stop one validator & the
 // sentry node, configure those two nodes to be relays for the remote signer, spin up a single remote signer, restart

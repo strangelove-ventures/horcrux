@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -15,6 +16,8 @@ import (
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
+	dto "github.com/prometheus/client_model/go"
+	"github.com/prometheus/common/expfmt"
 	"github.com/strangelove-ventures/horcrux/signer"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"golang.org/x/sync/errgroup"
@@ -24,9 +27,11 @@ import (
 
 const (
 	signerPort       = "2222"
+	debugPort        = "8453"
 	signerImage      = "horcrux-test"
 	binary           = "horcrux"
 	signerPortDocker = signerPort + "/tcp"
+	debugPortDocker  = debugPort + "/tcp"
 )
 
 // Signer represents a remote signer instance
@@ -265,12 +270,18 @@ func MakeSigners(
 }
 
 func (ts *Signer) GetHosts() (out Hosts) {
-	host := ContainerPort{
+	signerHost := ContainerPort{
 		Name:      ts.Name(),
 		Container: ts.Container,
 		Port:      docker.Port(signerPortDocker),
 	}
-	out = append(out, host)
+
+	debugHost := ContainerPort{
+		Name:      ts.Name(),
+		Container: ts.Container,
+		Port:      docker.Port(debugPortDocker),
+	}
+	out = append(out, signerHost, debugHost)
 	return
 }
 
@@ -322,6 +333,7 @@ func (ts *Signer) ExecHorcruxCmd(ctx context.Context, cmd ...string) error {
 			Hostname: container,
 			ExposedPorts: map[docker.Port]struct{}{
 				docker.Port(signerPortDocker): {},
+				docker.Port(debugPortDocker):  {},
 			},
 			Image:  signerImage,
 			Cmd:    cmd,
@@ -389,6 +401,7 @@ func (ts *Signer) InitThresholdModeConfig(
 	cmd = append(cmd, listenNodes.ConfigInitFlags()...)
 	cmd = append(cmd, cosigners.ConfigInitFlags()...)
 	cmd = append(cmd, "--threshold", fmt.Sprint(threshold))
+	cmd = append(cmd, "-d", fmt.Sprintf("0.0.0.0:%s", debugPort))
 	return ts.ExecHorcruxCmd(ctx, cmd...)
 }
 
@@ -438,6 +451,7 @@ func (ts *Signer) CreateSingleSignerContainer() error {
 			Hostname: ts.Name(),
 			ExposedPorts: map[docker.Port]struct{}{
 				docker.Port(signerPortDocker): {},
+				docker.Port(debugPortDocker):  {},
 			},
 			DNS:    []string{},
 			Image:  signerImage,
@@ -480,6 +494,7 @@ func (ts *Signer) CreateCosignerContainer() error {
 			Hostname: ts.Name(),
 			ExposedPorts: map[docker.Port]struct{}{
 				docker.Port(signerPortDocker): {},
+				docker.Port(debugPortDocker):  {},
 			},
 			DNS:    []string{},
 			Image:  signerImage,
@@ -541,6 +556,31 @@ func (ts *Signer) GetLeader(ctx context.Context) (string, error) {
 		return "", err
 	}
 	return res.GetLeader(), nil
+}
+
+func (ts *Signer) GetMetrics(ctx context.Context) (map[string]*dto.MetricFamily, error) {
+	debugAddr := GetHostPort(ts.Container, debugPortDocker)
+	resp, err := http.Get("http://" + debugAddr + "/metrics")
+	if err != nil {
+		return nil, err
+	}
+
+	// //We Read the response body on the line below.
+	// body, err := ioutil.ReadAll(resp.Body)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// //Convert the body to type string
+	// sb := string(body)
+	// ts.tl.Log("Raw Metrics : ", sb)
+	var parser expfmt.TextParser
+	//mf, err := parser.TextToMetricFamilies(strings.NewReader(sb))
+	mf, err := parser.TextToMetricFamilies(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return mf, nil
+
 }
 
 func (ts *Signer) PollForLeader(ctx context.Context, expectedLeader string) error {
