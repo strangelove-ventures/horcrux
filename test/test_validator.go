@@ -2,11 +2,14 @@ package test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/ory/dockertest"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/strangelove-ventures/horcrux/signer"
 	crypto "github.com/tendermint/tendermint/crypto"
 	ed25519 "github.com/tendermint/tendermint/crypto/ed25519"
@@ -133,4 +136,74 @@ func (tv *TestValidator) WaitForConsecutiveBlocks(blocks int64) error {
 
 func (tv *TestValidator) EnsureNotSlashed() error {
 	return tv.Sentries[0].EnsureNotSlashed(tv.PubKey.Address())
+}
+
+func (tv *TestValidator) CaptureCosignerMetrics(ctx context.Context) {
+	for _, s := range tv.Signers {
+		s := s
+		ticker := time.NewTicker(time.Second)
+
+		go func() {
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					m, err := s.GetMetrics(ctx)
+
+					if err != nil {
+						tv.tl.Logf("-------------------------------------------------\n")
+						tv.tl.Logf("{%s} -> Error getting metrics : %v", s.Name(), err)
+						tv.tl.Logf("-------------------------------------------------\n")
+
+					}
+					tv.tl.Logf("-------------------------------------------------\n")
+					fmt.Println("Got Metrics", m)
+					ConvertMapToJSON(m)
+					tv.tl.Logf("-------------------------------------------------\n")
+
+				}
+			}
+		}()
+	}
+}
+
+func ConvertMapToJSON(data map[string]*dto.MetricFamily) (string, error) {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return "", err
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(jsonData, &result); err != nil {
+		panic(err)
+	}
+
+	signerCosignerSignLagSeconds := result["signer_cosigner_sign_lag_seconds"]
+	jsonData, err = json.Marshal(signerCosignerSignLagSeconds)
+	if err != nil {
+		return "", err
+	}
+
+	err = AppendJSONToFile(string(jsonData), "./output.json")
+	if err != nil {
+		return "", err
+	}
+
+	return string(jsonData), nil
+}
+
+func AppendJSONToFile(jsonData string, filePath string) error {
+	f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	if _, err := f.WriteString(jsonData + "\n"); err != nil {
+		return err
+	}
+
+	return nil
 }

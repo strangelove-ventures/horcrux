@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -14,6 +15,8 @@ import (
 
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
+	dto "github.com/prometheus/client_model/go"
+	"github.com/prometheus/common/expfmt"
 	"github.com/strangelove-ventures/horcrux/signer"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 	tmjson "github.com/tendermint/tendermint/libs/json"
@@ -24,9 +27,11 @@ import (
 
 const (
 	signerPort       = "2222"
+	debugPort        = "8453"
 	signerImage      = "horcrux-test"
 	binary           = "horcrux"
 	signerPortDocker = signerPort + "/tcp"
+	debugPortDocker  = debugPort + "/tcp"
 )
 
 // TestSigner represents a remote signer instance
@@ -264,12 +269,19 @@ func MakeTestSigners(
 }
 
 func (ts *TestSigner) GetHosts() (out Hosts) {
-	host := ContainerPort{
+	signerHost := ContainerPort{
 		Name:      ts.Name(),
 		Container: ts.Container,
 		Port:      docker.Port(signerPortDocker),
 	}
-	out = append(out, host)
+
+	debugHost := ContainerPort{
+		Name:      ts.Name(),
+		Container: ts.Container,
+		Port:      docker.Port(debugPortDocker),
+	}
+
+	out = append(out, signerHost, debugHost)
 	return
 }
 
@@ -321,6 +333,7 @@ func (ts *TestSigner) ExecHorcruxCmd(ctx context.Context, cmd ...string) error {
 			Hostname: container,
 			ExposedPorts: map[docker.Port]struct{}{
 				docker.Port(signerPortDocker): {},
+				docker.Port(debugPortDocker):  {},
 			},
 			Image:  signerImage,
 			Cmd:    cmd,
@@ -390,6 +403,7 @@ func (ts *TestSigner) InitCosignerConfig(
 		"--cosigner",
 		fmt.Sprintf("--peers=%s", peers.PeerString(skip)),
 		fmt.Sprintf("--threshold=%d", threshold),
+		fmt.Sprintf("-d=%s", fmt.Sprintf("0.0.0.0:%s", debugPort)),
 		fmt.Sprintf("--listen=%s", ts.GRPCAddress()),
 	)
 }
@@ -440,6 +454,7 @@ func (ts *TestSigner) CreateSingleSignerContainer() error {
 			Hostname: ts.Name(),
 			ExposedPorts: map[docker.Port]struct{}{
 				docker.Port(signerPortDocker): {},
+				docker.Port(debugPortDocker):  {},
 			},
 			DNS:    []string{},
 			Image:  signerImage,
@@ -482,6 +497,7 @@ func (ts *TestSigner) CreateCosignerContainer() error {
 			Hostname: ts.Name(),
 			ExposedPorts: map[docker.Port]struct{}{
 				docker.Port(signerPortDocker): {},
+				docker.Port(debugPortDocker):  {},
 			},
 			DNS:    []string{},
 			Image:  signerImage,
@@ -550,4 +566,28 @@ func (ts *TestSigner) horcruxCmd(cmd []string) (out []string) {
 	out = append(out, cmd...)
 	out = append(out, fmt.Sprintf("--home=%s", ts.Dir()))
 	return out
+}
+func (ts *TestSigner) GetMetrics(ctx context.Context) (map[string]*dto.MetricFamily, error) {
+	debugAddr := GetHostPort(ts.Container, debugPortDocker)
+	resp, err := http.Get("http://" + debugAddr + "/metrics")
+	if err != nil {
+		return nil, err
+	}
+
+	// //We Read the response body on the line below.
+	// body, err := ioutil.ReadAll(resp.Body)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// //Convert the body to type string
+	// sb := string(body)
+	// ts.tl.Log("Raw Metrics : ", sb)
+	var parser expfmt.TextParser
+	//mf, err := parser.TextToMetricFamilies(strings.NewReader(sb))
+	mf, err := parser.TextToMetricFamilies(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return mf, nil
+
 }

@@ -43,6 +43,9 @@ func Test4Of7SignerTwoSentries(t *testing.T) {
 	// Wait for all nodes to get to given block height
 	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5))
 
+	//Get Metrics in separate go routine
+	go ourValidator.CaptureCosignerMetrics(ctx)
+
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
 	require.NoError(t, ourValidator.EnsureNotSlashed())
 }
@@ -78,6 +81,9 @@ func Test2Of3SignerTwoSentries(t *testing.T) {
 	// Wait for all nodes to get to given block height
 	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5))
 
+	//Get Metrics in separate go routine
+	go ourValidator.CaptureCosignerMetrics(ctx)
+
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
 	require.NoError(t, ourValidator.EnsureNotSlashed())
 }
@@ -112,6 +118,9 @@ func Test2Of3SignerUniqueSentry(t *testing.T) {
 
 	// Wait for all nodes to get to given block height
 	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5))
+
+	//Get Metrics in separate go routine
+	go ourValidator.CaptureCosignerMetrics(ctx)
 
 	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
 	require.NoError(t, ourValidator.EnsureNotSlashed())
@@ -156,6 +165,9 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 
 	// Wait for all nodes to get to given block height
 	require.NoError(t, allNodes.WaitForHeight(5))
+
+	//Get Metrics in separate go routine
+	// go ourValidator.CaptureCosignerMetrics(ctx)
 
 	// start remote signer
 	require.NoError(t, StartSingleSignerContainers(signers, ourValidatorAccountNode, ourValidatorNodes))
@@ -287,6 +299,9 @@ func TestDownedSigners2of3(t *testing.T) {
 	// Wait for all nodes to get to given block height
 	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5))
 
+	//Get Metrics in separate go routine
+	go ourValidator.CaptureCosignerMetrics(ctx)
+
 	// Test taking down each node in the signer cluster for a period of time
 	for _, signer := range ourValidator.Signers {
 		t.Logf("{%s} -> Stopping signer...", signer.Name())
@@ -332,6 +347,9 @@ func TestLeaderElection2of3(t *testing.T) {
 
 	// Wait for all nodes to get to given block height
 	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5))
+
+	//Get Metrics in separate go routine
+	go ourValidator.CaptureCosignerMetrics(ctx)
 
 	// Test electing each node in the signer cluster for a period of time
 	for _, signer := range ourValidator.Signers {
@@ -382,6 +400,9 @@ func TestDownedSigners3of5(t *testing.T) {
 
 	// Wait for all nodes to get to given block height
 	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries).WaitForHeight(5))
+
+	//Get Metrics in separate go routine
+	go ourValidator.CaptureCosignerMetrics(ctx)
 
 	// Test taking down 2 nodes at a time in the signer cluster for a period of time
 	for i := 0; i < len(ourValidator.Signers); i++ {
