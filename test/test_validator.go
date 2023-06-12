@@ -177,7 +177,7 @@ func ConvertMapToJSON(data map[string]*dto.MetricFamily) (string, error) {
 
 	var result map[string]interface{}
 	if err := json.Unmarshal(jsonData, &result); err != nil {
-		panic(err)
+		return "", err
 	}
 
 	signerCosignerSignLagSeconds := result["signer_cosigner_sign_lag_seconds"]
@@ -186,7 +186,18 @@ func ConvertMapToJSON(data map[string]*dto.MetricFamily) (string, error) {
 		return "", err
 	}
 
+	signerCosignerEphemeralShareLagSeconds := result["signer_cosigner_ephemeral_share_lag_seconds"]
+	jsonDataEphemeral, err := json.Marshal(signerCosignerEphemeralShareLagSeconds)
+	if err != nil {
+		return "", err
+	}
+
 	err = AppendJSONToFile(string(jsonData), "./output.json")
+	if err != nil {
+		return "", err
+	}
+
+	err = AppendJSONToFile(string(jsonDataEphemeral), "./outputE.json")
 	if err != nil {
 		return "", err
 	}
