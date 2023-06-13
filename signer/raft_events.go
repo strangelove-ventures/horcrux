@@ -35,7 +35,7 @@ func (f *fsm) handleLSSEvent(value string) {
 		)
 		return
 	}
-	if err := f.thresholdValidator.LoadSignStateIfNecessary(lss.ChainID); err != nil {
+	if _, err := f.thresholdValidator.LoadSignStateIfNecessary(lss.ChainID); err != nil {
 		f.logger.Error(
 			"Error loading sign state during raft replication",
 			"chain_id", lss.ChainID,
