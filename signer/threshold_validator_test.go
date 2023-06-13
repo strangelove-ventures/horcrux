@@ -145,7 +145,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	)
 	defer validator.Stop()
 
-	err := validator.LoadSignStateIfNecessary(testChainID)
+	_, err := validator.LoadSignStateIfNecessary(testChainID)
 	require.NoError(t, err)
 
 	raftStore.SetThresholdValidator(validator)

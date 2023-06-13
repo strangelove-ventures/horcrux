@@ -13,6 +13,22 @@ type HRSKey struct {
 	Step   int8
 }
 
+func (hrs HRSKey) GreaterThan(other HRSKey) bool {
+	if hrs.Height > other.Height {
+		return true
+	}
+	if hrs.Height < other.Height {
+		return false
+	}
+	if hrs.Round > other.Round {
+		return true
+	}
+	if hrs.Round < other.Round {
+		return false
+	}
+	return hrs.Step > other.Step
+}
+
 type HRSTKey struct {
 	Height    int64
 	Round     int64

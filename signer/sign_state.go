@@ -62,12 +62,28 @@ type SignState struct {
 	filePath string
 }
 
+func (signState SignState) HRSKey() HRSKey {
+	return HRSKey{
+		Height: signState.Height,
+		Round:  signState.Round,
+		Step:   signState.Step,
+	}
+}
+
 type SignStateConsensus struct {
 	Height    int64
 	Round     int64
 	Step      int8
 	Signature []byte
 	SignBytes cometbytes.HexBytes
+}
+
+func (ssc SignStateConsensus) HRSKey() HRSKey {
+	return HRSKey{
+		Height: ssc.Height,
+		Round:  ssc.Round,
+		Step:   ssc.Step,
+	}
 }
 
 type ChainSignStateConsensus struct {
@@ -96,16 +112,8 @@ func newConflictingDataError(existingSignBytes, newSignBytes []byte) *Conflictin
 	}
 }
 
-func (signState *SignState) GetFromCache(hrs HRSKey, lock *sync.Mutex) (HRSKey, *SignStateConsensus) {
-	if lock != nil {
-		lock.Lock()
-		defer lock.Unlock()
-	}
-	latestBlock := HRSKey{
-		Height: signState.Height,
-		Round:  signState.Round,
-		Step:   signState.Step,
-	}
+func (signState *SignState) GetFromCache(hrs HRSKey) (HRSKey, *SignStateConsensus) {
+	latestBlock := signState.HRSKey()
 	if ssc, ok := signState.cache[hrs]; ok {
 		return latestBlock, &ssc
 	}
@@ -120,7 +128,7 @@ func (signState *SignState) Save(
 	ssc SignStateConsensus,
 	pendingDiskWG *sync.WaitGroup,
 ) error {
-	err := signState.GetErrorIfLessOrEqual(ssc.Height, ssc.Round, ssc.Step, nil)
+	err := signState.GetErrorIfLessOrEqual(ssc.Height, ssc.Round, ssc.Step)
 	if err != nil {
 		return err
 	}
@@ -217,34 +225,14 @@ func newSameHRSError(hrs HRSKey) *SameHRSError {
 	}
 }
 
-func (signState *SignState) GetErrorIfLessOrEqual(height int64, round int64, step int8, lock *sync.Mutex) error {
-	if lock != nil {
-		lock.Lock()
-		defer lock.Unlock()
+func (signState *SignState) GetErrorIfLessOrEqual(height int64, round int64, step int8) error {
+	hrs := HRSKey{Height: height, Round: round, Step: step}
+	signStateHRS := signState.HRSKey()
+	if signStateHRS.GreaterThan(hrs) {
+		return errors.New("regression not allowed")
 	}
-	if height < signState.Height {
-		// lower height than current, don't allow state rollback
-		return errors.New("height regression not allowed")
-	}
-	if height > signState.Height {
-		return nil
-	}
-	// Height is equal
 
-	if round < signState.Round {
-		// lower round than current round for same block, don't allow state rollback
-		return errors.New("round regression not allowed")
-	}
-	if round > signState.Round {
-		return nil
-	}
-	// Height and Round are equal
-
-	if step < signState.Step {
-		// lower round than current round for same block, don't allow state rollback
-		return errors.New("step regression not allowed")
-	}
-	if step == signState.Step {
+	if hrs == signStateHRS {
 		// same HRS as current
 		return newSameHRSError(HRSKey{Height: height, Round: round, Step: step})
 	}
