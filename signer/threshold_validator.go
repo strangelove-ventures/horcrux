@@ -46,14 +46,10 @@ type ThresholdValidator struct {
 type ChainSignState struct {
 	// stores the last sign state for a block we have fully signed
 	// Cached to respond to SignVote requests if we already have a signature
-	lastSignState      *SignState
-	lastSignStateMutex *sync.Mutex
+	lastSignState *SignState
 
 	// stores the last sign state that we've started progress on
-	lastSignStateInitiated      *SignState
-	lastSignStateInitiatedMutex *sync.Mutex
-
-	signStates chan SignStateConsensus
+	lastSignStateInitiated *SignState
 }
 
 // NewThresholdValidator creates and returns a new ThresholdValidator
@@ -85,8 +81,6 @@ func NewThresholdValidator(
 func (pv *ThresholdValidator) SaveLastSignedState(chainID string, signState SignStateConsensus) error {
 	css := pv.mustLoadChainState(chainID)
 
-	css.lastSignStateMutex.Lock()
-	defer css.lastSignStateMutex.Unlock()
 	return css.lastSignState.Save(signState, &pv.pendingDiskWG)
 }
 
@@ -103,8 +97,6 @@ func (pv *ThresholdValidator) mustLoadChainState(chainID string) ChainSignState 
 func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, signState SignStateConsensus) error {
 	css := pv.mustLoadChainState(chainID)
 
-	css.lastSignStateInitiatedMutex.Lock()
-	defer css.lastSignStateInitiatedMutex.Unlock()
 	return css.lastSignStateInitiated.Save(signState, &pv.pendingDiskWG)
 }
 
@@ -369,11 +361,6 @@ func (pv *ThresholdValidator) LoadSignStateIfNecessary(chainID string) (ChainSig
 	css := ChainSignState{
 		lastSignState:          signState,
 		lastSignStateInitiated: signState.FreshCache(),
-
-		lastSignStateMutex:          &sync.Mutex{},
-		lastSignStateInitiatedMutex: &sync.Mutex{},
-
-		signStates: make(chan SignStateConsensus, 5),
 	}
 
 	pv.chainStateMu.Lock()
@@ -391,9 +378,7 @@ func (pv *ThresholdValidator) LoadSignStateIfNecessary(chainID string) (ChainSig
 func (pv *ThresholdValidator) getExistingBlockSignature(chainID string, block *Block) ([]byte, time.Time, error) {
 	css := pv.mustLoadChainState(chainID)
 
-	css.lastSignStateMutex.Lock()
 	latestBlock, existingSignature := css.lastSignState.GetFromCache(block.HRSKey())
-	css.lastSignStateMutex.Unlock()
 
 	return pv.compareBlockSignature(chainID, block, latestBlock, existingSignature)
 }
@@ -491,56 +476,44 @@ func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, blo
 
 	// Keep track of the last block that we began the signing process for. Only allow one attempt per block
 	if err := pv.SaveLastSignedStateInitiated(chainID, NewSignStateConsensus(height, round, step)); err != nil {
+		existingSignature, existingTimestamp, sameBlockErr := pv.getExistingBlockSignature(chainID, block)
+
 		switch err.(type) {
 		case *SameHRSError:
 			// Wait for last sign state signature to be the same block
 
-			existingSignature, existingTimestamp, sameBlockErr := pv.getExistingBlockSignature(chainID, block)
 			if sameBlockErr == nil {
 				if existingSignature != nil {
 					return existingSignature, existingTimestamp, nil
 				}
 				// sign again
 			} else {
-				switch sameBlockErr.(type) {
-				case *StillWaitingForBlockError:
-					ctx, cancel := context.WithTimeout(ctx, time.Second)
-					defer cancel()
-					for {
-						select {
-						case <-ctx.Done():
-							return nil, stamp, errors.New("timed out waiting for block signature from cluster")
-						case signState := <-css.signStates:
-							fmt.Printf("compareBlockSignature. block: %+v - existingSignature: %+v\n", block, signState)
-
-							existingSignature, existingTimestamp, sameBlockErr = pv.compareBlockSignature(chainID, block, block.HRSKey(), &signState)
-							if sameBlockErr == nil {
-								return existingSignature, existingTimestamp, nil
-							}
-							switch sameBlockErr.(type) {
-							case *StillWaitingForBlockError:
-								continue
-							default:
-								return nil, existingTimestamp, sameBlockErr
-							}
-						}
-					}
-				default:
+				if _, ok := sameBlockErr.(*StillWaitingForBlockError); !ok {
 					return nil, existingTimestamp, sameBlockErr
 				}
 
+				ctx, cancel := context.WithTimeout(ctx, time.Second)
+				defer cancel()
+				for {
+					select {
+					case <-ctx.Done():
+						return nil, stamp, errors.New("timed out waiting for block signature from cluster")
+					case signState := <-css.lastSignState.channel:
+						existingSignature, existingTimestamp, sameBlockErr = pv.compareBlockSignature(chainID, block, block.HRSKey(), &signState)
+						if sameBlockErr == nil {
+							return existingSignature, existingTimestamp, nil
+						}
+						if _, ok := sameBlockErr.(*StillWaitingForBlockError); !ok {
+							return nil, existingTimestamp, sameBlockErr
+						}
+					}
+				}
 			}
 		default:
-			existingSignature, existingTimestamp, sameBlockErr := pv.getExistingBlockSignature(chainID, block)
 			if sameBlockErr == nil {
 				return existingSignature, stamp, nil
 			}
-			hrs := HRSKey{
-				Height: height,
-				Round:  round,
-				Step:   step,
-			}
-			return nil, existingTimestamp, pv.newBeyondBlockError(chainID, hrs)
+			return nil, existingTimestamp, pv.newBeyondBlockError(chainID, block.HRSKey())
 		}
 	}
 
@@ -664,21 +637,14 @@ func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, blo
 	}
 
 	// Err will be present if newLss is not above high watermark
-	css.lastSignStateMutex.Lock()
-	err = css.lastSignState.Save(newLss.SignStateConsensus, &pv.pendingDiskWG)
-	css.lastSignStateMutex.Unlock()
-
-	if err != nil {
+	if err = css.lastSignState.Save(newLss.SignStateConsensus, &pv.pendingDiskWG); err != nil {
 		if _, isSameHRSError := err.(*SameHRSError); !isSameHRSError {
 			return nil, stamp, err
 		}
 	}
 
-	css.signStates <- newLss.SignStateConsensus
-
 	// Emit last signed state to cluster
-	err = pv.raftStore.Emit(raftEventLSS, newLss)
-	if err != nil {
+	if err := pv.raftStore.Emit(raftEventLSS, newLss); err != nil {
 		pv.logger.Error("Error emitting LSS", err.Error())
 	}
 

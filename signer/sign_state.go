@@ -58,6 +58,8 @@ type SignState struct {
 	Signature       []byte              `json:"signature,omitempty"`
 	SignBytes       cometbytes.HexBytes `json:"signbytes,omitempty"`
 	cache           map[HRSKey]SignStateConsensus
+	mu              sync.RWMutex
+	channel         chan SignStateConsensus
 
 	filePath string
 }
@@ -114,6 +116,8 @@ func newConflictingDataError(existingSignBytes, newSignBytes []byte) *Conflictin
 
 func (signState *SignState) GetFromCache(hrs HRSKey) (HRSKey, *SignStateConsensus) {
 	latestBlock := signState.HRSKey()
+	signState.mu.RLock()
+	defer signState.mu.RUnlock()
 	if ssc, ok := signState.cache[hrs]; ok {
 		return latestBlock, &ssc
 	}
@@ -134,7 +138,10 @@ func (signState *SignState) Save(
 	}
 	// HRS is greater than existing state, allow
 
+	signState.mu.Lock()
 	signState.cache[HRSKey{Height: ssc.Height, Round: ssc.Round, Step: ssc.Step}] = ssc
+	signState.mu.Unlock()
+
 	for hrs := range signState.cache {
 		if hrs.Height < ssc.Height-blocksToCache {
 			delete(signState.cache, hrs)
@@ -155,6 +162,11 @@ func (signState *SignState) Save(
 	} else {
 		signState.save()
 	}
+
+	for len(signState.channel) > 0 {
+		<-signState.channel
+	}
+	signState.channel <- ssc
 
 	return nil
 }
@@ -251,6 +263,7 @@ func (signState *SignState) FreshCache() *SignState {
 		Signature:       signState.Signature,
 		SignBytes:       signState.SignBytes,
 		cache:           make(map[HRSKey]SignStateConsensus),
+		channel:         make(chan SignStateConsensus, 1),
 		filePath:        signState.filePath,
 	}
 
@@ -301,6 +314,7 @@ func LoadOrCreateSignState(filepath string) (*SignState, error) {
 		state := &SignState{
 			filePath: filepath,
 			cache:    make(map[HRSKey]SignStateConsensus),
+			channel:  make(chan SignStateConsensus, 1),
 		}
 		state.save()
 		return state, nil
