@@ -1,9 +1,5 @@
 package signer
 
-import (
-	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
-)
-
 const (
 	SignerTypeSoftSign = "SoftSign"
 	SignerTypeHSM      = "HSM"
@@ -13,7 +9,7 @@ const (
 type ThresholdSigner interface {
 	Type() string
 
-	DealShares(req CosignerGetEphemeralSecretPartRequest) (HrsMetadata, error)
+	DealShares(req CosignerGetEphemeralSecretPartRequest) ([]CosignerMetadata, error)
 
 	GetEphemeralSecretPart(req CosignerGetEphemeralSecretPartRequest, m *LastSignStateWrapper,
 		pubKeys map[int]CosignerRSAPubKey) (CosignerEphemeralSecretPart, error)
@@ -32,15 +28,6 @@ type ThresholdSigner interface {
 // CosignerMetadata holds the share and the ephermeral secret public key
 // Moved from Local cosigner to threshold_ed25519
 type CosignerMetadata struct {
-	Share                    []byte
+	Shares                   [][]byte
 	EphemeralSecretPublicKey []byte
-}
-
-// HrsMetadata holds the ephemeral nonces from cosigner peers
-// for a given height, round, step.
-type HrsMetadata struct {
-	// need to be _total_ entries per player
-	Secret      []byte
-	DealtShares []tsed25519.Scalar
-	Cosigners   []CosignerMetadata
 }

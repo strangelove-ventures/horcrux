@@ -46,9 +46,8 @@ type CosignerSignRequest struct {
 }
 
 type CosignerSignResponse struct {
-	EphemeralPublic []byte
-	Timestamp       time.Time
-	Signature       []byte
+	Timestamp time.Time
+	Signature []byte
 }
 
 type CosignerEphemeralSecretPart struct {

@@ -67,9 +67,8 @@ func (rpc *GRPCServer) SetEphemeralSecretPartsAndSign(
 		"step", req.Hrst.Step,
 	)
 	return &proto.CosignerGRPCSetEphemeralSecretPartsAndSignResponse{
-		EphemeralPublic: res.EphemeralPublic,
-		Timestamp:       res.Timestamp.UnixNano(),
-		Signature:       res.Signature,
+		Timestamp: res.Timestamp.UnixNano(),
+		Signature: res.Signature,
 	}, nil
 }
 

@@ -119,8 +119,7 @@ func (cosigner *RemoteCosigner) SetEphemeralSecretPartsAndSign(
 		return nil, err
 	}
 	return &CosignerSignResponse{
-		EphemeralPublic: res.GetEphemeralPublic(),
-		Timestamp:       time.Unix(0, res.GetTimestamp()),
-		Signature:       res.GetSignature(),
+		Timestamp: time.Unix(0, res.GetTimestamp()),
+		Signature: res.GetSignature(),
 	}, nil
 }

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/coinbase/kryptology/pkg/ted25519/ted25519"
 	"github.com/cometbft/cometbft/crypto"
 	"github.com/cometbft/cometbft/libs/log"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
@@ -14,7 +15,6 @@ import (
 	comet "github.com/cometbft/cometbft/types"
 	"github.com/hashicorp/raft"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
-	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
 var _ PrivValidator = &ThresholdValidator{}
@@ -261,7 +261,6 @@ func (pv *ThresholdValidator) waitForPeerSetEphemeralSharesAndSign(
 	signBytes []byte,
 	shareSignatures *[][]byte,
 	shareSignaturesMutex *sync.Mutex,
-	ephemeralPublic *[]byte,
 	wg *sync.WaitGroup,
 ) {
 	peerStartTime := time.Now()
@@ -323,9 +322,6 @@ func (pv *ThresholdValidator) waitForPeerSetEphemeralSharesAndSign(
 	peerIdx := peerID - 1
 	(*shareSignatures)[peerIdx] = make([]byte, len(sigRes.Signature))
 	copy((*shareSignatures)[peerIdx], sigRes.Signature)
-	if peerID == ourID {
-		*ephemeralPublic = sigRes.EphemeralPublic
-	}
 }
 
 func waitUntilCompleteOrTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
@@ -551,12 +547,10 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	// share sigs is updated by goroutines
 	shareSignaturesMutex := sync.Mutex{}
 
-	var ephemeralPublic []byte
-
 	for cosigner := range ephSecrets {
 		// set peerEphemeralSecretParts and sign in single rpc call.
 		go pv.waitForPeerSetEphemeralSharesAndSign(chainID, ourID, cosigner, hrst, ephSecrets,
-			signBytes, &shareSignatures, &shareSignaturesMutex, &ephemeralPublic, &setEphemeralAndSignWaitGroup)
+			signBytes, &shareSignatures, &shareSignaturesMutex, &setEphemeralAndSignWaitGroup)
 	}
 
 	// Wait for threshold cosigners to be complete
@@ -575,29 +569,30 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	)
 
 	// collect all valid responses into array of ids and signatures for the threshold lib
-	sigIds := make([]int, 0)
-	shareSigs := make([][]byte, 0)
+	shareSigs := make([]*ted25519.PartialSignature, 0, pv.threshold)
 	for idx, shareSig := range shareSignatures {
 		if len(shareSig) == 0 {
 			continue
 		}
-		sigIds = append(sigIds, idx+1)
 
 		// we are ok to use the share signatures - complete boolean
 		// prevents future concurrent access
-		shareSigs = append(shareSigs, shareSig)
+		shareSigs = append(shareSigs, &ted25519.PartialSignature{
+			ShareIdentifier: byte(idx + 1),
+			Sig:             shareSig,
+		})
 	}
 
-	if len(sigIds) < pv.threshold {
+	if len(shareSigs) < pv.threshold {
 		totalInsufficientCosigners.Inc()
 		return nil, stamp, errors.New("not enough co-signers")
 	}
 
 	// assemble into final signature
-	combinedSig := tsed25519.CombineShares(total, sigIds, shareSigs)
-
-	signature := ephemeralPublic
-	signature = append(signature, combinedSig...)
+	signature, err := ted25519.Aggregate(shareSigs, &ted25519.ShareConfiguration{T: pv.threshold, N: int(total)})
+	if err != nil {
+		return nil, stamp, fmt.Errorf("failed to aggregate signatures")
+	}
 
 	// verify the combined signature before saving to watermark
 	if !pv.myCosigner.VerifySignature(chainID, signBytes, signature) {

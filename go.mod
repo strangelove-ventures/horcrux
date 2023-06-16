@@ -8,6 +8,7 @@ require (
 	github.com/Jille/raftadmin v1.2.0
 	github.com/armon/go-metrics v0.4.1
 	github.com/avast/retry-go v3.0.0+incompatible
+	github.com/coinbase/kryptology v1.8.0
 	github.com/cometbft/cometbft v0.37.0
 	github.com/cosmos/cosmos-sdk v0.47.1
 	github.com/gogo/protobuf v1.3.2
@@ -22,7 +23,6 @@ require (
 	github.com/spf13/viper v1.14.0
 	github.com/stretchr/testify v1.8.2
 	github.com/tendermint/go-amino v0.16.0
-	gitlab.com/unit410/edwards25519 v0.0.0-20220725154547-61980033348e
 	gitlab.com/unit410/threshold-ed25519 v0.0.0-20220725172740-6ee731f539ac
 	golang.org/x/sync v0.1.0
 	google.golang.org/grpc v1.55.0
@@ -46,12 +46,15 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bgentry/speakeasy v0.1.1-0.20220910012023-760eaf8b6816 // indirect
 	github.com/boltdb/bolt v1.3.1 // indirect
+	github.com/btcsuite/btcd v0.21.0-beta.0.20201114000516-e9c7a5ac6401 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
+	github.com/bwesterb/go-ristretto v1.2.0 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/cometbft/cometbft-db v0.7.0 // indirect
 	github.com/confio/ics23/go v0.9.0 // indirect
+	github.com/consensys/gnark-crypto v0.5.3 // indirect
 	github.com/containerd/continuity v0.3.0 // indirect
 	github.com/cosmos/btcutil v1.0.5 // indirect
 	github.com/cosmos/cosmos-proto v1.0.0-beta.2 // indirect
@@ -130,6 +133,7 @@ require (
 	github.com/tidwall/btree v1.6.0 // indirect
 	github.com/zondax/hid v0.9.1 // indirect
 	github.com/zondax/ledger-go v0.14.1 // indirect
+	gitlab.com/unit410/edwards25519 v0.0.0-20220725154547-61980033348e // indirect
 	go.etcd.io/bbolt v1.3.7 // indirect
 	golang.org/x/crypto v0.7.0 // indirect
 	golang.org/x/exp v0.0.0-20230321023759-10a507213a29 // indirect
