@@ -140,13 +140,13 @@ func (signState *SignState) Save(
 
 	signState.mu.Lock()
 	signState.cache[HRSKey{Height: ssc.Height, Round: ssc.Round, Step: ssc.Step}] = ssc
-	signState.mu.Unlock()
 
 	for hrs := range signState.cache {
 		if hrs.Height < ssc.Height-blocksToCache {
 			delete(signState.cache, hrs)
 		}
 	}
+	signState.mu.Unlock()
 
 	signState.Height = ssc.Height
 	signState.Round = ssc.Round

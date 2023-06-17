@@ -256,6 +256,15 @@ func (pv *ThresholdValidator) waitForPeerEphemeralShares(
 		defer wg.Done()
 	}
 	thresholdPeersMutex.Unlock()
+
+	pv.logger.Debug(
+		"Received nonces",
+		"cosigner", peer.GetID(),
+		"chain_id", chainID,
+		"height", hrst.Height,
+		"round", hrst.Round,
+		"step", hrst.Step,
+	)
 }
 
 func (pv *ThresholdValidator) waitForPeerSetEphemeralSharesAndSign(
@@ -289,16 +298,6 @@ func (pv *ThresholdValidator) waitForPeerSetEphemeralSharesAndSign(
 		}
 	}
 
-	pv.logger.Debug(
-		"Number of ephemeral parts for peer",
-		"peer", peer.GetID(),
-		"count", len(peerEphemeralSecretParts),
-		"chain_id", chainID,
-		"height", hrst.Height,
-		"round", hrst.Round,
-		"step", hrst.Step,
-	)
-
 	peerID := peer.GetID()
 	sigRes, err := peer.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
 		ChainID:          chainID,
@@ -314,8 +313,8 @@ func (pv *ThresholdValidator) waitForPeerSetEphemeralSharesAndSign(
 
 	timedCosignerSignLag.WithLabelValues(peer.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
 	pv.logger.Debug(
-		"Received signature from peer",
-		"peer", peerID,
+		"Received signature part",
+		"cosigner", peerID,
 		"chain_id", chainID,
 		"height", hrst.Height,
 		"round", hrst.Round,
@@ -535,15 +534,20 @@ func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, blo
 			ephSecrets, &thresholdPeersMutex)
 	}
 
-	preMyEphSecrets := time.Now()
-
 	myEphSecrets, err := pv.myCosigner.GetEphemeralSecretParts(chainID, hrst)
 	if err != nil {
 		// Our ephemeral secret parts are required, cannot proceed
 		return nil, stamp, err
 	}
 
-	durationMyEphSecrets := time.Since(preMyEphSecrets)
+	pv.logger.Debug(
+		"Generated nonces",
+		"cosigner", pv.myCosigner.GetID(),
+		"chain_id", chainID,
+		"height", hrst.Height,
+		"round", hrst.Round,
+		"step", hrst.Step,
+	)
 
 	// Wait for threshold cosigners to be complete
 	// A Cosigner will either respond in time, or be cancelled with timeout
@@ -592,13 +596,6 @@ func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, blo
 	haveThresholdSignatures := time.Now()
 
 	timedSignBlockCosignerLag.Observe(time.Since(timeStartSignBlock).Seconds())
-	pv.logger.Debug(
-		"Done waiting for cosigners, assembling signatures",
-		"chain_id", chainID,
-		"height", hrst.Height,
-		"round", hrst.Round,
-		"step", hrst.Step,
-	)
 
 	// collect all valid responses into array of ids and signatures for the threshold lib
 	shareSigs := make([]*ted25519.PartialSignature, 0, pv.threshold)
@@ -625,6 +622,14 @@ func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, blo
 	if err != nil {
 		return nil, stamp, fmt.Errorf("failed to aggregate signatures")
 	}
+
+	pv.logger.Debug(
+		"Assembled full signature",
+		"chain_id", chainID,
+		"height", hrst.Height,
+		"round", hrst.Round,
+		"step", hrst.Step,
+	)
 
 	haveAggregateSignature := time.Now()
 
@@ -668,25 +673,25 @@ func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, blo
 	durationVerifySignature := signatureVerified.Sub(haveAggregateSignature)
 	durationSaveLastSignState := lastSignStateSaved.Sub(signatureVerified)
 
+	timeSignBlock := time.Since(timeStartSignBlock)
+	timedSignBlockLag.Observe(timeSignBlock.Seconds())
+
 	fmt.Printf(`durationSaveLastSignedStateInitiated: %.02f
 	durationGetNonces: %.02f
-	durationMyEphSecrets: %.02f,
 	durationThresholdSign: %.02f
 	durationAggregateSign: %.02f
 	durationVerifySignature: %.02f
 	durationSaveLastSignState: %.02f
+	durationTotal: %.02f,
 	`,
 		float64(durationSaveLastSignedStateInitiated.Microseconds())/1000.0,
 		float64(durationGetNonces.Microseconds())/1000.0,
-		float64(durationMyEphSecrets.Microseconds())/1000.0,
 		float64(durationThresholdSign.Microseconds())/1000.0,
 		float64(durationAggregateSign.Microseconds())/1000.0,
 		float64(durationVerifySignature.Microseconds())/1000.0,
 		float64(durationSaveLastSignState.Microseconds())/1000.0,
+		float64(timeSignBlock.Microseconds())/1000.0,
 	)
-
-	timeSignBlock := time.Since(timeStartSignBlock).Seconds()
-	timedSignBlockLag.Observe(timeSignBlock)
 
 	return signature, stamp, nil
 }
