@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coinbase/kryptology/pkg/ted25519/ted25519"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	comet "github.com/cometbft/cometbft/types"
 	"github.com/stretchr/testify/require"
-	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
 const (
@@ -52,8 +52,6 @@ func TestLocalCosignerGetID(t *testing.T) {
 
 func TestLocalCosignerSign2of2(t *testing.T) {
 	// Test signing with a 2 of 2
-
-	total := uint8(2)
 	threshold := uint8(2)
 
 	rsaKey1, err := rsa.GenerateKey(rand.Reader, bitSize)
@@ -70,21 +68,19 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		PublicKey: rsaKey2.PublicKey,
 	}}
 
-	privateKey := cometcryptoed25519.GenPrivKey()
-
-	privKeyBytes := [64]byte{}
-	copy(privKeyBytes[:], privateKey[:])
-	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
+	config := ted25519.ShareConfiguration{T: 2, N: 2}
+	pub, privShards, _, _ := ted25519.GenerateSharedKey(&config)
+	pubKey := cometcryptoed25519.PubKey(pub)
 
 	key1 := CosignerEd25519Key{
-		PubKey:       privateKey.PubKey(),
-		PrivateShard: privShards[0],
+		PubKey:       pubKey,
+		PrivateShard: reverseBytes(privShards[0].Value.Bytes()),
 		ID:           1,
 	}
 
 	key2 := CosignerEd25519Key{
-		PubKey:       privateKey.PubKey(),
-		PrivateShard: privShards[1],
+		PubKey:       pubKey,
+		PrivateShard: reverseBytes(privShards[1].Value.Bytes()),
 		ID:           2,
 	}
 
@@ -148,7 +144,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	require.Equal(t, cosigner1.GetID(), 1)
 	require.Equal(t, cosigner2.GetID(), 2)
 
-	publicKeys := make([]tsed25519.Element, 0)
+	publicKeys := make([]ted25519.PublicKey, 0)
 
 	now := time.Now()
 
@@ -171,10 +167,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 
 	publicKeys = append(publicKeys, ephemeralSharesFor1.EncryptedSecrets[0].SourceEphemeralSecretPublicKey)
 
-	ephemeralPublic := tsed25519.AddElements(publicKeys)
-
 	t.Logf("public keys: %x", publicKeys)
-	t.Logf("eph pub: %x", ephemeralPublic)
 	// pack a vote into sign bytes
 	var vote cometproto.Vote
 	vote.Height = 1
@@ -200,15 +193,22 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	sigIds := []int{1, 2}
-	sigArr := [][]byte{sigRes1.Signature, sigRes2.Signature}
+	shareSigs := []*ted25519.PartialSignature{
+		{
+			ShareIdentifier: 1,
+			Sig:             sigRes1.Signature,
+		},
+		{
+			ShareIdentifier: 2,
+			Sig:             sigRes2.Signature,
+		},
+	}
 
-	t.Logf("sig arr: %x", sigArr)
+	t.Logf("sig arr: %+v", shareSigs)
 
-	combinedSig := tsed25519.CombineShares(total, sigIds, sigArr)
-	signature := ephemeralPublic
-	signature = append(signature, combinedSig...)
+	combinedSig, err := ted25519.Aggregate(shareSigs, &config)
+	require.NoError(t, err, "failed to aggregate signatures")
 
-	t.Logf("signature: %x", signature)
-	require.True(t, privateKey.PubKey().VerifySignature(signBytes, signature))
+	t.Logf("signature: %x", combinedSig)
+	require.True(t, pubKey.VerifySignature(signBytes, combinedSig))
 }
