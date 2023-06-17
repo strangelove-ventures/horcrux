@@ -269,7 +269,6 @@ func (pv *ThresholdValidator) waitForPeerEphemeralShares(
 
 func (pv *ThresholdValidator) waitForPeerSetEphemeralSharesAndSign(
 	chainID string,
-	ourID int,
 	peer Cosigner,
 	hrst HRSTKey,
 	encryptedEphemeralSharesThresholdMap map[Cosigner][]CosignerEphemeralSecretPart,
@@ -282,10 +281,12 @@ func (pv *ThresholdValidator) waitForPeerSetEphemeralSharesAndSign(
 	defer wg.Done()
 	peerEphemeralSecretParts := make([]CosignerEphemeralSecretPart, 0, pv.threshold-1)
 
+	peerID := peer.GetID()
+
 	for _, encryptedSecrets := range encryptedEphemeralSharesThresholdMap {
 		for _, ephemeralSecretPart := range encryptedSecrets {
 			// if share is intended for peer, check to make sure source peer is included in threshold
-			if ephemeralSecretPart.DestinationID == peer.GetID() {
+			if ephemeralSecretPart.DestinationID == peerID {
 				for thresholdPeer := range encryptedEphemeralSharesThresholdMap {
 					if thresholdPeer.GetID() == ephemeralSecretPart.SourceID {
 						// source peer is included in threshold signature, include in sharing
@@ -298,7 +299,6 @@ func (pv *ThresholdValidator) waitForPeerSetEphemeralSharesAndSign(
 		}
 	}
 
-	peerID := peer.GetID()
 	sigRes, err := peer.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
 		ChainID:          chainID,
 		EncryptedSecrets: peerEphemeralSecretParts,
@@ -378,7 +378,12 @@ func (pv *ThresholdValidator) getExistingBlockSignature(chainID string, block *B
 	return pv.compareBlockSignature(chainID, block, latestBlock, existingSignature)
 }
 
-func (pv *ThresholdValidator) compareBlockSignature(chainID string, block *Block, latestBlock HRSKey, existingSignature *SignStateConsensus) ([]byte, time.Time, error) {
+func (pv *ThresholdValidator) compareBlockSignature(
+	chainID string,
+	block *Block,
+	latestBlock HRSKey,
+	existingSignature *SignStateConsensus,
+) ([]byte, time.Time, error) {
 	stamp, signBytes := block.Timestamp, block.SignBytes
 
 	blockHRS := block.HRSKey()
@@ -494,7 +499,8 @@ func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, blo
 					case <-ctx.Done():
 						return nil, stamp, errors.New("timed out waiting for block signature from cluster")
 					case signState := <-css.lastSignState.channel:
-						existingSignature, existingTimestamp, sameBlockErr = pv.compareBlockSignature(chainID, block, block.HRSKey(), &signState)
+						existingSignature, existingTimestamp, sameBlockErr = pv.compareBlockSignature(
+							chainID, block, block.HRSKey(), &signState)
 						if sameBlockErr == nil {
 							return existingSignature, existingTimestamp, nil
 						}
@@ -519,8 +525,6 @@ func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, blo
 	// Only wait until we have threshold sigs
 	getEphemeralWaitGroup.Add(pv.threshold - 1)
 	// Used to track how close we are to threshold
-
-	ourID := pv.myCosigner.GetID()
 
 	ephSecrets := make(map[Cosigner][]CosignerEphemeralSecretPart)
 	thresholdPeersMutex := sync.Mutex{}
@@ -557,7 +561,7 @@ func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, blo
 
 	timedSignBlockThresholdLag.Observe(time.Since(timeStartSignBlock).Seconds())
 	pv.logger.Debug(
-		"Have threshold peers",
+		"Have nonces from threshold number of cosigners",
 		"chain_id", chainID,
 		"height", hrst.Height,
 		"round", hrst.Round,
@@ -577,7 +581,7 @@ func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, blo
 
 	for cosigner := range ephSecrets {
 		// set peerEphemeralSecretParts and sign in single rpc call.
-		go pv.waitForPeerSetEphemeralSharesAndSign(chainID, ourID, cosigner, hrst, ephSecrets,
+		go pv.waitForPeerSetEphemeralSharesAndSign(chainID, cosigner, hrst, ephSecrets,
 			signBytes, &shareSignatures, &shareSignaturesMutex, &setEphemeralAndSignWaitGroup)
 	}
 

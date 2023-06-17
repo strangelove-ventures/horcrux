@@ -64,7 +64,33 @@ type SignState struct {
 	filePath string
 }
 
-func (signState SignState) HRSKey() HRSKey {
+func (signState *SignState) existingSignatureOrErrorIfRegression(hrst HRSTKey, signBytes []byte) ([]byte, error) {
+	signState.mu.RLock()
+	defer signState.mu.RUnlock()
+
+	sameHRS, err := signState.CheckHRS(hrst)
+	if err != nil {
+		return nil, err
+	}
+
+	if !sameHRS {
+		// not a regression in height. okay to sign
+		return nil, nil
+	}
+
+	// If the HRS is the same the sign bytes may still differ by timestamp
+	// It is ok to re-sign a different timestamp if that is the only difference in the sign bytes
+	if bytes.Equal(signBytes, signState.SignBytes) {
+		return signState.Signature, nil
+	} else if err := signState.OnlyDifferByTimestamp(signBytes); err != nil {
+		return nil, err
+	}
+
+	// same HRS, and only differ by timestamp - ok to sign again
+	return nil, nil
+}
+
+func (signState *SignState) HRSKey() HRSKey {
 	return HRSKey{
 		Height: signState.Height,
 		Round:  signState.Round,
@@ -80,11 +106,11 @@ type SignStateConsensus struct {
 	SignBytes cometbytes.HexBytes
 }
 
-func (ssc SignStateConsensus) HRSKey() HRSKey {
+func (signState SignStateConsensus) HRSKey() HRSKey {
 	return HRSKey{
-		Height: ssc.Height,
-		Round:  ssc.Round,
-		Step:   ssc.Step,
+		Height: signState.Height,
+		Round:  signState.Round,
+		Step:   signState.Step,
 	}
 }
 
