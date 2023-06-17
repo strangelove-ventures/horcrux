@@ -452,6 +452,8 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 		Timestamp: stamp.UnixNano(),
 	}
 
+	leaderStart := time.Now()
+
 	// Keep track of the last block that we began the signing process for. Only allow one attempt per block
 	if err := pv.SaveLastSignedStateInitiated(chainID, NewSignStateConsensus(height, round, step)); err != nil {
 		switch err.(type) {
@@ -493,6 +495,8 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 		}
 	}
 
+	saveLastSignedStateInitiatedDone := time.Now()
+
 	numPeers := len(pv.peerCosigners)
 	total := uint8(numPeers + 1)
 	getEphemeralWaitGroup := sync.WaitGroup{}
@@ -511,17 +515,23 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 			ephSecrets, &thresholdPeersMutex)
 	}
 
+	preMyEphSecrets := time.Now()
+
 	myEphSecrets, err := pv.myCosigner.GetEphemeralSecretParts(chainID, hrst)
 	if err != nil {
 		// Our ephemeral secret parts are required, cannot proceed
 		return nil, stamp, err
 	}
 
+	durationMyEphSecrets := time.Since(preMyEphSecrets)
+
 	// Wait for threshold cosigners to be complete
 	// A Cosigner will either respond in time, or be cancelled with timeout
 	if waitUntilCompleteOrTimeout(&getEphemeralWaitGroup, pv.grpcTimeout) {
 		return nil, stamp, errors.New("timed out waiting for ephemeral shares")
 	}
+
+	haveThresholdNonces := time.Now()
 
 	thresholdPeersMutex.Lock()
 	ephSecrets[pv.myCosigner] = myEphSecrets.EncryptedSecrets
@@ -559,6 +569,8 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 		return nil, stamp, errors.New("timed out waiting for peers to sign")
 	}
 
+	haveThresholdSignatures := time.Now()
+
 	timedSignBlockCosignerLag.Observe(time.Since(timeStartSignBlock).Seconds())
 	pv.logger.Debug(
 		"Done waiting for cosigners, assembling signatures",
@@ -594,11 +606,15 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 		return nil, stamp, fmt.Errorf("failed to aggregate signatures")
 	}
 
+	haveAggregateSignature := time.Now()
+
 	// verify the combined signature before saving to watermark
 	if !pv.myCosigner.VerifySignature(chainID, signBytes, signature) {
 		totalInvalidSignature.Inc()
 		return nil, stamp, errors.New("combined signature is not valid")
 	}
+
+	signatureVerified := time.Now()
 
 	newLss := ChainSignStateConsensus{
 		ChainID: chainID,
@@ -628,6 +644,32 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	if err != nil {
 		pv.logger.Error("Error emitting LSS", err.Error())
 	}
+
+	lastSignStateSaved := time.Now()
+
+	durationSaveLastSignedStateInitiated := saveLastSignedStateInitiatedDone.Sub(leaderStart)
+	durationGetNonces := haveThresholdNonces.Sub(saveLastSignedStateInitiatedDone)
+	durationThresholdSign := haveThresholdSignatures.Sub(haveThresholdNonces)
+	durationAggregateSign := haveAggregateSignature.Sub(haveThresholdSignatures)
+	durationVerifySignature := signatureVerified.Sub(haveAggregateSignature)
+	durationSaveLastSignState := lastSignStateSaved.Sub(signatureVerified)
+
+	fmt.Printf(`durationSaveLastSignedStateInitiated: %.02f
+	durationGetNonces: %.02f
+	durationMyEphSecrets: %.02f,
+	durationThresholdSign: %.02f
+	durationAggregateSign: %.02f
+	durationVerifySignature: %.02f
+	durationSaveLastSignState: %.02f
+	`,
+		float64(durationSaveLastSignedStateInitiated.Microseconds())/1000.0,
+		float64(durationGetNonces.Microseconds())/1000.0,
+		float64(durationMyEphSecrets.Microseconds())/1000.0,
+		float64(durationThresholdSign.Microseconds())/1000.0,
+		float64(durationAggregateSign.Microseconds())/1000.0,
+		float64(durationVerifySignature.Microseconds())/1000.0,
+		float64(durationSaveLastSignState.Microseconds())/1000.0,
+	)
 
 	timeSignBlock := time.Since(timeStartSignBlock).Seconds()
 	timedSignBlockLag.Observe(timeSignBlock)
