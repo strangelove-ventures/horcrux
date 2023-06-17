@@ -401,17 +401,9 @@ func (cosigner *LocalCosigner) GetEphemeralSecretParts(
 ) (*CosignerEphemeralSecretPartsResponse, error) {
 	metricsTimeKeeper.SetPreviousLocalEphemeralShare(time.Now())
 
-	start := time.Now()
-
 	if err := cosigner.LoadSignStateIfNecessary(chainID); err != nil {
 		return nil, err
 	}
-
-	postLoadSignState := time.Since(start)
-
-	fmt.Printf("time to load sign state: %.02f\n",
-		float64(postLoadSignState.Microseconds())/1000.0,
-	)
 
 	res := &CosignerEphemeralSecretPartsResponse{
 		EncryptedSecrets: make([]CosignerEphemeralSecretPart, len(cosigner.rsaPubKeys)-1),
@@ -428,7 +420,6 @@ func (cosigner *LocalCosigner) GetEphemeralSecretParts(
 		pubKey := pubKey
 
 		eg.Go(func() error {
-			getEphSecretPartStart := time.Now()
 			secretPart, err := cosigner.getEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
 				ChainID:   chainID,
 				ID:        pubKey.ID,
@@ -441,13 +432,6 @@ func (cosigner *LocalCosigner) GetEphemeralSecretParts(
 			if err != nil {
 				return err
 			}
-
-			durationGetEphSecretPart := time.Since(getEphSecretPartStart)
-			fmt.Printf("[%d] time to get eph secret part for [%d]: %.02f\n",
-				id,
-				pubKey.ID,
-				float64(durationGetEphSecretPart.Microseconds())/1000.0,
-			)
 
 			if pubKey.ID > id {
 				res.EncryptedSecrets[pubKey.ID-2] = secretPart
@@ -494,7 +478,6 @@ func (cosigner *LocalCosigner) getEphemeralSecretPart(
 
 	// generate metadata placeholder
 	if !ok {
-		preDealShares := time.Now()
 		newMeta, err := cosigner.dealShares(CosignerGetEphemeralSecretPartRequest{
 			ChainID:   chainID,
 			Height:    req.Height,
@@ -507,10 +490,6 @@ func (cosigner *LocalCosigner) getEphemeralSecretPart(
 			ccs.metaMu.Unlock()
 			return res, err
 		}
-
-		timeDealShares := time.Since(preDealShares)
-
-		fmt.Printf("[%d] time to deal shares: %.02f\n", id, float64(timeDealShares.Microseconds())/1000.0)
 
 		ccs.hrsMeta[hrst] = newMeta
 		meta = newMeta
@@ -527,20 +506,11 @@ func (cosigner *LocalCosigner) getEphemeralSecretPart(
 
 	sharePart := ourCosignerMeta.Shares[req.ID-1]
 
-	preEncrypt := time.Now()
-
 	// use RSA public to encrypt user's share part
 	encrypted, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, &pubKey.PublicKey, sharePart, nil)
 	if err != nil {
 		return res, err
 	}
-
-	postEncrypt := time.Since(preEncrypt)
-
-	fmt.Printf("[%d] time to rsa encrypt: %.02f\n",
-		id,
-		float64(postEncrypt.Microseconds())/1000.0,
-	)
 
 	res.SourceID = id
 	res.SourceEphemeralSecretPublicKey = ourCosignerMeta.EphemeralSecretPublicKey
@@ -548,30 +518,20 @@ func (cosigner *LocalCosigner) getEphemeralSecretPart(
 
 	// sign the response payload with our private key
 	// cosigners can verify the signature to confirm sender validity
-	{
-		preSign := time.Now()
 
-		jsonBytes, err := cometjson.Marshal(res)
+	jsonBytes, err := cometjson.Marshal(res)
 
-		if err != nil {
-			return res, err
-		}
-
-		digest := sha256.Sum256(jsonBytes)
-		signature, err := rsa.SignPSS(rand.Reader, &cosigner.key.RSAKey, crypto.SHA256, digest[:], nil)
-		if err != nil {
-			return res, err
-		}
-
-		postSign := time.Since(preSign)
-
-		fmt.Printf("[%d] time to rsa sign: %.02f\n",
-			id,
-			float64(postSign.Microseconds())/1000.0,
-		)
-
-		res.SourceSig = signature
+	if err != nil {
+		return res, err
 	}
+
+	digest := sha256.Sum256(jsonBytes)
+	signature, err := rsa.SignPSS(rand.Reader, &cosigner.key.RSAKey, crypto.SHA256, digest[:], nil)
+	if err != nil {
+		return res, err
+	}
+
+	res.SourceSig = signature
 
 	res.DestinationID = req.ID
 
