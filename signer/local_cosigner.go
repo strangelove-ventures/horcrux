@@ -15,6 +15,7 @@ import (
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	cometjson "github.com/cometbft/cometbft/libs/json"
+	"golang.org/x/sync/errgroup"
 )
 
 var _ Cosigner = &LocalCosigner{}
@@ -30,7 +31,8 @@ type LastSignStateWrapper struct {
 
 type ChainState struct {
 	// Signing is thread safe - lastSignStateMutex is used for putting locks so only one goroutine can r/w to the function
-	mu sync.Mutex
+	metaMu      sync.RWMutex
+	signStateMu sync.RWMutex
 
 	// lastSignState stores the last sign state for an HRS we have fully signed
 	// incremented whenever we are asked to sign an HRS
@@ -106,18 +108,13 @@ type LocalCosigner struct {
 // The disk write is scheduled in a separate goroutine which will perform an atomic write.
 // pendingDiskWG is used upon termination in pendingDiskWG to ensure all writes have completed.
 func (cosigner *LocalCosigner) SaveLastSignedState(chainID string, signState SignStateConsensus) error {
-	cs, ok := cosigner.chainState.Load(chainID)
-	if !ok {
-		return fmt.Errorf("failed to load chain state for %s", chainID)
+	ccs, err := cosigner.getChainState(chainID)
+	if err != nil {
+		return err
 	}
 
-	ccs, ok := cs.(*ChainState)
-	if !ok {
-		return fmt.Errorf("expected: (*ChainState), actual: (%T)", cs)
-	}
-
-	ccs.mu.Lock()
-	defer ccs.mu.Unlock()
+	ccs.signStateMu.Lock()
+	defer ccs.signStateMu.Unlock()
 	return ccs.lastSignState.Save(
 		signState,
 		&cosigner.pendingDiskWG,
@@ -164,13 +161,7 @@ func (cosigner *LocalCosigner) GetAddress() string {
 	return cosigner.address
 }
 
-// GetPubKey returns public key of the validator.
-// Implements Cosigner interface
-func (cosigner *LocalCosigner) GetPubKey(chainID string) (cometcrypto.PubKey, error) {
-	if err := cosigner.LoadSignStateIfNecessary(chainID); err != nil {
-		return nil, err
-	}
-
+func (cosigner *LocalCosigner) getChainState(chainID string) (*ChainState, error) {
 	cs, ok := cosigner.chainState.Load(chainID)
 	if !ok {
 		return nil, fmt.Errorf("failed to load chain state for %s", chainID)
@@ -179,6 +170,21 @@ func (cosigner *LocalCosigner) GetPubKey(chainID string) (cometcrypto.PubKey, er
 	ccs, ok := cs.(*ChainState)
 	if !ok {
 		return nil, fmt.Errorf("expected: (*ChainState), actual: (%T)", cs)
+	}
+
+	return ccs, nil
+}
+
+// GetPubKey returns public key of the validator.
+// Implements Cosigner interface
+func (cosigner *LocalCosigner) GetPubKey(chainID string) (cometcrypto.PubKey, error) {
+	if err := cosigner.LoadSignStateIfNecessary(chainID); err != nil {
+		return nil, err
+	}
+
+	ccs, err := cosigner.getChainState(chainID)
+	if err != nil {
+		return nil, err
 	}
 
 	return cometcryptoed25519.PubKey(ccs.pubKeyBytes), nil
@@ -191,13 +197,8 @@ func (cosigner *LocalCosigner) VerifySignature(chainID string, payload, signatur
 		return false
 	}
 
-	cs, ok := cosigner.chainState.Load(chainID)
-	if !ok {
-		return false
-	}
-
-	ccs, ok := cs.(*ChainState)
-	if !ok {
+	ccs, err := cosigner.getChainState(chainID)
+	if err != nil {
 		return false
 	}
 
@@ -212,23 +213,17 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 
 	res := CosignerSignResponse{}
 
-	cs, ok := cosigner.chainState.Load(chainID)
-	if !ok {
-		return res, fmt.Errorf("failed to load chain state for %s", chainID)
-	}
-
-	ccs, ok := cs.(*ChainState)
-	if !ok {
-		return res, fmt.Errorf("expected: (*ChainState), actual: (%T)", cs)
+	ccs, err := cosigner.getChainState(chainID)
+	if err != nil {
+		return res, err
 	}
 
 	// This function has multiple exit points.  Only start time can be guaranteed
 	metricsTimeKeeper.SetPreviousLocalSignStart(time.Now())
 
-	ccs.mu.Lock()
-	defer ccs.mu.Unlock()
-
-	lss := ccs.lastSignState
+	ccs.signStateMu.RLock()
+	lss := *ccs.lastSignState
+	ccs.signStateMu.RUnlock()
 
 	hrst, err := UnpackHRST(req.SignBytes)
 	if err != nil {
@@ -253,8 +248,11 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		// same HRS, and only differ by timestamp - ok to sign again
 	}
 
+	ccs.metaMu.RLock()
+
 	meta, ok := ccs.hrsMeta[hrst]
 	if !ok {
+		ccs.metaMu.RUnlock()
 		return res, errors.New("no metadata at HRS")
 	}
 
@@ -282,6 +280,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 			noncePub = ted25519.GeAdd(noncePub, c.EphemeralSecretPublicKey)
 		}
 	}
+	ccs.metaMu.RUnlock()
 
 	sig := ted25519.TSign(req.SignBytes, ccs.keyShare, ted25519.PublicKey(ccs.pubKeyBytes), nonceShare, noncePub)
 
@@ -320,32 +319,14 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 func (cosigner *LocalCosigner) dealShares(req CosignerGetEphemeralSecretPartRequest) ([]CosignerMetadata, error) {
 	chainID := req.ChainID
 
-	cs, ok := cosigner.chainState.Load(chainID)
-	if !ok {
-		return nil, fmt.Errorf("failed to load chain state for %s", chainID)
-	}
-
-	ccs, ok := cs.(*ChainState)
-	if !ok {
-		return nil, fmt.Errorf("expected: (*ChainState), actual: (%T)", cs)
-	}
-
-	hrsKey := HRSTKey{
-		Height:    req.Height,
-		Round:     req.Round,
-		Step:      req.Step,
-		Timestamp: req.Timestamp.UnixNano(),
-	}
-
-	meta, ok := ccs.hrsMeta[hrsKey]
-
-	if ok {
-		return meta, nil
+	ccs, err := cosigner.getChainState(chainID)
+	if err != nil {
+		return nil, err
 	}
 
 	total := len(cosigner.rsaPubKeys)
 
-	meta = make([]CosignerMetadata, total)
+	meta := make([]CosignerMetadata, total)
 
 	noncePub, nonceShares, _, err := ted25519.GenerateSharedNonce(&ted25519.ShareConfiguration{T: int(cosigner.threshold), N: total}, ccs.keyShare, ccs.pubKeyBytes, ted25519.Message{})
 	if err != nil {
@@ -362,10 +343,7 @@ func (cosigner *LocalCosigner) dealShares(req CosignerGetEphemeralSecretPartRequ
 		EphemeralSecretPublicKey: noncePub.Bytes(),
 	}
 
-	ccs.hrsMeta[hrsKey] = meta
-
 	return meta, nil
-
 }
 
 func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
@@ -436,38 +414,55 @@ func (cosigner *LocalCosigner) GetEphemeralSecretParts(
 	)
 
 	res := &CosignerEphemeralSecretPartsResponse{
-		EncryptedSecrets: make([]CosignerEphemeralSecretPart, 0, len(cosigner.rsaPubKeys)-1),
+		EncryptedSecrets: make([]CosignerEphemeralSecretPart, len(cosigner.rsaPubKeys)-1),
 	}
 
 	id := cosigner.GetID()
+
+	var eg errgroup.Group
 
 	for _, pubKey := range cosigner.rsaPubKeys {
 		if pubKey.ID == id {
 			continue
 		}
-		getEphSecretPartStart := time.Now()
-		secretPart, err := cosigner.getEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-			ChainID:   chainID,
-			ID:        pubKey.ID,
-			Height:    hrst.Height,
-			Round:     hrst.Round,
-			Step:      hrst.Step,
-			Timestamp: time.Unix(0, hrst.Timestamp),
+		pubKey := pubKey
+
+		eg.Go(func() error {
+			getEphSecretPartStart := time.Now()
+			secretPart, err := cosigner.getEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
+				ChainID:   chainID,
+				ID:        pubKey.ID,
+				Height:    hrst.Height,
+				Round:     hrst.Round,
+				Step:      hrst.Step,
+				Timestamp: time.Unix(0, hrst.Timestamp),
+			})
+
+			if err != nil {
+				return err
+			}
+
+			durationGetEphSecretPart := time.Since(getEphSecretPartStart)
+			fmt.Printf("[%d] time to get eph secret part for [%d]: %.02f\n",
+				id,
+				pubKey.ID,
+				float64(durationGetEphSecretPart.Microseconds())/1000.0,
+			)
+
+			if pubKey.ID > id {
+				res.EncryptedSecrets[pubKey.ID-2] = secretPart
+			} else {
+				res.EncryptedSecrets[pubKey.ID-1] = secretPart
+			}
+
+			return nil
 		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		durationGetEphSecretPart := time.Since(getEphSecretPartStart)
-		fmt.Printf("[%d] time to get eph secret part for [%d]: %.02f\n",
-			id,
-			pubKey.ID,
-			float64(durationGetEphSecretPart.Microseconds())/1000.0,
-		)
-
-		res.EncryptedSecrets = append(res.EncryptedSecrets, secretPart)
 	}
+
+	if err := eg.Wait(); err != nil {
+		return nil, err
+	}
+
 	return res, nil
 }
 
@@ -479,19 +474,10 @@ func (cosigner *LocalCosigner) getEphemeralSecretPart(
 	chainID := req.ChainID
 	res := CosignerEphemeralSecretPart{}
 
-	cs, ok := cosigner.chainState.Load(chainID)
-	if !ok {
-		return res, fmt.Errorf("failed to load chain state for %s", chainID)
+	ccs, err := cosigner.getChainState(chainID)
+	if err != nil {
+		return res, err
 	}
-
-	ccs, ok := cs.(*ChainState)
-	if !ok {
-		return res, fmt.Errorf("expected: (*ChainState), actual: (%T)", cs)
-	}
-
-	// protects the meta map
-	ccs.mu.Lock()
-	defer ccs.mu.Unlock()
 
 	hrst := HRSTKey{
 		Height:    req.Height,
@@ -502,7 +488,10 @@ func (cosigner *LocalCosigner) getEphemeralSecretPart(
 
 	id := cosigner.GetID()
 
+	// protects the meta map
+	ccs.metaMu.Lock()
 	meta, ok := ccs.hrsMeta[hrst]
+
 	// generate metadata placeholder
 	if !ok {
 		preDealShares := time.Now()
@@ -515,6 +504,7 @@ func (cosigner *LocalCosigner) getEphemeralSecretPart(
 		})
 
 		if err != nil {
+			ccs.metaMu.Unlock()
 			return res, err
 		}
 
@@ -522,9 +512,10 @@ func (cosigner *LocalCosigner) getEphemeralSecretPart(
 
 		fmt.Printf("[%d] time to deal shares: %.02f\n", id, float64(timeDealShares.Microseconds())/1000.0)
 
+		ccs.hrsMeta[hrst] = newMeta
 		meta = newMeta
-		ccs.hrsMeta[hrst] = meta
 	}
+	ccs.metaMu.Unlock()
 
 	ourCosignerMeta := meta[id-1]
 
@@ -591,14 +582,9 @@ func (cosigner *LocalCosigner) getEphemeralSecretPart(
 func (cosigner *LocalCosigner) setEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest) error {
 	chainID := req.ChainID
 
-	cs, ok := cosigner.chainState.Load(chainID)
-	if !ok {
-		return fmt.Errorf("failed to load chain state for %s", chainID)
-	}
-
-	ccs, ok := cs.(*ChainState)
-	if !ok {
-		return fmt.Errorf("expected: (*ChainState), actual: (%T)", cs)
+	ccs, err := cosigner.getChainState(chainID)
+	if err != nil {
+		return err
 	}
 
 	// Verify the source signature
@@ -629,9 +615,11 @@ func (cosigner *LocalCosigner) setEphemeralSecretPart(req CosignerSetEphemeralSe
 		return err
 	}
 
-	// protects the meta map
-	ccs.mu.Lock()
-	defer ccs.mu.Unlock()
+	// decrypt share
+	sharePart, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, &cosigner.key.RSAKey, req.EncryptedSharePart, nil)
+	if err != nil {
+		return err
+	}
 
 	hrst := HRSTKey{
 		Height:    req.Height,
@@ -640,22 +628,20 @@ func (cosigner *LocalCosigner) setEphemeralSecretPart(req CosignerSetEphemeralSe
 		Timestamp: req.Timestamp.UnixNano(),
 	}
 
+	// protects the meta map
+	ccs.metaMu.Lock()
+	defer ccs.metaMu.Unlock()
+
 	meta, ok := ccs.hrsMeta[hrst]
 	// generate metadata placeholder
 	if !ok {
 		return fmt.Errorf(
-			"unexpected state, metadata for hrs does not exist for H: %d, R: %d, S: %d, T: %d",
+			"unexpected state, metadata does not exist for H: %d, R: %d, S: %d, T: %d",
 			hrst.Height,
 			hrst.Round,
 			hrst.Step,
 			hrst.Timestamp,
 		)
-	}
-
-	// decrypt share
-	sharePart, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, &cosigner.key.RSAKey, req.EncryptedSharePart, nil)
-	if err != nil {
-		return err
 	}
 
 	// set slot
@@ -675,21 +661,27 @@ func (cosigner *LocalCosigner) SetEphemeralSecretPartsAndSign(
 		return nil, err
 	}
 
+	var eg errgroup.Group
+
 	for _, secretPart := range req.EncryptedSecrets {
-		err := cosigner.setEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
-			ChainID:                        chainID,
-			SourceID:                       secretPart.SourceID,
-			SourceEphemeralSecretPublicKey: secretPart.SourceEphemeralSecretPublicKey,
-			EncryptedSharePart:             secretPart.EncryptedSharePart,
-			SourceSig:                      secretPart.SourceSig,
-			Height:                         req.HRST.Height,
-			Round:                          req.HRST.Round,
-			Step:                           req.HRST.Step,
-			Timestamp:                      time.Unix(0, req.HRST.Timestamp),
+		secretPart := secretPart
+		eg.Go(func() error {
+			return cosigner.setEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
+				ChainID:                        chainID,
+				SourceID:                       secretPart.SourceID,
+				SourceEphemeralSecretPublicKey: secretPart.SourceEphemeralSecretPublicKey,
+				EncryptedSharePart:             secretPart.EncryptedSharePart,
+				SourceSig:                      secretPart.SourceSig,
+				Height:                         req.HRST.Height,
+				Round:                          req.HRST.Round,
+				Step:                           req.HRST.Step,
+				Timestamp:                      time.Unix(0, req.HRST.Timestamp),
+			})
 		})
-		if err != nil {
-			return nil, err
-		}
+	}
+
+	if err := eg.Wait(); err != nil {
+		return nil, err
 	}
 
 	res, err := cosigner.sign(CosignerSignRequest{
