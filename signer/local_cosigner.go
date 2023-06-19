@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coinbase/kryptology/pkg/ted25519/ted25519"
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	cometjson "github.com/cometbft/cometbft/libs/json"
@@ -19,13 +18,18 @@ import (
 
 var _ Cosigner = &LocalCosigner{}
 
-type LastSignStateWrapper struct {
-	// Signing is thread safe - lastSignStateMutex is used for putting locks so only one goroutine can r/w to the function
-	Mu sync.Mutex
-
-	// lastSignState stores the last sign state for an HRS we have fully signed
-	// incremented whenever we are asked to sign an HRS
-	LastSignState *SignState
+// LocalCosigner responds to sign requests using the key shard
+// The cosigner maintains a watermark to avoid double-signing
+//
+// LocalCosigner signing is thread saafe
+type LocalCosigner struct {
+	config        *RuntimeConfig
+	key           CosignerRSAKey
+	threshold     uint8
+	chainState    sync.Map
+	rsaPubKeys    map[int]CosignerRSAPubKey
+	address       string
+	pendingDiskWG sync.WaitGroup
 }
 
 type ChainState struct {
@@ -36,46 +40,43 @@ type ChainState struct {
 	// incremented whenever we are asked to sign an HRS
 	lastSignState *SignState
 
-	pubKeyBytes []byte
-	keyShare    *ted25519.KeyShare
+	signer ThresholdSigner
 
 	// Height, Round, Step -> metadata
-	hrsMeta map[HRSTKey][]CosignerMetadata
+	nonces map[HRSTKey][]Nonces
 }
 
-func (ccs *ChainState) getNonces(myID int, hrst HRSTKey) (*ted25519.NonceShare, ted25519.PublicKey, error) {
+// CosignerMetadata holds the share and the ephermeral secret public key
+// Moved from Local cosigner to threshold_ed25519
+type CosignerMetadata struct {
+	Shares                   [][]byte
+	EphemeralSecretPublicKey []byte
+}
+
+func (ccs *ChainState) combinedNonces(myID int, threshold uint8, hrst HRSTKey) ([]Nonce, error) {
 	ccs.mu.RLock()
 	defer ccs.mu.RUnlock()
 
-	meta, ok := ccs.hrsMeta[hrst]
+	nonces, ok := ccs.nonces[hrst]
 	if !ok {
-		return nil, nil, errors.New("no metadata at HRS")
+		return nil, errors.New("no metadata at HRS")
 	}
 
-	var nonceShare *ted25519.NonceShare
-	var noncePub ted25519.PublicKey
+	combinedNonces := make([]Nonce, 0, threshold)
 
 	// calculate secret and public keys
-	for _, c := range meta {
+	for _, c := range nonces {
 		if len(c.Shares) == 0 || len(c.Shares[myID-1]) == 0 {
 			continue
 		}
 
-		thisNonce := ted25519.NonceShareFromBytes(c.Shares[myID-1])
-		if nonceShare == nil {
-			nonceShare = thisNonce
-		} else {
-			nonceShare = nonceShare.Add(thisNonce)
-		}
-
-		if len(noncePub) == 0 {
-			noncePub = c.EphemeralSecretPublicKey
-		} else {
-			noncePub = ted25519.GeAdd(noncePub, c.EphemeralSecretPublicKey)
-		}
+		combinedNonces = append(combinedNonces, Nonce{
+			Share:  c.Shares[myID-1],
+			PubKey: c.PubKey,
+		})
 	}
 
-	return nonceShare, noncePub, nil
+	return combinedNonces, nil
 }
 
 // return true if we are less than the other key
@@ -120,20 +121,6 @@ type CosignerGetEphemeralSecretPartRequest struct {
 	Round     int64
 	Step      int8
 	Timestamp time.Time
-}
-
-// LocalCosigner responds to sign requests using the key shard
-// The cosigner maintains a watermark to avoid double-signing
-//
-// LocalCosigner signing is thread saafe
-type LocalCosigner struct {
-	config        *RuntimeConfig
-	key           CosignerRSAKey
-	threshold     uint8
-	chainState    sync.Map
-	rsaPubKeys    map[int]CosignerRSAPubKey
-	address       string
-	pendingDiskWG sync.WaitGroup
 }
 
 // Save updates the high watermark height/round/step (HRS) if it is greater
@@ -218,7 +205,7 @@ func (cosigner *LocalCosigner) GetPubKey(chainID string) (cometcrypto.PubKey, er
 		return nil, err
 	}
 
-	return cometcryptoed25519.PubKey(ccs.pubKeyBytes), nil
+	return cometcryptoed25519.PubKey(ccs.signer.PubKey()), nil
 }
 
 // VerifySignature validates a signed payload against the public key.
@@ -233,7 +220,7 @@ func (cosigner *LocalCosigner) VerifySignature(chainID string, payload, signatur
 		return false
 	}
 
-	return cometcryptoed25519.PubKey(ccs.pubKeyBytes).VerifySignature(payload, signature)
+	return cometcryptoed25519.PubKey(ccs.signer.PubKey()).VerifySignature(payload, signature)
 }
 
 // Sign the sign request using the cosigner's shard
@@ -267,20 +254,21 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		return res, nil
 	}
 
-	nonceShare, noncePub, err := ccs.getNonces(cosigner.GetID(), hrst)
+	nonces, err := ccs.combinedNonces(cosigner.GetID(), cosigner.threshold, hrst)
 	if err != nil {
 		return res, err
 	}
 
-	sig := ted25519.TSign(req.SignBytes, ccs.keyShare, ted25519.PublicKey(ccs.pubKeyBytes), nonceShare, noncePub)
-
-	ccs.lastSignState.EphemeralPublic = noncePub
+	sig, err := ccs.signer.Sign(nonces, req.SignBytes)
+	if err != nil {
+		return res, err
+	}
 
 	err = ccs.lastSignState.Save(SignStateConsensus{
 		Height:    hrst.Height,
 		Round:     hrst.Round,
 		Step:      hrst.Step,
-		Signature: sig.Bytes(),
+		Signature: sig,
 		SignBytes: req.SignBytes,
 	}, &cosigner.pendingDiskWG)
 
@@ -290,15 +278,15 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		}
 	}
 
-	for existingKey := range ccs.hrsMeta {
+	for existingKey := range ccs.nonces {
 		// delete any HRS lower than our signed level
 		// we will not be providing parts for any lower HRS
 		if existingKey.Less(hrst) {
-			delete(ccs.hrsMeta, existingKey)
+			delete(ccs.nonces, existingKey)
 		}
 	}
 
-	res.Signature = sig.Bytes()
+	res.Signature = sig
 
 	// Note - Function may return before this line so elapsed time for Finish may be multiple block times
 	metricsTimeKeeper.SetPreviousLocalSignFinish(time.Now())
@@ -306,7 +294,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	return res, nil
 }
 
-func (cosigner *LocalCosigner) dealShares(req CosignerGetEphemeralSecretPartRequest) ([]CosignerMetadata, error) {
+func (cosigner *LocalCosigner) dealShares(req CosignerGetEphemeralSecretPartRequest) ([]Nonces, error) {
 	chainID := req.ChainID
 
 	ccs, err := cosigner.getChainState(chainID)
@@ -316,27 +304,14 @@ func (cosigner *LocalCosigner) dealShares(req CosignerGetEphemeralSecretPartRequ
 
 	total := len(cosigner.rsaPubKeys)
 
-	meta := make([]CosignerMetadata, total)
+	meta := make([]Nonces, total)
 
-	noncePub, nonceShares, _, err := ted25519.GenerateSharedNonce(
-		&ted25519.ShareConfiguration{T: int(cosigner.threshold), N: total},
-		ccs.keyShare,
-		ccs.pubKeyBytes,
-		ted25519.Message{},
-	)
+	nonces, err := ccs.signer.GenerateNonces()
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate nonce shares: %w", err)
+		return nil, err
 	}
 
-	shares := make([][]byte, total)
-	for i, s := range nonceShares {
-		shares[i] = s.Bytes()
-	}
-
-	meta[cosigner.GetID()-1] = CosignerMetadata{
-		Shares:                   shares,
-		EphemeralSecretPublicKey: noncePub.Bytes(),
-	}
+	meta[cosigner.GetID()-1] = nonces
 
 	return meta, nil
 }
@@ -355,25 +330,15 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 		return err
 	}
 
-	keyFile, err := cosigner.config.KeyFileExistsCosigner(chainID)
+	signer, err := NewThresholdSignerSoft(cosigner.config, cosigner.GetID(), chainID)
 	if err != nil {
 		return err
 	}
 
-	key, err := LoadCosignerEd25519Key(keyFile)
-	if err != nil {
-		return fmt.Errorf("error reading cosigner key: %s", err)
-	}
-
-	if key.ID != cosigner.GetID() {
-		return fmt.Errorf("key shard ID (%d) in (%s) does not match cosigner ID (%d)", key.ID, keyFile, cosigner.GetID())
-	}
-
 	cosigner.chainState.Store(chainID, &ChainState{
 		lastSignState: signState,
-		hrsMeta:       make(map[HRSTKey][]CosignerMetadata),
-		keyShare:      ted25519.NewKeyShare(byte(key.ID), reverseBytes(key.PrivateShard)),
-		pubKeyBytes:   key.PubKey.(cometcryptoed25519.PubKey)[:],
+		nonces:        make(map[HRSTKey][]Nonces),
+		signer:        signer,
 	})
 
 	return nil
@@ -445,7 +410,7 @@ func (cosigner *LocalCosigner) GetEphemeralSecretParts(
 	return res, nil
 }
 
-func (cosigner *LocalCosigner) dealSharesIfNecessary(chainID string, hrst HRSTKey) ([]CosignerMetadata, error) {
+func (cosigner *LocalCosigner) dealSharesIfNecessary(chainID string, hrst HRSTKey) ([]Nonces, error) {
 	ccs, err := cosigner.getChainState(chainID)
 	if err != nil {
 		return nil, err
@@ -455,12 +420,12 @@ func (cosigner *LocalCosigner) dealSharesIfNecessary(chainID string, hrst HRSTKe
 	ccs.mu.Lock()
 	defer ccs.mu.Unlock()
 
-	meta, ok := ccs.hrsMeta[hrst]
+	nonces, ok := ccs.nonces[hrst]
 	if ok {
-		return meta, nil
+		return nonces, nil
 	}
 
-	newMeta, err := cosigner.dealShares(CosignerGetEphemeralSecretPartRequest{
+	newNonces, err := cosigner.dealShares(CosignerGetEphemeralSecretPartRequest{
 		ChainID:   chainID,
 		Height:    hrst.Height,
 		Round:     hrst.Round,
@@ -472,8 +437,8 @@ func (cosigner *LocalCosigner) dealSharesIfNecessary(chainID string, hrst HRSTKe
 		return nil, err
 	}
 
-	ccs.hrsMeta[hrst] = newMeta
-	return newMeta, nil
+	ccs.nonces[hrst] = newNonces
+	return newNonces, nil
 }
 
 // Get the ephemeral secret part for an ephemeral share
@@ -515,7 +480,7 @@ func (cosigner *LocalCosigner) getEphemeralSecretPart(
 	}
 
 	res.SourceID = id
-	res.SourceEphemeralSecretPublicKey = ourCosignerMeta.EphemeralSecretPublicKey
+	res.SourceEphemeralSecretPublicKey = ourCosignerMeta.PubKey
 	res.EncryptedSharePart = encrypted
 
 	// sign the response payload with our private key
@@ -594,7 +559,7 @@ func (cosigner *LocalCosigner) setEphemeralSecretPart(req CosignerSetEphemeralSe
 	ccs.mu.Lock()
 	defer ccs.mu.Unlock()
 
-	meta, ok := ccs.hrsMeta[hrst]
+	nonces, ok := ccs.nonces[hrst]
 	// generate metadata placeholder
 	if !ok {
 		return fmt.Errorf(
@@ -607,11 +572,11 @@ func (cosigner *LocalCosigner) setEphemeralSecretPart(req CosignerSetEphemeralSe
 	}
 
 	// set slot
-	if meta[req.SourceID-1].Shares == nil {
-		meta[req.SourceID-1].Shares = make([][]byte, len(cosigner.rsaPubKeys))
+	if nonces[req.SourceID-1].Shares == nil {
+		nonces[req.SourceID-1].Shares = make([][]byte, len(cosigner.rsaPubKeys))
 	}
-	meta[req.SourceID-1].Shares[cosigner.GetID()-1] = sharePart
-	meta[req.SourceID-1].EphemeralSecretPublicKey = req.SourceEphemeralSecretPublicKey
+	nonces[req.SourceID-1].Shares[cosigner.GetID()-1] = sharePart
+	nonces[req.SourceID-1].PubKey = req.SourceEphemeralSecretPublicKey
 	return nil
 }
 

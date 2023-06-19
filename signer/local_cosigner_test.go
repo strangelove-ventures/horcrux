@@ -86,6 +86,16 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 
 	tmpDir := t.TempDir()
 
+	cfg := Config{
+		ThresholdModeConfig: &ThresholdModeConfig{
+			Threshold: 2,
+			Cosigners: CosignersConfig{
+				{ShardID: 1},
+				{ShardID: 2},
+			},
+		},
+	}
+
 	cosigner1Dir, cosigner2Dir := filepath.Join(tmpDir, "cosigner1"), filepath.Join(tmpDir, "cosigner2")
 	err = os.Mkdir(cosigner1Dir, 0700)
 	require.NoError(t, err)
@@ -97,6 +107,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		&RuntimeConfig{
 			HomeDir:  cosigner1Dir,
 			StateDir: cosigner1Dir,
+			Config:   cfg,
 		},
 		CosignerRSAKey{
 			ID:     key1.ID,
@@ -118,6 +129,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		&RuntimeConfig{
 			HomeDir:  cosigner2Dir,
 			StateDir: cosigner2Dir,
+			Config:   cfg,
 		},
 		CosignerRSAKey{
 			ID:     key2.ID,
