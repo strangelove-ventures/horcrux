@@ -1,18 +1,17 @@
 package signer
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/coinbase/kryptology/pkg/ted25519/ted25519"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	comet "github.com/cometbft/cometbft/types"
+	ecies "github.com/ecies/go/v2"
 	"github.com/stretchr/testify/require"
+	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
 const (
@@ -24,7 +23,7 @@ const (
 func TestLocalCosignerGetID(t *testing.T) {
 	dummyPub := cometcryptoed25519.PubKey{}
 
-	rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
+	eciesKey, err := ecies.GenerateKey()
 	require.NoError(t, err)
 
 	key := CosignerEd25519Key{
@@ -35,13 +34,13 @@ func TestLocalCosignerGetID(t *testing.T) {
 
 	cosigner := NewLocalCosigner(
 		&RuntimeConfig{},
-		CosignerRSAKey{
-			ID:     key.ID,
-			RSAKey: *rsaKey,
+		CosignerECIESKey{
+			ID:       key.ID,
+			ECIESKey: eciesKey,
 		},
-		[]CosignerRSAPubKey{{
+		[]CosignerECIESPubKey{{
 			ID:        1,
-			PublicKey: rsaKey.PublicKey,
+			PublicKey: eciesKey.PublicKey,
 		}},
 		"",
 		0,
@@ -54,33 +53,36 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	// Test signing with a 2 of 2
 	threshold := uint8(2)
 
-	rsaKey1, err := rsa.GenerateKey(rand.Reader, bitSize)
+	eciesKey1, err := ecies.GenerateKey()
 	require.NoError(t, err)
 
-	rsaKey2, err := rsa.GenerateKey(rand.Reader, bitSize)
+	eciesKey2, err := ecies.GenerateKey()
 	require.NoError(t, err)
 
-	pubKeys := []CosignerRSAPubKey{{
+	pubKeys := []CosignerECIESPubKey{{
 		ID:        1,
-		PublicKey: rsaKey1.PublicKey,
+		PublicKey: eciesKey1.PublicKey,
 	}, {
 		ID:        2,
-		PublicKey: rsaKey2.PublicKey,
+		PublicKey: eciesKey2.PublicKey,
 	}}
 
-	config := ted25519.ShareConfiguration{T: 2, N: 2}
-	pub, privShards, _, _ := ted25519.GenerateSharedKey(&config)
-	pubKey := cometcryptoed25519.PubKey(pub)
+	privateKey := cometcryptoed25519.GenPrivKey()
+
+	privKeyBytes := [64]byte{}
+	copy(privKeyBytes[:], privateKey[:])
+	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, 2)
+	pubKey := privateKey.PubKey()
 
 	key1 := CosignerEd25519Key{
 		PubKey:       pubKey,
-		PrivateShard: reverseBytes(privShards[0].Value.Bytes()),
+		PrivateShard: privShards[0],
 		ID:           1,
 	}
 
 	key2 := CosignerEd25519Key{
 		PubKey:       pubKey,
-		PrivateShard: reverseBytes(privShards[1].Value.Bytes()),
+		PrivateShard: privShards[1],
 		ID:           2,
 	}
 
@@ -109,9 +111,9 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 			StateDir: cosigner1Dir,
 			Config:   cfg,
 		},
-		CosignerRSAKey{
-			ID:     key1.ID,
-			RSAKey: *rsaKey1,
+		CosignerECIESKey{
+			ID:       key1.ID,
+			ECIESKey: eciesKey1,
 		},
 		pubKeys,
 		"",
@@ -131,9 +133,9 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 			StateDir: cosigner2Dir,
 			Config:   cfg,
 		},
-		CosignerRSAKey{
-			ID:     key2.ID,
-			RSAKey: *rsaKey2,
+		CosignerECIESKey{
+			ID:       key2.ID,
+			ECIESKey: eciesKey2,
 		},
 		pubKeys,
 		"",
@@ -156,7 +158,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	require.Equal(t, cosigner1.GetID(), 1)
 	require.Equal(t, cosigner2.GetID(), 2)
 
-	publicKeys := make([]ted25519.PublicKey, 0)
+	publicKeys := make([][]byte, 0)
 
 	now := time.Now()
 
@@ -205,22 +207,15 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	shareSigs := []*ted25519.PartialSignature{
-		{
-			ShareIdentifier: 1,
-			Sig:             sigRes1.Signature,
-		},
-		{
-			ShareIdentifier: 2,
-			Sig:             sigRes2.Signature,
-		},
-	}
+	sigIds := []int{1, 2}
+	sigArr := [][]byte{sigRes1.Signature[32:], sigRes2.Signature[32:]}
 
-	t.Logf("sig arr: %+v", shareSigs)
+	t.Logf("sig arr: %x", sigArr)
 
-	combinedSig, err := ted25519.Aggregate(shareSigs, &config)
-	require.NoError(t, err, "failed to aggregate signatures")
+	combinedSig := tsed25519.CombineShares(2, sigIds, sigArr)
+	signature := sigRes1.Signature[:32]
+	signature = append(signature, combinedSig...)
 
 	t.Logf("signature: %x", combinedSig)
-	require.True(t, pubKey.VerifySignature(signBytes, combinedSig))
+	require.True(t, pubKey.VerifySignature(signBytes, signature))
 }

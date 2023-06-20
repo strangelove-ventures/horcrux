@@ -142,6 +142,14 @@ func (c RuntimeConfig) KeyFilePathCosignerRSA() string {
 	return filepath.Join(keyDir, "rsa_keys.json")
 }
 
+func (c RuntimeConfig) KeyFilePathCosignerECIES() string {
+	keyDir := c.HomeDir
+	if kd := c.cachedKeyDirectory(); kd != "" {
+		keyDir = kd
+	}
+	return filepath.Join(keyDir, "ecies_keys.json")
+}
+
 func (c RuntimeConfig) PrivValStateFile(chainID string) string {
 	return filepath.Join(c.StateDir, fmt.Sprintf("%s_priv_validator_state.json", chainID))
 }
@@ -181,6 +189,11 @@ func (c RuntimeConfig) KeyFileExistsCosigner(chainID string) (string, error) {
 
 func (c RuntimeConfig) KeyFileExistsCosignerRSA() (string, error) {
 	keyFile := c.KeyFilePathCosignerRSA()
+	return keyFile, fileExists(keyFile)
+}
+
+func (c RuntimeConfig) KeyFileExistsCosignerECIES() (string, error) {
+	keyFile := c.KeyFilePathCosignerECIES()
 	return keyFile, fileExists(keyFile)
 }
 

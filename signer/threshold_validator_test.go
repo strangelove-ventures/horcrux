@@ -2,8 +2,6 @@ package signer
 
 import (
 	"bytes"
-	"crypto/rand"
-	"crypto/rsa"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -18,6 +16,7 @@ import (
 	cometrand "github.com/cometbft/cometbft/libs/rand"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	comet "github.com/cometbft/cometbft/types"
+	ecies "github.com/ecies/go/v2"
 	"github.com/stretchr/testify/require"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
@@ -71,19 +70,19 @@ func loadKeyForLocalCosigner(
 }
 
 func testThresholdValidator(t *testing.T, threshold, total uint8) {
-	rsaKeys := make([]*rsa.PrivateKey, total)
-	pubKeys := make([]CosignerRSAPubKey, total)
+	eciesKeys := make([]*ecies.PrivateKey, total)
+	pubKeys := make([]CosignerECIESPubKey, total)
 	cosigners := make([]*LocalCosigner, total)
 
 	for i := uint8(0); i < total; i++ {
-		rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
+		eciesKey, err := ecies.GenerateKey()
 		require.NoError(t, err)
 
-		rsaKeys[i] = rsaKey
+		eciesKeys[i] = eciesKey
 
-		pubKeys[i] = CosignerRSAPubKey{
+		pubKeys[i] = CosignerECIESPubKey{
 			ID:        int(i) + 1,
-			PublicKey: rsaKey.PublicKey,
+			PublicKey: eciesKey.PublicKey,
 		}
 	}
 
@@ -119,9 +118,9 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 		cosigner := NewLocalCosigner(
 			cosignerConfig,
-			CosignerRSAKey{
-				ID:     pubKey.ID,
-				RSAKey: *rsaKeys[i],
+			CosignerECIESKey{
+				ID:       pubKey.ID,
+				ECIESKey: eciesKeys[i],
 			},
 			pubKeys, "", threshold,
 		)

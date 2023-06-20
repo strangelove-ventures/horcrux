@@ -10,6 +10,7 @@ import (
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	cometcryptoencoding "github.com/cometbft/cometbft/crypto/encoding"
 	cometprotocrypto "github.com/cometbft/cometbft/proto/tendermint/crypto"
+	ecies "github.com/ecies/go/v2"
 	amino "github.com/tendermint/go-amino"
 )
 
@@ -166,6 +167,78 @@ func (key *CosignerRSAKey) UnmarshalJSON(data []byte) error {
 // LoadCosignerRSAKey loads a CosignerRSAKey from file.
 func LoadCosignerRSAKey(file string) (CosignerRSAKey, error) {
 	pvKey := CosignerRSAKey{}
+	keyJSONBytes, err := os.ReadFile(file)
+	if err != nil {
+		return pvKey, err
+	}
+
+	err = json.Unmarshal(keyJSONBytes, &pvKey)
+	if err != nil {
+		return pvKey, err
+	}
+
+	return pvKey, nil
+}
+
+// CosignerECIESKey is a cosigner-to-cosigner encryption and signature key
+type CosignerECIESKey struct {
+	ECIESKey  *ecies.PrivateKey  `json:"eciesKey"`
+	ID        int                `json:"id"`
+	ECIESPubs []*ecies.PublicKey `json:"eciesPubs"`
+}
+
+func (key *CosignerECIESKey) MarshalJSON() ([]byte, error) {
+	type Alias CosignerECIESKey
+
+	// marshal our private key and all public keys
+	privateBytes := key.ECIESKey
+	pubKeysBytes := make([][]byte, 0)
+	for _, pubKey := range key.ECIESPubs {
+		pubKeysBytes = append(pubKeysBytes, pubKey.Bytes(true))
+	}
+
+	return json.Marshal(&struct {
+		ECIESKey  []byte   `json:"eciesKey"`
+		ECIESPubs [][]byte `json:"eciesPubs"`
+		*Alias
+	}{
+		ECIESKey:  privateBytes.Bytes(),
+		ECIESPubs: pubKeysBytes,
+		Alias:     (*Alias)(key),
+	})
+}
+
+func (key *CosignerECIESKey) UnmarshalJSON(data []byte) error {
+	type Alias CosignerECIESKey
+
+	aux := &struct {
+		ECIESKey  []byte   `json:"eciesKey"`
+		ECIESPubs [][]byte `json:"eciesPubs"`
+		*Alias
+	}{
+		Alias: (*Alias)(key),
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	// unmarshal the public key bytes for each cosigner
+	key.ECIESPubs = make([]*ecies.PublicKey, 0)
+	for _, bytes := range aux.ECIESPubs {
+		pub, err := ecies.NewPublicKeyFromBytes(bytes)
+		if err != nil {
+			return err
+		}
+		key.ECIESPubs = append(key.ECIESPubs, pub)
+	}
+
+	key.ECIESKey = ecies.NewPrivateKeyFromBytes(aux.ECIESKey)
+	return nil
+}
+
+// LoadCosignerECIESKey loads a CosignerECIESKey from file.
+func LoadCosignerECIESKey(file string) (CosignerECIESKey, error) {
+	pvKey := CosignerECIESKey{}
 	keyJSONBytes, err := os.ReadFile(file)
 	if err != nil {
 		return pvKey, err

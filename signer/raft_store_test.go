@@ -1,13 +1,12 @@
 package signer
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
 	"os"
 	"testing"
 	"time"
 
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	ecies "github.com/ecies/go/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,7 +18,7 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 
 	dummyPub := cometcryptoed25519.PubKey{}
 
-	rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
+	eciesKey, err := ecies.GenerateKey()
 	require.NoError(t, err)
 
 	key := CosignerEd25519Key{
@@ -30,13 +29,13 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 
 	cosigner := NewLocalCosigner(
 		&RuntimeConfig{},
-		CosignerRSAKey{
-			ID:     key.ID,
-			RSAKey: *rsaKey,
+		CosignerECIESKey{
+			ID:       key.ID,
+			ECIESKey: eciesKey,
 		},
-		[]CosignerRSAPubKey{{
+		[]CosignerECIESPubKey{{
 			ID:        1,
-			PublicKey: rsaKey.PublicKey,
+			PublicKey: eciesKey.PublicKey,
 		}},
 		"",
 		0,

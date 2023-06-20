@@ -18,12 +18,12 @@ func NewThresholdValidator(
 		return nil, nil, err
 	}
 
-	keyFile, err := config.KeyFileExistsCosignerRSA()
+	keyFile, err := config.KeyFileExistsCosignerECIES()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	key, err := signer.LoadCosignerRSAKey(keyFile)
+	key, err := signer.LoadCosignerECIESKey(keyFile)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
 	}
@@ -31,7 +31,7 @@ func NewThresholdValidator(
 	thresholdCfg := config.Config.ThresholdModeConfig
 
 	remoteCosigners := make([]signer.Cosigner, 0, len(thresholdCfg.Cosigners)-1)
-	pubKeys := make([]signer.CosignerRSAPubKey, len(thresholdCfg.Cosigners))
+	pubKeys := make([]signer.CosignerECIESPubKey, len(thresholdCfg.Cosigners))
 
 	var p2pListen string
 
@@ -45,9 +45,9 @@ func NewThresholdValidator(
 			p2pListen = c.P2PAddr
 		}
 
-		pubKeys[i] = signer.CosignerRSAPubKey{
+		pubKeys[i] = signer.CosignerECIESPubKey{
 			ID:        c.ShardID,
-			PublicKey: *key.RSAPubs[c.ShardID-1],
+			PublicKey: key.ECIESPubs[c.ShardID-1],
 		}
 	}
 
