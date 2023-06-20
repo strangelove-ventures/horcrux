@@ -564,17 +564,7 @@ func (ts *Signer) GetMetrics(ctx context.Context) (map[string]*dto.MetricFamily,
 	if err != nil {
 		return nil, err
 	}
-
-	// //We Read the response body on the line below.
-	// body, err := ioutil.ReadAll(resp.Body)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// //Convert the body to type string
-	// sb := string(body)
-	// ts.tl.Log("Raw Metrics : ", sb)
 	var parser expfmt.TextParser
-	//mf, err := parser.TextToMetricFamilies(strings.NewReader(sb))
 	mf, err := parser.TextToMetricFamilies(resp.Body)
 	if err != nil {
 		return nil, err
