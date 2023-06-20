@@ -364,7 +364,7 @@ func (cosigner *LocalCosigner) GetNonces(
 
 	var eg errgroup.Group
 
-	for i := 1; i <= int(total); i++ {
+	for i := 1; i <= total; i++ {
 		if i == id {
 			continue
 		}
@@ -479,7 +479,8 @@ func (cosigner *LocalCosigner) setNonce(req CosignerSetNonceRequest) error {
 		return errors.New("SourceSig field is required")
 	}
 
-	noncePub, nonceShare, err := cosigner.security.DecryptAndVerify(req.SourceID, req.SourcePubKey, req.EncryptedSharePart, req.SourceSig)
+	noncePub, nonceShare, err := cosigner.security.DecryptAndVerify(
+		req.SourceID, req.SourcePubKey, req.EncryptedSharePart, req.SourceSig)
 	if err != nil {
 		return err
 	}

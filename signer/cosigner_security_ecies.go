@@ -13,7 +13,8 @@ import (
 
 var _ CosignerSecurity = &CosignerSecurityECIES{}
 
-// CosignerSecurityECIES is an implementation of CosignerSecurity using ECIES for encryption and ECDSA for digital signature.
+// CosignerSecurityECIES is an implementation of CosignerSecurity
+// using ECIES for encryption and ECDSA for digital signature.
 type CosignerSecurityECIES struct {
 	key          CosignerECIESKey
 	eciesPubKeys map[int]CosignerECIESPubKey
@@ -81,7 +82,14 @@ func (c *CosignerSecurityECIES) EncryptAndSign(id int, noncePub []byte, nonceSha
 	}
 
 	hash := sha256.Sum256(jsonBytes)
-	signature, err := ecdsa.SignASN1(rand.Reader, &ecdsa.PrivateKey{PublicKey: ecdsa.PublicKey(*c.key.ECIESKey.PublicKey), D: c.key.ECIESKey.D}, hash[:])
+	signature, err := ecdsa.SignASN1(
+		rand.Reader,
+		&ecdsa.PrivateKey{
+			PublicKey: ecdsa.PublicKey(*c.key.ECIESKey.PublicKey),
+			D:         c.key.ECIESKey.D,
+		},
+		hash[:],
+	)
 	if err != nil {
 		return nonce, err
 	}
@@ -92,8 +100,14 @@ func (c *CosignerSecurityECIES) EncryptAndSign(id int, noncePub []byte, nonceSha
 	return nonce, nil
 }
 
-// DecryptAndVerify decrypts the nonce and verifies the signature to authenticate the source cosigner.
-func (c *CosignerSecurityECIES) DecryptAndVerify(id int, encryptedNoncePub []byte, encryptedNonceShare []byte, signature []byte) ([]byte, []byte, error) {
+// DecryptAndVerify decrypts the nonce and verifies
+// the signature to authenticate the source cosigner.
+func (c *CosignerSecurityECIES) DecryptAndVerify(
+	id int,
+	encryptedNoncePub []byte,
+	encryptedNonceShare []byte,
+	signature []byte,
+) ([]byte, []byte, error) {
 	digestMsg := CosignerNonce{
 		SourceID:           id,
 		SourcePubKey:       encryptedNoncePub,

@@ -92,8 +92,14 @@ func (c *CosignerSecurityRSA) EncryptAndSign(id int, noncePub []byte, nonceShare
 	return nonce, nil
 }
 
-// DecryptAndVerify decrypts the nonce and verifies the signature to authenticate the source cosigner.
-func (c *CosignerSecurityRSA) DecryptAndVerify(id int, encryptedNoncePub []byte, encryptedNonceShare []byte, signature []byte) ([]byte, []byte, error) {
+// DecryptAndVerify decrypts the nonce and verifies
+// the signature to authenticate the source cosigner.
+func (c *CosignerSecurityRSA) DecryptAndVerify(
+	id int,
+	encryptedNoncePub []byte,
+	encryptedNonceShare []byte,
+	signature []byte,
+) ([]byte, []byte, error) {
 	digestMsg := CosignerNonce{
 		SourceID:           id,
 		SourcePubKey:       encryptedNoncePub,

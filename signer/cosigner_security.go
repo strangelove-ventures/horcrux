@@ -6,8 +6,17 @@ type CosignerSecurity interface {
 	GetID() int
 
 	// EncryptAndSign encrypts the nonce and signs it for authentication.
-	EncryptAndSign(id int, noncePub []byte, nonceShare []byte) (CosignerNonce, error)
+	EncryptAndSign(
+		id int,
+		noncePub []byte,
+		nonceShare []byte,
+	) (CosignerNonce, error)
 
 	// DecryptAndVerify decrypts the nonce and verifies the signature to authenticate the source cosigner.
-	DecryptAndVerify(id int, encryptedNoncePub []byte, encryptedNonceShare []byte, signature []byte) ([]byte, []byte, error)
+	DecryptAndVerify(
+		id int,
+		encryptedNoncePub []byte,
+		encryptedNonceShare []byte,
+		signature []byte,
+	) ([]byte, []byte, error)
 }
