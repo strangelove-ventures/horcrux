@@ -49,8 +49,8 @@ type ChainState struct {
 // CosignerMetadata holds the share and the ephermeral secret public key
 // Moved from Local cosigner to threshold_ed25519
 type CosignerMetadata struct {
-	Shares                   [][]byte
-	EphemeralSecretPublicKey []byte
+	Shares [][]byte
+	PubKey []byte
 }
 
 func (ccs *ChainState) combinedNonces(myID int, threshold uint8, hrst HRSTKey) ([]Nonce, error) {
@@ -114,7 +114,7 @@ type CosignerRSAPubKey struct {
 	PublicKey rsa.PublicKey
 }
 
-type CosignerGetEphemeralSecretPartRequest struct {
+type CosignerGetNonceRequest struct {
 	ChainID   string
 	ID        int
 	Height    int64
@@ -208,6 +208,16 @@ func (cosigner *LocalCosigner) GetPubKey(chainID string) (cometcrypto.PubKey, er
 	return cometcryptoed25519.PubKey(ccs.signer.PubKey()), nil
 }
 
+// CombineSignatures takes
+func (cosigner *LocalCosigner) CombineSignatures(chainID string, signatures []PartialSignature) ([]byte, error) {
+	ccs, err := cosigner.getChainState(chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	return ccs.signer.CombineSignatures(signatures)
+}
+
 // VerifySignature validates a signed payload against the public key.
 // Implements Cosigner interface
 func (cosigner *LocalCosigner) VerifySignature(chainID string, payload, signature []byte) bool {
@@ -294,7 +304,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	return res, nil
 }
 
-func (cosigner *LocalCosigner) dealShares(req CosignerGetEphemeralSecretPartRequest) ([]Nonces, error) {
+func (cosigner *LocalCosigner) dealShares(req CosignerGetNonceRequest) ([]Nonces, error) {
 	chainID := req.ChainID
 
 	ccs, err := cosigner.getChainState(chainID)
@@ -355,18 +365,18 @@ func reverseBytes(inBytes []byte) []byte {
 	return outBytes
 }
 
-func (cosigner *LocalCosigner) GetEphemeralSecretParts(
+func (cosigner *LocalCosigner) GetNonces(
 	chainID string,
 	hrst HRSTKey,
-) (*CosignerEphemeralSecretPartsResponse, error) {
+) (*CosignerNoncesResponse, error) {
 	metricsTimeKeeper.SetPreviousLocalEphemeralShare(time.Now())
 
 	if err := cosigner.LoadSignStateIfNecessary(chainID); err != nil {
 		return nil, err
 	}
 
-	res := &CosignerEphemeralSecretPartsResponse{
-		EncryptedSecrets: make([]CosignerEphemeralSecretPart, len(cosigner.rsaPubKeys)-1),
+	res := &CosignerNoncesResponse{
+		EncryptedSecrets: make([]CosignerNonce, len(cosigner.rsaPubKeys)-1),
 	}
 
 	id := cosigner.GetID()
@@ -380,7 +390,7 @@ func (cosigner *LocalCosigner) GetEphemeralSecretParts(
 		pubKey := pubKey
 
 		eg.Go(func() error {
-			secretPart, err := cosigner.getEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
+			secretPart, err := cosigner.getNonce(CosignerGetNonceRequest{
 				ChainID:   chainID,
 				ID:        pubKey.ID,
 				Height:    hrst.Height,
@@ -425,7 +435,7 @@ func (cosigner *LocalCosigner) dealSharesIfNecessary(chainID string, hrst HRSTKe
 		return nonces, nil
 	}
 
-	newNonces, err := cosigner.dealShares(CosignerGetEphemeralSecretPartRequest{
+	newNonces, err := cosigner.dealShares(CosignerGetNonceRequest{
 		ChainID:   chainID,
 		Height:    hrst.Height,
 		Round:     hrst.Round,
@@ -443,11 +453,11 @@ func (cosigner *LocalCosigner) dealSharesIfNecessary(chainID string, hrst HRSTKe
 
 // Get the ephemeral secret part for an ephemeral share
 // The ephemeral secret part is encrypted for the receiver
-func (cosigner *LocalCosigner) getEphemeralSecretPart(
-	req CosignerGetEphemeralSecretPartRequest,
-) (CosignerEphemeralSecretPart, error) {
+func (cosigner *LocalCosigner) getNonce(
+	req CosignerGetNonceRequest,
+) (CosignerNonce, error) {
 	chainID := req.ChainID
-	res := CosignerEphemeralSecretPart{}
+	res := CosignerNonce{}
 
 	hrst := HRSTKey{
 		Height:    req.Height,
@@ -480,7 +490,7 @@ func (cosigner *LocalCosigner) getEphemeralSecretPart(
 	}
 
 	res.SourceID = id
-	res.SourceEphemeralSecretPublicKey = ourCosignerMeta.PubKey
+	res.SourcePubKey = ourCosignerMeta.PubKey
 	res.EncryptedSharePart = encrypted
 
 	// sign the response payload with our private key
@@ -506,7 +516,7 @@ func (cosigner *LocalCosigner) getEphemeralSecretPart(
 }
 
 // Store an ephemeral secret share part provided by another cosigner
-func (cosigner *LocalCosigner) setEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest) error {
+func (cosigner *LocalCosigner) setNonce(req CosignerSetNonceRequest) error {
 	chainID := req.ChainID
 
 	ccs, err := cosigner.getChainState(chainID)
@@ -519,10 +529,10 @@ func (cosigner *LocalCosigner) setEphemeralSecretPart(req CosignerSetEphemeralSe
 		return errors.New("SourceSig field is required")
 	}
 
-	digestMsg := CosignerEphemeralSecretPart{
-		SourceID:                       req.SourceID,
-		SourceEphemeralSecretPublicKey: req.SourceEphemeralSecretPublicKey,
-		EncryptedSharePart:             req.EncryptedSharePart,
+	digestMsg := CosignerNonce{
+		SourceID:           req.SourceID,
+		SourcePubKey:       req.SourcePubKey,
+		EncryptedSharePart: req.EncryptedSharePart,
 	}
 
 	digestBytes, err := cometjson.Marshal(digestMsg)
@@ -576,12 +586,12 @@ func (cosigner *LocalCosigner) setEphemeralSecretPart(req CosignerSetEphemeralSe
 		nonces[req.SourceID-1].Shares = make([][]byte, len(cosigner.rsaPubKeys))
 	}
 	nonces[req.SourceID-1].Shares[cosigner.GetID()-1] = sharePart
-	nonces[req.SourceID-1].PubKey = req.SourceEphemeralSecretPublicKey
+	nonces[req.SourceID-1].PubKey = req.SourcePubKey
 	return nil
 }
 
-func (cosigner *LocalCosigner) SetEphemeralSecretPartsAndSign(
-	req CosignerSetEphemeralSecretPartsAndSignRequest) (*CosignerSignResponse, error) {
+func (cosigner *LocalCosigner) SetNoncesAndSign(
+	req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error) {
 	chainID := req.ChainID
 
 	if err := cosigner.LoadSignStateIfNecessary(chainID); err != nil {
@@ -593,16 +603,16 @@ func (cosigner *LocalCosigner) SetEphemeralSecretPartsAndSign(
 	for _, secretPart := range req.EncryptedSecrets {
 		secretPart := secretPart
 		eg.Go(func() error {
-			return cosigner.setEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
-				ChainID:                        chainID,
-				SourceID:                       secretPart.SourceID,
-				SourceEphemeralSecretPublicKey: secretPart.SourceEphemeralSecretPublicKey,
-				EncryptedSharePart:             secretPart.EncryptedSharePart,
-				SourceSig:                      secretPart.SourceSig,
-				Height:                         req.HRST.Height,
-				Round:                          req.HRST.Round,
-				Step:                           req.HRST.Step,
-				Timestamp:                      time.Unix(0, req.HRST.Timestamp),
+			return cosigner.setNonce(CosignerSetNonceRequest{
+				ChainID:            chainID,
+				SourceID:           secretPart.SourceID,
+				SourcePubKey:       secretPart.SourcePubKey,
+				EncryptedSharePart: secretPart.EncryptedSharePart,
+				SourceSig:          secretPart.SourceSig,
+				Height:             req.HRST.Height,
+				Round:              req.HRST.Round,
+				Step:               req.HRST.Step,
+				Timestamp:          time.Unix(0, req.HRST.Timestamp),
 			})
 		})
 	}

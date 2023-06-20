@@ -8,8 +8,6 @@ import (
 
 var _ ThresholdSigner = &ThresholdSignerSoft{}
 
-const SignerTypeSoftSign = "SoftSign"
-
 type ThresholdSignerSoft struct {
 	privateKeyShard *ted25519.KeyShare
 	pubKey          ted25519.PublicKey
@@ -40,10 +38,6 @@ func NewThresholdSignerSoft(config *RuntimeConfig, id int, chainID string) (*Thr
 	}
 
 	return &s, nil
-}
-
-func (s *ThresholdSignerSoft) Type() string {
-	return SignerTypeSoftSign
 }
 
 func (s *ThresholdSignerSoft) PubKey() []byte {
@@ -102,4 +96,20 @@ func (s *ThresholdSignerSoft) GenerateNonces() (Nonces, error) {
 	}
 
 	return nonces, nil
+}
+
+func (s *ThresholdSignerSoft) CombineSignatures(signatures []PartialSignature) ([]byte, error) {
+	partialSigs := make([]*ted25519.PartialSignature, len(signatures))
+	for _, s := range signatures {
+		partialSigs = append(partialSigs, &ted25519.PartialSignature{
+			ShareIdentifier: byte(s.ID),
+			Sig:             s.Signature,
+		})
+	}
+	signature, err := ted25519.Aggregate(partialSigs, &ted25519.ShareConfiguration{T: s.threshold, N: s.total})
+	if err != nil {
+		return nil, fmt.Errorf("failed to combine signatures: %w", err)
+	}
+
+	return signature, nil
 }

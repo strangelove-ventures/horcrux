@@ -76,10 +76,10 @@ func (cosigner *RemoteCosigner) getGRPCClient() (proto.CosignerGRPCClient, *grpc
 }
 
 // Implements the cosigner interface
-func (cosigner *RemoteCosigner) GetEphemeralSecretParts(
+func (cosigner *RemoteCosigner) GetNonces(
 	chainID string,
 	req HRSTKey,
-) (*CosignerEphemeralSecretPartsResponse, error) {
+) (*CosignerNoncesResponse, error) {
 	client, conn, err := cosigner.getGRPCClient()
 	if err != nil {
 		return nil, err
@@ -87,21 +87,21 @@ func (cosigner *RemoteCosigner) GetEphemeralSecretParts(
 	defer conn.Close()
 	context, cancelFunc := getContext()
 	defer cancelFunc()
-	res, err := client.GetEphemeralSecretParts(context, &proto.CosignerGRPCGetEphemeralSecretPartsRequest{
+	res, err := client.GetNonces(context, &proto.CosignerGRPCGetNoncesRequest{
 		ChainID: chainID,
 		Hrst:    req.toProto(),
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &CosignerEphemeralSecretPartsResponse{
-		EncryptedSecrets: CosignerEphemeralSecretPartsFromProto(res.GetEncryptedSecrets()),
+	return &CosignerNoncesResponse{
+		EncryptedSecrets: CosignerNoncesFromProto(res.GetEncryptedSecrets()),
 	}, nil
 }
 
 // Implements the cosigner interface
-func (cosigner *RemoteCosigner) SetEphemeralSecretPartsAndSign(
-	req CosignerSetEphemeralSecretPartsAndSignRequest) (*CosignerSignResponse, error) {
+func (cosigner *RemoteCosigner) SetNoncesAndSign(
+	req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error) {
 	client, conn, err := cosigner.getGRPCClient()
 	if err != nil {
 		return nil, err
@@ -109,9 +109,9 @@ func (cosigner *RemoteCosigner) SetEphemeralSecretPartsAndSign(
 	defer conn.Close()
 	context, cancelFunc := getContext()
 	defer cancelFunc()
-	res, err := client.SetEphemeralSecretPartsAndSign(context, &proto.CosignerGRPCSetEphemeralSecretPartsAndSignRequest{
+	res, err := client.SetNoncesAndSign(context, &proto.CosignerGRPCSetNoncesAndSignRequest{
 		ChainID:          req.ChainID,
-		EncryptedSecrets: CosignerEphemeralSecretParts(req.EncryptedSecrets).toProto(),
+		EncryptedSecrets: CosignerNonces(req.EncryptedSecrets).toProto(),
 		Hrst:             req.HRST.toProto(),
 		SignBytes:        req.SignBytes,
 	})

@@ -38,13 +38,13 @@ func (rpc *GRPCServer) SignBlock(
 	}, nil
 }
 
-func (rpc *GRPCServer) SetEphemeralSecretPartsAndSign(
+func (rpc *GRPCServer) SetNoncesAndSign(
 	_ context.Context,
-	req *proto.CosignerGRPCSetEphemeralSecretPartsAndSignRequest,
-) (*proto.CosignerGRPCSetEphemeralSecretPartsAndSignResponse, error) {
-	res, err := rpc.cosigner.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
+	req *proto.CosignerGRPCSetNoncesAndSignRequest,
+) (*proto.CosignerGRPCSetNoncesAndSignResponse, error) {
+	res, err := rpc.cosigner.SetNoncesAndSign(CosignerSetNoncesAndSignRequest{
 		ChainID:          req.ChainID,
-		EncryptedSecrets: CosignerEphemeralSecretPartsFromProto(req.GetEncryptedSecrets()),
+		EncryptedSecrets: CosignerNoncesFromProto(req.GetEncryptedSecrets()),
 		HRST:             HRSTKeyFromProto(req.GetHrst()),
 		SignBytes:        req.GetSignBytes(),
 	})
@@ -66,25 +66,25 @@ func (rpc *GRPCServer) SetEphemeralSecretPartsAndSign(
 		"round", req.Hrst.Round,
 		"step", req.Hrst.Step,
 	)
-	return &proto.CosignerGRPCSetEphemeralSecretPartsAndSignResponse{
+	return &proto.CosignerGRPCSetNoncesAndSignResponse{
 		Timestamp: res.Timestamp.UnixNano(),
 		Signature: res.Signature,
 	}, nil
 }
 
-func (rpc *GRPCServer) GetEphemeralSecretParts(
+func (rpc *GRPCServer) GetNonces(
 	_ context.Context,
-	req *proto.CosignerGRPCGetEphemeralSecretPartsRequest,
-) (*proto.CosignerGRPCGetEphemeralSecretPartsResponse, error) {
-	res, err := rpc.cosigner.GetEphemeralSecretParts(
+	req *proto.CosignerGRPCGetNoncesRequest,
+) (*proto.CosignerGRPCGetNoncesResponse, error) {
+	res, err := rpc.cosigner.GetNonces(
 		req.ChainID,
 		HRSTKeyFromProto(req.GetHrst()),
 	)
 	if err != nil {
 		return nil, err
 	}
-	return &proto.CosignerGRPCGetEphemeralSecretPartsResponse{
-		EncryptedSecrets: CosignerEphemeralSecretParts(res.EncryptedSecrets).toProto(),
+	return &proto.CosignerGRPCGetNoncesResponse{
+		EncryptedSecrets: CosignerNonces(res.EncryptedSecrets).toProto(),
 	}, nil
 }
 

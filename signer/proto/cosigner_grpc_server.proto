@@ -6,8 +6,8 @@ package proto;
 
 service CosignerGRPC {
 	rpc SignBlock (CosignerGRPCSignBlockRequest) returns (CosignerGRPCSignBlockResponse) {}
-	rpc SetEphemeralSecretPartsAndSign (CosignerGRPCSetEphemeralSecretPartsAndSignRequest) returns (CosignerGRPCSetEphemeralSecretPartsAndSignResponse) {}
-  rpc GetEphemeralSecretParts (CosignerGRPCGetEphemeralSecretPartsRequest) returns (CosignerGRPCGetEphemeralSecretPartsResponse) {}
+	rpc SetNoncesAndSign (CosignerGRPCSetNoncesAndSignRequest) returns (CosignerGRPCSetNoncesAndSignResponse) {}
+  rpc GetNonces (CosignerGRPCGetNoncesRequest) returns (CosignerGRPCGetNoncesResponse) {}
   rpc TransferLeadership (CosignerGRPCTransferLeadershipRequest) returns (CosignerGRPCTransferLeadershipResponse) {}
   rpc GetLeader (CosignerGRPCGetLeaderRequest) returns (CosignerGRPCGetLeaderResponse) {}
 }
@@ -29,10 +29,10 @@ message CosignerGRPCSignBlockResponse {
 	bytes signature = 1;
 }
 
-message EphemeralSecretPart {
+message Nonce {
 	int32 sourceID = 1;
 	int32 destinationID = 2;
-	bytes sourceEphemeralSecretPublicKey = 3;
+	bytes sourcePubKey = 3;
 	bytes encryptedSharePart = 4;
 	bytes sourceSig = 5;
 }
@@ -44,26 +44,26 @@ message HRST {
   int64 timestamp = 4;
 }
 
-message CosignerGRPCSetEphemeralSecretPartsAndSignRequest {
-	repeated EphemeralSecretPart encryptedSecrets = 1;
+message CosignerGRPCSetNoncesAndSignRequest {
+	repeated Nonce encryptedSecrets = 1;
 	HRST hrst = 2;
 	bytes signBytes = 3;
   string chainID = 4;
 }
 
-message CosignerGRPCSetEphemeralSecretPartsAndSignResponse {
+message CosignerGRPCSetNoncesAndSignResponse {
 	bytes ephemeralPublic = 1;
 	int64 timestamp = 2;
 	bytes signature = 3;
 }
 
-message CosignerGRPCGetEphemeralSecretPartsRequest {
+message CosignerGRPCGetNoncesRequest {
 	HRST hrst = 1;
   string chainID = 2;
 }
 
-message CosignerGRPCGetEphemeralSecretPartsResponse {
-	repeated EphemeralSecretPart encryptedSecrets = 1;
+message CosignerGRPCGetNoncesResponse {
+	repeated Nonce encryptedSecrets = 1;
 }
 
 message CosignerGRPCTransferLeadershipRequest {

@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coinbase/kryptology/pkg/ted25519/ted25519"
 	"github.com/cometbft/cometbft/crypto"
 	"github.com/cometbft/cometbft/libs/log"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
@@ -31,7 +30,7 @@ type ThresholdValidator struct {
 	chainStateMu sync.RWMutex
 
 	// our own cosigner
-	myCosigner Cosigner
+	myCosigner *LocalCosigner
 
 	// peer cosigners
 	peerCosigners []Cosigner
@@ -58,7 +57,7 @@ func NewThresholdValidator(
 	config *RuntimeConfig,
 	threshold int,
 	grpcTimeout time.Duration,
-	myCosigner Cosigner,
+	myCosigner *LocalCosigner,
 	peerCosigners []Cosigner,
 	raftStore *RaftStore,
 ) *ThresholdValidator {
@@ -109,11 +108,7 @@ func (pv *ThresholdValidator) Stop() {
 func (pv *ThresholdValidator) waitForSignStatesToFlushToDisk() {
 	pv.pendingDiskWG.Wait()
 
-	switch cosigner := pv.myCosigner.(type) {
-	case *LocalCosigner:
-		cosigner.waitForSignStatesToFlushToDisk()
-	default:
-	}
+	pv.myCosigner.waitForSignStatesToFlushToDisk()
 }
 
 // GetPubKey returns the public key of the validator.
@@ -232,11 +227,11 @@ func (pv *ThresholdValidator) waitForPeerEphemeralShares(
 	peer Cosigner,
 	hrst HRSTKey,
 	wg *sync.WaitGroup,
-	encryptedEphemeralSharesThresholdMap map[Cosigner][]CosignerEphemeralSecretPart,
+	encryptedEphemeralSharesThresholdMap map[Cosigner][]CosignerNonce,
 	thresholdPeersMutex *sync.Mutex,
 ) {
 	peerStartTime := time.Now()
-	ephemeralSecretParts, err := peer.GetEphemeralSecretParts(chainID, hrst)
+	ephemeralSecretParts, err := peer.GetNonces(chainID, hrst)
 	if err != nil {
 
 		// Significant missing shares may lead to signature failure
@@ -271,7 +266,7 @@ func (pv *ThresholdValidator) waitForPeerSetEphemeralSharesAndSign(
 	chainID string,
 	peer Cosigner,
 	hrst HRSTKey,
-	encryptedEphemeralSharesThresholdMap map[Cosigner][]CosignerEphemeralSecretPart,
+	encryptedEphemeralSharesThresholdMap map[Cosigner][]CosignerNonce,
 	signBytes []byte,
 	shareSignatures *[][]byte,
 	shareSignaturesMutex *sync.Mutex,
@@ -279,7 +274,7 @@ func (pv *ThresholdValidator) waitForPeerSetEphemeralSharesAndSign(
 ) {
 	peerStartTime := time.Now()
 	defer wg.Done()
-	peerEphemeralSecretParts := make([]CosignerEphemeralSecretPart, 0, pv.threshold-1)
+	peerNonces := make([]CosignerNonce, 0, pv.threshold-1)
 
 	peerID := peer.GetID()
 
@@ -290,7 +285,7 @@ func (pv *ThresholdValidator) waitForPeerSetEphemeralSharesAndSign(
 				for thresholdPeer := range encryptedEphemeralSharesThresholdMap {
 					if thresholdPeer.GetID() == ephemeralSecretPart.SourceID {
 						// source peer is included in threshold signature, include in sharing
-						peerEphemeralSecretParts = append(peerEphemeralSecretParts, ephemeralSecretPart)
+						peerNonces = append(peerNonces, ephemeralSecretPart)
 						break
 					}
 				}
@@ -299,9 +294,9 @@ func (pv *ThresholdValidator) waitForPeerSetEphemeralSharesAndSign(
 		}
 	}
 
-	sigRes, err := peer.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
+	sigRes, err := peer.SetNoncesAndSign(CosignerSetNoncesAndSignRequest{
 		ChainID:          chainID,
-		EncryptedSecrets: peerEphemeralSecretParts,
+		EncryptedSecrets: peerNonces,
 		HRST:             hrst,
 		SignBytes:        signBytes,
 	})
@@ -362,12 +357,7 @@ func (pv *ThresholdValidator) LoadSignStateIfNecessary(chainID string) (ChainSig
 	pv.chainState[chainID] = css
 	pv.chainStateMu.Unlock()
 
-	switch cosigner := pv.myCosigner.(type) {
-	case *LocalCosigner:
-		return css, cosigner.LoadSignStateIfNecessary(chainID)
-	default:
-		return ChainSignState{}, fmt.Errorf("unknown cosigner type: %T", cosigner)
-	}
+	return css, pv.myCosigner.LoadSignStateIfNecessary(chainID)
 }
 
 func (pv *ThresholdValidator) getExistingBlockSignature(chainID string, block *Block) ([]byte, time.Time, error) {
@@ -526,7 +516,7 @@ func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, blo
 	getEphemeralWaitGroup.Add(pv.threshold - 1)
 	// Used to track how close we are to threshold
 
-	ephSecrets := make(map[Cosigner][]CosignerEphemeralSecretPart)
+	ephSecrets := make(map[Cosigner][]CosignerNonce)
 	thresholdPeersMutex := sync.Mutex{}
 
 	for _, c := range pv.peerCosigners {
@@ -534,7 +524,7 @@ func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, blo
 			ephSecrets, &thresholdPeersMutex)
 	}
 
-	myEphSecrets, err := pv.myCosigner.GetEphemeralSecretParts(chainID, hrst)
+	myEphSecrets, err := pv.myCosigner.GetNonces(chainID, hrst)
 	if err != nil {
 		// Our ephemeral secret parts are required, cannot proceed
 		return nil, stamp, err
@@ -580,7 +570,7 @@ func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, blo
 	shareSignaturesMutex := sync.Mutex{}
 
 	for cosigner := range ephSecrets {
-		// set peerEphemeralSecretParts and sign in single rpc call.
+		// set peerNonces and sign in single rpc call.
 		go pv.waitForPeerSetEphemeralSharesAndSign(chainID, cosigner, hrst, ephSecrets,
 			signBytes, &shareSignatures, &shareSignaturesMutex, &setEphemeralAndSignWaitGroup)
 	}
@@ -594,7 +584,7 @@ func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, blo
 	timedSignBlockCosignerLag.Observe(time.Since(timeStartSignBlock).Seconds())
 
 	// collect all valid responses into array of ids and signatures for the threshold lib
-	shareSigs := make([]*ted25519.PartialSignature, 0, pv.threshold)
+	shareSigs := make([]PartialSignature, 0, pv.threshold)
 	for idx, shareSig := range shareSignatures {
 		if len(shareSig) == 0 {
 			continue
@@ -602,9 +592,9 @@ func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, blo
 
 		// we are ok to use the share signatures - complete boolean
 		// prevents future concurrent access
-		shareSigs = append(shareSigs, &ted25519.PartialSignature{
-			ShareIdentifier: byte(idx + 1),
-			Sig:             shareSig,
+		shareSigs = append(shareSigs, PartialSignature{
+			ID:        idx + 1,
+			Signature: shareSig,
 		})
 	}
 
@@ -614,9 +604,9 @@ func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, blo
 	}
 
 	// assemble into final signature
-	signature, err := ted25519.Aggregate(shareSigs, &ted25519.ShareConfiguration{T: pv.threshold, N: int(total)})
+	signature, err := pv.myCosigner.CombineSignatures(chainID, shareSigs)
 	if err != nil {
-		return nil, stamp, fmt.Errorf("failed to aggregate signatures")
+		return nil, stamp, err
 	}
 
 	pv.logger.Debug(

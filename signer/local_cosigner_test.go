@@ -167,17 +167,17 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		Timestamp: now.UnixNano(),
 	}
 
-	ephemeralSharesFor2, err := cosigner1.GetEphemeralSecretParts(testChainID, hrst)
+	ephemeralSharesFor2, err := cosigner1.GetNonces(testChainID, hrst)
 	require.NoError(t, err)
 
-	publicKeys = append(publicKeys, ephemeralSharesFor2.EncryptedSecrets[0].SourceEphemeralSecretPublicKey)
+	publicKeys = append(publicKeys, ephemeralSharesFor2.EncryptedSecrets[0].SourcePubKey)
 
-	ephemeralSharesFor1, err := cosigner2.GetEphemeralSecretParts(testChainID, hrst)
+	ephemeralSharesFor1, err := cosigner2.GetNonces(testChainID, hrst)
 	require.NoError(t, err)
 
 	t.Logf("Shares from 2: %d", len(ephemeralSharesFor1.EncryptedSecrets))
 
-	publicKeys = append(publicKeys, ephemeralSharesFor1.EncryptedSecrets[0].SourceEphemeralSecretPublicKey)
+	publicKeys = append(publicKeys, ephemeralSharesFor1.EncryptedSecrets[0].SourcePubKey)
 
 	t.Logf("public keys: %x", publicKeys)
 	// pack a vote into sign bytes
@@ -189,7 +189,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 
 	signBytes := comet.VoteSignBytes("chain-id", &vote)
 
-	sigRes1, err := cosigner1.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
+	sigRes1, err := cosigner1.SetNoncesAndSign(CosignerSetNoncesAndSignRequest{
 		ChainID:          testChainID,
 		EncryptedSecrets: ephemeralSharesFor1.EncryptedSecrets,
 		HRST:             hrst,
@@ -197,7 +197,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	sigRes2, err := cosigner2.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
+	sigRes2, err := cosigner2.SetNoncesAndSign(CosignerSetNoncesAndSignRequest{
 		ChainID:          testChainID,
 		EncryptedSecrets: ephemeralSharesFor2.EncryptedSecrets,
 		HRST:             hrst,

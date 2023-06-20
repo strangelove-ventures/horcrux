@@ -201,20 +201,20 @@ func (x *CosignerGRPCSignBlockResponse) GetSignature() []byte {
 	return nil
 }
 
-type EphemeralSecretPart struct {
+type Nonce struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
 	SourceID                       int32  `protobuf:"varint,1,opt,name=sourceID,proto3" json:"sourceID,omitempty"`
 	DestinationID                  int32  `protobuf:"varint,2,opt,name=destinationID,proto3" json:"destinationID,omitempty"`
-	SourceEphemeralSecretPublicKey []byte `protobuf:"bytes,3,opt,name=sourceEphemeralSecretPublicKey,proto3" json:"sourceEphemeralSecretPublicKey,omitempty"`
+	SourcePubKey []byte `protobuf:"bytes,3,opt,name=sourcePubKey,proto3" json:"sourcePubKey,omitempty"`
 	EncryptedSharePart             []byte `protobuf:"bytes,4,opt,name=encryptedSharePart,proto3" json:"encryptedSharePart,omitempty"`
 	SourceSig                      []byte `protobuf:"bytes,5,opt,name=sourceSig,proto3" json:"sourceSig,omitempty"`
 }
 
-func (x *EphemeralSecretPart) Reset() {
-	*x = EphemeralSecretPart{}
+func (x *Nonce) Reset() {
+	*x = Nonce{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_signer_proto_cosigner_grpc_server_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -222,13 +222,13 @@ func (x *EphemeralSecretPart) Reset() {
 	}
 }
 
-func (x *EphemeralSecretPart) String() string {
+func (x *Nonce) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*EphemeralSecretPart) ProtoMessage() {}
+func (*Nonce) ProtoMessage() {}
 
-func (x *EphemeralSecretPart) ProtoReflect() protoreflect.Message {
+func (x *Nonce) ProtoReflect() protoreflect.Message {
 	mi := &file_signer_proto_cosigner_grpc_server_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -240,40 +240,40 @@ func (x *EphemeralSecretPart) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use EphemeralSecretPart.ProtoReflect.Descriptor instead.
-func (*EphemeralSecretPart) Descriptor() ([]byte, []int) {
+// Deprecated: Use Nonce.ProtoReflect.Descriptor instead.
+func (*Nonce) Descriptor() ([]byte, []int) {
 	return file_signer_proto_cosigner_grpc_server_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *EphemeralSecretPart) GetSourceID() int32 {
+func (x *Nonce) GetSourceID() int32 {
 	if x != nil {
 		return x.SourceID
 	}
 	return 0
 }
 
-func (x *EphemeralSecretPart) GetDestinationID() int32 {
+func (x *Nonce) GetDestinationID() int32 {
 	if x != nil {
 		return x.DestinationID
 	}
 	return 0
 }
 
-func (x *EphemeralSecretPart) GetSourceEphemeralSecretPublicKey() []byte {
+func (x *Nonce) GetSourcePubKey() []byte {
 	if x != nil {
-		return x.SourceEphemeralSecretPublicKey
+		return x.SourcePubKey
 	}
 	return nil
 }
 
-func (x *EphemeralSecretPart) GetEncryptedSharePart() []byte {
+func (x *Nonce) GetEncryptedSharePart() []byte {
 	if x != nil {
 		return x.EncryptedSharePart
 	}
 	return nil
 }
 
-func (x *EphemeralSecretPart) GetSourceSig() []byte {
+func (x *Nonce) GetSourceSig() []byte {
 	if x != nil {
 		return x.SourceSig
 	}
@@ -351,19 +351,19 @@ func (x *HRST) GetTimestamp() int64 {
 	return 0
 }
 
-type CosignerGRPCSetEphemeralSecretPartsAndSignRequest struct {
+type CosignerGRPCSetNoncesAndSignRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	EncryptedSecrets []*EphemeralSecretPart `protobuf:"bytes,1,rep,name=encryptedSecrets,proto3" json:"encryptedSecrets,omitempty"`
+	EncryptedSecrets []*Nonce `protobuf:"bytes,1,rep,name=encryptedSecrets,proto3" json:"encryptedSecrets,omitempty"`
 	Hrst             *HRST                  `protobuf:"bytes,2,opt,name=hrst,proto3" json:"hrst,omitempty"`
 	SignBytes        []byte                 `protobuf:"bytes,3,opt,name=signBytes,proto3" json:"signBytes,omitempty"`
 	ChainID          string                 `protobuf:"bytes,4,opt,name=chainID,proto3" json:"chainID,omitempty"`
 }
 
-func (x *CosignerGRPCSetEphemeralSecretPartsAndSignRequest) Reset() {
-	*x = CosignerGRPCSetEphemeralSecretPartsAndSignRequest{}
+func (x *CosignerGRPCSetNoncesAndSignRequest) Reset() {
+	*x = CosignerGRPCSetNoncesAndSignRequest{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_signer_proto_cosigner_grpc_server_proto_msgTypes[5]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -371,13 +371,13 @@ func (x *CosignerGRPCSetEphemeralSecretPartsAndSignRequest) Reset() {
 	}
 }
 
-func (x *CosignerGRPCSetEphemeralSecretPartsAndSignRequest) String() string {
+func (x *CosignerGRPCSetNoncesAndSignRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CosignerGRPCSetEphemeralSecretPartsAndSignRequest) ProtoMessage() {}
+func (*CosignerGRPCSetNoncesAndSignRequest) ProtoMessage() {}
 
-func (x *CosignerGRPCSetEphemeralSecretPartsAndSignRequest) ProtoReflect() protoreflect.Message {
+func (x *CosignerGRPCSetNoncesAndSignRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_signer_proto_cosigner_grpc_server_proto_msgTypes[5]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -389,40 +389,40 @@ func (x *CosignerGRPCSetEphemeralSecretPartsAndSignRequest) ProtoReflect() proto
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CosignerGRPCSetEphemeralSecretPartsAndSignRequest.ProtoReflect.Descriptor instead.
-func (*CosignerGRPCSetEphemeralSecretPartsAndSignRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use CosignerGRPCSetNoncesAndSignRequest.ProtoReflect.Descriptor instead.
+func (*CosignerGRPCSetNoncesAndSignRequest) Descriptor() ([]byte, []int) {
 	return file_signer_proto_cosigner_grpc_server_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *CosignerGRPCSetEphemeralSecretPartsAndSignRequest) GetEncryptedSecrets() []*EphemeralSecretPart {
+func (x *CosignerGRPCSetNoncesAndSignRequest) GetEncryptedSecrets() []*Nonce {
 	if x != nil {
 		return x.EncryptedSecrets
 	}
 	return nil
 }
 
-func (x *CosignerGRPCSetEphemeralSecretPartsAndSignRequest) GetHrst() *HRST {
+func (x *CosignerGRPCSetNoncesAndSignRequest) GetHrst() *HRST {
 	if x != nil {
 		return x.Hrst
 	}
 	return nil
 }
 
-func (x *CosignerGRPCSetEphemeralSecretPartsAndSignRequest) GetSignBytes() []byte {
+func (x *CosignerGRPCSetNoncesAndSignRequest) GetSignBytes() []byte {
 	if x != nil {
 		return x.SignBytes
 	}
 	return nil
 }
 
-func (x *CosignerGRPCSetEphemeralSecretPartsAndSignRequest) GetChainID() string {
+func (x *CosignerGRPCSetNoncesAndSignRequest) GetChainID() string {
 	if x != nil {
 		return x.ChainID
 	}
 	return ""
 }
 
-type CosignerGRPCSetEphemeralSecretPartsAndSignResponse struct {
+type CosignerGRPCSetNoncesAndSignResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -432,8 +432,8 @@ type CosignerGRPCSetEphemeralSecretPartsAndSignResponse struct {
 	Signature       []byte `protobuf:"bytes,3,opt,name=signature,proto3" json:"signature,omitempty"`
 }
 
-func (x *CosignerGRPCSetEphemeralSecretPartsAndSignResponse) Reset() {
-	*x = CosignerGRPCSetEphemeralSecretPartsAndSignResponse{}
+func (x *CosignerGRPCSetNoncesAndSignResponse) Reset() {
+	*x = CosignerGRPCSetNoncesAndSignResponse{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_signer_proto_cosigner_grpc_server_proto_msgTypes[6]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -441,13 +441,13 @@ func (x *CosignerGRPCSetEphemeralSecretPartsAndSignResponse) Reset() {
 	}
 }
 
-func (x *CosignerGRPCSetEphemeralSecretPartsAndSignResponse) String() string {
+func (x *CosignerGRPCSetNoncesAndSignResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CosignerGRPCSetEphemeralSecretPartsAndSignResponse) ProtoMessage() {}
+func (*CosignerGRPCSetNoncesAndSignResponse) ProtoMessage() {}
 
-func (x *CosignerGRPCSetEphemeralSecretPartsAndSignResponse) ProtoReflect() protoreflect.Message {
+func (x *CosignerGRPCSetNoncesAndSignResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_signer_proto_cosigner_grpc_server_proto_msgTypes[6]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -459,33 +459,33 @@ func (x *CosignerGRPCSetEphemeralSecretPartsAndSignResponse) ProtoReflect() prot
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CosignerGRPCSetEphemeralSecretPartsAndSignResponse.ProtoReflect.Descriptor instead.
-func (*CosignerGRPCSetEphemeralSecretPartsAndSignResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use CosignerGRPCSetNoncesAndSignResponse.ProtoReflect.Descriptor instead.
+func (*CosignerGRPCSetNoncesAndSignResponse) Descriptor() ([]byte, []int) {
 	return file_signer_proto_cosigner_grpc_server_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *CosignerGRPCSetEphemeralSecretPartsAndSignResponse) GetEphemeralPublic() []byte {
+func (x *CosignerGRPCSetNoncesAndSignResponse) GetEphemeralPublic() []byte {
 	if x != nil {
 		return x.EphemeralPublic
 	}
 	return nil
 }
 
-func (x *CosignerGRPCSetEphemeralSecretPartsAndSignResponse) GetTimestamp() int64 {
+func (x *CosignerGRPCSetNoncesAndSignResponse) GetTimestamp() int64 {
 	if x != nil {
 		return x.Timestamp
 	}
 	return 0
 }
 
-func (x *CosignerGRPCSetEphemeralSecretPartsAndSignResponse) GetSignature() []byte {
+func (x *CosignerGRPCSetNoncesAndSignResponse) GetSignature() []byte {
 	if x != nil {
 		return x.Signature
 	}
 	return nil
 }
 
-type CosignerGRPCGetEphemeralSecretPartsRequest struct {
+type CosignerGRPCGetNoncesRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -494,8 +494,8 @@ type CosignerGRPCGetEphemeralSecretPartsRequest struct {
 	ChainID string `protobuf:"bytes,2,opt,name=chainID,proto3" json:"chainID,omitempty"`
 }
 
-func (x *CosignerGRPCGetEphemeralSecretPartsRequest) Reset() {
-	*x = CosignerGRPCGetEphemeralSecretPartsRequest{}
+func (x *CosignerGRPCGetNoncesRequest) Reset() {
+	*x = CosignerGRPCGetNoncesRequest{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_signer_proto_cosigner_grpc_server_proto_msgTypes[7]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -503,13 +503,13 @@ func (x *CosignerGRPCGetEphemeralSecretPartsRequest) Reset() {
 	}
 }
 
-func (x *CosignerGRPCGetEphemeralSecretPartsRequest) String() string {
+func (x *CosignerGRPCGetNoncesRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CosignerGRPCGetEphemeralSecretPartsRequest) ProtoMessage() {}
+func (*CosignerGRPCGetNoncesRequest) ProtoMessage() {}
 
-func (x *CosignerGRPCGetEphemeralSecretPartsRequest) ProtoReflect() protoreflect.Message {
+func (x *CosignerGRPCGetNoncesRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_signer_proto_cosigner_grpc_server_proto_msgTypes[7]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -521,35 +521,35 @@ func (x *CosignerGRPCGetEphemeralSecretPartsRequest) ProtoReflect() protoreflect
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CosignerGRPCGetEphemeralSecretPartsRequest.ProtoReflect.Descriptor instead.
-func (*CosignerGRPCGetEphemeralSecretPartsRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use CosignerGRPCGetNoncesRequest.ProtoReflect.Descriptor instead.
+func (*CosignerGRPCGetNoncesRequest) Descriptor() ([]byte, []int) {
 	return file_signer_proto_cosigner_grpc_server_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *CosignerGRPCGetEphemeralSecretPartsRequest) GetHrst() *HRST {
+func (x *CosignerGRPCGetNoncesRequest) GetHrst() *HRST {
 	if x != nil {
 		return x.Hrst
 	}
 	return nil
 }
 
-func (x *CosignerGRPCGetEphemeralSecretPartsRequest) GetChainID() string {
+func (x *CosignerGRPCGetNoncesRequest) GetChainID() string {
 	if x != nil {
 		return x.ChainID
 	}
 	return ""
 }
 
-type CosignerGRPCGetEphemeralSecretPartsResponse struct {
+type CosignerGRPCGetNoncesResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	EncryptedSecrets []*EphemeralSecretPart `protobuf:"bytes,1,rep,name=encryptedSecrets,proto3" json:"encryptedSecrets,omitempty"`
+	EncryptedSecrets []*Nonce `protobuf:"bytes,1,rep,name=encryptedSecrets,proto3" json:"encryptedSecrets,omitempty"`
 }
 
-func (x *CosignerGRPCGetEphemeralSecretPartsResponse) Reset() {
-	*x = CosignerGRPCGetEphemeralSecretPartsResponse{}
+func (x *CosignerGRPCGetNoncesResponse) Reset() {
+	*x = CosignerGRPCGetNoncesResponse{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_signer_proto_cosigner_grpc_server_proto_msgTypes[8]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -557,13 +557,13 @@ func (x *CosignerGRPCGetEphemeralSecretPartsResponse) Reset() {
 	}
 }
 
-func (x *CosignerGRPCGetEphemeralSecretPartsResponse) String() string {
+func (x *CosignerGRPCGetNoncesResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CosignerGRPCGetEphemeralSecretPartsResponse) ProtoMessage() {}
+func (*CosignerGRPCGetNoncesResponse) ProtoMessage() {}
 
-func (x *CosignerGRPCGetEphemeralSecretPartsResponse) ProtoReflect() protoreflect.Message {
+func (x *CosignerGRPCGetNoncesResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_signer_proto_cosigner_grpc_server_proto_msgTypes[8]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -575,12 +575,12 @@ func (x *CosignerGRPCGetEphemeralSecretPartsResponse) ProtoReflect() protoreflec
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CosignerGRPCGetEphemeralSecretPartsResponse.ProtoReflect.Descriptor instead.
-func (*CosignerGRPCGetEphemeralSecretPartsResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use CosignerGRPCGetNoncesResponse.ProtoReflect.Descriptor instead.
+func (*CosignerGRPCGetNoncesResponse) Descriptor() ([]byte, []int) {
 	return file_signer_proto_cosigner_grpc_server_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *CosignerGRPCGetEphemeralSecretPartsResponse) GetEncryptedSecrets() []*EphemeralSecretPart {
+func (x *CosignerGRPCGetNoncesResponse) GetEncryptedSecrets() []*Nonce {
 	if x != nil {
 		return x.EncryptedSecrets
 	}
@@ -935,12 +935,12 @@ var file_signer_proto_cosigner_grpc_server_proto_goTypes = []interface{}{
 	(*Block)(nil),                         // 0: proto.Block
 	(*CosignerGRPCSignBlockRequest)(nil),  // 1: proto.CosignerGRPCSignBlockRequest
 	(*CosignerGRPCSignBlockResponse)(nil), // 2: proto.CosignerGRPCSignBlockResponse
-	(*EphemeralSecretPart)(nil),           // 3: proto.EphemeralSecretPart
+	(*Nonce)(nil),           // 3: proto.Nonce
 	(*HRST)(nil),                          // 4: proto.HRST
-	(*CosignerGRPCSetEphemeralSecretPartsAndSignRequest)(nil),  // 5: proto.CosignerGRPCSetEphemeralSecretPartsAndSignRequest
-	(*CosignerGRPCSetEphemeralSecretPartsAndSignResponse)(nil), // 6: proto.CosignerGRPCSetEphemeralSecretPartsAndSignResponse
-	(*CosignerGRPCGetEphemeralSecretPartsRequest)(nil),         // 7: proto.CosignerGRPCGetEphemeralSecretPartsRequest
-	(*CosignerGRPCGetEphemeralSecretPartsResponse)(nil),        // 8: proto.CosignerGRPCGetEphemeralSecretPartsResponse
+	(*CosignerGRPCSetNoncesAndSignRequest)(nil),  // 5: proto.CosignerGRPCSetNoncesAndSignRequest
+	(*CosignerGRPCSetNoncesAndSignResponse)(nil), // 6: proto.CosignerGRPCSetNoncesAndSignResponse
+	(*CosignerGRPCGetNoncesRequest)(nil),         // 7: proto.CosignerGRPCGetNoncesRequest
+	(*CosignerGRPCGetNoncesResponse)(nil),        // 8: proto.CosignerGRPCGetNoncesResponse
 	(*CosignerGRPCTransferLeadershipRequest)(nil),              // 9: proto.CosignerGRPCTransferLeadershipRequest
 	(*CosignerGRPCTransferLeadershipResponse)(nil),             // 10: proto.CosignerGRPCTransferLeadershipResponse
 	(*CosignerGRPCGetLeaderRequest)(nil),                       // 11: proto.CosignerGRPCGetLeaderRequest
@@ -948,18 +948,18 @@ var file_signer_proto_cosigner_grpc_server_proto_goTypes = []interface{}{
 }
 var file_signer_proto_cosigner_grpc_server_proto_depIdxs = []int32{
 	0,  // 0: proto.CosignerGRPCSignBlockRequest.block:type_name -> proto.Block
-	3,  // 1: proto.CosignerGRPCSetEphemeralSecretPartsAndSignRequest.encryptedSecrets:type_name -> proto.EphemeralSecretPart
-	4,  // 2: proto.CosignerGRPCSetEphemeralSecretPartsAndSignRequest.hrst:type_name -> proto.HRST
-	4,  // 3: proto.CosignerGRPCGetEphemeralSecretPartsRequest.hrst:type_name -> proto.HRST
-	3,  // 4: proto.CosignerGRPCGetEphemeralSecretPartsResponse.encryptedSecrets:type_name -> proto.EphemeralSecretPart
+	3,  // 1: proto.CosignerGRPCSetNoncesAndSignRequest.encryptedSecrets:type_name -> proto.Nonce
+	4,  // 2: proto.CosignerGRPCSetNoncesAndSignRequest.hrst:type_name -> proto.HRST
+	4,  // 3: proto.CosignerGRPCGetNoncesRequest.hrst:type_name -> proto.HRST
+	3,  // 4: proto.CosignerGRPCGetNoncesResponse.encryptedSecrets:type_name -> proto.Nonce
 	1,  // 5: proto.CosignerGRPC.SignBlock:input_type -> proto.CosignerGRPCSignBlockRequest
-	5,  // 6: proto.CosignerGRPC.SetEphemeralSecretPartsAndSign:input_type -> proto.CosignerGRPCSetEphemeralSecretPartsAndSignRequest
-	7,  // 7: proto.CosignerGRPC.GetEphemeralSecretParts:input_type -> proto.CosignerGRPCGetEphemeralSecretPartsRequest
+	5,  // 6: proto.CosignerGRPC.SetNoncesAndSign:input_type -> proto.CosignerGRPCSetNoncesAndSignRequest
+	7,  // 7: proto.CosignerGRPC.GetNonces:input_type -> proto.CosignerGRPCGetNoncesRequest
 	9,  // 8: proto.CosignerGRPC.TransferLeadership:input_type -> proto.CosignerGRPCTransferLeadershipRequest
 	11, // 9: proto.CosignerGRPC.GetLeader:input_type -> proto.CosignerGRPCGetLeaderRequest
 	2,  // 10: proto.CosignerGRPC.SignBlock:output_type -> proto.CosignerGRPCSignBlockResponse
-	6,  // 11: proto.CosignerGRPC.SetEphemeralSecretPartsAndSign:output_type -> proto.CosignerGRPCSetEphemeralSecretPartsAndSignResponse
-	8,  // 12: proto.CosignerGRPC.GetEphemeralSecretParts:output_type -> proto.CosignerGRPCGetEphemeralSecretPartsResponse
+	6,  // 11: proto.CosignerGRPC.SetNoncesAndSign:output_type -> proto.CosignerGRPCSetNoncesAndSignResponse
+	8,  // 12: proto.CosignerGRPC.GetNonces:output_type -> proto.CosignerGRPCGetNoncesResponse
 	10, // 13: proto.CosignerGRPC.TransferLeadership:output_type -> proto.CosignerGRPCTransferLeadershipResponse
 	12, // 14: proto.CosignerGRPC.GetLeader:output_type -> proto.CosignerGRPCGetLeaderResponse
 	10, // [10:15] is the sub-list for method output_type
@@ -1012,7 +1012,7 @@ func file_signer_proto_cosigner_grpc_server_proto_init() {
 			}
 		}
 		file_signer_proto_cosigner_grpc_server_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*EphemeralSecretPart); i {
+			switch v := v.(*Nonce); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1036,7 +1036,7 @@ func file_signer_proto_cosigner_grpc_server_proto_init() {
 			}
 		}
 		file_signer_proto_cosigner_grpc_server_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CosignerGRPCSetEphemeralSecretPartsAndSignRequest); i {
+			switch v := v.(*CosignerGRPCSetNoncesAndSignRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1048,7 +1048,7 @@ func file_signer_proto_cosigner_grpc_server_proto_init() {
 			}
 		}
 		file_signer_proto_cosigner_grpc_server_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CosignerGRPCSetEphemeralSecretPartsAndSignResponse); i {
+			switch v := v.(*CosignerGRPCSetNoncesAndSignResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1060,7 +1060,7 @@ func file_signer_proto_cosigner_grpc_server_proto_init() {
 			}
 		}
 		file_signer_proto_cosigner_grpc_server_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CosignerGRPCGetEphemeralSecretPartsRequest); i {
+			switch v := v.(*CosignerGRPCGetNoncesRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1072,7 +1072,7 @@ func file_signer_proto_cosigner_grpc_server_proto_init() {
 			}
 		}
 		file_signer_proto_cosigner_grpc_server_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CosignerGRPCGetEphemeralSecretPartsResponse); i {
+			switch v := v.(*CosignerGRPCGetNoncesResponse); i {
 			case 0:
 				return &v.state
 			case 1:
