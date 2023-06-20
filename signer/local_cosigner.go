@@ -1,7 +1,6 @@
 package signer
 
 import (
-	"crypto/rsa"
 	"errors"
 	"fmt"
 	"sync"
@@ -9,7 +8,6 @@ import (
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	ecies "github.com/ecies/go/v2"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -102,16 +100,6 @@ func (hrst *HRSTKey) Less(other HRSTKey) bool {
 
 	// HRS is greater or equal
 	return false
-}
-
-type CosignerRSAPubKey struct {
-	ID        int
-	PublicKey rsa.PublicKey
-}
-
-type CosignerECIESPubKey struct {
-	ID        int
-	PublicKey *ecies.PublicKey
 }
 
 type CosignerGetNonceRequest struct {
@@ -278,6 +266,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		}
 	}
 
+	ccs.mu.Lock()
 	for existingKey := range ccs.nonces {
 		// delete any HRS lower than our signed level
 		// we will not be providing parts for any lower HRS
@@ -285,6 +274,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 			delete(ccs.nonces, existingKey)
 		}
 	}
+	ccs.mu.Unlock()
 
 	res.Signature = sig
 

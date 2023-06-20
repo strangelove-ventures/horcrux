@@ -20,6 +20,12 @@ type CosignerSecurityECIES struct {
 	eciesPubKeys map[int]CosignerECIESPubKey
 }
 
+// CosignerECIESKey is a cosigner's ECIES public key.
+type CosignerECIESPubKey struct {
+	ID        int
+	PublicKey *ecies.PublicKey
+}
+
 // NewCosignerSecurityECIES creates a new CosignerSecurityECIES.
 func NewCosignerSecurityECIES(key CosignerECIESKey, eciesPubKeys []CosignerECIESPubKey) *CosignerSecurityECIES {
 	c := &CosignerSecurityECIES{

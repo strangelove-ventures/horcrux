@@ -19,6 +19,12 @@ type CosignerSecurityRSA struct {
 	rsaPubKeys map[int]CosignerRSAPubKey
 }
 
+// CosignerRSAKey is a cosigner's RSA public key.
+type CosignerRSAPubKey struct {
+	ID        int
+	PublicKey rsa.PublicKey
+}
+
 // NewCosignerSecurityRSA creates a new CosignerSecurityRSA.
 func NewCosignerSecurityRSA(key CosignerRSAKey, rsaPubKeys []CosignerRSAPubKey) *CosignerSecurityRSA {
 	c := &CosignerSecurityRSA{
