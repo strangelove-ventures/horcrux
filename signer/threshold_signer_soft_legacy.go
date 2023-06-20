@@ -92,7 +92,7 @@ func (s *ThresholdSignerSoftLegacy) GenerateNonces() (Nonces, error) {
 	}
 
 	nonces := Nonces{
-		PubKey: secret,
+		PubKey: tsed25519.ScalarMultiplyBase(secret),
 		Shares: make([][]byte, s.total),
 	}
 

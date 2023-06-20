@@ -100,11 +100,11 @@ func (s *ThresholdSignerSoft) GenerateNonces() (Nonces, error) {
 
 func (s *ThresholdSignerSoft) CombineSignatures(signatures []PartialSignature) ([]byte, error) {
 	partialSigs := make([]*ted25519.PartialSignature, len(signatures))
-	for _, s := range signatures {
-		partialSigs = append(partialSigs, &ted25519.PartialSignature{
+	for i, s := range signatures {
+		partialSigs[i] = &ted25519.PartialSignature{
 			ShareIdentifier: byte(s.ID),
 			Sig:             s.Signature,
-		})
+		}
 	}
 	signature, err := ted25519.Aggregate(partialSigs, &ted25519.ShareConfiguration{T: s.threshold, N: s.total})
 	if err != nil {

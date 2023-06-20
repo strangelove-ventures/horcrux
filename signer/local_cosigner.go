@@ -340,9 +340,18 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 		return err
 	}
 
-	signer, err := NewThresholdSignerSoft(cosigner.config, cosigner.GetID(), chainID)
-	if err != nil {
-		return err
+	var signer ThresholdSigner
+	// TODO wire up new ThresholdSigner types
+	if false {
+		signer, err = NewThresholdSignerSoftLegacy(cosigner.config, cosigner.GetID(), chainID)
+		if err != nil {
+			return err
+		}
+	} else {
+		signer, err = NewThresholdSignerSoft(cosigner.config, cosigner.GetID(), chainID)
+		if err != nil {
+			return err
+		}
 	}
 
 	cosigner.chainState.Store(chainID, &ChainState{
