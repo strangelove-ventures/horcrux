@@ -10,16 +10,16 @@ import (
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
-var _ ThresholdSigner = &ThresholdSignerSoftLegacy{}
+var _ ThresholdSigner = &ThresholdSignerSoft{}
 
-type ThresholdSignerSoftLegacy struct {
+type ThresholdSignerSoft struct {
 	privateKeyShard []byte
 	pubKey          []byte
 	threshold       uint8
 	total           uint8
 }
 
-func NewThresholdSignerSoftLegacy(config *RuntimeConfig, id int, chainID string) (*ThresholdSignerSoftLegacy, error) {
+func NewThresholdSignerSoft(config *RuntimeConfig, id int, chainID string) (*ThresholdSignerSoft, error) {
 	keyFile, err := config.KeyFileExistsCosigner(chainID)
 	if err != nil {
 		return nil, err
@@ -34,7 +34,7 @@ func NewThresholdSignerSoftLegacy(config *RuntimeConfig, id int, chainID string)
 		return nil, fmt.Errorf("key shard ID (%d) in (%s) does not match cosigner ID (%d)", key.ID, keyFile, id)
 	}
 
-	s := ThresholdSignerSoftLegacy{
+	s := ThresholdSignerSoft{
 		privateKeyShard: key.PrivateShard,
 		pubKey:          key.PubKey.Bytes(),
 		threshold:       uint8(config.Config.ThresholdModeConfig.Threshold),
@@ -44,11 +44,11 @@ func NewThresholdSignerSoftLegacy(config *RuntimeConfig, id int, chainID string)
 	return &s, nil
 }
 
-func (s *ThresholdSignerSoftLegacy) PubKey() []byte {
+func (s *ThresholdSignerSoft) PubKey() []byte {
 	return s.pubKey
 }
 
-func (s *ThresholdSignerSoftLegacy) Sign(nonces []Nonce, payload []byte) ([]byte, error) {
+func (s *ThresholdSignerSoft) Sign(nonces []Nonce, payload []byte) ([]byte, error) {
 	nonceShare, noncePub, err := s.sumNonces(nonces)
 	if err != nil {
 		return nil, fmt.Errorf("failed to combine nonces: %w", err)
@@ -59,7 +59,7 @@ func (s *ThresholdSignerSoftLegacy) Sign(nonces []Nonce, payload []byte) ([]byte
 	return append(noncePub, sig...), nil
 }
 
-func (s *ThresholdSignerSoftLegacy) sumNonces(nonces []Nonce) (tsed25519.Scalar, tsed25519.Element, error) {
+func (s *ThresholdSignerSoft) sumNonces(nonces []Nonce) (tsed25519.Scalar, tsed25519.Element, error) {
 	shareParts := make([]tsed25519.Scalar, len(nonces))
 	publicKeys := make([]tsed25519.Element, len(nonces))
 
@@ -85,7 +85,7 @@ func (s *ThresholdSignerSoftLegacy) sumNonces(nonces []Nonce) (tsed25519.Scalar,
 	return nonceShare, noncePub, nil
 }
 
-func (s *ThresholdSignerSoftLegacy) GenerateNonces() (Nonces, error) {
+func (s *ThresholdSignerSoft) GenerateNonces() (Nonces, error) {
 	secret := make([]byte, 32)
 	if _, err := rand.Read(secret); err != nil {
 		return Nonces{}, err
@@ -105,7 +105,7 @@ func (s *ThresholdSignerSoftLegacy) GenerateNonces() (Nonces, error) {
 	return nonces, nil
 }
 
-func (s *ThresholdSignerSoftLegacy) CombineSignatures(signatures []PartialSignature) ([]byte, error) {
+func (s *ThresholdSignerSoft) CombineSignatures(signatures []PartialSignature) ([]byte, error) {
 	sigIds := make([]int, len(signatures))
 	shareSigs := make([][]byte, len(signatures))
 	var ephPub []byte

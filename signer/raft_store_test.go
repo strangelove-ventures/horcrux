@@ -29,16 +29,16 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 
 	cosigner := NewLocalCosigner(
 		&RuntimeConfig{},
-		CosignerECIESKey{
-			ID:       key.ID,
-			ECIESKey: eciesKey,
-		},
-		[]CosignerECIESPubKey{{
-			ID:        1,
-			PublicKey: eciesKey.PublicKey,
-		}},
+		NewCosignerSecurityECIES(
+			CosignerECIESKey{
+				ID:       key.ID,
+				ECIESKey: eciesKey,
+			},
+			[]CosignerECIESPubKey{{
+				ID:        key.ID,
+				PublicKey: eciesKey.PublicKey,
+			}}),
 		"",
-		0,
 	)
 
 	s := &RaftStore{

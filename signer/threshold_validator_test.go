@@ -94,10 +94,10 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 	cosignersConfig := make(CosignersConfig, total)
 
-	for _, pubKey := range pubKeys {
-		cosignersConfig = append(cosignersConfig, CosignerConfig{
+	for i, pubKey := range pubKeys {
+		cosignersConfig[i] = CosignerConfig{
 			ShardID: pubKey.ID,
-		})
+		}
 	}
 
 	for i, pubKey := range pubKeys {
@@ -118,11 +118,14 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 		cosigner := NewLocalCosigner(
 			cosignerConfig,
-			CosignerECIESKey{
-				ID:       pubKey.ID,
-				ECIESKey: eciesKeys[i],
-			},
-			pubKeys, "", threshold,
+			NewCosignerSecurityECIES(
+				CosignerECIESKey{
+					ID:       pubKey.ID,
+					ECIESKey: eciesKeys[i],
+				},
+				pubKeys,
+			),
+			"",
 		)
 		require.NoError(t, err)
 

@@ -204,3 +204,51 @@ func createCosignerRSAShardsCmd() *cobra.Command {
 	addOutputDirFlag(cmd)
 	return cmd
 }
+
+// createCosignerRSAShardsCmd is a cobra command for creating cosigner shards from a priv validator
+func createCosignerECIESShardsCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "create-ecies-shards",
+		Args:  cobra.NoArgs,
+		Short: "Create cosigner ECIES shards",
+
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
+			shards, _ := cmd.Flags().GetUint8(flagShards)
+
+			if shards <= 0 {
+				return fmt.Errorf("shards must be greater than zero (%d): %w", shards, err)
+			}
+
+			csKeys, err := signer.CreateCosignerECIESShards(int(shards))
+			if err != nil {
+				return err
+			}
+
+			out, _ := cmd.Flags().GetString(flagOutputDir)
+			if out != "" {
+				if err := os.MkdirAll(out, 0700); err != nil {
+					return err
+				}
+			}
+
+			// silence usage after all input has been validated
+			cmd.SilenceUsage = true
+
+			for _, c := range csKeys {
+				dir, err := createCosignerDirectoryIfNecessary(out, c.ID)
+				if err != nil {
+					return err
+				}
+				filename := filepath.Join(dir, "ecies_keys.json")
+				if err = signer.WriteCosignerECIESShardFile(c, filename); err != nil {
+					return err
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "Created ECIES Shard %s\n", filename)
+			}
+			return nil
+		},
+	}
+	addTotalShardsFlag(cmd)
+	addOutputDirFlag(cmd)
+	return cmd
+}

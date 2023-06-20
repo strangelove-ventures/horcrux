@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,25 +19,25 @@ func NewThresholdValidator(
 		return nil, nil, err
 	}
 
-	keyFile, err := config.KeyFileExistsCosignerECIES()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	key, err := signer.LoadCosignerECIESKey(keyFile)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
-	}
-
 	thresholdCfg := config.Config.ThresholdModeConfig
 
 	remoteCosigners := make([]signer.Cosigner, 0, len(thresholdCfg.Cosigners)-1)
-	pubKeys := make([]signer.CosignerECIESPubKey, len(thresholdCfg.Cosigners))
 
 	var p2pListen string
 
-	for i, c := range thresholdCfg.Cosigners {
-		if c.ShardID != key.ID {
+	var security signer.CosignerSecurity
+	var eciesErr error
+	security, eciesErr = config.CosignerSecurityECIES()
+	if eciesErr != nil {
+		var rsaErr error
+		security, rsaErr = config.CosignerSecurityRSA()
+		if rsaErr != nil {
+			return nil, nil, errors.Join(eciesErr, rsaErr)
+		}
+	}
+
+	for _, c := range thresholdCfg.Cosigners {
+		if c.ShardID != security.GetID() {
 			remoteCosigners = append(
 				remoteCosigners,
 				signer.NewRemoteCosigner(c.ShardID, c.P2PAddr),
@@ -44,23 +45,16 @@ func NewThresholdValidator(
 		} else {
 			p2pListen = c.P2PAddr
 		}
-
-		pubKeys[i] = signer.CosignerECIESPubKey{
-			ID:        c.ShardID,
-			PublicKey: key.ECIESPubs[c.ShardID-1],
-		}
 	}
 
 	if p2pListen == "" {
-		return nil, nil, fmt.Errorf("cosigner config does not exist for our shard ID %d", key.ID)
+		return nil, nil, fmt.Errorf("cosigner config does not exist for our shard ID %d", security.GetID())
 	}
 
 	localCosigner := signer.NewLocalCosigner(
 		&config,
-		key,
-		pubKeys,
+		security,
 		p2pListen,
-		uint8(thresholdCfg.Threshold),
 	)
 
 	// Validated prior in ValidateThresholdModeConfig
@@ -73,7 +67,7 @@ func NewThresholdValidator(
 	}
 
 	// RAFT node ID is the cosigner ID
-	nodeID := fmt.Sprint(key.ID)
+	nodeID := fmt.Sprint(security.GetID())
 
 	// Start RAFT store listener
 	raftStore := signer.NewRaftStore(nodeID,

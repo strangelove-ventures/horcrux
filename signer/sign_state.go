@@ -172,21 +172,28 @@ func (signState *SignState) Save(
 			delete(signState.cache, hrs)
 		}
 	}
-	signState.mu.Unlock()
 
 	signState.Height = ssc.Height
 	signState.Round = ssc.Round
 	signState.Step = ssc.Step
 	signState.Signature = ssc.Signature
 	signState.SignBytes = ssc.SignBytes
+
+	jsonBytes, err := cometjson.MarshalIndent(signState, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+
+	signState.mu.Unlock()
+
 	if pendingDiskWG != nil {
 		pendingDiskWG.Add(1)
 		go func() {
 			defer pendingDiskWG.Done()
-			signState.save()
+			signState.save(jsonBytes)
 		}()
 	} else {
-		signState.save()
+		signState.save(jsonBytes)
 	}
 
 	for len(signState.channel) > 0 {
@@ -198,7 +205,7 @@ func (signState *SignState) Save(
 }
 
 // Save persists the FilePvLastSignState to its filePath.
-func (signState *SignState) save() {
+func (signState *SignState) save(jsonBytes []byte) {
 	outFile := signState.filePath
 	if outFile == "none" {
 		return
@@ -206,11 +213,8 @@ func (signState *SignState) save() {
 	if outFile == "" {
 		panic("cannot save SignState: filePath not set")
 	}
-	jsonBytes, err := cometjson.MarshalIndent(signState, "", "  ")
-	if err != nil {
-		panic(err)
-	}
-	err = tempfile.WriteFileAtomic(outFile, jsonBytes, 0600)
+
+	err := tempfile.WriteFileAtomic(outFile, jsonBytes, 0600)
 	if err != nil {
 		panic(err)
 	}
@@ -342,7 +346,13 @@ func LoadOrCreateSignState(filepath string) (*SignState, error) {
 			cache:    make(map[HRSKey]SignStateConsensus),
 			channel:  make(chan SignStateConsensus, 1),
 		}
-		state.save()
+
+		jsonBytes, err := cometjson.MarshalIndent(state, "", "  ")
+		if err != nil {
+			panic(err)
+		}
+
+		state.save(jsonBytes)
 		return state, nil
 	}
 

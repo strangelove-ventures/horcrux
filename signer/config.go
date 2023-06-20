@@ -111,6 +111,56 @@ type RuntimeConfig struct {
 	Config     Config
 }
 
+func (c RuntimeConfig) CosignerSecurityECIES() (*CosignerSecurityECIES, error) {
+	keyFile, err := c.KeyFileExistsCosignerECIES()
+	if err != nil {
+		return nil, err
+	}
+
+	key, err := LoadCosignerECIESKey(keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
+	}
+
+	pubKeys := make([]CosignerECIESPubKey, len(key.ECIESPubs))
+	for i, pk := range key.ECIESPubs {
+		pubKeys[i] = CosignerECIESPubKey{
+			ID:        i + 1,
+			PublicKey: pk,
+		}
+	}
+
+	return NewCosignerSecurityECIES(
+		key,
+		pubKeys,
+	), nil
+}
+
+func (c RuntimeConfig) CosignerSecurityRSA() (*CosignerSecurityRSA, error) {
+	keyFile, err := c.KeyFileExistsCosignerRSA()
+	if err != nil {
+		return nil, err
+	}
+
+	key, err := LoadCosignerRSAKey(keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
+	}
+
+	pubKeys := make([]CosignerRSAPubKey, len(key.RSAPubs))
+	for i, pk := range key.RSAPubs {
+		pubKeys[i] = CosignerRSAPubKey{
+			ID:        i + 1,
+			PublicKey: *pk,
+		}
+	}
+
+	return NewCosignerSecurityRSA(
+		key,
+		pubKeys,
+	), nil
+}
+
 func (c RuntimeConfig) cachedKeyDirectory() string {
 	if c.Config.PrivValKeyDir != nil {
 		return *c.Config.PrivValKeyDir

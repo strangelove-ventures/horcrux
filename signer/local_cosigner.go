@@ -1,10 +1,7 @@
 package signer
 
 import (
-	"crypto/ecdsa"
-	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"sync"
@@ -12,7 +9,6 @@ import (
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	cometjson "github.com/cometbft/cometbft/libs/json"
 	ecies "github.com/ecies/go/v2"
 	"golang.org/x/sync/errgroup"
 )
@@ -25,10 +21,8 @@ var _ Cosigner = &LocalCosigner{}
 // LocalCosigner signing is thread saafe
 type LocalCosigner struct {
 	config        *RuntimeConfig
-	key           CosignerECIESKey
-	threshold     uint8
+	security      CosignerSecurity
 	chainState    sync.Map
-	eciesPubKeys  map[int]CosignerECIESPubKey
 	address       string
 	pendingDiskWG sync.WaitGroup
 }
@@ -153,30 +147,20 @@ func (cosigner *LocalCosigner) waitForSignStatesToFlushToDisk() {
 
 func NewLocalCosigner(
 	config *RuntimeConfig,
-	key CosignerECIESKey,
-	eciesPubKeys []CosignerECIESPubKey,
+	security CosignerSecurity,
 	address string,
-	threshold uint8,
 ) *LocalCosigner {
-	cosigner := &LocalCosigner{
-		config:       config,
-		key:          key,
-		eciesPubKeys: make(map[int]CosignerECIESPubKey),
-		threshold:    threshold,
-		address:      address,
+	return &LocalCosigner{
+		config:   config,
+		security: security,
+		address:  address,
 	}
-
-	for _, pubKey := range eciesPubKeys {
-		cosigner.eciesPubKeys[pubKey.ID] = pubKey
-	}
-
-	return cosigner
 }
 
 // GetID returns the id of the cosigner
 // Implements Cosigner interface
 func (cosigner *LocalCosigner) GetID() int {
-	return cosigner.key.ID
+	return cosigner.security.GetID()
 }
 
 // GetAddress returns the RPC URL of the cosigner
@@ -270,7 +254,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		return res, nil
 	}
 
-	nonces, err := ccs.combinedNonces(cosigner.GetID(), cosigner.threshold, hrst)
+	nonces, err := ccs.combinedNonces(cosigner.GetID(), uint8(cosigner.config.Config.ThresholdModeConfig.Threshold), hrst)
 	if err != nil {
 		return res, err
 	}
@@ -318,9 +302,7 @@ func (cosigner *LocalCosigner) dealShares(req CosignerGetNonceRequest) ([]Nonces
 		return nil, err
 	}
 
-	total := len(cosigner.eciesPubKeys)
-
-	meta := make([]Nonces, total)
+	meta := make([]Nonces, len(cosigner.config.Config.ThresholdModeConfig.Cosigners))
 
 	nonces, err := ccs.signer.GenerateNonces()
 	if err != nil {
@@ -348,7 +330,7 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 
 	var signer ThresholdSigner
 
-	signer, err = NewThresholdSignerSoftLegacy(cosigner.config, cosigner.GetID(), chainID)
+	signer, err = NewThresholdSignerSoft(cosigner.config, cosigner.GetID(), chainID)
 	if err != nil {
 		return err
 	}
@@ -362,17 +344,6 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 	return nil
 }
 
-// reverseBytes returns a new slice of the input bytes reversed
-func reverseBytes(inBytes []byte) []byte {
-	outBytes := make([]byte, len(inBytes))
-
-	for i, j := 0, len(inBytes)-1; j >= 0; i, j = i+1, j-1 {
-		outBytes[i] = inBytes[j]
-	}
-
-	return outBytes
-}
-
 func (cosigner *LocalCosigner) GetNonces(
 	chainID string,
 	hrst HRSTKey,
@@ -383,24 +354,27 @@ func (cosigner *LocalCosigner) GetNonces(
 		return nil, err
 	}
 
+	total := len(cosigner.config.Config.ThresholdModeConfig.Cosigners)
+
 	res := &CosignerNoncesResponse{
-		EncryptedSecrets: make([]CosignerNonce, len(cosigner.eciesPubKeys)-1),
+		EncryptedSecrets: make([]CosignerNonce, total-1),
 	}
 
 	id := cosigner.GetID()
 
 	var eg errgroup.Group
 
-	for _, pubKey := range cosigner.eciesPubKeys {
-		if pubKey.ID == id {
+	for i := 1; i <= int(total); i++ {
+		if i == id {
 			continue
 		}
-		pubKey := pubKey
+
+		i := i
 
 		eg.Go(func() error {
 			secretPart, err := cosigner.getNonce(CosignerGetNonceRequest{
 				ChainID:   chainID,
-				ID:        pubKey.ID,
+				ID:        i,
 				Height:    hrst.Height,
 				Round:     hrst.Round,
 				Step:      hrst.Step,
@@ -411,10 +385,10 @@ func (cosigner *LocalCosigner) GetNonces(
 				return err
 			}
 
-			if pubKey.ID > id {
-				res.EncryptedSecrets[pubKey.ID-2] = secretPart
+			if i > id {
+				res.EncryptedSecrets[i-2] = secretPart
 			} else {
-				res.EncryptedSecrets[pubKey.ID-1] = secretPart
+				res.EncryptedSecrets[i-1] = secretPart
 			}
 
 			return nil
@@ -465,7 +439,7 @@ func (cosigner *LocalCosigner) getNonce(
 	req CosignerGetNonceRequest,
 ) (CosignerNonce, error) {
 	chainID := req.ChainID
-	res := CosignerNonce{}
+	zero := CosignerNonce{}
 
 	hrst := HRSTKey{
 		Height:    req.Height,
@@ -478,48 +452,17 @@ func (cosigner *LocalCosigner) getNonce(
 
 	meta, err := cosigner.dealSharesIfNecessary(chainID, hrst)
 	if err != nil {
-		return res, err
+		return zero, err
 	}
 
 	ourCosignerMeta := meta[id-1]
 
-	// grab the cosigner info for the ID being requested
-	pubKey, ok := cosigner.eciesPubKeys[req.ID]
-	if !ok {
-		return res, errors.New("unknown cosigner ID")
-	}
-
-	sharePart := ourCosignerMeta.Shares[req.ID-1]
-
-	// use ECIES public to encrypt user's share part
-	encrypted, err := ecies.Encrypt(pubKey.PublicKey, sharePart)
+	nonce, err := cosigner.security.EncryptAndSign(req.ID, ourCosignerMeta.PubKey, ourCosignerMeta.Shares[req.ID-1])
 	if err != nil {
-		return res, err
+		return zero, err
 	}
 
-	res.SourceID = id
-	res.SourcePubKey = ourCosignerMeta.PubKey
-	res.EncryptedSharePart = encrypted
-
-	// sign the response payload with our private key
-	// cosigners can verify the signature to confirm sender validity
-
-	jsonBytes, err := cometjson.Marshal(res)
-
-	if err != nil {
-		return res, err
-	}
-
-	hash := sha256.Sum256(jsonBytes)
-	signature, err := ecdsa.SignASN1(rand.Reader, &ecdsa.PrivateKey{PublicKey: ecdsa.PublicKey(*cosigner.key.ECIESKey.PublicKey), D: cosigner.key.ECIESKey.D}, hash[:])
-	if err != nil {
-		return res, err
-	}
-
-	res.SourceSig = signature
-	res.DestinationID = req.ID
-
-	return res, nil
+	return nonce, nil
 }
 
 // Store an ephemeral secret share part provided by another cosigner
@@ -536,30 +479,7 @@ func (cosigner *LocalCosigner) setNonce(req CosignerSetNonceRequest) error {
 		return errors.New("SourceSig field is required")
 	}
 
-	digestMsg := CosignerNonce{
-		SourceID:           req.SourceID,
-		SourcePubKey:       req.SourcePubKey,
-		EncryptedSharePart: req.EncryptedSharePart,
-	}
-
-	digestBytes, err := cometjson.Marshal(digestMsg)
-	if err != nil {
-		return err
-	}
-
-	digest := sha256.Sum256(digestBytes)
-	pubKey, ok := cosigner.eciesPubKeys[req.SourceID]
-
-	if !ok {
-		return fmt.Errorf("unknown cosigner: %d", req.SourceID)
-	}
-
-	validSignature := ecdsa.VerifyASN1((*ecdsa.PublicKey)(pubKey.PublicKey), digest[:], req.SourceSig)
-	if !validSignature {
-		return fmt.Errorf("signature is invalid")
-	}
-
-	sharePart, err := ecies.Decrypt(cosigner.key.ECIESKey, req.EncryptedSharePart)
+	noncePub, nonceShare, err := cosigner.security.DecryptAndVerify(req.SourceID, req.SourcePubKey, req.EncryptedSharePart, req.SourceSig)
 	if err != nil {
 		return err
 	}
@@ -589,10 +509,10 @@ func (cosigner *LocalCosigner) setNonce(req CosignerSetNonceRequest) error {
 
 	// set slot
 	if nonces[req.SourceID-1].Shares == nil {
-		nonces[req.SourceID-1].Shares = make([][]byte, len(cosigner.eciesPubKeys))
+		nonces[req.SourceID-1].Shares = make([][]byte, len(cosigner.config.Config.ThresholdModeConfig.Cosigners))
 	}
-	nonces[req.SourceID-1].Shares[cosigner.GetID()-1] = sharePart
-	nonces[req.SourceID-1].PubKey = req.SourcePubKey
+	nonces[req.SourceID-1].Shares[cosigner.GetID()-1] = nonceShare
+	nonces[req.SourceID-1].PubKey = noncePub
 	return nil
 }
 

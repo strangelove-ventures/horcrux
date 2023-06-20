@@ -102,20 +102,20 @@ func (tv *Validator) Dir() string {
 	return filepath.Join(tv.Home, tv.Name())
 }
 
-func (tv *Validator) genRSAShares() error {
-	rsaShards, err := signer.CreateCosignerRSAShards(len(tv.Signers))
+func (tv *Validator) genSecurityShards() error {
+	shards, err := signer.CreateCosignerECIESShards(len(tv.Signers))
 	if err != nil {
 		return err
 	}
 
 	for i, s := range tv.Signers {
-		tv.tl.Logf("{%s} -> Writing RSA Key Shard To File... ", s.Name())
+		tv.tl.Logf("{%s} -> Writing ECIES Key Shard To File... ", s.Name())
 		if err := os.MkdirAll(s.Dir(), 0700); err != nil {
 			return err
 		}
 
-		cosignerFilename := filepath.Join(s.Dir(), "rsa_keys.json")
-		if err := signer.WriteCosignerRSAShardFile(rsaShards[i], cosignerFilename); err != nil {
+		cosignerFilename := filepath.Join(s.Dir(), "ecies_keys.json")
+		if err := signer.WriteCosignerECIESShardFile(shards[i], cosignerFilename); err != nil {
 			return err
 		}
 	}
@@ -126,7 +126,7 @@ func (tv *Validator) genRSAShares() error {
 // genPrivKeyAndShards generates cosigner RSA shards.
 // If existingKey is nil, generates Ed25519 key shards, otherwise shards existing key.
 func (tv *Validator) genPrivKeyAndShards(existingKey *privval.FilePVKey, chainIDs ...string) error {
-	if err := tv.genRSAShares(); err != nil {
+	if err := tv.genSecurityShards(); err != nil {
 		return err
 	}
 
