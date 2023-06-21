@@ -52,6 +52,7 @@ func NewThresholdValidator(
 	}
 
 	localCosigner := signer.NewLocalCosigner(
+		logger,
 		&config,
 		security,
 		p2pListen,

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/libs/log"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	comet "github.com/cometbft/cometbft/types"
 	ecies "github.com/ecies/go/v2"
@@ -144,6 +145,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 		require.NoError(t, err)
 
 		cosigner := NewLocalCosigner(
+			log.NewNopLogger(),
 			&RuntimeConfig{
 				HomeDir:  cosignerDir,
 				StateDir: cosignerDir,

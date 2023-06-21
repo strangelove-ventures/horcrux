@@ -8,6 +8,7 @@ import (
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/libs/log"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -18,6 +19,7 @@ var _ Cosigner = &LocalCosigner{}
 //
 // LocalCosigner signing is thread saafe
 type LocalCosigner struct {
+	logger        log.Logger
 	config        *RuntimeConfig
 	security      CosignerSecurity
 	chainState    sync.Map
@@ -134,11 +136,13 @@ func (cosigner *LocalCosigner) waitForSignStatesToFlushToDisk() {
 }
 
 func NewLocalCosigner(
+	logger log.Logger,
 	config *RuntimeConfig,
 	security CosignerSecurity,
 	address string,
 ) *LocalCosigner {
 	return &LocalCosigner{
+		logger:   logger,
 		config:   config,
 		security: security,
 		address:  address,
@@ -388,6 +392,14 @@ func (cosigner *LocalCosigner) GetNonces(
 	if err := eg.Wait(); err != nil {
 		return nil, err
 	}
+
+	cosigner.logger.Debug(
+		"Generated nonces",
+		"chain_id", chainID,
+		"height", hrst.Height,
+		"round", hrst.Round,
+		"step", hrst.Step,
+	)
 
 	return res, nil
 }

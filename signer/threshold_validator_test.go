@@ -12,6 +12,7 @@ import (
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/crypto/tmhash"
+	"github.com/cometbft/cometbft/libs/log"
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	cometrand "github.com/cometbft/cometbft/libs/rand"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
@@ -117,6 +118,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 		}
 
 		cosigner := NewLocalCosigner(
+			log.NewNopLogger(),
 			cosignerConfig,
 			NewCosignerSecurityECIES(
 				CosignerECIESKey{

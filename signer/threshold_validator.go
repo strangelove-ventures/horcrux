@@ -530,15 +530,6 @@ func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, blo
 		return nil, stamp, err
 	}
 
-	pv.logger.Debug(
-		"Generated nonces",
-		"cosigner", pv.myCosigner.GetID(),
-		"chain_id", chainID,
-		"height", hrst.Height,
-		"round", hrst.Round,
-		"step", hrst.Step,
-	)
-
 	// Wait for threshold cosigners to be complete
 	// A Cosigner will either respond in time, or be cancelled with timeout
 	if waitUntilCompleteOrTimeout(&getEphemeralWaitGroup, pv.grpcTimeout) {

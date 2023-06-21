@@ -6,6 +6,7 @@ import (
 	"time"
 
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/libs/log"
 	ecies "github.com/ecies/go/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -28,6 +29,7 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 	}
 
 	cosigner := NewLocalCosigner(
+		log.NewNopLogger(),
 		&RuntimeConfig{},
 		NewCosignerSecurityECIES(
 			CosignerECIESKey{
