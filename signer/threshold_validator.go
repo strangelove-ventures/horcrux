@@ -2,7 +2,6 @@ package signer
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -116,46 +115,46 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, block
 			}
 			// good to sign again
 			return nil, time.Time{}, nil
-		} else {
-			if _, ok := sameBlockErr.(*StillWaitingForBlockError); !ok {
-				return nil, existingTimestamp, sameBlockErr
-			}
+		}
 
-			// the cluster is already in progress signing this block
-			// wait for cluster to finish before proceeding
+		if _, ok := sameBlockErr.(*StillWaitingForBlockError); !ok {
+			return nil, existingTimestamp, sameBlockErr
+		}
 
-			css.lastSignState.cond.L.Lock()
-			defer css.lastSignState.cond.L.Unlock()
-			for {
-				css.lastSignState.cond.Wait()
+		// the cluster is already in progress signing this block
+		// wait for cluster to finish before proceeding
 
-				ssc, ok := css.lastSignState.cache[block.HRSKey()]
-				if !ok {
-					pv.logger.Debug(
-						"Cond does not exist in cache",
-						"height", height,
-						"round", round,
-						"step", step,
-					)
-					continue
-				}
+		css.lastSignState.cond.L.Lock()
+		defer css.lastSignState.cond.L.Unlock()
+		for {
+			css.lastSignState.cond.Wait()
 
-				existingSignature, existingTimestamp, sameBlockErr = pv.compareBlockSignature(
-					chainID, block, block.HRSKey(), &ssc)
-				if sameBlockErr == nil {
-					return existingSignature, existingTimestamp, nil
-				}
-				if _, ok := sameBlockErr.(*StillWaitingForBlockError); !ok {
-					return nil, existingTimestamp, sameBlockErr
-				}
-
+			ssc, ok := css.lastSignState.cache[block.HRSKey()]
+			if !ok {
 				pv.logger.Debug(
-					"Stil waiting for block to be signed",
+					"Cond does not exist in cache",
 					"height", height,
 					"round", round,
 					"step", step,
 				)
+				continue
 			}
+
+			existingSignature, existingTimestamp, sameBlockErr = pv.compareBlockSignature(
+				chainID, block, block.HRSKey(), &ssc)
+			if sameBlockErr == nil {
+				return existingSignature, existingTimestamp, nil
+			}
+			if _, ok := sameBlockErr.(*StillWaitingForBlockError); !ok {
+				return nil, existingTimestamp, sameBlockErr
+			}
+
+			pv.logger.Debug(
+				"Stil waiting for block to be signed",
+				"height", height,
+				"round", round,
+				"step", step,
+			)
 		}
 	default:
 		if sameBlockErr == nil {
@@ -210,7 +209,7 @@ func (pv *ThresholdValidator) SignVote(chainID string, vote *cometproto.Vote) er
 		SignBytes: comet.VoteSignBytes(chainID, vote),
 	}
 
-	sig, stamp, err := pv.SignBlock(context.TODO(), chainID, block)
+	sig, stamp, err := pv.SignBlock(chainID, block)
 
 	vote.Signature = sig
 	vote.Timestamp = stamp
@@ -229,7 +228,7 @@ func (pv *ThresholdValidator) SignProposal(chainID string, proposal *cometproto.
 		SignBytes: comet.ProposalSignBytes(chainID, proposal),
 	}
 
-	sig, stamp, err := pv.SignBlock(context.TODO(), chainID, block)
+	sig, stamp, err := pv.SignBlock(chainID, block)
 
 	proposal.Signature = sig
 	proposal.Timestamp = stamp
@@ -490,7 +489,7 @@ func (pv *ThresholdValidator) compareBlockSignature(
 	return nil, stamp, newStillWaitingForBlockError(chainID, blockHRS)
 }
 
-func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, block *Block) ([]byte, time.Time, error) {
+func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, time.Time, error) {
 	height, round, step, stamp, signBytes := block.Height, block.Round, block.Step, block.Timestamp, block.SignBytes
 
 	css, err := pv.LoadSignStateIfNecessary(chainID)

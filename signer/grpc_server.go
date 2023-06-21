@@ -19,7 +19,7 @@ type GRPCServer struct {
 }
 
 func (rpc *GRPCServer) SignBlock(
-	ctx context.Context,
+	_ context.Context,
 	req *proto.CosignerGRPCSignBlockRequest,
 ) (*proto.CosignerGRPCSignBlockResponse, error) {
 	block := &Block{
@@ -29,7 +29,7 @@ func (rpc *GRPCServer) SignBlock(
 		SignBytes: req.Block.GetSignBytes(),
 		Timestamp: time.Unix(0, req.Block.GetTimestamp()),
 	}
-	res, _, err := rpc.thresholdValidator.SignBlock(ctx, req.ChainID, block)
+	res, _, err := rpc.thresholdValidator.SignBlock(req.ChainID, block)
 	if err != nil {
 		return nil, err
 	}
