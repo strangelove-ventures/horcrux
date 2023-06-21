@@ -8,7 +8,7 @@ import (
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	"github.com/cometbft/cometbft/libs/log"
+	cometlog "github.com/cometbft/cometbft/libs/log"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -19,7 +19,7 @@ var _ Cosigner = &LocalCosigner{}
 //
 // LocalCosigner signing is thread saafe
 type LocalCosigner struct {
-	logger        log.Logger
+	logger        cometlog.Logger
 	config        *RuntimeConfig
 	security      CosignerSecurity
 	chainState    sync.Map
@@ -136,7 +136,7 @@ func (cosigner *LocalCosigner) waitForSignStatesToFlushToDisk() {
 }
 
 func NewLocalCosigner(
-	logger log.Logger,
+	logger cometlog.Logger,
 	config *RuntimeConfig,
 	security CosignerSecurity,
 	address string,

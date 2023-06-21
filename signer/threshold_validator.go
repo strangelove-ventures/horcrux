@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/cometbft/cometbft/crypto"
-	"github.com/cometbft/cometbft/libs/log"
+	cometlog "github.com/cometbft/cometbft/libs/log"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	cometrpcjsontypes "github.com/cometbft/cometbft/rpc/jsonrpc/types"
 	comet "github.com/cometbft/cometbft/types"
@@ -37,7 +37,7 @@ type ThresholdValidator struct {
 
 	raftStore *RaftStore
 
-	logger log.Logger
+	logger cometlog.Logger
 
 	pendingDiskWG sync.WaitGroup
 }
@@ -53,7 +53,7 @@ type ChainSignState struct {
 
 // NewThresholdValidator creates and returns a new ThresholdValidator
 func NewThresholdValidator(
-	logger log.Logger,
+	logger cometlog.Logger,
 	config *RuntimeConfig,
 	threshold int,
 	grpcTimeout time.Duration,

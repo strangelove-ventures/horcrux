@@ -21,7 +21,7 @@ import (
 	"github.com/Jille/raft-grpc-leader-rpc/leaderhealth"
 	raftgrpctransport "github.com/Jille/raft-grpc-transport"
 	"github.com/Jille/raftadmin"
-	"github.com/cometbft/cometbft/libs/log"
+	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/cometbft/cometbft/libs/service"
 	"github.com/hashicorp/raft"
 	boltdb "github.com/hashicorp/raft-boltdb/v2"
@@ -56,7 +56,7 @@ type RaftStore struct {
 
 	raft *raft.Raft // The consensus mechanism
 
-	logger             log.Logger
+	logger             cometlog.Logger
 	cosigner           *LocalCosigner
 	thresholdValidator *ThresholdValidator
 }
@@ -64,7 +64,7 @@ type RaftStore struct {
 // New returns a new Store.
 func NewRaftStore(
 	nodeID string, directory string, bindAddress string, timeout time.Duration,
-	logger log.Logger, cosigner *LocalCosigner, cosigners []Cosigner) *RaftStore {
+	logger cometlog.Logger, cosigner *LocalCosigner, cosigners []Cosigner) *RaftStore {
 	cosignerRaftStore := &RaftStore{
 		NodeID:      nodeID,
 		RaftDir:     directory,
@@ -356,7 +356,7 @@ func (f *fsm) applyDelete(key string) interface{} {
 
 type fsmSnapshot struct {
 	store  map[string]string
-	logger log.Logger
+	logger cometlog.Logger
 }
 
 func (f *fsmSnapshot) Persist(sink raft.SnapshotSink) error {
