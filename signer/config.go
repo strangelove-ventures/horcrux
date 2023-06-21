@@ -55,10 +55,7 @@ func (c *Config) ValidateSingleSignerConfig() error {
 	if len(c.ChainNodes) == 0 {
 		return fmt.Errorf("need to have chainNodes configured for priv-val connection")
 	}
-	if err := c.ChainNodes.Validate(); err != nil {
-		return err
-	}
-	return nil
+	return c.ChainNodes.Validate()
 }
 
 func (c *Config) ValidateThresholdModeConfig() error {
@@ -92,11 +89,7 @@ func (c *Config) ValidateThresholdModeConfig() error {
 		return fmt.Errorf("invalid grpcTimeout: %w", err)
 	}
 
-	if err := c.ThresholdModeConfig.Cosigners.Validate(); err != nil {
-		return err
-	}
-
-	return nil
+	return c.ThresholdModeConfig.Cosigners.Validate()
 }
 
 type RuntimeConfig struct {

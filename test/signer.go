@@ -16,6 +16,8 @@ import (
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
+
+	//nolint:importas
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/strangelove-ventures/horcrux/signer"
@@ -560,17 +562,22 @@ func (ts *Signer) GetLeader(ctx context.Context) (string, error) {
 
 func (ts *Signer) GetMetrics(ctx context.Context) (map[string]*dto.MetricFamily, error) {
 	debugAddr := GetHostPort(ts.Container, debugPortDocker)
-	resp, err := http.Get("http://" + debugAddr + "/metrics")
+	req, err := http.NewRequestWithContext(ctx, "GET", "http://"+debugAddr+"/metrics", nil)
 	if err != nil {
 		return nil, err
 	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
 	var parser expfmt.TextParser
 	mf, err := parser.TextToMetricFamilies(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 	return mf, nil
-
 }
 
 func (ts *Signer) PollForLeader(ctx context.Context, expectedLeader string) error {

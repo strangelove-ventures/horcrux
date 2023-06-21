@@ -42,7 +42,7 @@ func testChainSingleNodeAndHorcrux(
 	// Wait for all nodes to get to given block height
 	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries[chainID]).WaitForHeight(5))
 
-	//Get Metrics in separate go routine
+	// Get Metrics in separate go routine
 	go ourValidator.CaptureCosignerMetrics(ctx)
 
 	require.NoError(t, ourValidator.WaitForConsecutiveBlocks(chainID, 10))
