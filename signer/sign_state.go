@@ -51,18 +51,17 @@ func ProposalToStep(_ *cometproto.Proposal) int8 {
 
 // SignState stores signing information for high level watermark management.
 type SignState struct {
-	Height          int64               `json:"height"`
-	Round           int64               `json:"round"`
-	Step            int8                `json:"step"`
-	EphemeralPublic []byte              `json:"ephemeral_public"`
-	Signature       []byte              `json:"signature,omitempty"`
-	SignBytes       cometbytes.HexBytes `json:"signbytes,omitempty"`
-	cache           map[HRSKey]SignStateConsensus
-	mu              sync.RWMutex
-	channel         chan SignStateConsensus
-	errChannel      chan HRSKey
+	Height          int64                         `json:"height"`
+	Round           int64                         `json:"round"`
+	Step            int8                          `json:"step"`
+	EphemeralPublic []byte                        `json:"ephemeral_public"`
+	Signature       []byte                        `json:"signature,omitempty"`
+	SignBytes       cometbytes.HexBytes           `json:"signbytes,omitempty"`
+	cache           map[HRSKey]SignStateConsensus `json:"-"`
+	mu              sync.RWMutex                  `json:"-"`
+	cond            *sync.Cond                    `json:"-"`
 
-	filePath string
+	filePath string `json:"-"`
 }
 
 func (signState *SignState) existingSignatureOrErrorIfRegression(hrst HRSTKey, signBytes []byte) ([]byte, error) {
@@ -92,6 +91,8 @@ func (signState *SignState) existingSignatureOrErrorIfRegression(hrst HRSTKey, s
 }
 
 func (signState *SignState) HRSKey() HRSKey {
+	signState.mu.RLock()
+	defer signState.mu.RUnlock()
 	return HRSKey{
 		Height: signState.Height,
 		Round:  signState.Round,
@@ -187,6 +188,8 @@ func (signState *SignState) Save(
 
 	signState.mu.Unlock()
 
+	signState.cond.Broadcast()
+
 	if pendingDiskWG != nil {
 		pendingDiskWG.Add(1)
 		go func() {
@@ -196,11 +199,6 @@ func (signState *SignState) Save(
 	} else {
 		signState.save(jsonBytes)
 	}
-
-	for len(signState.channel) > 0 {
-		<-signState.channel
-	}
-	signState.channel <- ssc
 
 	return nil
 }
@@ -294,10 +292,11 @@ func (signState *SignState) FreshCache() *SignState {
 		Signature:       signState.Signature,
 		SignBytes:       signState.SignBytes,
 		cache:           make(map[HRSKey]SignStateConsensus),
-		channel:         make(chan SignStateConsensus, 1),
-		errChannel:      make(chan HRSKey, 1),
-		filePath:        signState.filePath,
+
+		filePath: signState.filePath,
 	}
+
+	newSignState.cond = sync.NewCond(&newSignState.mu)
 
 	newSignState.cache[HRSKey{
 		Height: signState.Height,
@@ -344,11 +343,10 @@ func LoadOrCreateSignState(filepath string) (*SignState, error) {
 		// the only scenario where we want to create a new sign state file is when the file does not exist.
 		// Make an empty sign state and save it.
 		state := &SignState{
-			filePath:   filepath,
-			cache:      make(map[HRSKey]SignStateConsensus),
-			channel:    make(chan SignStateConsensus, 1),
-			errChannel: make(chan HRSKey, 1),
+			filePath: filepath,
+			cache:    make(map[HRSKey]SignStateConsensus),
 		}
+		state.cond = sync.NewCond(&state.mu)
 
 		jsonBytes, err := cometjson.MarshalIndent(state, "", "  ")
 		if err != nil {

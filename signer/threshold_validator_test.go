@@ -19,6 +19,7 @@ import (
 	ecies "github.com/ecies/go/v2"
 	"github.com/stretchr/testify/require"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
+	"golang.org/x/sync/errgroup"
 )
 
 func TestThresholdValidator2of2(t *testing.T) {
@@ -249,12 +250,85 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	require.Error(t, err, "double sign!")
 
 	proposal = cometproto.Proposal{
-		Height: 1,
-		Round:  21,
-		Type:   cometproto.ProposalType,
+		Height:    1,
+		Round:     21,
+		Type:      cometproto.ProposalType,
+		Timestamp: time.Now(),
 	}
 
+	proposalClone := proposal
+	proposalClone.Timestamp = proposal.Timestamp.Add(2 * time.Millisecond)
+
+	proposalClone2 := proposal
+	proposalClone2.Timestamp = proposal.Timestamp.Add(4 * time.Millisecond)
+
+	var eg errgroup.Group
+
+	eg.Go(func() error {
+		return newValidator.SignProposal(testChainID, &proposal)
+	})
+	eg.Go(func() error {
+		return newValidator.SignProposal(testChainID, &proposalClone)
+	})
+	eg.Go(func() error {
+		return newValidator.SignProposal(testChainID, &proposalClone2)
+	})
 	// signing higher block now should succeed
-	err = newValidator.SignProposal(testChainID, &proposal)
+	err = eg.Wait()
 	require.NoError(t, err)
+
+	// Sign some votes from multiple sentries
+	for i := 2; i < 50; i++ {
+		prevote := cometproto.Vote{
+			Height:    int64(i),
+			Round:     0,
+			Type:      cometproto.PrevoteType,
+			Timestamp: time.Now(),
+		}
+
+		prevoteClone := prevote
+		prevoteClone.Timestamp = prevote.Timestamp.Add(2 * time.Millisecond)
+
+		prevoteClone2 := prevote
+		prevoteClone2.Timestamp = prevote.Timestamp.Add(4 * time.Millisecond)
+
+		eg.Go(func() error {
+			return newValidator.SignVote(testChainID, &prevote)
+		})
+		eg.Go(func() error {
+			return newValidator.SignVote(testChainID, &prevoteClone)
+		})
+		eg.Go(func() error {
+			return newValidator.SignVote(testChainID, &prevoteClone2)
+		})
+
+		err = eg.Wait()
+		require.NoError(t, err)
+
+		precommit := cometproto.Vote{
+			Height:    int64(i),
+			Round:     0,
+			Type:      cometproto.PrecommitType,
+			Timestamp: time.Now(),
+		}
+
+		precommitClone := precommit
+		precommitClone.Timestamp = precommit.Timestamp.Add(2 * time.Millisecond)
+
+		precommitClone2 := precommit
+		precommitClone2.Timestamp = precommit.Timestamp.Add(4 * time.Millisecond)
+
+		eg.Go(func() error {
+			return newValidator.SignVote(testChainID, &precommit)
+		})
+		eg.Go(func() error {
+			return newValidator.SignVote(testChainID, &precommitClone)
+		})
+		eg.Go(func() error {
+			return newValidator.SignVote(testChainID, &precommitClone2)
+		})
+
+		err = eg.Wait()
+		require.NoError(t, err)
+	}
 }
