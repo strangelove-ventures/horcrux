@@ -99,6 +99,17 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, signS
 	return css.lastSignStateInitiated.Save(signState, &pv.pendingDiskWG)
 }
 
+// HandleError will alert any waiting goroutines that an error
+// has occurred during signing and a retry can be attempted.
+func (pv *ThresholdValidator) notifyBlockSignError(chainID string, hrs HRSKey) {
+	css := pv.mustLoadChainState(chainID)
+
+	for len(css.lastSignStateInitiated.errChannel) > 0 {
+		<-css.lastSignStateInitiated.errChannel
+	}
+	css.lastSignStateInitiated.errChannel <- hrs
+}
+
 // Stop safely shuts down the ThresholdValidator.
 func (pv *ThresholdValidator) Stop() {
 	pv.waitForSignStatesToFlushToDisk()
@@ -484,6 +495,8 @@ func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, blo
 
 				ctx, cancel := context.WithTimeout(ctx, time.Second)
 				defer cancel()
+
+			SameHeightLoop:
 				for {
 					select {
 					case <-ctx.Done():
@@ -496,6 +509,12 @@ func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, blo
 						}
 						if _, ok := sameBlockErr.(*StillWaitingForBlockError); !ok {
 							return nil, existingTimestamp, sameBlockErr
+						}
+
+					case errHRS := <-css.lastSignStateInitiated.errChannel:
+						if block.HRSKey() == errHRS {
+							// error occurred during signing at this hrs, okay to try again
+							break SameHeightLoop
 						}
 					}
 				}
@@ -526,6 +545,7 @@ func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, blo
 
 	myEphSecrets, err := pv.myCosigner.GetNonces(chainID, hrst)
 	if err != nil {
+		pv.notifyBlockSignError(chainID, block.HRSKey())
 		// Our ephemeral secret parts are required, cannot proceed
 		return nil, stamp, err
 	}
@@ -533,6 +553,7 @@ func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, blo
 	// Wait for threshold cosigners to be complete
 	// A Cosigner will either respond in time, or be cancelled with timeout
 	if waitUntilCompleteOrTimeout(&getEphemeralWaitGroup, pv.grpcTimeout) {
+		pv.notifyBlockSignError(chainID, block.HRSKey())
 		return nil, stamp, errors.New("timed out waiting for ephemeral shares")
 	}
 
@@ -569,6 +590,7 @@ func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, blo
 	// Wait for threshold cosigners to be complete
 	// A Cosigner will either respond in time, or be cancelled with timeout
 	if waitUntilCompleteOrTimeout(&setEphemeralAndSignWaitGroup, 4*time.Second) {
+		pv.notifyBlockSignError(chainID, block.HRSKey())
 		return nil, stamp, errors.New("timed out waiting for peers to sign")
 	}
 
@@ -591,12 +613,14 @@ func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, blo
 
 	if len(shareSigs) < pv.threshold {
 		totalInsufficientCosigners.Inc()
+		pv.notifyBlockSignError(chainID, block.HRSKey())
 		return nil, stamp, errors.New("not enough co-signers")
 	}
 
 	// assemble into final signature
 	signature, err := pv.myCosigner.CombineSignatures(chainID, shareSigs)
 	if err != nil {
+		pv.notifyBlockSignError(chainID, block.HRSKey())
 		return nil, stamp, err
 	}
 
@@ -611,6 +635,7 @@ func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, blo
 	// verify the combined signature before saving to watermark
 	if !pv.myCosigner.VerifySignature(chainID, signBytes, signature) {
 		totalInvalidSignature.Inc()
+		pv.notifyBlockSignError(chainID, block.HRSKey())
 		return nil, stamp, errors.New("combined signature is not valid")
 	}
 
@@ -628,6 +653,7 @@ func (pv *ThresholdValidator) SignBlock(ctx context.Context, chainID string, blo
 	// Err will be present if newLss is not above high watermark
 	if err = css.lastSignState.Save(newLss.SignStateConsensus, &pv.pendingDiskWG); err != nil {
 		if _, isSameHRSError := err.(*SameHRSError); !isSameHRSError {
+			pv.notifyBlockSignError(chainID, block.HRSKey())
 			return nil, stamp, err
 		}
 	}

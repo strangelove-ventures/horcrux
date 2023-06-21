@@ -60,6 +60,7 @@ type SignState struct {
 	cache           map[HRSKey]SignStateConsensus
 	mu              sync.RWMutex
 	channel         chan SignStateConsensus
+	errChannel      chan HRSKey
 
 	filePath string
 }
@@ -294,6 +295,7 @@ func (signState *SignState) FreshCache() *SignState {
 		SignBytes:       signState.SignBytes,
 		cache:           make(map[HRSKey]SignStateConsensus),
 		channel:         make(chan SignStateConsensus, 1),
+		errChannel:      make(chan HRSKey, 1),
 		filePath:        signState.filePath,
 	}
 
@@ -342,9 +344,10 @@ func LoadOrCreateSignState(filepath string) (*SignState, error) {
 		// the only scenario where we want to create a new sign state file is when the file does not exist.
 		// Make an empty sign state and save it.
 		state := &SignState{
-			filePath: filepath,
-			cache:    make(map[HRSKey]SignStateConsensus),
-			channel:  make(chan SignStateConsensus, 1),
+			filePath:   filepath,
+			cache:      make(map[HRSKey]SignStateConsensus),
+			channel:    make(chan SignStateConsensus, 1),
+			errChannel: make(chan HRSKey, 1),
 		}
 
 		jsonBytes, err := cometjson.MarshalIndent(state, "", "  ")
