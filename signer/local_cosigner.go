@@ -426,29 +426,32 @@ func (cosigner *LocalCosigner) GetEphemeralSecretParts(
 	id := cosigner.GetID()
 
 	var eg errgroup.Group
+	// getting nonces requires encrypting and signing for each cosigner,
+	// so we perform these operations in parallel.
 
-	for i, pubKey := range cosigner.rsaPubKeys {
-		if pubKey.ID == id {
+	for peerID := range cosigner.rsaPubKeys {
+		if peerID == id {
 			continue
 		}
 
-		i := i
-		id := pubKey.ID
+		peerID := peerID
 
 		eg.Go(func() error {
 			secretPart, err := cosigner.getEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
 				ChainID:   chainID,
-				ID:        id,
+				ID:        peerID,
 				Height:    hrst.Height,
 				Round:     hrst.Round,
 				Step:      hrst.Step,
 				Timestamp: time.Unix(0, hrst.Timestamp),
 			})
 
-			if i > id {
-				res.EncryptedSecrets[i-2] = secretPart
+			idx := peerID - 1
+
+			if idx >= id {
+				res.EncryptedSecrets[idx-1] = secretPart
 			} else {
-				res.EncryptedSecrets[i-1] = secretPart
+				res.EncryptedSecrets[idx] = secretPart
 			}
 
 			return err
@@ -651,6 +654,9 @@ func (cosigner *LocalCosigner) SetEphemeralSecretPartsAndSign(
 	}
 
 	var eg errgroup.Group
+
+	// setting nonces requires decrypting and verifying signature from each cosigner,
+	// so we perform these operations in parallel.
 
 	for _, secretPart := range req.EncryptedSecrets {
 		secretPart := secretPart
