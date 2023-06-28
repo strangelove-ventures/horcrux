@@ -16,6 +16,7 @@ import (
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	"gitlab.com/unit410/edwards25519"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
+	"golang.org/x/sync/errgroup"
 )
 
 var _ Cosigner = &LocalCosigner{}
@@ -419,30 +420,48 @@ func (cosigner *LocalCosigner) GetEphemeralSecretParts(
 	}
 
 	res := &CosignerEphemeralSecretPartsResponse{
-		EncryptedSecrets: make([]CosignerEphemeralSecretPart, 0, len(cosigner.rsaPubKeys)-1),
+		EncryptedSecrets: make([]CosignerEphemeralSecretPart, len(cosigner.rsaPubKeys)-1),
 	}
 
 	id := cosigner.GetID()
 
-	for _, pubKey := range cosigner.rsaPubKeys {
-		if pubKey.ID == id {
+	var eg errgroup.Group
+	// getting nonces requires encrypting and signing for each cosigner,
+	// so we perform these operations in parallel.
+
+	for peerID := range cosigner.rsaPubKeys {
+		if peerID == id {
 			continue
 		}
-		secretPart, err := cosigner.getEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
-			ChainID:   chainID,
-			ID:        pubKey.ID,
-			Height:    hrst.Height,
-			Round:     hrst.Round,
-			Step:      hrst.Step,
-			Timestamp: time.Unix(0, hrst.Timestamp),
+
+		peerID := peerID
+
+		eg.Go(func() error {
+			secretPart, err := cosigner.getEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
+				ChainID:   chainID,
+				ID:        peerID,
+				Height:    hrst.Height,
+				Round:     hrst.Round,
+				Step:      hrst.Step,
+				Timestamp: time.Unix(0, hrst.Timestamp),
+			})
+
+			idx := peerID - 1
+
+			if idx >= id {
+				res.EncryptedSecrets[idx-1] = secretPart
+			} else {
+				res.EncryptedSecrets[idx] = secretPart
+			}
+
+			return err
 		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		res.EncryptedSecrets = append(res.EncryptedSecrets, secretPart)
 	}
+
+	if err := eg.Wait(); err != nil {
+		return nil, err
+	}
+
 	return res, nil
 }
 
@@ -634,21 +653,31 @@ func (cosigner *LocalCosigner) SetEphemeralSecretPartsAndSign(
 		return nil, err
 	}
 
+	var eg errgroup.Group
+
+	// setting nonces requires decrypting and verifying signature from each cosigner,
+	// so we perform these operations in parallel.
+
 	for _, secretPart := range req.EncryptedSecrets {
-		err := cosigner.setEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
-			ChainID:                        chainID,
-			SourceID:                       secretPart.SourceID,
-			SourceEphemeralSecretPublicKey: secretPart.SourceEphemeralSecretPublicKey,
-			EncryptedSharePart:             secretPart.EncryptedSharePart,
-			SourceSig:                      secretPart.SourceSig,
-			Height:                         req.HRST.Height,
-			Round:                          req.HRST.Round,
-			Step:                           req.HRST.Step,
-			Timestamp:                      time.Unix(0, req.HRST.Timestamp),
+		secretPart := secretPart
+
+		eg.Go(func() error {
+			return cosigner.setEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
+				ChainID:                        chainID,
+				SourceID:                       secretPart.SourceID,
+				SourceEphemeralSecretPublicKey: secretPart.SourceEphemeralSecretPublicKey,
+				EncryptedSharePart:             secretPart.EncryptedSharePart,
+				SourceSig:                      secretPart.SourceSig,
+				Height:                         req.HRST.Height,
+				Round:                          req.HRST.Round,
+				Step:                           req.HRST.Step,
+				Timestamp:                      time.Unix(0, req.HRST.Timestamp),
+			})
 		})
-		if err != nil {
-			return nil, err
-		}
+	}
+
+	if err := eg.Wait(); err != nil {
+		return nil, err
 	}
 
 	res, err := cosigner.sign(CosignerSignRequest{
