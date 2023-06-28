@@ -290,7 +290,7 @@ func (softSigner *ThresholdSignerSoft) SetNonce(
 
 	// Verify the source signature
 	if req.Signature == nil {
-		return errors.New("Signature field is required")
+		return errors.New("signature field is required")
 	}
 
 	digestMsg := CosignerNonce{

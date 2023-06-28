@@ -576,7 +576,7 @@ func (cosigner *LocalCosigner) setNonce(req CosignerSetNonceRequest) error {
 
 	// Verify the source signature
 	if req.Signature == nil {
-		return errors.New("Signature field is required")
+		return errors.New("signature field is required")
 	}
 
 	digestMsg := CosignerNonce{
