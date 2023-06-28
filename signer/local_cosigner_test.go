@@ -159,22 +159,22 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		Timestamp: now.UnixNano(),
 	}
 
-	ephemeralSharesFor2, err := cosigner1.GetEphemeralSecretParts(testChainID, hrst)
+	noncesFor2, err := cosigner1.GetNonces(testChainID, hrst)
 	require.NoError(t, err)
 
-	publicKeys = append(publicKeys, ephemeralSharesFor2.EncryptedSecrets[0].SourceEphemeralSecretPublicKey)
+	publicKeys = append(publicKeys, noncesFor2.Nonces[0].PubKey)
 
-	ephemeralSharesFor1, err := cosigner2.GetEphemeralSecretParts(testChainID, hrst)
+	noncesFor1, err := cosigner2.GetNonces(testChainID, hrst)
 	require.NoError(t, err)
 
-	t.Logf("Shares from 2: %d", len(ephemeralSharesFor1.EncryptedSecrets))
+	t.Logf("Shares from 2: %d", len(noncesFor1.Nonces))
 
-	publicKeys = append(publicKeys, ephemeralSharesFor1.EncryptedSecrets[0].SourceEphemeralSecretPublicKey)
+	publicKeys = append(publicKeys, noncesFor1.Nonces[0].PubKey)
 
-	ephemeralPublic := tsed25519.AddElements(publicKeys)
+	noncePublic := tsed25519.AddElements(publicKeys)
 
 	t.Logf("public keys: %x", publicKeys)
-	t.Logf("eph pub: %x", ephemeralPublic)
+	t.Logf("eph pub: %x", noncePublic)
 	// pack a vote into sign bytes
 	var vote cometproto.Vote
 	vote.Height = 1
@@ -184,19 +184,19 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 
 	signBytes := comet.VoteSignBytes("chain-id", &vote)
 
-	sigRes1, err := cosigner1.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
-		ChainID:          testChainID,
-		EncryptedSecrets: ephemeralSharesFor1.EncryptedSecrets,
-		HRST:             hrst,
-		SignBytes:        signBytes,
+	sigRes1, err := cosigner1.SetNoncesAndSign(CosignerSetNoncesAndSignRequest{
+		ChainID:   testChainID,
+		Nonces:    noncesFor1.Nonces,
+		HRST:      hrst,
+		SignBytes: signBytes,
 	})
 	require.NoError(t, err)
 
-	sigRes2, err := cosigner2.SetEphemeralSecretPartsAndSign(CosignerSetEphemeralSecretPartsAndSignRequest{
-		ChainID:          testChainID,
-		EncryptedSecrets: ephemeralSharesFor2.EncryptedSecrets,
-		HRST:             hrst,
-		SignBytes:        signBytes,
+	sigRes2, err := cosigner2.SetNoncesAndSign(CosignerSetNoncesAndSignRequest{
+		ChainID:   testChainID,
+		Nonces:    noncesFor2.Nonces,
+		HRST:      hrst,
+		SignBytes: signBytes,
 	})
 	require.NoError(t, err)
 
@@ -206,7 +206,7 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	t.Logf("sig arr: %x", sigArr)
 
 	combinedSig := tsed25519.CombineShares(total, sigIds, sigArr)
-	signature := ephemeralPublic
+	signature := noncePublic
 	signature = append(signature, combinedSig...)
 
 	t.Logf("signature: %x", signature)

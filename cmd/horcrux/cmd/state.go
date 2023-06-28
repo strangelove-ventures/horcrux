@@ -111,7 +111,7 @@ func setStateCmd() *cobra.Command {
 
 			fmt.Fprintf(cmd.OutOrStdout(), "Setting height %d\n", height)
 
-			pv.EphemeralPublic, cs.EphemeralPublic = nil, nil
+			pv.NoncePublic, cs.NoncePublic = nil, nil
 			signState := signer.SignStateConsensus{
 				Height:    height,
 				Round:     0,
@@ -195,7 +195,7 @@ func importStateCmd() *cobra.Command {
 				return err
 			}
 
-			pv.EphemeralPublic = nil
+			pv.NoncePublic = nil
 			signState := signer.SignStateConsensus{
 				Height:    pvState.Height,
 				Round:     int64(pvState.Round),
@@ -231,8 +231,8 @@ func printSignState(out io.Writer, ss *signer.SignState) {
 		"  Step:      %v\n",
 		ss.Height, ss.Round, ss.Step)
 
-	if ss.EphemeralPublic != nil {
-		fmt.Fprintln(out, "  Ephemeral Public Key:", base64.StdEncoding.EncodeToString(ss.EphemeralPublic))
+	if ss.NoncePublic != nil {
+		fmt.Fprintln(out, "  Nonce Public Key:", base64.StdEncoding.EncodeToString(ss.NoncePublic))
 	}
 	if ss.Signature != nil {
 		fmt.Fprintln(out, "  Signature:", base64.StdEncoding.EncodeToString(ss.Signature))

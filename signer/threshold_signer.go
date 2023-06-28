@@ -13,12 +13,12 @@ const (
 type ThresholdSigner interface {
 	Type() string
 
-	DealShares(req CosignerGetEphemeralSecretPartRequest) (HrsMetadata, error)
+	DealShares(req CosignerGetNonceRequest) (HrsMetadata, error)
 
-	GetEphemeralSecretPart(req CosignerGetEphemeralSecretPartRequest, m *LastSignStateWrapper,
-		pubKeys map[int]CosignerRSAPubKey) (CosignerEphemeralSecretPart, error)
+	GetNonce(req CosignerGetNonceRequest, m *LastSignStateWrapper,
+		pubKeys map[int]CosignerRSAPubKey) (CosignerNonce, error)
 
-	SetEphemeralSecretPart(req CosignerSetEphemeralSecretPartRequest, m *LastSignStateWrapper,
+	SetNonce(req CosignerSetNonceRequest, m *LastSignStateWrapper,
 		pubKeys map[int]CosignerRSAPubKey) error
 
 	Sign(req CosignerSignRequest, m *LastSignStateWrapper) (CosignerSignResponse, error)
@@ -32,8 +32,8 @@ type ThresholdSigner interface {
 // CosignerMetadata holds the share and the ephermeral secret public key
 // Moved from Local cosigner to threshold_ed25519
 type CosignerMetadata struct {
-	Share                    []byte
-	EphemeralSecretPublicKey []byte
+	Share          []byte
+	NoncePublicKey []byte
 }
 
 // HrsMetadata holds the ephemeral nonces from cosigner peers
