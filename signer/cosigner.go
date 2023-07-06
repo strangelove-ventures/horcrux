@@ -88,12 +88,12 @@ func CosignerNonceFromProto(secretPart *proto.Nonce) CosignerNonce {
 	}
 }
 
-func CosignerNoncesFromProto(
-	secretParts []*proto.Nonce) (out []CosignerNonce) {
-	for _, secretPart := range secretParts {
-		out = append(out, CosignerNonceFromProto(secretPart))
+func CosignerNoncesFromProto(secretParts []*proto.Nonce) []CosignerNonce {
+	out := make([]CosignerNonce, len(secretParts))
+	for i, secretPart := range secretParts {
+		out[i] = CosignerNonceFromProto(secretPart)
 	}
-	return
+	return out
 }
 
 type CosignerSetNonceRequest struct {
