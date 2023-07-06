@@ -51,13 +51,13 @@ func ProposalToStep(_ *cometproto.Proposal) int8 {
 
 // SignState stores signing information for high level watermark management.
 type SignState struct {
-	Height          int64               `json:"height"`
-	Round           int64               `json:"round"`
-	Step            int8                `json:"step"`
-	EphemeralPublic []byte              `json:"ephemeral_public"`
-	Signature       []byte              `json:"signature,omitempty"`
-	SignBytes       cometbytes.HexBytes `json:"signbytes,omitempty"`
-	cache           map[HRSKey]SignStateConsensus
+	Height      int64               `json:"height"`
+	Round       int64               `json:"round"`
+	Step        int8                `json:"step"`
+	NoncePublic []byte              `json:"ephemeral_public"`
+	Signature   []byte              `json:"signature,omitempty"`
+	SignBytes   cometbytes.HexBytes `json:"signbytes,omitempty"`
+	cache       map[HRSKey]SignStateConsensus
 
 	filePath string
 }
@@ -256,14 +256,14 @@ func (signState *SignState) GetErrorIfLessOrEqual(height int64, round int64, ste
 // including the most recent sign state.
 func (signState *SignState) FreshCache() *SignState {
 	newSignState := &SignState{
-		Height:          signState.Height,
-		Round:           signState.Round,
-		Step:            signState.Step,
-		EphemeralPublic: signState.EphemeralPublic,
-		Signature:       signState.Signature,
-		SignBytes:       signState.SignBytes,
-		cache:           make(map[HRSKey]SignStateConsensus),
-		filePath:        signState.filePath,
+		Height:      signState.Height,
+		Round:       signState.Round,
+		Step:        signState.Step,
+		NoncePublic: signState.NoncePublic,
+		Signature:   signState.Signature,
+		SignBytes:   signState.SignBytes,
+		cache:       make(map[HRSKey]SignStateConsensus),
+		filePath:    signState.filePath,
 	}
 
 	newSignState.cache[HRSKey{

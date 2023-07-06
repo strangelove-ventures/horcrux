@@ -71,7 +71,7 @@ Metrics may vary between Cosigner processes since there is only one leader.
 
 Watch 'signer_missed_ephemeral_shares' which will note when the leader is not able to get a signature from the peer.  If 'signer_total_missed_ephemeral_shares' increases to a high number, this may indicate a larger issue.
 
-Each block, Ephemeral Secrets are shared between Cosigners.  Monitoring 'signer_seconds_since_last_local_ephemeral_share_time' and ensuring it does not exceed the block time will allow you to know when a Cosigner was not contacted for a block.
+Each block, Nonce Secrets are shared between Cosigners.  Monitoring 'signer_seconds_since_last_local_ephemeral_share_time' and ensuring it does not exceed the block time will allow you to know when a Cosigner was not contacted for a block.
 
 ## Metrics that don't always correspond to block time
 There is no guarantee that a Cosigner will sign a block if the threshold is reached early.  You may watch 'signer_seconds_since_last_local_sign_start_time' but there is no guarantee that 'signer_seconds_since_last_local_sign_finish_time' will be reached since there are multiple sanity checks that may cause an early exit in some circumstances (rather rare)

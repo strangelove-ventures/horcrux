@@ -46,66 +46,66 @@ type CosignerSignRequest struct {
 }
 
 type CosignerSignResponse struct {
-	EphemeralPublic []byte
-	Timestamp       time.Time
-	Signature       []byte
+	NoncePublic []byte
+	Timestamp   time.Time
+	Signature   []byte
 }
 
-type CosignerEphemeralSecretPart struct {
-	SourceID                       int
-	DestinationID                  int
-	SourceEphemeralSecretPublicKey []byte
-	EncryptedSharePart             []byte
-	SourceSig                      []byte
+type CosignerNonce struct {
+	SourceID      int
+	DestinationID int
+	PubKey        []byte
+	Share         []byte
+	Signature     []byte
 }
 
-func (secretPart *CosignerEphemeralSecretPart) toProto() *proto.EphemeralSecretPart {
-	return &proto.EphemeralSecretPart{
-		SourceID:                       int32(secretPart.SourceID),
-		DestinationID:                  int32(secretPart.DestinationID),
-		SourceEphemeralSecretPublicKey: secretPart.SourceEphemeralSecretPublicKey,
-		EncryptedSharePart:             secretPart.EncryptedSharePart,
-		SourceSig:                      secretPart.SourceSig,
+func (secretPart *CosignerNonce) toProto() *proto.Nonce {
+	return &proto.Nonce{
+		SourceID:      int32(secretPart.SourceID),
+		DestinationID: int32(secretPart.DestinationID),
+		PubKey:        secretPart.PubKey,
+		Share:         secretPart.Share,
+		Signature:     secretPart.Signature,
 	}
 }
 
-type CosignerEphemeralSecretParts []CosignerEphemeralSecretPart
+type CosignerNonces []CosignerNonce
 
-func (secretParts CosignerEphemeralSecretParts) toProto() (out []*proto.EphemeralSecretPart) {
+func (secretParts CosignerNonces) toProto() (out []*proto.Nonce) {
 	for _, secretPart := range secretParts {
 		out = append(out, secretPart.toProto())
 	}
 	return
 }
 
-func CosignerEphemeralSecretPartFromProto(secretPart *proto.EphemeralSecretPart) CosignerEphemeralSecretPart {
-	return CosignerEphemeralSecretPart{
-		SourceID:                       int(secretPart.SourceID),
-		DestinationID:                  int(secretPart.DestinationID),
-		SourceEphemeralSecretPublicKey: secretPart.SourceEphemeralSecretPublicKey,
-		EncryptedSharePart:             secretPart.EncryptedSharePart,
-		SourceSig:                      secretPart.SourceSig,
+func CosignerNonceFromProto(secretPart *proto.Nonce) CosignerNonce {
+	return CosignerNonce{
+		SourceID:      int(secretPart.SourceID),
+		DestinationID: int(secretPart.DestinationID),
+		PubKey:        secretPart.PubKey,
+		Share:         secretPart.Share,
+		Signature:     secretPart.Signature,
 	}
 }
 
-func CosignerEphemeralSecretPartsFromProto(
-	secretParts []*proto.EphemeralSecretPart) (out []CosignerEphemeralSecretPart) {
-	for _, secretPart := range secretParts {
-		out = append(out, CosignerEphemeralSecretPartFromProto(secretPart))
+func CosignerNoncesFromProto(secretParts []*proto.Nonce) []CosignerNonce {
+	out := make([]CosignerNonce, len(secretParts))
+	for i, secretPart := range secretParts {
+		out[i] = CosignerNonceFromProto(secretPart)
 	}
-	return
+	return out
 }
 
-type CosignerSetEphemeralSecretPartRequest struct {
-	ChainID                        string
-	SourceID                       int
-	SourceEphemeralSecretPublicKey []byte
-	EncryptedSharePart             []byte
-	SourceSig                      []byte
-	Height                         int64
-	Round                          int64
-	Step                           int8
-	Timestamp                      time.Time
+type CosignerSetNonceRequest struct {
+	ChainID   string
+	SourceID  int
+	PubKey    []byte
+	Share     []byte
+	Signature []byte
+	Height    int64
+	Round     int64
+	Step      int8
+	Timestamp time.Time
 }
 
 type CosignerSignBlockRequest struct {
@@ -117,15 +117,15 @@ type CosignerSignBlockResponse struct {
 	Signature []byte
 }
 
-type CosignerEphemeralSecretPartsResponse struct {
-	EncryptedSecrets []CosignerEphemeralSecretPart
+type CosignerNoncesResponse struct {
+	Nonces []CosignerNonce
 }
 
-type CosignerSetEphemeralSecretPartsAndSignRequest struct {
-	ChainID          string
-	EncryptedSecrets []CosignerEphemeralSecretPart
-	HRST             HRSTKey
-	SignBytes        []byte
+type CosignerSetNoncesAndSignRequest struct {
+	ChainID   string
+	Nonces    []CosignerNonce
+	HRST      HRSTKey
+	SignBytes []byte
 }
 
 // Cosigner interface is a set of methods for an m-of-n threshold signature.
@@ -143,9 +143,9 @@ type Cosigner interface {
 
 	VerifySignature(chainID string, payload, signature []byte) bool
 
-	// Get ephemeral secret part for all cosigner shards
-	GetEphemeralSecretParts(chainID string, hrst HRSTKey) (*CosignerEphemeralSecretPartsResponse, error)
+	// Get nonces for all cosigner shards
+	GetNonces(chainID string, hrst HRSTKey) (*CosignerNoncesResponse, error)
 
 	// Sign the requested bytes
-	SetEphemeralSecretPartsAndSign(req CosignerSetEphemeralSecretPartsAndSignRequest) (*CosignerSignResponse, error)
+	SetNoncesAndSign(req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error)
 }

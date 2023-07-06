@@ -12,7 +12,7 @@ type metricsTimer struct {
 	mu                                              sync.Mutex
 	previousPrecommit, previousPrevote              time.Time
 	previousLocalSignStart, previousLocalSignFinish time.Time
-	previousLocalEphemeralShare                     time.Time
+	previousLocalNonce                              time.Time
 }
 
 func newMetricsTimer() *metricsTimer {
@@ -21,7 +21,7 @@ func newMetricsTimer() *metricsTimer {
 		mu:                sync.Mutex{},
 		previousPrecommit: now, previousPrevote: now,
 		previousLocalSignStart: now, previousLocalSignFinish: now,
-		previousLocalEphemeralShare: now,
+		previousLocalNonce: now,
 	}
 }
 
@@ -49,10 +49,10 @@ func (mt *metricsTimer) SetPreviousLocalSignFinish(t time.Time) {
 	mt.previousLocalSignFinish = t
 }
 
-func (mt *metricsTimer) SetPreviousLocalEphemeralShare(t time.Time) {
+func (mt *metricsTimer) SetPreviousLocalNonce(t time.Time) {
 	mt.mu.Lock()
 	defer mt.mu.Unlock()
-	mt.previousLocalEphemeralShare = t
+	mt.previousLocalNonce = t
 }
 
 func (mt *metricsTimer) UpdatePrometheusMetrics() {
@@ -64,7 +64,7 @@ func (mt *metricsTimer) UpdatePrometheusMetrics() {
 	secondsSinceLastPrevote.Set(time.Since(mt.previousPrevote).Seconds())
 	secondsSinceLastLocalSignStart.Set(time.Since(mt.previousLocalSignStart).Seconds())
 	secondsSinceLastLocalSignFinish.Set(time.Since(mt.previousLocalSignFinish).Seconds())
-	secondsSinceLastLocalEphemeralShareTime.Set(time.Since(mt.previousLocalEphemeralShare).Seconds())
+	secondsSinceLastLocalNonceTime.Set(time.Since(mt.previousLocalNonce).Seconds())
 }
 
 var (
@@ -134,7 +134,7 @@ var (
 		Help: "Seconds Since Last Local Finish Sign (Should stay below 2 * Block Time)",
 	})
 
-	secondsSinceLastLocalEphemeralShareTime = promauto.NewGauge(prometheus.GaugeOpts{
+	secondsSinceLastLocalNonceTime = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "signer_seconds_since_last_local_ephemeral_share_time",
 		Help: "Seconds Since Last Local Ephemeral Share Sign " +
 			"(Should not increase beyond block time; If high, may indicate raft joining issue for CoSigner) ",
@@ -157,14 +157,14 @@ var (
 		Help: "Total Prevote Missed",
 	})
 
-	missedEphemeralShares = promauto.NewGaugeVec(
+	missedNonces = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "signer_missed_ephemeral_shares",
 			Help: "Consecutive Threshold Signature Parts Missed",
 		},
 		[]string{"peerid"},
 	)
-	totalMissedEphemeralShares = promauto.NewCounterVec(
+	totalMissedNonces = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "signer_total_missed_ephemeral_shares",
 			Help: "Total Threshold Signature Parts Missed",
@@ -231,7 +231,7 @@ var (
 		Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 	})
 
-	timedCosignerEphemeralShareLag = promauto.NewSummaryVec(
+	timedCosignerNonceLag = promauto.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Name:       "signer_cosigner_ephemeral_share_lag_seconds",
 			Help:       "Time taken to get cosigner ephemeral share",

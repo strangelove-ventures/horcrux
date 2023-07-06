@@ -23,8 +23,8 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type CosignerGRPCClient interface {
 	SignBlock(ctx context.Context, in *CosignerGRPCSignBlockRequest, opts ...grpc.CallOption) (*CosignerGRPCSignBlockResponse, error)
-	SetEphemeralSecretPartsAndSign(ctx context.Context, in *CosignerGRPCSetEphemeralSecretPartsAndSignRequest, opts ...grpc.CallOption) (*CosignerGRPCSetEphemeralSecretPartsAndSignResponse, error)
-	GetEphemeralSecretParts(ctx context.Context, in *CosignerGRPCGetEphemeralSecretPartsRequest, opts ...grpc.CallOption) (*CosignerGRPCGetEphemeralSecretPartsResponse, error)
+	SetNoncesAndSign(ctx context.Context, in *CosignerGRPCSetNoncesAndSignRequest, opts ...grpc.CallOption) (*CosignerGRPCSetNoncesAndSignResponse, error)
+	GetNonces(ctx context.Context, in *CosignerGRPCGetNoncesRequest, opts ...grpc.CallOption) (*CosignerGRPCGetNoncesResponse, error)
 	TransferLeadership(ctx context.Context, in *CosignerGRPCTransferLeadershipRequest, opts ...grpc.CallOption) (*CosignerGRPCTransferLeadershipResponse, error)
 	GetLeader(ctx context.Context, in *CosignerGRPCGetLeaderRequest, opts ...grpc.CallOption) (*CosignerGRPCGetLeaderResponse, error)
 }
@@ -46,18 +46,18 @@ func (c *cosignerGRPCClient) SignBlock(ctx context.Context, in *CosignerGRPCSign
 	return out, nil
 }
 
-func (c *cosignerGRPCClient) SetEphemeralSecretPartsAndSign(ctx context.Context, in *CosignerGRPCSetEphemeralSecretPartsAndSignRequest, opts ...grpc.CallOption) (*CosignerGRPCSetEphemeralSecretPartsAndSignResponse, error) {
-	out := new(CosignerGRPCSetEphemeralSecretPartsAndSignResponse)
-	err := c.cc.Invoke(ctx, "/proto.CosignerGRPC/SetEphemeralSecretPartsAndSign", in, out, opts...)
+func (c *cosignerGRPCClient) SetNoncesAndSign(ctx context.Context, in *CosignerGRPCSetNoncesAndSignRequest, opts ...grpc.CallOption) (*CosignerGRPCSetNoncesAndSignResponse, error) {
+	out := new(CosignerGRPCSetNoncesAndSignResponse)
+	err := c.cc.Invoke(ctx, "/proto.CosignerGRPC/SetNoncesAndSign", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *cosignerGRPCClient) GetEphemeralSecretParts(ctx context.Context, in *CosignerGRPCGetEphemeralSecretPartsRequest, opts ...grpc.CallOption) (*CosignerGRPCGetEphemeralSecretPartsResponse, error) {
-	out := new(CosignerGRPCGetEphemeralSecretPartsResponse)
-	err := c.cc.Invoke(ctx, "/proto.CosignerGRPC/GetEphemeralSecretParts", in, out, opts...)
+func (c *cosignerGRPCClient) GetNonces(ctx context.Context, in *CosignerGRPCGetNoncesRequest, opts ...grpc.CallOption) (*CosignerGRPCGetNoncesResponse, error) {
+	out := new(CosignerGRPCGetNoncesResponse)
+	err := c.cc.Invoke(ctx, "/proto.CosignerGRPC/GetNonces", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -87,8 +87,8 @@ func (c *cosignerGRPCClient) GetLeader(ctx context.Context, in *CosignerGRPCGetL
 // for forward compatibility
 type CosignerGRPCServer interface {
 	SignBlock(context.Context, *CosignerGRPCSignBlockRequest) (*CosignerGRPCSignBlockResponse, error)
-	SetEphemeralSecretPartsAndSign(context.Context, *CosignerGRPCSetEphemeralSecretPartsAndSignRequest) (*CosignerGRPCSetEphemeralSecretPartsAndSignResponse, error)
-	GetEphemeralSecretParts(context.Context, *CosignerGRPCGetEphemeralSecretPartsRequest) (*CosignerGRPCGetEphemeralSecretPartsResponse, error)
+	SetNoncesAndSign(context.Context, *CosignerGRPCSetNoncesAndSignRequest) (*CosignerGRPCSetNoncesAndSignResponse, error)
+	GetNonces(context.Context, *CosignerGRPCGetNoncesRequest) (*CosignerGRPCGetNoncesResponse, error)
 	TransferLeadership(context.Context, *CosignerGRPCTransferLeadershipRequest) (*CosignerGRPCTransferLeadershipResponse, error)
 	GetLeader(context.Context, *CosignerGRPCGetLeaderRequest) (*CosignerGRPCGetLeaderResponse, error)
 	mustEmbedUnimplementedCosignerGRPCServer()
@@ -101,11 +101,11 @@ type UnimplementedCosignerGRPCServer struct {
 func (UnimplementedCosignerGRPCServer) SignBlock(context.Context, *CosignerGRPCSignBlockRequest) (*CosignerGRPCSignBlockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SignBlock not implemented")
 }
-func (UnimplementedCosignerGRPCServer) SetEphemeralSecretPartsAndSign(context.Context, *CosignerGRPCSetEphemeralSecretPartsAndSignRequest) (*CosignerGRPCSetEphemeralSecretPartsAndSignResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SetEphemeralSecretPartsAndSign not implemented")
+func (UnimplementedCosignerGRPCServer) SetNoncesAndSign(context.Context, *CosignerGRPCSetNoncesAndSignRequest) (*CosignerGRPCSetNoncesAndSignResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetNoncesAndSign not implemented")
 }
-func (UnimplementedCosignerGRPCServer) GetEphemeralSecretParts(context.Context, *CosignerGRPCGetEphemeralSecretPartsRequest) (*CosignerGRPCGetEphemeralSecretPartsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetEphemeralSecretParts not implemented")
+func (UnimplementedCosignerGRPCServer) GetNonces(context.Context, *CosignerGRPCGetNoncesRequest) (*CosignerGRPCGetNoncesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetNonces not implemented")
 }
 func (UnimplementedCosignerGRPCServer) TransferLeadership(context.Context, *CosignerGRPCTransferLeadershipRequest) (*CosignerGRPCTransferLeadershipResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method TransferLeadership not implemented")
@@ -144,38 +144,38 @@ func _CosignerGRPC_SignBlock_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
-func _CosignerGRPC_SetEphemeralSecretPartsAndSign_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CosignerGRPCSetEphemeralSecretPartsAndSignRequest)
+func _CosignerGRPC_SetNoncesAndSign_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CosignerGRPCSetNoncesAndSignRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(CosignerGRPCServer).SetEphemeralSecretPartsAndSign(ctx, in)
+		return srv.(CosignerGRPCServer).SetNoncesAndSign(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/proto.CosignerGRPC/SetEphemeralSecretPartsAndSign",
+		FullMethod: "/proto.CosignerGRPC/SetNoncesAndSign",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CosignerGRPCServer).SetEphemeralSecretPartsAndSign(ctx, req.(*CosignerGRPCSetEphemeralSecretPartsAndSignRequest))
+		return srv.(CosignerGRPCServer).SetNoncesAndSign(ctx, req.(*CosignerGRPCSetNoncesAndSignRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _CosignerGRPC_GetEphemeralSecretParts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CosignerGRPCGetEphemeralSecretPartsRequest)
+func _CosignerGRPC_GetNonces_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CosignerGRPCGetNoncesRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(CosignerGRPCServer).GetEphemeralSecretParts(ctx, in)
+		return srv.(CosignerGRPCServer).GetNonces(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/proto.CosignerGRPC/GetEphemeralSecretParts",
+		FullMethod: "/proto.CosignerGRPC/GetNonces",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CosignerGRPCServer).GetEphemeralSecretParts(ctx, req.(*CosignerGRPCGetEphemeralSecretPartsRequest))
+		return srv.(CosignerGRPCServer).GetNonces(ctx, req.(*CosignerGRPCGetNoncesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -228,12 +228,12 @@ var CosignerGRPC_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _CosignerGRPC_SignBlock_Handler,
 		},
 		{
-			MethodName: "SetEphemeralSecretPartsAndSign",
-			Handler:    _CosignerGRPC_SetEphemeralSecretPartsAndSign_Handler,
+			MethodName: "SetNoncesAndSign",
+			Handler:    _CosignerGRPC_SetNoncesAndSign_Handler,
 		},
 		{
-			MethodName: "GetEphemeralSecretParts",
-			Handler:    _CosignerGRPC_GetEphemeralSecretParts_Handler,
+			MethodName: "GetNonces",
+			Handler:    _CosignerGRPC_GetNonces_Handler,
 		},
 		{
 			MethodName: "TransferLeadership",
