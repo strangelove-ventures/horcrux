@@ -12,7 +12,7 @@ import (
 )
 
 func createListener() (net.Listener, func(), error) {
-	l, err := net.Listen("tcp", ":0")
+	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -25,9 +25,9 @@ func TestMultiResolver(t *testing.T) {
 	targetIP, targetDNS := "multi:///", "multi:///"
 
 	for i := 0; i < 3; i++ {
-		l, close, err := createListener()
+		l, c, err := createListener()
 		require.NoError(t, err)
-		defer close()
+		defer c()
 
 		if i != 0 {
 			targetIP += ","
