@@ -8,7 +8,7 @@ require (
 	github.com/Jille/raftadmin v1.2.0
 	github.com/armon/go-metrics v0.4.1
 	github.com/avast/retry-go v3.0.0+incompatible
-	github.com/cometbft/cometbft v0.37.1
+	github.com/cometbft/cometbft v0.37.2
 	github.com/cosmos/cosmos-sdk v0.47.3
 	github.com/gogo/protobuf v1.3.2
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
