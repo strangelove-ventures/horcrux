@@ -7,35 +7,26 @@ import (
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 )
 
-type HRSKey struct {
-	Height int64
-	Round  int64
-	Step   int8
-}
+// Cosigner interface is a set of methods for an m-of-n threshold signature.
+// This interface abstracts the underlying key storage and management
+type Cosigner interface {
+	// Get the ID of the cosigner
+	// The ID is the shamir index: 1, 2, etc...
+	GetID() int
 
-type HRSTKey struct {
-	Height    int64
-	Round     int64
-	Step      int8
-	Timestamp int64
-}
+	// Get the P2P URL (GRPC and Raft)
+	GetAddress() string
 
-func HRSTKeyFromProto(hrs *proto.HRST) HRSTKey {
-	return HRSTKey{
-		Height:    hrs.GetHeight(),
-		Round:     hrs.GetRound(),
-		Step:      int8(hrs.GetStep()),
-		Timestamp: hrs.GetTimestamp(),
-	}
-}
+	// Get the combined public key
+	GetPubKey(chainID string) (cometcrypto.PubKey, error)
 
-func (hrst HRSTKey) toProto() *proto.HRST {
-	return &proto.HRST{
-		Height:    hrst.Height,
-		Round:     hrst.Round,
-		Step:      int32(hrst.Step),
-		Timestamp: hrst.Timestamp,
-	}
+	VerifySignature(chainID string, payload, signature []byte) bool
+
+	// Get nonces for all cosigner shards
+	GetNonces(chainID string, hrst HRSTKey) (*CosignerNoncesResponse, error)
+
+	// Sign the requested bytes
+	SetNoncesAndSign(req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error)
 }
 
 // CosignerSignRequest is sent to a co-signer to obtain their signature for the SignBytes
@@ -126,26 +117,4 @@ type CosignerSetNoncesAndSignRequest struct {
 	Nonces    []CosignerNonce
 	HRST      HRSTKey
 	SignBytes []byte
-}
-
-// Cosigner interface is a set of methods for an m-of-n threshold signature.
-// This interface abstracts the underlying key storage and management
-type Cosigner interface {
-	// Get the ID of the cosigner
-	// The ID is the shamir index: 1, 2, etc...
-	GetID() int
-
-	// Get the P2P URL (GRPC and Raft)
-	GetAddress() string
-
-	// Get the combined public key
-	GetPubKey(chainID string) (cometcrypto.PubKey, error)
-
-	VerifySignature(chainID string, payload, signature []byte) bool
-
-	// Get nonces for all cosigner shards
-	GetNonces(chainID string, hrst HRSTKey) (*CosignerNoncesResponse, error)
-
-	// Sign the requested bytes
-	SetNoncesAndSign(req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error)
 }

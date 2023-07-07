@@ -45,36 +45,6 @@ type ChainState struct {
 	hrsMeta map[HRSTKey]HrsMetadata
 }
 
-// return true if we are less than the other key
-func (hrst *HRSTKey) Less(other HRSTKey) bool {
-	if hrst.Height < other.Height {
-		return true
-	}
-
-	if hrst.Height > other.Height {
-		return false
-	}
-
-	// height is equal, check round
-
-	if hrst.Round < other.Round {
-		return true
-	}
-
-	if hrst.Round > other.Round {
-		return false
-	}
-
-	// round is equal, check step
-
-	if hrst.Step < other.Step {
-		return true
-	}
-
-	// HRS is greater or equal
-	return false
-}
-
 type CosignerRSAPubKey struct {
 	ID        int
 	PublicKey rsa.PublicKey
@@ -308,7 +278,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	for existingKey := range ccs.hrsMeta {
 		// delete any HRS lower than our signed level
 		// we will not be providing parts for any lower HRS
-		if existingKey.Less(hrst) {
+		if existingKey.HRSKey().LessThan(hrst.HRSKey()) {
 			delete(ccs.hrsMeta, existingKey)
 		}
 	}
