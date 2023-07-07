@@ -1,7 +1,6 @@
 package signer
 
 import (
-	"bytes"
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
@@ -197,34 +196,23 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	// This function has multiple exit points.  Only start time can be guaranteed
 	metricsTimeKeeper.SetPreviousLocalSignStart(time.Now())
 
-	ccs.mu.Lock()
-	defer ccs.mu.Unlock()
-
-	lss := ccs.lastSignState
-
 	hrst, err := UnpackHRST(req.SignBytes)
 	if err != nil {
 		return res, err
 	}
 
-	sameHRS, err := lss.CheckHRS(hrst)
+	existingSignature, err := ccs.lastSignState.existingSignatureOrErrorIfRegression(hrst, req.SignBytes)
 	if err != nil {
 		return res, err
 	}
 
-	// If the HRS is the same the sign bytes may still differ by timestamp
-	// It is ok to re-sign a different timestamp if that is the only difference in the sign bytes
-	if sameHRS {
-		if bytes.Equal(req.SignBytes, lss.SignBytes) {
-			res.NoncePublic = lss.NoncePublic
-			res.Signature = lss.Signature
-			return res, nil
-		} else if err := lss.OnlyDifferByTimestamp(req.SignBytes); err != nil {
-			return res, err
-		}
-
-		// same HRS, and only differ by timestamp - ok to sign again
+	if existingSignature != nil {
+		res.Signature = existingSignature
+		return res, nil
 	}
+
+	ccs.mu.Lock()
+	defer ccs.mu.Unlock()
 
 	meta, ok := ccs.hrsMeta[hrst]
 	if !ok {
