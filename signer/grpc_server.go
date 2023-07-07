@@ -18,6 +18,18 @@ type GRPCServer struct {
 	proto.UnimplementedCosignerGRPCServer
 }
 
+func NewGRPCServer(
+	cosigner *LocalCosigner,
+	thresholdValidator *ThresholdValidator,
+	raftStore *RaftStore,
+) *GRPCServer {
+	return &GRPCServer{
+		cosigner:           cosigner,
+		thresholdValidator: thresholdValidator,
+		raftStore:          raftStore,
+	}
+}
+
 func (rpc *GRPCServer) SignBlock(
 	_ context.Context,
 	req *proto.CosignerGRPCSignBlockRequest,
