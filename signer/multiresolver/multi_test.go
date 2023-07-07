@@ -18,26 +18,35 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-func createListener(nodeID string, homedir string) (net.Listener, func(), error) {
+func createListener(nodeID string, homedir string) (string, func(), error) {
 	sock, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		return nil, nil, err
+		return "", nil, err
 	}
 
-	s := signer.NewRaftStore(nodeID, homedir, "127.0.0.1:"+strconv.Itoa(sock.Addr().(*net.TCPAddr).Port), 500*time.Millisecond, nil, nil, nil)
+	port := strconv.Itoa(sock.Addr().(*net.TCPAddr).Port)
+
+	s := signer.NewRaftStore(
+		nodeID,
+		homedir,
+		"127.0.0.1:"+port,
+		500*time.Millisecond,
+		nil, nil, nil)
 
 	transportManager, err := s.Open()
 	if err != nil {
-		return nil, nil, err
+		return "", nil, err
 	}
 
 	grpcServer := grpc.NewServer()
 	proto.RegisterCosignerGRPCServer(grpcServer, signer.NewGRPCServer(nil, nil, s))
 	transportManager.Register(grpcServer)
 
-	go grpcServer.Serve(sock)
+	go func() {
+		_ = grpcServer.Serve(sock)
+	}()
 
-	return sock, func() {
+	return port, func() {
 		grpcServer.Stop()
 	}, nil
 }
@@ -48,7 +57,7 @@ func TestMultiResolver(t *testing.T) {
 	tmp := t.TempDir()
 
 	for i := 0; i < 3; i++ {
-		l, c, err := createListener(strconv.Itoa(i+1), filepath.Join(tmp, fmt.Sprintf("cosigner%d", i+1)))
+		port, c, err := createListener(strconv.Itoa(i+1), filepath.Join(tmp, fmt.Sprintf("cosigner%d", i+1)))
 		require.NoError(t, err)
 		defer c()
 
@@ -57,13 +66,8 @@ func TestMultiResolver(t *testing.T) {
 			targetDNS += ","
 		}
 
-		targetIP += "127.0.0.1:"
-		targetDNS += "localhost:"
-
-		port := strconv.Itoa(l.Addr().(*net.TCPAddr).Port)
-
-		targetIP += port
-		targetDNS += port
+		targetIP += "127.0.0.1:" + port
+		targetDNS += "localhost:" + port
 	}
 
 	multiresolver.Register()
