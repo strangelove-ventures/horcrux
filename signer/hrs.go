@@ -30,19 +30,7 @@ func (hrs HRSKey) GreaterThan(other HRSKey) bool {
 
 // LessThan returns true if the HRSKey is less than the other HRSKey.
 func (hrs HRSKey) LessThan(other HRSKey) bool {
-	if hrs.Height < other.Height {
-		return true
-	}
-	if hrs.Height > other.Height {
-		return false
-	}
-	if hrs.Round < other.Round {
-		return true
-	}
-	if hrs.Round > other.Round {
-		return false
-	}
-	return hrs.Step < other.Step
+	return hrs != other && !hrs.GreaterThan(other)
 }
 
 // HRSTKey represents the HRS metadata key with a timestamp.

@@ -51,17 +51,19 @@ func ProposalToStep(_ *cometproto.Proposal) int8 {
 
 // SignState stores signing information for high level watermark management.
 type SignState struct {
-	Height      int64                         `json:"height"`
-	Round       int64                         `json:"round"`
-	Step        int8                          `json:"step"`
-	NoncePublic []byte                        `json:"nonce_public"`
-	Signature   []byte                        `json:"signature,omitempty"`
-	SignBytes   cometbytes.HexBytes           `json:"signbytes,omitempty"`
-	cache       map[HRSKey]SignStateConsensus `json:"-"`
-	mu          sync.RWMutex                  `json:"-"`
-	cond        *sync.Cond                    `json:"-"`
+	Height      int64               `json:"height"`
+	Round       int64               `json:"round"`
+	Step        int8                `json:"step"`
+	NoncePublic []byte              `json:"nonce_public"`
+	Signature   []byte              `json:"signature,omitempty"`
+	SignBytes   cometbytes.HexBytes `json:"signbytes,omitempty"`
 
-	filePath string `json:"-"`
+	filePath string
+
+	// mu protects the cache and is used for signaling with cond.
+	mu    sync.RWMutex
+	cache map[HRSKey]SignStateConsensus
+	cond  *sync.Cond
 }
 
 func (signState *SignState) existingSignatureOrErrorIfRegression(hrst HRSTKey, signBytes []byte) ([]byte, error) {

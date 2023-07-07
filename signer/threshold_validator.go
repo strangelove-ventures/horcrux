@@ -116,10 +116,8 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, block
 
 	existingSignature, existingTimestamp, sameBlockErr := pv.getExistingBlockSignature(chainID, block)
 
-	switch err.(type) {
-	case *SameHRSError:
+	if _, ok := err.(*SameHRSError); ok {
 		// Wait for last sign state signature to be the same block
-
 		if sameBlockErr == nil {
 			if existingSignature != nil {
 				return existingSignature, existingTimestamp, nil
@@ -167,7 +165,7 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, block
 				"step", step,
 			)
 		}
-	default:
+	} else {
 		if sameBlockErr == nil {
 			return existingSignature, block.Timestamp, nil
 		}
@@ -180,14 +178,14 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, block
 func (pv *ThresholdValidator) notifyBlockSignError(chainID string, hrs HRSKey) {
 	css := pv.mustLoadChainState(chainID)
 
-	css.lastSignState.cond.L.Lock()
+	css.lastSignState.mu.Lock()
 	css.lastSignState.cache[hrs] = SignStateConsensus{
 		Height: hrs.Height,
 		Round:  hrs.Round,
 		Step:   hrs.Step,
 		// empty signature to indicate error
 	}
-	css.lastSignState.cond.L.Unlock()
+	css.lastSignState.mu.Unlock()
 	css.lastSignState.cond.Broadcast()
 }
 
