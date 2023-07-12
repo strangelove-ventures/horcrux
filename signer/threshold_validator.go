@@ -464,9 +464,12 @@ func (pv *ThresholdValidator) LoadSignStateIfNecessary(chainID string) error {
 		return err
 	}
 
+	lastSignStateInitiated := signState.FreshCache()
+	lastSignStateInitiated.filePath = dontSave
+
 	pv.chainState.Store(chainID, ChainSignState{
 		lastSignState:          signState,
-		lastSignStateInitiated: signState.FreshCache(),
+		lastSignStateInitiated: lastSignStateInitiated,
 
 		lastSignStateMutex:          &sync.Mutex{},
 		lastSignStateInitiatedMutex: &sync.Mutex{},
