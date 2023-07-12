@@ -93,6 +93,14 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 	tmpDir := t.TempDir()
 
+	cosignersConfig := make(CosignersConfig, total)
+
+	for i, pubKey := range pubKeys {
+		cosignersConfig[i] = CosignerConfig{
+			ShardID: pubKey.ID,
+		}
+	}
+
 	for i, pubKey := range pubKeys {
 		cosignerDir := filepath.Join(tmpDir, fmt.Sprintf("cosigner_%d", pubKey.ID))
 		err := os.MkdirAll(cosignerDir, 0777)
@@ -101,9 +109,16 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 		cosignerConfig := &RuntimeConfig{
 			HomeDir:  cosignerDir,
 			StateDir: cosignerDir,
+			Config: Config{
+				ThresholdModeConfig: &ThresholdModeConfig{
+					Threshold: int(threshold),
+					Cosigners: cosignersConfig,
+				},
+			},
 		}
 
 		cosigner := NewLocalCosigner(
+			cometlog.NewNopLogger(),
 			cosignerConfig,
 			CosignerRSAKey{
 				ID:     pubKey.ID,
