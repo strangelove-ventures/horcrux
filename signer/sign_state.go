@@ -21,7 +21,6 @@ const (
 	stepPrevote   int8 = 2
 	stepPrecommit int8 = 3
 	blocksToCache      = 3
-	dontSave           = "DONT_SAVE"
 )
 
 func CanonicalVoteToStep(vote *cometproto.CanonicalVote) int8 {
@@ -229,7 +228,7 @@ func (signState *SignState) Save(
 // Save persists the FilePvLastSignState to its filePath.
 func (signState *SignState) save(jsonBytes []byte) {
 	outFile := signState.filePath
-	if outFile == dontSave {
+	if outFile == os.DevNull {
 		return
 	}
 	if outFile == "" {
