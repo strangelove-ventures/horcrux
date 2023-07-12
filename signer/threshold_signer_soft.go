@@ -153,7 +153,7 @@ func (softSigner *ThresholdSignerSoft) Sign(
 	for existingKey := range softSigner.hrsMeta {
 		// delete any HRS lower than our signed level
 		// we will not be providing parts for any lower HRS
-		if existingKey.Less(hrst) {
+		if existingKey.HRSKey().LessThan(hrst.HRSKey()) {
 			delete(softSigner.hrsMeta, existingKey)
 		}
 	}
