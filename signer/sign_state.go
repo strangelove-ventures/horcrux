@@ -102,6 +102,14 @@ func (signState *SignState) HRSKey() HRSKey {
 	}
 }
 
+func (signState *SignState) hrsKeyLocked() HRSKey {
+	return HRSKey{
+		Height: signState.Height,
+		Round:  signState.Round,
+		Step:   signState.Step,
+	}
+}
+
 type SignStateConsensus struct {
 	Height    int64
 	Round     int64
@@ -144,32 +152,24 @@ func newConflictingDataError(existingSignBytes, newSignBytes []byte) *Conflictin
 	}
 }
 
+// GetFromCache will return the latest signed block within the SignState
+// and the relevant SignStateConsensus from the cache, if present.
 func (signState *SignState) GetFromCache(hrs HRSKey) (HRSKey, *SignStateConsensus) {
-	latestBlock := signState.HRSKey()
 	signState.mu.RLock()
 	defer signState.mu.RUnlock()
+	latestBlock := signState.hrsKeyLocked()
 	if ssc, ok := signState.cache[hrs]; ok {
 		return latestBlock, &ssc
 	}
 	return latestBlock, nil
 }
 
-// Save updates the high watermark height/round/step (HRS) if it is greater
-// than the current high watermark. If pendingDiskWG is provided, the write operation
-// will be a separate goroutine (async). This allows pendingDiskWG to be used to .Wait()
-// for all pending SignState disk writes.
-func (signState *SignState) Save(
-	ssc SignStateConsensus,
-	pendingDiskWG *sync.WaitGroup,
-) error {
-	err := signState.GetErrorIfLessOrEqual(ssc.Height, ssc.Round, ssc.Step)
-	if err != nil {
-		return err
-	}
-	// HRS is greater than existing state, allow
-
+// cacheAndMarshal will cache a SignStateConsensus for it's HRS and return the marshalled bytes.
+func (signState *SignState) cacheAndMarshal(ssc SignStateConsensus) []byte {
 	signState.mu.Lock()
-	signState.cache[HRSKey{Height: ssc.Height, Round: ssc.Round, Step: ssc.Step}] = ssc
+	defer signState.mu.Unlock()
+
+	signState.cache[ssc.HRSKey()] = ssc
 
 	for hrs := range signState.cache {
 		if hrs.Height < ssc.Height-blocksToCache {
@@ -188,8 +188,28 @@ func (signState *SignState) Save(
 		panic(err)
 	}
 
-	signState.mu.Unlock()
+	return jsonBytes
+}
 
+// Save updates the high watermark height/round/step (HRS) if it is greater
+// than the current high watermark. If pendingDiskWG is provided, the write operation
+// will be a separate goroutine (async). This allows pendingDiskWG to be used to .Wait()
+// for all pending SignState disk writes.
+func (signState *SignState) Save(
+	ssc SignStateConsensus,
+	pendingDiskWG *sync.WaitGroup,
+) error {
+	err := signState.GetErrorIfLessOrEqual(ssc.Height, ssc.Round, ssc.Step)
+	if err != nil {
+		return err
+	}
+
+	// HRS is greater than existing state, move forward with caching and saving.
+
+	jsonBytes := signState.cacheAndMarshal(ssc)
+
+	// Broadcast to waiting goroutines to notify them that an
+	// existing signature for their HRS may now be available.
 	signState.cond.Broadcast()
 
 	if pendingDiskWG != nil {
@@ -208,9 +228,6 @@ func (signState *SignState) Save(
 // Save persists the FilePvLastSignState to its filePath.
 func (signState *SignState) save(jsonBytes []byte) {
 	outFile := signState.filePath
-	if outFile == "none" {
-		return
-	}
 	if outFile == "" {
 		panic("cannot save SignState: filePath not set")
 	}
@@ -394,25 +411,23 @@ func checkVoteOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) error {
 	// set the times to the same value and check equality
 	newVote.Timestamp = lastVote.Timestamp
 
-	isEqual := proto.Equal(&newVote, &lastVote)
-
-	if !isEqual {
-		lastVoteBlockID := lastVote.GetBlockID()
-		newVoteBlockID := newVote.GetBlockID()
-		if newVoteBlockID == nil && lastVoteBlockID != nil {
-			return errors.New("already signed vote with non-nil BlockID. refusing to sign vote on nil BlockID")
-		}
-		if newVoteBlockID != nil && lastVoteBlockID == nil {
-			return errors.New("already signed vote with nil BlockID. refusing to sign vote on non-nil BlockID")
-		}
-		if !bytes.Equal(lastVoteBlockID.GetHash(), newVoteBlockID.GetHash()) {
-			return fmt.Errorf("differing block IDs - last Vote: %s, new Vote: %s",
-				lastVoteBlockID.GetHash(), newVoteBlockID.GetHash())
-		}
-		return newConflictingDataError(lastSignBytes, newSignBytes)
+	if proto.Equal(&newVote, &lastVote) {
+		return nil
 	}
 
-	return nil
+	lastVoteBlockID := lastVote.GetBlockID()
+	newVoteBlockID := newVote.GetBlockID()
+	if newVoteBlockID == nil && lastVoteBlockID != nil {
+		return errors.New("already signed vote with non-nil BlockID. refusing to sign vote on nil BlockID")
+	}
+	if newVoteBlockID != nil && lastVoteBlockID == nil {
+		return errors.New("already signed vote with nil BlockID. refusing to sign vote on non-nil BlockID")
+	}
+	if !bytes.Equal(lastVoteBlockID.GetHash(), newVoteBlockID.GetHash()) {
+		return fmt.Errorf("differing block IDs - last Vote: %s, new Vote: %s",
+			lastVoteBlockID.GetHash(), newVoteBlockID.GetHash())
+	}
+	return newConflictingDataError(lastSignBytes, newSignBytes)
 }
 
 func checkProposalOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) error {

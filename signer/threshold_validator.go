@@ -114,66 +114,83 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, block
 		return nil, time.Time{}, nil
 	}
 
+	// There was an error saving the last sign state, so check if there is an existing signature for this block.
 	existingSignature, existingTimestamp, sameBlockErr := pv.getExistingBlockSignature(chainID, block)
 
-	if _, ok := err.(*SameHRSError); ok {
-		// Wait for last sign state signature to be the same block
-		if sameBlockErr == nil {
-			if existingSignature != nil {
-				return existingSignature, existingTimestamp, nil
-			}
-			// good to sign again
-			return nil, time.Time{}, nil
-		}
-
-		if _, ok := sameBlockErr.(*StillWaitingForBlockError); !ok {
-			return nil, existingTimestamp, sameBlockErr
-		}
-
-		// the cluster is already in progress signing this block
-		// wait for cluster to finish before proceeding
-
-		css.lastSignState.cond.L.Lock()
-		defer css.lastSignState.cond.L.Unlock()
-		for {
-			css.lastSignState.cond.Wait()
-
-			ssc, ok := css.lastSignState.cache[block.HRSKey()]
-			if !ok {
-				pv.logger.Debug(
-					"Cond does not exist in cache",
-					"height", height,
-					"round", round,
-					"step", step,
-				)
-				continue
-			}
-
-			existingSignature, existingTimestamp, sameBlockErr = pv.compareBlockSignature(
-				chainID, block, block.HRSKey(), &ssc)
-			if sameBlockErr == nil {
-				return existingSignature, existingTimestamp, nil
-			}
-			if _, ok := sameBlockErr.(*StillWaitingForBlockError); !ok {
-				return nil, existingTimestamp, sameBlockErr
-			}
-
-			pv.logger.Debug(
-				"Stil waiting for block to be signed",
-				"height", height,
-				"round", round,
-				"step", step,
-			)
-		}
-	} else {
+	if _, ok := err.(*SameHRSError); !ok {
 		if sameBlockErr == nil {
 			return existingSignature, block.Timestamp, nil
 		}
 		return nil, existingTimestamp, pv.newBeyondBlockError(chainID, block.HRSKey())
 	}
+
+	if sameBlockErr == nil {
+		if existingSignature != nil {
+			// signature already exists for this block. return it.
+			return existingSignature, existingTimestamp, nil
+		}
+		// good to sign again
+		return nil, time.Time{}, nil
+	}
+
+	if _, ok := sameBlockErr.(*StillWaitingForBlockError); !ok {
+		// we have an error other than still waiting for block. return error.
+		return nil, existingTimestamp, fmt.Errorf(
+			"same block error, but we are not still waiting for signature: %w",
+			sameBlockErr,
+		)
+	}
+
+	// the cluster is already in progress signing this block
+	// wait for cluster to finish before proceeding
+
+	// intended usage of cond lock prior to cond.Wait().
+	// cond.Wait() will unlock cond.L while it blocks waiting, then re-lock when unblocking from
+	// the cond.Broadcast().
+	css.lastSignState.cond.L.Lock()
+	defer css.lastSignState.cond.L.Unlock()
+	for {
+		// block until sign state is saved. It will notify and unblock when block is next signed.
+		css.lastSignState.cond.Wait()
+
+		// check if HRS exists in cache now
+		ssc, ok := css.lastSignState.cache[block.HRSKey()]
+		if !ok {
+			pv.logger.Debug(
+				"Block does not yet exist in cache while waiting for signature",
+				"height", height,
+				"round", round,
+				"step", step,
+			)
+			continue
+		}
+
+		existingSignature, existingTimestamp, sameBlockErr = pv.compareBlockSignatureAgainstSSC(chainID, block, &ssc)
+		if sameBlockErr == nil {
+			return existingSignature, existingTimestamp, nil
+		}
+		if _, ok := sameBlockErr.(*StillWaitingForBlockError); !ok {
+			return nil, existingTimestamp, fmt.Errorf(
+				"same block error in loop, but we are not still waiting for signature: %w",
+				sameBlockErr,
+			)
+		}
+
+		latest := css.lastSignState
+
+		pv.logger.Debug(
+			"Stil waiting for block to be signed",
+			"height", height,
+			"round", round,
+			"step", step,
+			"latest_height", latest.Height,
+			"latest_round", latest.Round,
+			"latest_step", latest.Step,
+		)
+	}
 }
 
-// HandleError will alert any waiting goroutines that an error
+// notifyBlockSignError will alert any waiting goroutines that an error
 // has occurred during signing and a retry can be attempted.
 func (pv *ThresholdValidator) notifyBlockSignError(chainID string, hrs HRSKey) {
 	css := pv.mustLoadChainState(chainID)
@@ -463,52 +480,76 @@ func (pv *ThresholdValidator) LoadSignStateIfNecessary(chainID string) error {
 	}
 }
 
+// getExistingBlockSignature returns the existins block signature and no error if the signature is valid for the block.
+// It returns nil signature and nil error if there is no signature and it's okay to sign (fresh or again).
+// It returns an error if we have already signed a greater block, or if we are still waiting for in in-progress sign.
 func (pv *ThresholdValidator) getExistingBlockSignature(chainID string, block *Block) ([]byte, time.Time, error) {
 	css := pv.mustLoadChainState(chainID)
 
 	latestBlock, existingSignature := css.lastSignState.GetFromCache(block.HRSKey())
+	if existingSignature != nil {
+		// signature exists in cache, so compare against that
+		return pv.compareBlockSignatureAgainstSSC(chainID, block, existingSignature)
+	}
 
-	return pv.compareBlockSignature(chainID, block, latestBlock, existingSignature)
+	// signature does not exist in cache, so compare against latest signed block.
+	return nil, block.Timestamp, pv.compareBlockSignatureAgainstHRS(chainID, block, latestBlock)
 }
 
-func (pv *ThresholdValidator) compareBlockSignature(
+// compareBlockSignatureAgainstSSC compares a block's HRS against a cached signature.
+//
+// If the existing signature is for a greater HRS than the block, we are already beyond
+// the requested HRS, so we can error and move on.
+//
+// If the existing signature is for a lesser HRS than the block, then we can return
+// a stillWaitingForBlock error to continue waiting for the HRS to be signed.
+//
+// If the HRS of the existing signature and the block are the same, we return the existing signature
+// if the block sign request is for a proposal or if the bytes to sign are identical.
+func (pv *ThresholdValidator) compareBlockSignatureAgainstSSC(
 	chainID string,
 	block *Block,
-	latestBlock HRSKey,
 	existingSignature *SignStateConsensus,
 ) ([]byte, time.Time, error) {
 	stamp, signBytes := block.Timestamp, block.SignBytes
 
+	if err := pv.compareBlockSignatureAgainstHRS(chainID, block, existingSignature.HRSKey()); err != nil {
+		return nil, stamp, err
+	}
+
+	// If a proposal has already been signed for this HRS, or the sign payload is identical, return the existing signature.
+	if block.Step == stepPropose || bytes.Equal(signBytes, existingSignature.SignBytes) {
+		return existingSignature.Signature, block.Timestamp, nil
+	}
+
+	// If there is a difference in the existing signature payload other than timestamp, return that error.
+	if err := existingSignature.OnlyDifferByTimestamp(signBytes); err != nil {
+		return nil, stamp, err
+	}
+
+	// only differ by timestamp, okay to sign again
+	return nil, stamp, nil
+}
+
+// compareBlockSignatureAgainstHRS returns a BeyondBlockError if the hrs is greater than the
+// block. It returns a StillWaitingForBlockError if the hrs is less than the block. If returns nil if the hrs is
+// equal to the block.
+func (pv *ThresholdValidator) compareBlockSignatureAgainstHRS(
+	chainID string,
+	block *Block,
+	hrs HRSKey,
+) error {
 	blockHRS := block.HRSKey()
 
-	if existingSignature != nil {
-		existingHRS := existingSignature.HRSKey()
-
-		if existingHRS.GreaterThan(blockHRS) {
-			return nil, stamp, pv.newBeyondBlockError(chainID, blockHRS)
-		}
-
-		if existingHRS != blockHRS {
-			return nil, stamp, newStillWaitingForBlockError(chainID, blockHRS)
-		}
-
-		// If a proposal has already been signed for this HRS, return that
-		if block.Step == stepPropose || bytes.Equal(signBytes, existingSignature.SignBytes) {
-			return existingSignature.Signature, block.Timestamp, nil
-		}
-		if err := existingSignature.OnlyDifferByTimestamp(signBytes); err != nil {
-			return nil, stamp, err
-		}
-
-		// only differ by timestamp, okay to sign again
-		return nil, stamp, nil
+	if hrs.GreaterThan(blockHRS) {
+		return pv.newBeyondBlockError(chainID, blockHRS)
 	}
 
-	if latestBlock.GreaterThan(blockHRS) {
-		return nil, stamp, pv.newBeyondBlockError(chainID, blockHRS)
+	if hrs != blockHRS {
+		return newStillWaitingForBlockError(chainID, blockHRS)
 	}
 
-	return nil, stamp, newStillWaitingForBlockError(chainID, blockHRS)
+	return nil
 }
 
 func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, time.Time, error) {
