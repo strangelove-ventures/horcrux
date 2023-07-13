@@ -19,10 +19,9 @@ import (
 
 var _ Cosigner = &LocalCosigner{}
 
-// LocalCosigner responds to sign requests using the key shard
-// The cosigner maintains a watermark to avoid double-signing
-//
-// LocalCosigner signing is thread saafe
+// LocalCosigner responds to sign requests.
+// It maintains a high watermark to avoid double-signing.
+// Signing is thread safe.
 type LocalCosigner struct {
 	logger        cometlog.Logger
 	config        *RuntimeConfig

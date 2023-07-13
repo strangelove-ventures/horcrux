@@ -391,16 +391,18 @@ func (pv *ThresholdValidator) waitForPeerSetNoncesAndSign(
 	for _, nonces := range noncesMap {
 		for _, nonce := range nonces {
 			// if share is intended for peer, check to make sure source peer is included in threshold
-			if nonce.DestinationID == peerID {
-				for thresholdPeer := range noncesMap {
-					if thresholdPeer.GetID() == nonce.SourceID {
-						// source peer is included in threshold signature, include in sharing
-						peerNonces = append(peerNonces, nonce)
-						break
-					}
+			if nonce.DestinationID != peerID {
+				continue
+			}
+			for thresholdPeer := range noncesMap {
+				if thresholdPeer.GetID() != nonce.SourceID {
+					continue
 				}
+				// source peer is included in threshold signature, include in sharing
+				peerNonces = append(peerNonces, nonce)
 				break
 			}
+			break
 		}
 	}
 
