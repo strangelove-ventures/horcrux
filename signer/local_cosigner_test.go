@@ -9,6 +9,7 @@ import (
 	"time"
 
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	cometlog "github.com/cometbft/cometbft/libs/log"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	comet "github.com/cometbft/cometbft/types"
 	"github.com/stretchr/testify/require"
@@ -34,6 +35,7 @@ func TestLocalCosignerGetID(t *testing.T) {
 	}
 
 	cosigner := NewLocalCosigner(
+		cometlog.NewNopLogger(),
 		&RuntimeConfig{},
 		CosignerRSAKey{
 			ID:     key.ID,
@@ -90,6 +92,16 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 
 	tmpDir := t.TempDir()
 
+	cfg := Config{
+		ThresholdModeConfig: &ThresholdModeConfig{
+			Threshold: int(threshold),
+			Cosigners: CosignersConfig{
+				CosignerConfig{ShardID: 1},
+				CosignerConfig{ShardID: 2},
+			},
+		},
+	}
+
 	cosigner1Dir, cosigner2Dir := filepath.Join(tmpDir, "cosigner1"), filepath.Join(tmpDir, "cosigner2")
 	err = os.Mkdir(cosigner1Dir, 0700)
 	require.NoError(t, err)
@@ -98,9 +110,11 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	require.NoError(t, err)
 
 	cosigner1 := NewLocalCosigner(
+		cometlog.NewNopLogger(),
 		&RuntimeConfig{
 			HomeDir:  cosigner1Dir,
 			StateDir: cosigner1Dir,
+			Config:   cfg,
 		},
 		CosignerRSAKey{
 			ID:     key1.ID,
@@ -119,9 +133,11 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	defer cosigner1.waitForSignStatesToFlushToDisk()
 
 	cosigner2 := NewLocalCosigner(
+		cometlog.NewNopLogger(),
 		&RuntimeConfig{
 			HomeDir:  cosigner2Dir,
 			StateDir: cosigner2Dir,
+			Config:   cfg,
 		},
 		CosignerRSAKey{
 			ID:     key2.ID,
@@ -200,14 +216,19 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	sigIds := []int{1, 2}
-	sigArr := [][]byte{sigRes1.Signature, sigRes2.Signature}
+	sigs := []PartialSignature{
+		{
+			ID:        1,
+			Signature: sigRes1.Signature,
+		},
+		{
+			ID:        2,
+			Signature: sigRes2.Signature,
+		},
+	}
 
-	t.Logf("sig arr: %x", sigArr)
-
-	combinedSig := tsed25519.CombineShares(total, sigIds, sigArr)
-	signature := noncePublic
-	signature = append(signature, combinedSig...)
+	signature, err := cosigner1.CombineSignatures(testChainID, sigs)
+	require.NoError(t, err)
 
 	t.Logf("signature: %x", signature)
 	require.True(t, privateKey.PubKey().VerifySignature(signBytes, signature))
