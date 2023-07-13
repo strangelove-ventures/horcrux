@@ -57,7 +57,7 @@ func getGoModuleVersion(pkg string) string {
 	cmd := exec.Command("go", "list", "-m", "-u", "-f", "{{.Version}}", pkg)
 	out, err := cmd.Output()
 	if err != nil {
-		panic(fmt.Sprintf("failed to evaluate Go module version for %s: %v", pkg, err))
+		panic(fmt.Sprintf("failed to evaluate Go module version: %v", err))
 	}
 	return strings.TrimSpace(string(out))
 }

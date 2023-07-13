@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,15 +24,9 @@ func NewThresholdValidator(
 
 	var p2pListen string
 
-	var security signer.CosignerSecurity
-	var eciesErr error
-	security, eciesErr = config.CosignerSecurityECIES()
-	if eciesErr != nil {
-		var rsaErr error
-		security, rsaErr = config.CosignerSecurityRSA()
-		if rsaErr != nil {
-			return nil, nil, errors.Join(eciesErr, rsaErr)
-		}
+	security, err := config.CosignerSecurityRSA()
+	if err != nil {
+		return nil, nil, err
 	}
 
 	for _, c := range thresholdCfg.Cosigners {

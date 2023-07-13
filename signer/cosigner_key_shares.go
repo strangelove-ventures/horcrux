@@ -8,7 +8,6 @@ import (
 
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/cometbft/cometbft/privval"
-	ecies "github.com/ecies/go/v2"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
@@ -80,31 +79,6 @@ func WriteCosignerRSAShardFile(cosigner CosignerRSAKey, file string) error {
 	return os.WriteFile(file, jsonBytes, 0600)
 }
 
-// CreateCosignerRSAShards generate  CosignerRSAKey objects
-func CreateCosignerECIESShards(shards int) (out []CosignerECIESKey, err error) {
-	rsaKeys, pubKeys, err := makeECIESKeys(shards)
-	if err != nil {
-		return nil, err
-	}
-	for i, key := range rsaKeys {
-		out = append(out, CosignerECIESKey{
-			ID:        i + 1,
-			ECIESKey:  key,
-			ECIESPubs: pubKeys,
-		})
-	}
-	return out, nil
-}
-
-// WriteCosignerRSAShardFile writes a cosigner RSA key to a given file name
-func WriteCosignerECIESShardFile(cosigner CosignerECIESKey, file string) error {
-	jsonBytes, err := json.Marshal(&cosigner)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(file, jsonBytes, 0600)
-}
-
 func makeRSAKeys(num int) (rsaKeys []*rsa.PrivateKey, pubKeys []*rsa.PublicKey, err error) {
 	rsaKeys = make([]*rsa.PrivateKey, num)
 	pubKeys = make([]*rsa.PublicKey, num)
@@ -118,18 +92,4 @@ func makeRSAKeys(num int) (rsaKeys []*rsa.PrivateKey, pubKeys []*rsa.PublicKey, 
 		pubKeys[i] = &rsaKey.PublicKey
 	}
 	return
-}
-
-func makeECIESKeys(num int) ([]*ecies.PrivateKey, []*ecies.PublicKey, error) {
-	eciesKeys := make([]*ecies.PrivateKey, num)
-	pubKeys := make([]*ecies.PublicKey, num)
-	for i := 0; i < num; i++ {
-		eciesKey, err := ecies.GenerateKey()
-		if err != nil {
-			return nil, nil, err
-		}
-		eciesKeys[i] = eciesKey
-		pubKeys[i] = eciesKey.PublicKey
-	}
-	return eciesKeys, pubKeys, nil
 }
