@@ -3,15 +3,17 @@ package signer
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	cometlog "github.com/cometbft/cometbft/libs/log"
+	"github.com/cometbft/cometbft/libs/log"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	comet "github.com/cometbft/cometbft/types"
+	ecies "github.com/ecies/go/v2"
 	"github.com/stretchr/testify/require"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
@@ -22,149 +24,99 @@ const (
 	bitSize      = 4096
 )
 
-func TestLocalCosignerGetID(t *testing.T) {
-	dummyPub := cometcryptoed25519.PubKey{}
-
-	rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
-	require.NoError(t, err)
-
-	key := CosignerEd25519Key{
-		PubKey:       dummyPub,
-		PrivateShard: []byte{},
-		ID:           1,
-	}
-
-	cosigner := NewLocalCosigner(
-		cometlog.NewNopLogger(),
-		&RuntimeConfig{},
-		CosignerRSAKey{
-			ID:     key.ID,
-			RSAKey: *rsaKey,
-		},
-		[]CosignerRSAPubKey{{
-			ID:        1,
-			PublicKey: rsaKey.PublicKey,
-		}},
-		"",
-		0,
-	)
-
-	require.Equal(t, 1, cosigner.GetID())
+func TestLocalCosignerSignRSA2of3(t *testing.T) {
+	testLocalCosignerSignRSA(t, 2, 3)
 }
 
-func TestLocalCosignerSign2of2(t *testing.T) {
-	// Test signing with a 2 of 2
+func TestLocalCosignerSignRSA3of5(t *testing.T) {
+	testLocalCosignerSignRSA(t, 3, 5)
+}
 
-	total := uint8(2)
-	threshold := uint8(2)
+func testLocalCosignerSignRSA(t *testing.T, threshold, total uint8) {
+	security := make([]CosignerSecurity, total)
 
-	rsaKey1, err := rsa.GenerateKey(rand.Reader, bitSize)
-	require.NoError(t, err)
+	keys := make([]*rsa.PrivateKey, total)
+	pubKeys := make([]CosignerRSAPubKey, total)
+	for i := 0; i < int(total); i++ {
+		var err error
+		keys[i], err = rsa.GenerateKey(rand.Reader, bitSize)
+		require.NoError(t, err)
 
-	rsaKey2, err := rsa.GenerateKey(rand.Reader, bitSize)
-	require.NoError(t, err)
+		pubKeys[i] = CosignerRSAPubKey{
+			ID:        i + 1,
+			PublicKey: keys[i].PublicKey,
+		}
+	}
 
-	pubKeys := []CosignerRSAPubKey{{
-		ID:        1,
-		PublicKey: rsaKey1.PublicKey,
-	}, {
-		ID:        2,
-		PublicKey: rsaKey2.PublicKey,
-	}}
+	for i, k := range keys {
+		security[i] = NewCosignerSecurityRSA(
+			CosignerRSAKey{
+				ID:     i + 1,
+				RSAKey: *k,
+			},
+			pubKeys,
+		)
+	}
 
+	testLocalCosignerSign(t, threshold, total, security)
+}
+
+func TestLocalCosignerSignECIES2of3(t *testing.T) {
+	testLocalCosignerSignECIES(t, 2, 3)
+}
+
+func TestLocalCosignerSignECIES3of5(t *testing.T) {
+	testLocalCosignerSignECIES(t, 3, 5)
+}
+
+func testLocalCosignerSignECIES(t *testing.T, threshold, total uint8) {
+	security := make([]CosignerSecurity, total)
+
+	keys := make([]*ecies.PrivateKey, total)
+	pubKeys := make([]CosignerECIESPubKey, total)
+	for i := 0; i < int(total); i++ {
+		var err error
+		keys[i], err = ecies.GenerateKey()
+		require.NoError(t, err)
+
+		pubKeys[i] = CosignerECIESPubKey{
+			ID:        i + 1,
+			PublicKey: keys[i].PublicKey,
+		}
+	}
+
+	for i, k := range keys {
+		security[i] = NewCosignerSecurityECIES(
+			CosignerECIESKey{
+				ID:       i + 1,
+				ECIESKey: k,
+			},
+			pubKeys,
+		)
+	}
+
+	testLocalCosignerSign(t, threshold, total, security)
+}
+
+func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []CosignerSecurity) {
 	privateKey := cometcryptoed25519.GenPrivKey()
 
 	privKeyBytes := [64]byte{}
 	copy(privKeyBytes[:], privateKey[:])
 	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
-
-	key1 := CosignerEd25519Key{
-		PubKey:       privateKey.PubKey(),
-		PrivateShard: privShards[0],
-		ID:           1,
-	}
-
-	key2 := CosignerEd25519Key{
-		PubKey:       privateKey.PubKey(),
-		PrivateShard: privShards[1],
-		ID:           2,
-	}
-
-	tmpDir := t.TempDir()
+	pubKey := privateKey.PubKey()
 
 	cfg := Config{
 		ThresholdModeConfig: &ThresholdModeConfig{
 			Threshold: int(threshold),
-			Cosigners: CosignersConfig{
-				CosignerConfig{ShardID: 1},
-				CosignerConfig{ShardID: 2},
-			},
+			Cosigners: make(CosignersConfig, total),
 		},
 	}
 
-	cosigner1Dir, cosigner2Dir := filepath.Join(tmpDir, "cosigner1"), filepath.Join(tmpDir, "cosigner2")
-	err = os.Mkdir(cosigner1Dir, 0700)
-	require.NoError(t, err)
+	tmpDir := t.TempDir()
 
-	err = os.Mkdir(cosigner2Dir, 0700)
-	require.NoError(t, err)
-
-	cosigner1 := NewLocalCosigner(
-		cometlog.NewNopLogger(),
-		&RuntimeConfig{
-			HomeDir:  cosigner1Dir,
-			StateDir: cosigner1Dir,
-			Config:   cfg,
-		},
-		CosignerRSAKey{
-			ID:     key1.ID,
-			RSAKey: *rsaKey1,
-		},
-		pubKeys,
-		"",
-		threshold,
-	)
-
-	key1Bz, err := key1.MarshalJSON()
-	require.NoError(t, err)
-	err = os.WriteFile(cosigner1.config.KeyFilePathCosigner(testChainID), key1Bz, 0600)
-	require.NoError(t, err)
-
-	defer cosigner1.waitForSignStatesToFlushToDisk()
-
-	cosigner2 := NewLocalCosigner(
-		cometlog.NewNopLogger(),
-		&RuntimeConfig{
-			HomeDir:  cosigner2Dir,
-			StateDir: cosigner2Dir,
-			Config:   cfg,
-		},
-		CosignerRSAKey{
-			ID:     key2.ID,
-			RSAKey: *rsaKey2,
-		},
-		pubKeys,
-		"",
-		threshold,
-	)
-
-	key2Bz, err := key2.MarshalJSON()
-	require.NoError(t, err)
-	err = os.WriteFile(cosigner2.config.KeyFilePathCosigner(testChainID), key2Bz, 0600)
-	require.NoError(t, err)
-
-	defer cosigner2.waitForSignStatesToFlushToDisk()
-
-	err = cosigner1.LoadSignStateIfNecessary(testChainID)
-	require.NoError(t, err)
-
-	err = cosigner2.LoadSignStateIfNecessary(testChainID)
-	require.NoError(t, err)
-
-	require.Equal(t, cosigner1.GetID(), 1)
-	require.Equal(t, cosigner2.GetID(), 2)
-
-	publicKeys := make([]tsed25519.Element, 0)
+	thresholdCosigners := make([]*LocalCosigner, threshold)
+	nonces := make([][]CosignerNonce, threshold)
 
 	now := time.Now()
 
@@ -175,22 +127,56 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 		Timestamp: now.UnixNano(),
 	}
 
-	noncesFor2, err := cosigner1.GetNonces(testChainID, hrst)
-	require.NoError(t, err)
+	for i := 0; i < int(total); i++ {
+		id := i + 1
 
-	publicKeys = append(publicKeys, noncesFor2.Nonces[0].PubKey)
+		key := CosignerEd25519Key{
+			PubKey:       pubKey,
+			PrivateShard: privShards[i],
+			ID:           id,
+		}
 
-	noncesFor1, err := cosigner2.GetNonces(testChainID, hrst)
-	require.NoError(t, err)
+		cfg.ThresholdModeConfig.Cosigners[i] = CosignerConfig{
+			ShardID: id,
+		}
 
-	t.Logf("Shares from 2: %d", len(noncesFor1.Nonces))
+		cosignerDir := filepath.Join(tmpDir, fmt.Sprintf("cosigner%d", id))
+		err := os.Mkdir(cosignerDir, 0700)
+		require.NoError(t, err)
 
-	publicKeys = append(publicKeys, noncesFor1.Nonces[0].PubKey)
+		cosigner := NewLocalCosigner(
+			log.NewNopLogger(),
+			&RuntimeConfig{
+				HomeDir:  cosignerDir,
+				StateDir: cosignerDir,
+				Config:   cfg,
+			},
+			security[i],
+			"",
+		)
 
-	noncePublic := tsed25519.AddElements(publicKeys)
+		keyBz, err := key.MarshalJSON()
+		require.NoError(t, err)
+		err = os.WriteFile(cosigner.config.KeyFilePathCosigner(testChainID), keyBz, 0600)
+		require.NoError(t, err)
 
-	t.Logf("public keys: %x", publicKeys)
-	t.Logf("eph pub: %x", noncePublic)
+		defer cosigner.waitForSignStatesToFlushToDisk()
+
+		err = cosigner.LoadSignStateIfNecessary(testChainID)
+		require.NoError(t, err)
+
+		require.Equal(t, cosigner.GetID(), id)
+
+		if i < int(threshold) {
+			thresholdCosigners[i] = cosigner
+
+			nonce, err := cosigner.GetNonces(testChainID, hrst)
+			require.NoError(t, err)
+
+			nonces[i] = nonce.Nonces
+		}
+	}
+
 	// pack a vote into sign bytes
 	var vote cometproto.Vote
 	vote.Height = 1
@@ -200,36 +186,39 @@ func TestLocalCosignerSign2of2(t *testing.T) {
 
 	signBytes := comet.VoteSignBytes("chain-id", &vote)
 
-	sigRes1, err := cosigner1.SetNoncesAndSign(CosignerSetNoncesAndSignRequest{
-		ChainID:   testChainID,
-		Nonces:    noncesFor1.Nonces,
-		HRST:      hrst,
-		SignBytes: signBytes,
-	})
-	require.NoError(t, err)
+	sigs := make([]PartialSignature, threshold)
 
-	sigRes2, err := cosigner2.SetNoncesAndSign(CosignerSetNoncesAndSignRequest{
-		ChainID:   testChainID,
-		Nonces:    noncesFor2.Nonces,
-		HRST:      hrst,
-		SignBytes: signBytes,
-	})
-	require.NoError(t, err)
+	for i, cosigner := range thresholdCosigners {
+		cosignerNonces := make([]CosignerNonce, 0, threshold-1)
 
-	sigs := []PartialSignature{
-		{
-			ID:        1,
-			Signature: sigRes1.Signature,
-		},
-		{
-			ID:        2,
-			Signature: sigRes2.Signature,
-		},
+		for j, nonce := range nonces {
+			if i == j {
+				continue
+			}
+
+			for _, n := range nonce {
+				if n.DestinationID == cosigner.GetID() {
+					cosignerNonces = append(cosignerNonces, n)
+				}
+			}
+		}
+
+		sigRes, err := cosigner.SetNoncesAndSign(CosignerSetNoncesAndSignRequest{
+			ChainID:   testChainID,
+			Nonces:    cosignerNonces,
+			HRST:      hrst,
+			SignBytes: signBytes,
+		})
+		require.NoError(t, err)
+
+		sigs[i] = PartialSignature{
+			ID:        cosigner.GetID(),
+			Signature: sigRes.Signature,
+		}
 	}
 
-	signature, err := cosigner1.CombineSignatures(testChainID, sigs)
+	combinedSig, err := thresholdCosigners[0].CombineSignatures(testChainID, sigs)
 	require.NoError(t, err)
 
-	t.Logf("signature: %x", signature)
-	require.True(t, privateKey.PubKey().VerifySignature(signBytes, signature))
+	require.True(t, pubKey.VerifySignature(signBytes, combinedSig))
 }
