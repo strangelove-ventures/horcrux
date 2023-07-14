@@ -1,10 +1,6 @@
 package signer
 
 import (
-	"crypto"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"sync"
@@ -12,7 +8,6 @@ import (
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	cometjson "github.com/cometbft/cometbft/libs/json"
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	"golang.org/x/sync/errgroup"
 )
@@ -25,10 +20,8 @@ var _ Cosigner = &LocalCosigner{}
 type LocalCosigner struct {
 	logger        cometlog.Logger
 	config        *RuntimeConfig
-	key           CosignerRSAKey
-	threshold     uint8
+	security      CosignerSecurity
 	chainState    sync.Map
-	rsaPubKeys    map[int]CosignerRSAPubKey
 	address       string
 	pendingDiskWG sync.WaitGroup
 }
@@ -36,25 +29,15 @@ type LocalCosigner struct {
 func NewLocalCosigner(
 	logger cometlog.Logger,
 	config *RuntimeConfig,
-	key CosignerRSAKey,
-	rsaPubKeys []CosignerRSAPubKey,
+	security CosignerSecurity,
 	address string,
-	threshold uint8,
 ) *LocalCosigner {
-	cosigner := &LocalCosigner{
-		logger:     logger,
-		config:     config,
-		key:        key,
-		rsaPubKeys: make(map[int]CosignerRSAPubKey),
-		threshold:  threshold,
-		address:    address,
+	return &LocalCosigner{
+		logger:   logger,
+		config:   config,
+		security: security,
+		address:  address,
 	}
-
-	for _, pubKey := range rsaPubKeys {
-		cosigner.rsaPubKeys[pubKey.ID] = pubKey
-	}
-
-	return cosigner
 }
 
 type ChainState struct {
@@ -97,11 +80,6 @@ func (ccs *ChainState) combinedNonces(myID int, threshold uint8, hrst HRSTKey) (
 	return combinedNonces, nil
 }
 
-type CosignerRSAPubKey struct {
-	ID        int
-	PublicKey rsa.PublicKey
-}
-
 type CosignerGetNonceRequest struct {
 	ChainID   string
 	ID        int
@@ -136,7 +114,7 @@ func (cosigner *LocalCosigner) waitForSignStatesToFlushToDisk() {
 // GetID returns the id of the cosigner
 // Implements Cosigner interface
 func (cosigner *LocalCosigner) GetID() int {
-	return cosigner.key.ID
+	return cosigner.security.GetID()
 }
 
 // GetAddress returns the RPC URL of the cosigner
@@ -332,8 +310,10 @@ func (cosigner *LocalCosigner) GetNonces(
 		return nil, err
 	}
 
+	total := len(cosigner.config.Config.ThresholdModeConfig.Cosigners)
+
 	res := &CosignerNoncesResponse{
-		Nonces: make([]CosignerNonce, len(cosigner.rsaPubKeys)-1),
+		Nonces: make([]CosignerNonce, total-1),
 	}
 
 	id := cosigner.GetID()
@@ -342,12 +322,13 @@ func (cosigner *LocalCosigner) GetNonces(
 	// getting nonces requires encrypting and signing for each cosigner,
 	// so we perform these operations in parallel.
 
-	for peerID := range cosigner.rsaPubKeys {
+	for i := 0; i < total; i++ {
+		peerID := i + 1
 		if peerID == id {
 			continue
 		}
 
-		peerID := peerID
+		i := i
 
 		eg.Go(func() error {
 			secretPart, err := cosigner.getNonce(CosignerGetNonceRequest{
@@ -359,12 +340,10 @@ func (cosigner *LocalCosigner) GetNonces(
 				Timestamp: time.Unix(0, hrst.Timestamp),
 			})
 
-			idx := peerID - 1
-
-			if idx >= id {
-				res.Nonces[idx-1] = secretPart
+			if i >= id {
+				res.Nonces[i-1] = secretPart
 			} else {
-				res.Nonces[idx] = secretPart
+				res.Nonces[i] = secretPart
 			}
 
 			return err
@@ -423,7 +402,7 @@ func (cosigner *LocalCosigner) getNonce(
 	req CosignerGetNonceRequest,
 ) (CosignerNonce, error) {
 	chainID := req.ChainID
-	res := CosignerNonce{}
+	zero := CosignerNonce{}
 
 	hrst := HRSTKey{
 		Height:    req.Height,
@@ -436,45 +415,16 @@ func (cosigner *LocalCosigner) getNonce(
 
 	meta, err := cosigner.dealSharesIfNecessary(chainID, hrst)
 	if err != nil {
-		return res, err
+		return zero, err
 	}
 
 	ourCosignerMeta := meta[id-1]
-
-	// grab the cosigner info for the ID being requested
-	pubKey, ok := cosigner.rsaPubKeys[req.ID]
-	if !ok {
-		return res, errors.New("unknown cosigner ID")
-	}
-
-	// use RSA public to encrypt user's share part
-	encrypted, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, &pubKey.PublicKey, ourCosignerMeta.Shares[req.ID-1], nil)
+	nonce, err := cosigner.security.EncryptAndSign(req.ID, ourCosignerMeta.PubKey, ourCosignerMeta.Shares[req.ID-1])
 	if err != nil {
-		return res, err
+		return zero, err
 	}
 
-	res.SourceID = id
-	res.PubKey = ourCosignerMeta.PubKey
-	res.Share = encrypted
-
-	// Sign the response payload with our private key.
-	// Cosigners can verify the signature to authenticate the sender.
-	jsonBytes, err := cometjson.Marshal(res)
-
-	if err != nil {
-		return res, err
-	}
-
-	digest := sha256.Sum256(jsonBytes)
-	signature, err := rsa.SignPSS(rand.Reader, &cosigner.key.RSAKey, crypto.SHA256, digest[:], nil)
-	if err != nil {
-		return res, err
-	}
-
-	res.Signature = signature
-	res.DestinationID = req.ID
-
-	return res, nil
+	return nonce, nil
 }
 
 // setNonce stores a nonce provided by another cosigner
@@ -491,31 +441,8 @@ func (cosigner *LocalCosigner) setNonce(req CosignerSetNonceRequest) error {
 		return errors.New("signature field is required")
 	}
 
-	digestMsg := CosignerNonce{
-		SourceID: req.SourceID,
-		PubKey:   req.PubKey,
-		Share:    req.Share,
-	}
-
-	digestBytes, err := cometjson.Marshal(digestMsg)
-	if err != nil {
-		return err
-	}
-
-	digest := sha256.Sum256(digestBytes)
-	pubKey, ok := cosigner.rsaPubKeys[req.SourceID]
-
-	if !ok {
-		return fmt.Errorf("unknown cosigner: %d", req.SourceID)
-	}
-
-	err = rsa.VerifyPSS(&pubKey.PublicKey, crypto.SHA256, digest[:], req.Signature, nil)
-	if err != nil {
-		return err
-	}
-
-	// decrypt share
-	nonceShare, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, &cosigner.key.RSAKey, req.Share, nil)
+	noncePub, nonceShare, err := cosigner.security.DecryptAndVerify(
+		req.SourceID, req.PubKey, req.Share, req.Signature)
 	if err != nil {
 		return err
 	}
@@ -548,7 +475,7 @@ func (cosigner *LocalCosigner) setNonce(req CosignerSetNonceRequest) error {
 		nonces[req.SourceID-1].Shares = make([][]byte, len(cosigner.config.Config.ThresholdModeConfig.Cosigners))
 	}
 	nonces[req.SourceID-1].Shares[cosigner.GetID()-1] = nonceShare
-	nonces[req.SourceID-1].PubKey = req.PubKey
+	nonces[req.SourceID-1].PubKey = noncePub
 
 	return nil
 }

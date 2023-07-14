@@ -111,6 +111,31 @@ type RuntimeConfig struct {
 	Config     Config
 }
 
+func (c RuntimeConfig) CosignerSecurityRSA() (*CosignerSecurityRSA, error) {
+	keyFile, err := c.KeyFileExistsCosignerRSA()
+	if err != nil {
+		return nil, err
+	}
+
+	key, err := LoadCosignerRSAKey(keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
+	}
+
+	pubKeys := make([]CosignerRSAPubKey, len(key.RSAPubs))
+	for i, pk := range key.RSAPubs {
+		pubKeys[i] = CosignerRSAPubKey{
+			ID:        i + 1,
+			PublicKey: *pk,
+		}
+	}
+
+	return NewCosignerSecurityRSA(
+		key,
+		pubKeys,
+	), nil
+}
+
 func (c RuntimeConfig) cachedKeyDirectory() string {
 	if c.Config.PrivValKeyDir != nil {
 		return *c.Config.PrivValKeyDir

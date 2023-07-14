@@ -8,7 +8,7 @@ import (
 	"time"
 
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	cometlog "github.com/cometbft/cometbft/libs/log"
+	"github.com/cometbft/cometbft/libs/log"
 	"github.com/stretchr/testify/require"
 )
 
@@ -30,18 +30,18 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 	}
 
 	cosigner := NewLocalCosigner(
-		cometlog.NewNopLogger(),
+		log.NewNopLogger(),
 		&RuntimeConfig{},
-		CosignerRSAKey{
-			ID:     key.ID,
-			RSAKey: *rsaKey,
-		},
-		[]CosignerRSAPubKey{{
-			ID:        1,
-			PublicKey: rsaKey.PublicKey,
-		}},
+		NewCosignerSecurityRSA(
+			CosignerRSAKey{
+				ID:     key.ID,
+				RSAKey: *rsaKey,
+			},
+			[]CosignerRSAPubKey{{
+				ID:        key.ID,
+				PublicKey: rsaKey.PublicKey,
+			}}),
 		"",
-		0,
 	)
 
 	s := &RaftStore{

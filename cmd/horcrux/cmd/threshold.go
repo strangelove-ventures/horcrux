@@ -18,25 +18,19 @@ func NewThresholdValidator(
 		return nil, nil, err
 	}
 
-	keyFile, err := config.KeyFileExistsCosignerRSA()
+	thresholdCfg := config.Config.ThresholdModeConfig
+
+	remoteCosigners := make([]signer.Cosigner, 0, len(thresholdCfg.Cosigners)-1)
+
+	var p2pListen string
+
+	security, err := config.CosignerSecurityRSA()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	key, err := signer.LoadCosignerRSAKey(keyFile)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
-	}
-
-	thresholdCfg := config.Config.ThresholdModeConfig
-
-	remoteCosigners := make([]signer.Cosigner, 0, len(thresholdCfg.Cosigners)-1)
-	pubKeys := make([]signer.CosignerRSAPubKey, len(thresholdCfg.Cosigners))
-
-	var p2pListen string
-
-	for i, c := range thresholdCfg.Cosigners {
-		if c.ShardID != key.ID {
+	for _, c := range thresholdCfg.Cosigners {
+		if c.ShardID != security.GetID() {
 			remoteCosigners = append(
 				remoteCosigners,
 				signer.NewRemoteCosigner(c.ShardID, c.P2PAddr),
@@ -44,24 +38,17 @@ func NewThresholdValidator(
 		} else {
 			p2pListen = c.P2PAddr
 		}
-
-		pubKeys[i] = signer.CosignerRSAPubKey{
-			ID:        c.ShardID,
-			PublicKey: *key.RSAPubs[c.ShardID-1],
-		}
 	}
 
 	if p2pListen == "" {
-		return nil, nil, fmt.Errorf("cosigner config does not exist for our shard ID %d", key.ID)
+		return nil, nil, fmt.Errorf("cosigner config does not exist for our shard ID %d", security.GetID())
 	}
 
 	localCosigner := signer.NewLocalCosigner(
 		logger,
 		&config,
-		key,
-		pubKeys,
+		security,
 		p2pListen,
-		uint8(thresholdCfg.Threshold),
 	)
 
 	// Validated prior in ValidateThresholdModeConfig
@@ -74,7 +61,7 @@ func NewThresholdValidator(
 	}
 
 	// RAFT node ID is the cosigner ID
-	nodeID := fmt.Sprint(key.ID)
+	nodeID := fmt.Sprint(security.GetID())
 
 	// Start RAFT store listener
 	raftStore := signer.NewRaftStore(nodeID,
