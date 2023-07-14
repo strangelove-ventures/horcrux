@@ -13,6 +13,7 @@ import (
 	"github.com/cometbft/cometbft/libs/log"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	comet "github.com/cometbft/cometbft/types"
+	ecies "github.com/ecies/go/v2"
 	"github.com/stretchr/testify/require"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
@@ -52,6 +53,43 @@ func testLocalCosignerSignRSA(t *testing.T, threshold, total uint8) {
 			CosignerRSAKey{
 				ID:     i + 1,
 				RSAKey: *k,
+			},
+			pubKeys,
+		)
+	}
+
+	testLocalCosignerSign(t, threshold, total, security)
+}
+
+func TestLocalCosignerSignECIES2of3(t *testing.T) {
+	testLocalCosignerSignECIES(t, 2, 3)
+}
+
+func TestLocalCosignerSignECIES3of5(t *testing.T) {
+	testLocalCosignerSignECIES(t, 3, 5)
+}
+
+func testLocalCosignerSignECIES(t *testing.T, threshold, total uint8) {
+	security := make([]CosignerSecurity, total)
+
+	keys := make([]*ecies.PrivateKey, total)
+	pubKeys := make([]CosignerECIESPubKey, total)
+	for i := 0; i < int(total); i++ {
+		var err error
+		keys[i], err = ecies.GenerateKey()
+		require.NoError(t, err)
+
+		pubKeys[i] = CosignerECIESPubKey{
+			ID:        i + 1,
+			PublicKey: keys[i].PublicKey,
+		}
+	}
+
+	for i, k := range keys {
+		security[i] = NewCosignerSecurityECIES(
+			CosignerECIESKey{
+				ID:       i + 1,
+				ECIESKey: k,
 			},
 			pubKeys,
 		)

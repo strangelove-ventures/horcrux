@@ -81,6 +81,8 @@ linters-settings:
         alias: cometrpcjsontypes
       - pkg: github.com/cometbft/cometbft/rpc/core/types
         alias: cometrpctypes
+      - pkg: github.com/ecies/go/v2
+        alias: ecies
       - pkg: github.com/grpc-ecosystem/go-grpc-middleware/retry
         alias: grpcretry
       - pkg : github.com/kraken-hpc/go-fork

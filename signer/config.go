@@ -111,6 +111,31 @@ type RuntimeConfig struct {
 	Config     Config
 }
 
+func (c RuntimeConfig) CosignerSecurityECIES() (*CosignerSecurityECIES, error) {
+	keyFile, err := c.KeyFileExistsCosignerECIES()
+	if err != nil {
+		return nil, err
+	}
+
+	key, err := LoadCosignerECIESKey(keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
+	}
+
+	pubKeys := make([]CosignerECIESPubKey, len(key.ECIESPubs))
+	for i, pk := range key.ECIESPubs {
+		pubKeys[i] = CosignerECIESPubKey{
+			ID:        i + 1,
+			PublicKey: pk,
+		}
+	}
+
+	return NewCosignerSecurityECIES(
+		key,
+		pubKeys,
+	), nil
+}
+
 func (c RuntimeConfig) CosignerSecurityRSA() (*CosignerSecurityRSA, error) {
 	keyFile, err := c.KeyFileExistsCosignerRSA()
 	if err != nil {
@@ -167,6 +192,14 @@ func (c RuntimeConfig) KeyFilePathCosignerRSA() string {
 	return filepath.Join(keyDir, "rsa_keys.json")
 }
 
+func (c RuntimeConfig) KeyFilePathCosignerECIES() string {
+	keyDir := c.HomeDir
+	if kd := c.cachedKeyDirectory(); kd != "" {
+		keyDir = kd
+	}
+	return filepath.Join(keyDir, "ecies_keys.json")
+}
+
 func (c RuntimeConfig) PrivValStateFile(chainID string) string {
 	return filepath.Join(c.StateDir, fmt.Sprintf("%s_priv_validator_state.json", chainID))
 }
@@ -206,6 +239,11 @@ func (c RuntimeConfig) KeyFileExistsCosigner(chainID string) (string, error) {
 
 func (c RuntimeConfig) KeyFileExistsCosignerRSA() (string, error) {
 	keyFile := c.KeyFilePathCosignerRSA()
+	return keyFile, fileExists(keyFile)
+}
+
+func (c RuntimeConfig) KeyFileExistsCosignerECIES() (string, error) {
+	keyFile := c.KeyFilePathCosignerECIES()
 	return keyFile, fileExists(keyFile)
 }
 
