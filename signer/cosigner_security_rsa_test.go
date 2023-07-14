@@ -72,5 +72,5 @@ func TestCosignerRSA(t *testing.T) {
 	require.Equal(t, mockShare, decryptedShare)
 
 	_, _, err = s3.DecryptAndVerify(1, nonce.PubKey, nonce.Share, nonce.Signature)
-	require.Error(t, err)
+	require.ErrorIs(t, rsa.ErrDecryption, err)
 }

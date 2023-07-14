@@ -40,10 +40,10 @@ func (key *CosignerRSAKey) MarshalJSON() ([]byte, error) {
 
 	// marshal our private key and all public keys
 	privateBytes := x509.MarshalPKCS1PrivateKey(&key.RSAKey)
-	rsaPubKeysBytes := make([][]byte, 0)
-	for _, pubKey := range key.RSAPubs {
+	rsaPubKeysBytes := make([][]byte, len(key.RSAPubs))
+	for i, pubKey := range key.RSAPubs {
 		publicBytes := x509.MarshalPKCS1PublicKey(pubKey)
-		rsaPubKeysBytes = append(rsaPubKeysBytes, publicBytes)
+		rsaPubKeysBytes[i] = publicBytes
 	}
 
 	return json.Marshal(&struct {
@@ -76,13 +76,13 @@ func (key *CosignerRSAKey) UnmarshalJSON(data []byte) error {
 	}
 
 	// unmarshal the public key bytes for each cosigner
-	key.RSAPubs = make([]*rsa.PublicKey, 0)
-	for _, bytes := range aux.RSAPubs {
+	key.RSAPubs = make([]*rsa.PublicKey, len(aux.RSAPubs))
+	for i, bytes := range aux.RSAPubs {
 		cosignerRsaPubkey, err := x509.ParsePKCS1PublicKey(bytes)
 		if err != nil {
 			return err
 		}
-		key.RSAPubs = append(key.RSAPubs, cosignerRsaPubkey)
+		key.RSAPubs[i] = cosignerRsaPubkey
 	}
 
 	key.RSAKey = *privateKey

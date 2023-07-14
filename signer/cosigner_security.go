@@ -1,6 +1,6 @@
 package signer
 
-// CosignerSecuritty is an interface for the security layer of the cosigner.
+// CosignerSecurity is an interface for the security layer of the cosigner.
 type CosignerSecurity interface {
 	// GetID returns the ID of the cosigner.
 	GetID() int
@@ -18,5 +18,5 @@ type CosignerSecurity interface {
 		encryptedNoncePub []byte,
 		encryptedNonceShare []byte,
 		signature []byte,
-	) ([]byte, []byte, error)
+	) (noncePub []byte, nonceShare []byte, err error)
 }
