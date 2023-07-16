@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
+	"golang.org/x/sync/errgroup"
 )
 
 func testChainSingleNodeAndHorcruxThreshold(
@@ -91,6 +92,52 @@ func preGenesisSingleNodeAndHorcruxThreshold(
 		*pubKey = pvPubKey
 
 		return nil
+	}
+}
+
+func preGenesisAllHorcruxThreshold(
+	ctx context.Context,
+	logger *zap.Logger,
+	client *client.Client,
+	network string,
+	totalSigners int, // total number of signers for the single horcrux validator
+	threshold uint8, // key shard threshold, and therefore how many horcrux signers must participate to sign a block
+	sentriesPerValidator int, // how many sentries for each horcrux validator (min: sentriesPerSigner, max: totalSentries)
+	sentriesPerSigner int, // how many sentries should each horcrux signer connect to (min: 1, max: sentriesPerValidator)
+	chain **cosmos.CosmosChain,
+	pubKeys []crypto.PubKey) func(ibc.ChainConfig) error {
+	return func(cc ibc.ChainConfig) error {
+		fnsPerVal := sentriesPerValidator - 1 // minus 1 for the validator itself
+		var eg errgroup.Group
+		for i, validator := range (*chain).Validators {
+			validator := validator
+			i := i
+			sentries := append(cosmos.ChainNodes{validator}, (*chain).FullNodes[i*fnsPerVal:(i+1)*fnsPerVal]...)
+
+			eg.Go(func() error {
+				pvPubKey, err := convertValidatorToHorcrux(
+					ctx,
+					logger,
+					client,
+					network,
+					validator,
+					totalSigners,
+					threshold,
+					sentries,
+					sentriesPerSigner,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				pubKeys[i] = pvPubKey
+
+				return nil
+			})
+		}
+
+		return eg.Wait()
 	}
 }
 

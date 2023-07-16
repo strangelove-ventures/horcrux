@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/cometbft/cometbft/crypto"
 	interchaintest "github.com/strangelove-ventures/interchaintest/v7"
 	"github.com/strangelove-ventures/interchaintest/v7/chain/cosmos"
 	"github.com/strangelove-ventures/interchaintest/v7/testutil"
@@ -243,64 +244,24 @@ func TestLeaderElection2of3(t *testing.T) {
 
 // tests a chain with only horcrux validators
 func TestChainPureHorcrux(t *testing.T) {
-	t.Parallel()
-	ctx, home, pool, network := SetupTestRun(t)
+	ctx := context.Background()
+	client, network := interchaintest.DockerSetup(t)
+	logger := zaptest.NewLogger(t)
 
-	const (
-		totalValidators      = 4
-		signersPerValidator  = 3
-		sentriesPerValidator = 2
-		threshold            = 2
-		sentriesPerSigner    = sentriesPerValidator
+	var chain *cosmos.CosmosChain
+	pubKeys := make([]crypto.PubKey, 2)
+
+	startChain(
+		ctx, t, logger, client, network, &chain, 2, 5, modifyGenesisStrictUptime,
+		preGenesisAllHorcruxThreshold(ctx, logger, client, network, 3, 2, 3, 1, &chain, pubKeys),
 	)
-	var chain *ChainType
-	if false {
-		// keeping this here as example of testing another chain
-		chain = getSentinelChain(ctx, chainID, sentriesPerSigner, "v0.8.3")
-	} else {
-		chain = getSimdChain(chainID, sentriesPerSigner)
+
+	err := testutil.WaitForBlocks(ctx, 20, chain)
+	require.NoError(t, err)
+
+	for _, p := range pubKeys {
+		requireHealthyValidator(t, chain.Validators[0], p.Address())
 	}
-
-	var validators []*Validator
-	var startValidatorsErrGroup errgroup.Group
-
-	var allNodes Nodes
-
-	// start horcrux cluster for each validator
-	for i := 0; i < totalValidators; i++ {
-		validator, err := NewHorcruxValidator(t, pool, network, home, i,
-			signersPerValidator, threshold, chain)
-		require.NoError(t, err)
-		validators = append(validators, validator)
-		allNodes = append(allNodes, validator.Sentries[chainID]...)
-		startValidatorsErrGroup.Go(func() error {
-			return validator.StartHorcruxCluster(sentriesPerSigner)
-		})
-	}
-
-	require.NoError(t, startValidatorsErrGroup.Wait())
-
-	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	require.NoError(t, Genesis(ctx, t, chain, []*Node{}, []*Node{}, validators))
-
-	require.NoError(t, allNodes.WaitForHeight(5))
-
-	var blockWaitErrGroup errgroup.Group
-
-	// wait for all validators to sign consecutive blocks
-	for _, tv := range validators {
-		validator := tv
-		blockWaitErrGroup.Go(func() error {
-			err := validator.WaitForConsecutiveBlocks(chainID, 30)
-			if err != nil {
-				return err
-			}
-			return validator.EnsureNotSlashed(chainID)
-		})
-	}
-
-	// wait for all validators to have consecutive blocks
-	require.NoError(t, blockWaitErrGroup.Wait())
 }
 
 // tests running a validator across multiple chains with a single horcrux cluster
