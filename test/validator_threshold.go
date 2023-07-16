@@ -52,7 +52,7 @@ func startChainSingleNodeAndHorcruxThreshold(
 	var pubKey crypto.PubKey
 
 	startChain(
-		ctx, t, logger, client, network, &chain, totalValidators, totalSentries, modifyGenesisStrictUptime,
+		ctx, t, logger, client, network, &chain, totalValidators, totalSentries-1, modifyGenesisStrictUptime,
 		preGenesisSingleNodeAndHorcruxThreshold(ctx, logger, client, network, totalSigners, threshold, sentriesPerSigner, &chain, &pubKey),
 	)
 
@@ -200,7 +200,7 @@ func convertValidatorToHorcrux(
 			ChainNodes: chainNodes,
 		}
 
-		if err := writeConfigAndKeysThreshold(ctx, validator.Chain.Config().ChainID, cosigner, config, eciesShards[i], ed25519Shards[i]); err != nil {
+		if err := writeConfigAndKeysThreshold(ctx, cosigner, config, eciesShards[i], chainEd25519Key{chainID: validator.Chain.Config().ChainID, key: ed25519Shards[i]}); err != nil {
 			return nil, err
 		}
 	}
@@ -219,13 +219,17 @@ func getShardedPrivvalKey(ctx context.Context, node *cosmos.ChainNode, threshold
 	return ed25519Shards, pvKey.PubKey, nil
 }
 
+type chainEd25519Key struct {
+	chainID string
+	key     signer.CosignerEd25519Key
+}
+
 func writeConfigAndKeysThreshold(
 	ctx context.Context,
-	chainID string,
 	cosigner *cosmos.SidecarProcess,
 	config signer.Config,
 	eciesKey signer.CosignerECIESKey,
-	ed25519Key signer.CosignerEd25519Key,
+	ed25519Keys ...chainEd25519Key,
 ) error {
 	configBz, err := json.Marshal(config)
 	if err != nil {
@@ -245,13 +249,15 @@ func writeConfigAndKeysThreshold(
 		return fmt.Errorf("failed to write ecies_keys.json: %w", err)
 	}
 
-	ed25519KeyBz, err := json.Marshal(&ed25519Key)
-	if err != nil {
-		return fmt.Errorf("failed to marshal ed25519 shard: %w", err)
-	}
+	for _, key := range ed25519Keys {
+		ed25519KeyBz, err := json.Marshal(&key.key)
+		if err != nil {
+			return fmt.Errorf("failed to marshal ed25519 shard: %w", err)
+		}
 
-	if err = cosigner.WriteFile(ctx, ed25519KeyBz, fmt.Sprintf(".horcrux/%s_shard.json", chainID)); err != nil {
-		return fmt.Errorf("failed to write %s_shard.json: %w", chainID, err)
+		if err = cosigner.WriteFile(ctx, ed25519KeyBz, fmt.Sprintf(".horcrux/%s_shard.json", key.chainID)); err != nil {
+			return fmt.Errorf("failed to write %s_shard.json: %w", key.chainID, err)
+		}
 	}
 
 	return nil

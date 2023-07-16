@@ -1,4 +1,4 @@
-name: Run Go Tests
+name: Tests
 
 on:
   pull_request:
@@ -13,7 +13,7 @@ on:
       - 'Makefile'
 
 jobs:
-  unit-tests:
+  unit:
     runs-on: ubuntu-latest
     steps:
       # Install and setup go
@@ -33,21 +33,21 @@ jobs:
       # run tests
       - name: run horcrux tests
         run: make test
-  e2e-tests:
+  e2e:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         test: 
+          - TestMultipleChainHorcrux
+          - TestChainPureHorcrux
+          - TestDownedSigners2of3
+          - TestDownedSigners3of5
+          - TestLeaderElection2of3
           - Test2Of3SignerThreeSentries
           - Test2Of3SignerThreeSentriesUniqueConnection
-          - Test3Of5SignerFiveSentriesUniqueConnection
-          - TestSingleSignerTwoSentries
           - TestUpgradeValidatorToHorcrux
-          - TestDownedSigners2of3
-          - TestLeaderElection2of3
-          - TestChainPureHorcrux
-          - TestMultipleChainHorcrux
+          - TestSingleSignerTwoSentries
     steps:
       # Install and setup go
       - name: Set up Go 1.20
