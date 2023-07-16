@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -22,7 +23,12 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func startChainSingleNodeAndHorcrux(
+const (
+	testChain        = "gaia" // ghcr.io/strangelove-ventures/heighliner/gaia
+	testChainVersion = "v10.0.2"
+)
+
+func startChain(
 	ctx context.Context,
 	t *testing.T,
 	logger *zap.Logger,
@@ -42,8 +48,8 @@ func startChainSingleNodeAndHorcrux(
 
 	cf := interchaintest.NewBuiltinChainFactory(logger, []*interchaintest.ChainSpec{
 		{
-			Name:          "gaia",
-			Version:       "v10.0.2",
+			Name:          testChain,
+			Version:       testChainVersion,
 			NumValidators: &nv,
 			NumFullNodes:  &nf,
 			ChainConfig: ibc.ChainConfig{
@@ -75,15 +81,21 @@ func startChainSingleNodeAndHorcrux(
 }
 
 func modifyGenesisStrictUptime(cc ibc.ChainConfig, b []byte) ([]byte, error) {
-	g := make(map[string]any)
-	if err := json.Unmarshal(b, &g); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal genesis file: %w", err)
+	return modifyGenesisSlashingUptime(10, 0.9)(cc, b)
+}
+
+func modifyGenesisSlashingUptime(signedBlocksWindow uint64, minSignedPerWindow float64) func(cc ibc.ChainConfig, b []byte) ([]byte, error) {
+	return func(cc ibc.ChainConfig, b []byte) ([]byte, error) {
+		g := make(map[string]any)
+		if err := json.Unmarshal(b, &g); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal genesis file: %w", err)
+		}
+
+		g["app_state"].(map[string]any)["slashing"].(map[string]any)["params"].(map[string]any)["signed_blocks_window"] = strconv.FormatUint(signedBlocksWindow, 10)
+		g["app_state"].(map[string]any)["slashing"].(map[string]any)["params"].(map[string]any)["min_signed_per_window"] = strconv.FormatFloat(minSignedPerWindow, 'f', 18, 64)
+
+		return json.Marshal(g)
 	}
-
-	g["app_state"].(map[string]any)["slashing"].(map[string]any)["params"].(map[string]any)["signed_blocks_window"] = "10"
-	g["app_state"].(map[string]any)["slashing"].(map[string]any)["params"].(map[string]any)["min_signed_per_window"] = "0.900000000000000000"
-
-	return json.Marshal(g)
 }
 
 func horcruxSidecar(ctx context.Context, node *cosmos.ChainNode, name string, client *client.Client, network string, startupFlags ...string) (*cosmos.SidecarProcess, error) {

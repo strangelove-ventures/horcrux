@@ -46,7 +46,7 @@ func startChainSingleNodeAndHorcruxSingle(
 	var chain *cosmos.CosmosChain
 	var pubKey crypto.PubKey
 
-	startChainSingleNodeAndHorcrux(
+	startChain(
 		ctx, t, logger, client, network, &chain, totalValidators, totalSentries, modifyGenesisStrictUptime,
 		preGenesisSingleNodeAndHorcruxSingle(ctx, logger, client, network, &chain, &pubKey),
 	)

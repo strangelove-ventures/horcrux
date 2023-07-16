@@ -50,7 +50,7 @@ func startChainSingleNodeAndHorcruxThreshold(
 	var chain *cosmos.CosmosChain
 	var pubKey crypto.PubKey
 
-	startChainSingleNodeAndHorcrux(
+	startChain(
 		ctx, t, logger, client, network, &chain, totalValidators, totalSentries, modifyGenesisStrictUptime,
 		preGenesisSingleNodeAndHorcruxThreshold(ctx, logger, client, network, totalSigners, threshold, sentriesPerSigner, &chain, &pubKey),
 	)
@@ -71,64 +71,94 @@ func preGenesisSingleNodeAndHorcruxThreshold(
 	return func(cc ibc.ChainConfig) error {
 		horcruxValidator := (*chain).Validators[0]
 
-		ed25519Shards, pvPubKey, err := getShardedPrivvalKey(ctx, horcruxValidator, threshold, uint8(totalSigners))
+		sentries := append(cosmos.ChainNodes{horcruxValidator}, (*chain).FullNodes...)
+
+		pvPubKey, err := convertValidatorToHorcrux(
+			ctx,
+			logger,
+			client,
+			network,
+			horcruxValidator,
+			totalSigners,
+			threshold,
+			sentries,
+			sentriesPerSigner,
+		)
 		if err != nil {
 			return err
 		}
 
 		*pubKey = pvPubKey
 
-		eciesShards, err := signer.CreateCosignerECIESShards(totalSigners)
-		if err != nil {
-			return err
-		}
-
-		sentries := append(cosmos.ChainNodes{horcruxValidator}, (*chain).FullNodes...)
-		sentriesForCosigners := getSentriesForCosignerConnection(sentries, totalSigners, sentriesPerSigner)
-
-		cosigners := make(signer.CosignersConfig, totalSigners)
-
-		for i := 0; i < totalSigners; i++ {
-			_, err := horcruxSidecar(ctx, horcruxValidator, fmt.Sprintf("cosigner-%d", i+1), client, network)
-			if err != nil {
-				return err
-			}
-
-			cosigners[i] = signer.CosignerConfig{
-				ShardID: i + 1,
-				P2PAddr: fmt.Sprintf("tcp://%s:%s", horcruxValidator.Sidecars[i].HostName(), signerPort),
-			}
-		}
-
-		for i := 0; i < totalSigners; i++ {
-			cosigner := horcruxValidator.Sidecars[i]
-
-			sentriesForCosigner := sentriesForCosigners[i]
-			chainNodes := make(signer.ChainNodes, len(sentriesForCosigner))
-			for i, sentry := range sentriesForCosigner {
-				chainNodes[i] = signer.ChainNode{
-					PrivValAddr: fmt.Sprintf("tcp://%s:1234", sentry.HostName()),
-				}
-			}
-
-			config := signer.Config{
-				SignMode: signer.SignModeThreshold,
-				ThresholdModeConfig: &signer.ThresholdModeConfig{
-					Threshold:   int(threshold),
-					Cosigners:   cosigners,
-					GRPCTimeout: "1500ms",
-					RaftTimeout: "1500ms",
-				},
-				ChainNodes: chainNodes,
-			}
-
-			if err := writeConfigAndKeysThreshold(ctx, (*chain).Config().ChainID, cosigner, config, eciesShards[i], ed25519Shards[i]); err != nil {
-				return err
-			}
-		}
-
-		return enablePrivvalListener(ctx, logger, sentries, client)
+		return nil
 	}
+}
+
+func convertValidatorToHorcrux(
+	ctx context.Context,
+	logger *zap.Logger,
+	client *client.Client,
+	network string,
+	validator *cosmos.ChainNode,
+	totalSigners int,
+	threshold uint8,
+	sentries cosmos.ChainNodes,
+	sentriesPerSigner int,
+) (crypto.PubKey, error) {
+	sentriesForCosigners := getSentriesForCosignerConnection(sentries, totalSigners, sentriesPerSigner)
+
+	ed25519Shards, pvPubKey, err := getShardedPrivvalKey(ctx, validator, threshold, uint8(totalSigners))
+	if err != nil {
+		return nil, err
+	}
+
+	eciesShards, err := signer.CreateCosignerECIESShards(totalSigners)
+	if err != nil {
+		return nil, err
+	}
+
+	cosigners := make(signer.CosignersConfig, totalSigners)
+
+	for i := 0; i < totalSigners; i++ {
+		_, err := horcruxSidecar(ctx, validator, fmt.Sprintf("cosigner-%d", i+1), client, network)
+		if err != nil {
+			return nil, err
+		}
+
+		cosigners[i] = signer.CosignerConfig{
+			ShardID: i + 1,
+			P2PAddr: fmt.Sprintf("tcp://%s:%s", validator.Sidecars[i].HostName(), signerPort),
+		}
+	}
+
+	for i := 0; i < totalSigners; i++ {
+		cosigner := validator.Sidecars[i]
+
+		sentriesForCosigner := sentriesForCosigners[i]
+		chainNodes := make(signer.ChainNodes, len(sentriesForCosigner))
+		for i, sentry := range sentriesForCosigner {
+			chainNodes[i] = signer.ChainNode{
+				PrivValAddr: fmt.Sprintf("tcp://%s:1234", sentry.HostName()),
+			}
+		}
+
+		config := signer.Config{
+			SignMode: signer.SignModeThreshold,
+			ThresholdModeConfig: &signer.ThresholdModeConfig{
+				Threshold:   int(threshold),
+				Cosigners:   cosigners,
+				GRPCTimeout: "1500ms",
+				RaftTimeout: "1500ms",
+			},
+			ChainNodes: chainNodes,
+		}
+
+		if err := writeConfigAndKeysThreshold(ctx, validator.Chain.Config().ChainID, cosigner, config, eciesShards[i], ed25519Shards[i]); err != nil {
+			return nil, err
+		}
+	}
+
+	return pvPubKey, enablePrivvalListener(ctx, logger, sentries, client)
 }
 
 func getShardedPrivvalKey(ctx context.Context, node *cosmos.ChainNode, threshold uint8, shards uint8) ([]signer.CosignerEd25519Key, crypto.PubKey, error) {

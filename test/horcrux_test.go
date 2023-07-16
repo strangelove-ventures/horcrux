@@ -1,10 +1,14 @@
 package test
 
 import (
+	"context"
 	"testing"
-	"time"
 
+	interchaintest "github.com/strangelove-ventures/interchaintest/v7"
+	"github.com/strangelove-ventures/interchaintest/v7/chain/cosmos"
+	"github.com/strangelove-ventures/interchaintest/v7/testutil"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zaptest"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -80,69 +84,39 @@ func TestSingleSignerTwoSentries(t *testing.T) {
 	testChainSingleNodeAndHorcruxSingle(t, 2, 2)
 }
 
-// TestUpgradeValidatorToHorcrux will spin up a chain with four validators, stop one validator, configure that validator
+// TestUpgradeValidatorToHorcrux will spin up a chain with two validators, stop one validator, configure that validator
 // to be a relay for the remote signer cluster, spin up a 2/3 threshold signer cluster, restart the validator and check
-// that no slashing occurs
+// that no slashing occurs.
 func TestUpgradeValidatorToHorcrux(t *testing.T) {
-	t.Parallel()
-	ctx, home, pool, network := SetupTestRun(t)
+	ctx := context.Background()
+	client, network := interchaintest.DockerSetup(t)
+	logger := zaptest.NewLogger(t)
 
-	const (
-		totalValidators   = 4
-		totalSigners      = 3
-		threshold         = 2
-		sentriesPerSigner = 1
-	)
-	chain := getSimdChain(chainID, sentriesPerSigner)
+	var chain *cosmos.CosmosChain
 
-	// initially all vals are single node (non-horcrux)
-	validators := GetValidators(0, totalValidators, home, chain, pool, network, t)
+	// slightly more lenient uptime requirement than modifyGenesisStrictUptime to account for
+	// the time it takes to upgrade the validator, where a few missed blocks is expected.
+	// allow 50% missed blocks in 10 block signed blocks window (5 missed blocks before slashing).
+	modifyGenesis := modifyGenesisSlashingUptime(10, 0.5)
 
-	// for this test we will upgrade the first validator to horcrux
-	ourValidatorNode := validators[0]
+	startChain(ctx, t, logger, client, network, &chain, 2, 1, modifyGenesis, nil)
 
-	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	require.NoError(t, Genesis(ctx, t, chain, validators, []*Node{}, []*Validator{}))
+	// validator to upgrade to horcrux
+	v := chain.Validators[0]
 
-	// Wait for all validators to get to given block height
-	require.NoError(t, validators.WaitForHeight(5))
-
-	// get the consensus key from our validator
-	ourValidatorPrivValKey, err := ourValidatorNode.GetPrivVal()
+	err := v.StopContainer(ctx)
 	require.NoError(t, err)
 
-	// create horcrux validator with same consensus key
-	ourValidatorUpgradedToHorcrux, err := NewHorcruxValidatorWithPrivValKey(t, pool, network, home,
-		0, 0, totalSigners, threshold, chain, ourValidatorPrivValKey)
+	pubKey, err := convertValidatorToHorcrux(ctx, logger, client, network, v, 3, 2, cosmos.ChainNodes{v}, 1)
 	require.NoError(t, err)
 
-	// stop our validator node before upgrading to horcrux
-	t.Logf("{%s} -> Stopping Node...", ourValidatorNode.Name())
-	require.NoError(t, ourValidatorNode.StopAndRemoveContainer(false))
+	err = v.StartContainer(ctx)
+	require.NoError(t, err)
 
-	time.Sleep(5 * time.Second) // wait for all containers to stop
+	err = testutil.WaitForBlocks(ctx, 20, chain)
+	require.NoError(t, err)
 
-	// bring in single signer node as a sentry for horcrux
-	ourValidatorUpgradedToHorcrux.Sentries[chainID] = []*Node{ourValidatorNode}
-
-	// modify node config to listen for private validator connections
-	ourValidatorNode.SetPrivValListen(validators.PeerString())
-
-	// remove priv_validator_key.json from our validator node
-	// horcrux now holds the sharded key
-	ourValidatorNode.GenNewPrivVal()
-
-	// start our new validator
-	require.NoError(t, ourValidatorUpgradedToHorcrux.StartHorcruxCluster(sentriesPerSigner))
-
-	t.Logf("{%s} -> Restarting Node...", ourValidatorNode.Name())
-	require.NoError(t, ourValidatorNode.Start(ctx, nil))
-
-	// wait for validator to be reachable
-	require.NoError(t, ourValidatorNode.GetHosts().WaitForAllToStart(t, 10))
-
-	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidatorUpgradedToHorcrux.Name())
-	require.NoError(t, ourValidatorUpgradedToHorcrux.EnsureNotSlashed(chainID))
+	requireHealthyValidator(t, chain.Validators[0], pubKey.Address())
 }
 
 func TestDownedSigners2of3(t *testing.T) {
