@@ -13,9 +13,9 @@ on:
       - 'Makefile'
 
 jobs:
-  test:
+  unit-tests:
     name: run tests
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     steps:
       # Install and setup go
       - name: Set up Go 1.20
@@ -27,13 +27,6 @@ jobs:
       - name: checkout horcrux
         uses: actions/checkout@v3
 
-      # cleanup docker environment on self-hosted test runner
-      - name: prepare fresh docker environment
-        run: |
-          docker stop $(docker ps -a -q) || true
-          docker rm -f $(docker ps -a -q) || true
-          docker network prune -f || true
-
       # make sure proto files are up to date
       - name: generate fresh signer proto .go files
         run: make signer-proto
@@ -41,3 +34,36 @@ jobs:
       # run tests
       - name: run horcrux tests
         run: make test
+  e2e-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test: 
+          - Test2Of3SignerThreeSentries
+          - Test2Of3SignerThreeSentriesUniqueConnection
+          - Test3Of5SignerFiveSentriesUniqueConnection
+          - TestSingleSignerTwoSentries
+          - TestUpgradeValidatorToHorcrux
+          - TestDownedSigners2of3
+          - TestLeaderElection2of3
+          - TestChainPureHorcrux
+          - TestMultipleChainHorcrux
+    steps:
+      # Install and setup go
+      - name: Set up Go 1.20
+        uses: actions/setup-go@v4
+        with:
+          go-version: '^1.20.0'
+
+      # checkout horcrux
+      - name: checkout horcrux
+        uses: actions/checkout@v3
+
+      # make sure proto files are up to date
+      - name: generate fresh signer proto .go files
+        run: make signer-proto
+
+      # run test matrix
+      - name: run test
+        run: cd test && go test -v -timeout 30m -run ^${{ matrix.test }}$ .
