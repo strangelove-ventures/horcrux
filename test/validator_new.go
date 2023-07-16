@@ -14,6 +14,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/bech32"
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	"github.com/docker/docker/client"
+	"github.com/strangelove-ventures/horcrux/signer/proto"
 	interchaintest "github.com/strangelove-ventures/interchaintest/v7"
 	"github.com/strangelove-ventures/interchaintest/v7/chain/cosmos"
 	"github.com/strangelove-ventures/interchaintest/v7/ibc"
@@ -21,6 +22,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 const (
@@ -174,4 +177,62 @@ func requireHealthyValidator(t *testing.T, referenceNode *cosmos.ChainNode, vali
 	require.False(t, signingInfo.ValSigningInfo.Tombstoned)
 	require.Equal(t, time.Unix(0, 0).UTC(), signingInfo.ValSigningInfo.JailedUntil)
 	require.Zero(t, signingInfo.ValSigningInfo.MissedBlocksCounter)
+}
+
+// transferLeadership elects a new raft leader.
+func transferLeadership(ctx context.Context, cosigner *cosmos.SidecarProcess) error {
+	_, _, err := cosigner.Exec(ctx, []string{"horcrux", "elect", strconv.FormatInt(int64(cosigner.Index+1), 10)}, nil)
+	return err
+}
+
+func pollForLeader(ctx context.Context, logger Logger, cosigner *cosmos.SidecarProcess, expectedLeader string) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			leader, err := getLeader(ctx, cosigner)
+			logger.Logf("{%s} => current leader: {%s}, expected leader: {%s}", cosigner.Name(), leader, expectedLeader)
+			if err != nil {
+				return fmt.Errorf("failed to get leader from cosigner: %s - %w", cosigner.Name(), err)
+			}
+			if leader == expectedLeader {
+				return nil
+			}
+		case <-ctx.Done():
+			return fmt.Errorf("leader did not match before timeout for cosigner: %s - %w", cosigner.Name(), ctx.Err())
+		}
+	}
+}
+
+// getLeader returns the current raft leader.
+func getLeader(ctx context.Context, cosigner *cosmos.SidecarProcess) (string, error) {
+	ports, err := cosigner.GetHostPorts(ctx, signerPortDocker)
+	if err != nil {
+		return "", err
+	}
+	grpcAddress := ports[0]
+	conn, err := grpc.Dial(grpcAddress,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
+	)
+	if err != nil {
+		return "", fmt.Errorf("dialing failed: %w", err)
+	}
+	defer conn.Close()
+
+	ctx, cancelFunc := context.WithTimeout(ctx, 10*time.Second)
+	defer cancelFunc()
+
+	grpcClient := proto.NewCosignerGRPCClient(conn)
+
+	res, err := grpcClient.GetLeader(ctx, &proto.CosignerGRPCGetLeaderRequest{})
+	if err != nil {
+		return "", err
+	}
+	return res.GetLeader(), nil
 }

@@ -9,7 +9,7 @@ require (
 	github.com/docker/docker v24.0.1+incompatible
 	github.com/ory/dockertest v3.3.5+incompatible
 	github.com/strangelove-ventures/horcrux v0.0.0
-	github.com/strangelove-ventures/interchaintest/v7 v7.0.0-20230715045256-7f05595c078f
+	github.com/strangelove-ventures/interchaintest/v7 v7.0.0-20230716013647-d66f6a196303
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/zap v1.24.0
 	golang.org/x/sync v0.3.0
