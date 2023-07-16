@@ -158,10 +158,7 @@ func (tv *Validator) genEd25519Shards(
 
 	tv.PubKeys[chainID] = key.PubKey
 
-	shards, err := signer.CreateCosignerEd25519Shards(key, tv.Threshold, uint8(len(tv.Signers)))
-	if err != nil {
-		return err
-	}
+	shards := signer.CreateCosignerEd25519Shards(key, tv.Threshold, uint8(len(tv.Signers)))
 
 	for i, s := range tv.Signers {
 		tv.tl.Logf("{%s} -> Writing Ed25519 Key Shard To File... ", s.Name())
