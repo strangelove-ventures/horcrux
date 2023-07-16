@@ -19,6 +19,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// testChainSingleNodeAndHorcruxThreshold tests a single chain with a single horcrux (threshold mode) validator and single node validators for the rest of the validators.
 func testChainSingleNodeAndHorcruxThreshold(
 	t *testing.T,
 	totalValidators int, // total number of validators on chain (one horcrux + single node for the rest)
@@ -36,6 +37,7 @@ func testChainSingleNodeAndHorcruxThreshold(
 	requireHealthyValidator(t, chain.Validators[0], pubKey.Address())
 }
 
+// startChainSingleNodeAndHorcruxThreshold starts a single chain with a single horcrux (threshold mode) validator and single node validators for the rest of the validators.
 func startChainSingleNodeAndHorcruxThreshold(
 	ctx context.Context,
 	t *testing.T,
@@ -51,14 +53,21 @@ func startChainSingleNodeAndHorcruxThreshold(
 	var chain *cosmos.CosmosChain
 	var pubKey crypto.PubKey
 
-	startChain(
-		ctx, t, logger, client, network, &chain, totalValidators, totalSentries-1, modifyGenesisStrictUptime,
-		preGenesisSingleNodeAndHorcruxThreshold(ctx, logger, client, network, totalSigners, threshold, sentriesPerSigner, &chain, &pubKey),
+	startChains(
+		ctx, t, logger, client, network,
+		chainWrapper{
+			chain:           &chain,
+			totalValidators: totalValidators,
+			totalSentries:   totalSentries - 1,
+			modifyGenesis:   modifyGenesisStrictUptime,
+			preGenesis:      preGenesisSingleNodeAndHorcruxThreshold(ctx, logger, client, network, totalSigners, threshold, sentriesPerSigner, &chain, &pubKey),
+		},
 	)
 
 	return chain, pubKey
 }
 
+// preGenesisSingleNodeAndHorcruxThreshold performs the pre-genesis setup to convert the first validator to a horcrux (threshold mode) validator.
 func preGenesisSingleNodeAndHorcruxThreshold(
 	ctx context.Context,
 	logger *zap.Logger,
@@ -95,6 +104,7 @@ func preGenesisSingleNodeAndHorcruxThreshold(
 	}
 }
 
+// preGenesisAllHorcruxThreshold performs the pre-genesis setup to convert all validators to horcrux validators.
 func preGenesisAllHorcruxThreshold(
 	ctx context.Context,
 	logger *zap.Logger,
@@ -141,6 +151,8 @@ func preGenesisAllHorcruxThreshold(
 	}
 }
 
+// convertValidatorToHorcrux converts a validator to a horcrux validator by creating horcrux and
+// configuring cosigners which will startup as sidecar processes for the validator.
 func convertValidatorToHorcrux(
 	ctx context.Context,
 	logger *zap.Logger,
@@ -208,6 +220,7 @@ func convertValidatorToHorcrux(
 	return pvPubKey, enablePrivvalListener(ctx, logger, sentries, client)
 }
 
+// getPrivvalKey gets the privval key from the validator and creates threshold shards from it.
 func getShardedPrivvalKey(ctx context.Context, node *cosmos.ChainNode, threshold uint8, shards uint8) ([]signer.CosignerEd25519Key, crypto.PubKey, error) {
 	pvKey, err := getPrivvalKey(ctx, node)
 	if err != nil {
@@ -219,11 +232,13 @@ func getShardedPrivvalKey(ctx context.Context, node *cosmos.ChainNode, threshold
 	return ed25519Shards, pvKey.PubKey, nil
 }
 
+// chainEd25519Key is a wrapper for a chain ID and an ed25519 consensus key.
 type chainEd25519Key struct {
 	chainID string
 	key     signer.CosignerEd25519Key
 }
 
+// writeConfigAndKeysThreshold writes the config and keys for a horcrux cosigner to the sidecar's docker volume.
 func writeConfigAndKeysThreshold(
 	ctx context.Context,
 	cosigner *cosmos.SidecarProcess,
@@ -263,6 +278,8 @@ func writeConfigAndKeysThreshold(
 	return nil
 }
 
+// getSentriesForCosignerConnection will return a slice of sentries for each cosigner to connect to.
+// The sentries will be picked for each cosigner in a round robin.
 func getSentriesForCosignerConnection(sentries cosmos.ChainNodes, numSigners int, sentriesPerSigner int) []cosmos.ChainNodes {
 	if sentriesPerSigner == 0 {
 		sentriesPerSigner = len(sentries)

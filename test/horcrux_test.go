@@ -83,7 +83,7 @@ func Test4Of7SignerTwoSentries(t *testing.T) {
 }
 
 // TestSingleSignerTwoSentries will spin up a chain with one single-node validator and one horcrux single
-// signer validtor.
+// signer validator.
 func TestSingleSignerTwoSentries(t *testing.T) {
 	testChainSingleNodeAndHorcruxSingle(t, 2, 2)
 }
@@ -112,7 +112,11 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	// allow 50% missed blocks in 10 block signed blocks window (5 missed blocks before slashing).
 	modifyGenesis := modifyGenesisSlashingUptime(signedBlocksWindow, minSignedPerWindow)
 
-	startChain(ctx, t, logger, client, network, &chain, totalValidators, 0, modifyGenesis, nil)
+	startChains(ctx, t, logger, client, network, chainWrapper{
+		chain:           &chain,
+		totalValidators: totalValidators,
+		modifyGenesis:   modifyGenesis,
+	})
 
 	// validator to upgrade to horcrux
 	v := chain.Validators[0]
@@ -131,6 +135,8 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 
 	requireHealthyValidator(t, chain.Validators[0], pubKey.Address())
 }
+
+// TestDownedSigners2of3 tests taking down 2 nodes at a time in the 2/3 threshold horcrux cluster for a period of time.
 
 func TestDownedSigners2of3(t *testing.T) {
 	ctx := context.Background()
@@ -172,6 +178,7 @@ func TestDownedSigners2of3(t *testing.T) {
 	}
 }
 
+// TestDownedSigners3of5 tests taking down 2 nodes at a time in the 3/5 threshold horcrux cluster for a period of time.
 func TestDownedSigners3of5(t *testing.T) {
 	ctx := context.Background()
 
@@ -225,6 +232,7 @@ func TestDownedSigners3of5(t *testing.T) {
 	}
 }
 
+// TestLeaderElection2of3 tests electing a specific leader in a 2/3 threshold horcrux cluster.
 func TestLeaderElection2of3(t *testing.T) {
 	ctx := context.Background()
 
@@ -287,7 +295,7 @@ func TestLeaderElection2of3(t *testing.T) {
 	}
 }
 
-// tests a chain with only horcrux validators
+// TestChainPureHorcrux tests a chain with only horcrux validators.
 func TestChainPureHorcrux(t *testing.T) {
 	ctx := context.Background()
 	client, network := interchaintest.DockerSetup(t)
@@ -304,9 +312,14 @@ func TestChainPureHorcrux(t *testing.T) {
 	var chain *cosmos.CosmosChain
 	pubKeys := make([]crypto.PubKey, totalValidators)
 
-	startChain(
-		ctx, t, logger, client, network, &chain, totalValidators, 1+totalValidators*(sentriesPerValidator-1), modifyGenesisStrictUptime,
-		preGenesisAllHorcruxThreshold(ctx, logger, client, network, signersPerValidator, threshold, sentriesPerValidator, sentriesPerSigner, &chain, pubKeys),
+	startChains(
+		ctx, t, logger, client, network, chainWrapper{
+			chain:           &chain,
+			totalValidators: totalValidators,
+			totalSentries:   1 + totalValidators*(sentriesPerValidator-1),
+			modifyGenesis:   modifyGenesisStrictUptime,
+			preGenesis:      preGenesisAllHorcruxThreshold(ctx, logger, client, network, signersPerValidator, threshold, sentriesPerValidator, sentriesPerSigner, &chain, pubKeys),
+		},
 	)
 
 	err := testutil.WaitForBlocks(ctx, 20, chain)
@@ -317,7 +330,7 @@ func TestChainPureHorcrux(t *testing.T) {
 	}
 }
 
-// tests running a validator across multiple chains with a single horcrux cluster
+// TestMultipleChainHorcrux tests running a validator across multiple chains with a single horcrux cluster.
 func TestMultipleChainHorcrux(t *testing.T) {
 	ctx := context.Background()
 	client, network := interchaintest.DockerSetup(t)
@@ -452,7 +465,22 @@ func TestMultipleChainHorcrux(t *testing.T) {
 		return nil
 	}
 
-	startTwoChains(ctx, t, logger, client, network, &chain1, &chain2, 2, 2, modifyGenesisStrictUptime, preGenesis1, modifyGenesisStrictUptime, preGenesis2)
+	startChains(ctx, t, logger, client, network,
+		chainWrapper{
+			chain:           &chain1,
+			totalValidators: 2,
+			totalSentries:   2,
+			modifyGenesis:   modifyGenesisStrictUptime,
+			preGenesis:      preGenesis1,
+		},
+		chainWrapper{
+			chain:           &chain2,
+			totalValidators: 2,
+			totalSentries:   2,
+			modifyGenesis:   modifyGenesisStrictUptime,
+			preGenesis:      preGenesis2,
+		},
+	)
 
 	testutil.WaitForBlocks(ctx, 20, chain1, chain2)
 

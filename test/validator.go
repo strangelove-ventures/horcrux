@@ -33,53 +33,59 @@ const (
 	signerPort       = "2222"
 	signerPortDocker = signerPort + "/tcp"
 
-	signerImage = "horcrux-test"
-	binary      = "horcrux"
+	signerImage        = "horcrux-test"
+	binary             = "horcrux"
+	signerImageUidGid  = "2345:2345"
+	signerImageHomeDir = "/home/horcrux"
 )
 
-type Logger interface {
-	Name() string
-	Log(...interface{})
-	Logf(string, ...interface{})
+// chainWrapper holds the initial configuration for a chain to start from genesis.
+type chainWrapper struct {
+	chain           **cosmos.CosmosChain
+	totalValidators int // total number of validators on chain at genesis
+	totalSentries   int // number of additional sentry nodes
+	modifyGenesis   func(cc ibc.ChainConfig, b []byte) ([]byte, error)
+	preGenesis      func(ibc.ChainConfig) error
 }
 
-func startChain(
+// startChains starts the given chains locally within docker composed of containers.
+func startChains(
 	ctx context.Context,
 	t *testing.T,
 	logger *zap.Logger,
 	client *client.Client,
 	network string,
-	chain **cosmos.CosmosChain,
-	totalValidators int, // total number of validators on chain at genesis
-	totalSentries int, // number of additional sentry nodes
-	modifyGenesis func(cc ibc.ChainConfig, b []byte) ([]byte, error),
-	preGenesis func(ibc.ChainConfig) error,
+	chains ...chainWrapper,
 ) {
-	nv := totalValidators
-	nf := totalSentries
-
 	err := BuildHorcruxImage(ctx, client)
 	require.NoError(t, err)
 
-	cf := interchaintest.NewBuiltinChainFactory(logger, []*interchaintest.ChainSpec{
-		{
+	cs := make([]*interchaintest.ChainSpec, len(chains))
+	for i, c := range chains {
+		cs[i] = &interchaintest.ChainSpec{
 			Name:          testChain,
 			Version:       testChainVersion,
-			NumValidators: &nv,
-			NumFullNodes:  &nf,
+			NumValidators: &c.totalValidators,
+			NumFullNodes:  &c.totalSentries,
 			ChainConfig: ibc.ChainConfig{
-				ModifyGenesis: modifyGenesis,
-				PreGenesis:    preGenesis,
+				ModifyGenesis: c.modifyGenesis,
+				PreGenesis:    c.preGenesis,
 			},
-		},
-	})
+		}
+	}
 
-	chains, err := cf.Chains(t.Name())
+	cf := interchaintest.NewBuiltinChainFactory(logger, cs)
+
+	cfChains, err := cf.Chains(t.Name())
 	require.NoError(t, err)
 
-	*chain = chains[0].(*cosmos.CosmosChain)
+	ic := interchaintest.NewInterchain()
 
-	ic := interchaintest.NewInterchain().AddChain(*chain)
+	for i, c := range cfChains {
+		chain := c.(*cosmos.CosmosChain)
+		*chains[i].chain = chain
+		ic.AddChain(chain)
+	}
 
 	err = ic.Build(ctx, nil, interchaintest.InterchainBuildOptions{
 		TestName:  t.Name(),
@@ -95,75 +101,13 @@ func startChain(
 	})
 }
 
-func startTwoChains(
-	ctx context.Context,
-	t *testing.T,
-	logger *zap.Logger,
-	client *client.Client,
-	network string,
-	chain1 **cosmos.CosmosChain,
-	chain2 **cosmos.CosmosChain,
-	totalValidators int, // total number of validators on chain at genesis
-	totalSentries int, // number of additional sentry nodes
-	modifyGenesis1 func(cc ibc.ChainConfig, b []byte) ([]byte, error),
-	preGenesis1 func(ibc.ChainConfig) error,
-	modifyGenesis2 func(cc ibc.ChainConfig, b []byte) ([]byte, error),
-	preGenesis2 func(ibc.ChainConfig) error,
-) {
-	nv := totalValidators
-	nf := totalSentries
-
-	err := BuildHorcruxImage(ctx, client)
-	require.NoError(t, err)
-
-	cf := interchaintest.NewBuiltinChainFactory(logger, []*interchaintest.ChainSpec{
-		{
-			Name:          testChain,
-			Version:       testChainVersion,
-			NumValidators: &nv,
-			NumFullNodes:  &nf,
-			ChainConfig: ibc.ChainConfig{
-				ModifyGenesis: modifyGenesis1,
-				PreGenesis:    preGenesis1,
-			},
-		},
-		{
-			Name:          testChain,
-			Version:       testChainVersion,
-			NumValidators: &nv,
-			NumFullNodes:  &nf,
-			ChainConfig: ibc.ChainConfig{
-				ModifyGenesis: modifyGenesis2,
-				PreGenesis:    preGenesis2,
-			},
-		},
-	})
-
-	chains, err := cf.Chains(t.Name())
-	require.NoError(t, err)
-
-	*chain1, *chain2 = chains[0].(*cosmos.CosmosChain), chains[1].(*cosmos.CosmosChain)
-
-	ic := interchaintest.NewInterchain().AddChain(*chain1).AddChain(*chain2)
-
-	err = ic.Build(ctx, nil, interchaintest.InterchainBuildOptions{
-		TestName:  t.Name(),
-		Client:    client,
-		NetworkID: network,
-		// BlockDatabaseFile: interchaintest.DefaultBlockDatabaseFilepath(),
-		SkipPathCreation: false,
-	})
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		_ = ic.Close()
-	})
-}
-
+// modifyGenesisStrictUptime modifies the genesis file to have a strict uptime slashing window.
+// 10 block window, 90% signed blocks required, so more than 1 missed block in 10 blocks will slash and jail the validator.
 func modifyGenesisStrictUptime(cc ibc.ChainConfig, b []byte) ([]byte, error) {
 	return modifyGenesisSlashingUptime(10, 0.9)(cc, b)
 }
 
+// modifyGenesisSlashingUptime modifies the genesis slashing period parameters.
 func modifyGenesisSlashingUptime(
 	signedBlocksWindow uint64,
 	minSignedPerWindow float64,
@@ -181,13 +125,14 @@ func modifyGenesisSlashingUptime(
 	}
 }
 
+// horcruxSidecar creates a horcrux sidecar process that will start when the chain starts.
 func horcruxSidecar(ctx context.Context, node *cosmos.ChainNode, name string, client *client.Client, network string, startupFlags ...string) (*cosmos.SidecarProcess, error) {
 	startCmd := []string{binary, "start"}
 	startCmd = append(startCmd, startupFlags...)
 	if err := node.NewSidecarProcess(
 		ctx, true, name, client, network,
-		ibc.DockerImage{Repository: signerImage, Version: "latest", UidGid: "2345:2345"},
-		"/home/horcrux", []string{signerPortDocker}, startCmd,
+		ibc.DockerImage{Repository: signerImage, Version: "latest", UidGid: signerImageUidGid},
+		signerImageHomeDir, []string{signerPortDocker}, startCmd,
 	); err != nil {
 		return nil, err
 	}
@@ -195,6 +140,7 @@ func horcruxSidecar(ctx context.Context, node *cosmos.ChainNode, name string, cl
 	return node.Sidecars[len(node.Sidecars)-1], nil
 }
 
+// getPrivvalKey reads the priv_validator_key.json file from the given node.
 func getPrivvalKey(ctx context.Context, node *cosmos.ChainNode) (privval.FilePVKey, error) {
 	keyBz, err := node.ReadFile(ctx, "config/priv_validator_key.json")
 	if err != nil {
@@ -209,6 +155,7 @@ func getPrivvalKey(ctx context.Context, node *cosmos.ChainNode) (privval.FilePVK
 	return pvKey, nil
 }
 
+// enablePrivvalListener enables the privval listener on the given sentry nodes.
 func enablePrivvalListener(
 	ctx context.Context,
 	logger *zap.Logger,
@@ -238,25 +185,32 @@ func enablePrivvalListener(
 	return eg.Wait()
 }
 
-func getValSigningInfo(tn *cosmos.ChainNode, address cometbytes.HexBytes) (*slashingtypes.QuerySigningInfoResponse, error) {
+// getValSigningInfo returns the signing info for the given validator from the reference node.
+func getValSigningInfo(tn *cosmos.ChainNode, address cometbytes.HexBytes) (*slashingtypes.ValidatorSigningInfo, error) {
 	valConsPrefix := fmt.Sprintf("%svalcons", tn.Chain.Config().Bech32Prefix)
 
 	bech32ValConsAddress, err := bech32.ConvertAndEncode(valConsPrefix, address)
 	if err != nil {
 		return nil, err
 	}
-	return slashingtypes.NewQueryClient(tn.CliContext()).SigningInfo(context.Background(), &slashingtypes.QuerySigningInfoRequest{
+	res, err := slashingtypes.NewQueryClient(tn.CliContext()).SigningInfo(context.Background(), &slashingtypes.QuerySigningInfoRequest{
 		ConsAddress: bech32ValConsAddress,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &res.ValSigningInfo, nil
 }
 
+// requireHealthyValidator asserts that the given validator is not tombstoned, not jailed, and has not missed any blocks in the slashing window.
 func requireHealthyValidator(t *testing.T, referenceNode *cosmos.ChainNode, validatorAddress cometbytes.HexBytes) {
 	signingInfo, err := getValSigningInfo(referenceNode, validatorAddress)
 	require.NoError(t, err)
 
-	require.False(t, signingInfo.ValSigningInfo.Tombstoned)
-	require.Equal(t, time.Unix(0, 0).UTC(), signingInfo.ValSigningInfo.JailedUntil)
-	require.Zero(t, signingInfo.ValSigningInfo.MissedBlocksCounter)
+	require.False(t, signingInfo.Tombstoned)
+	require.Equal(t, time.Unix(0, 0).UTC(), signingInfo.JailedUntil)
+	require.Zero(t, signingInfo.MissedBlocksCounter)
 }
 
 // transferLeadership elects a new raft leader.
@@ -265,7 +219,8 @@ func transferLeadership(ctx context.Context, cosigner *cosmos.SidecarProcess) er
 	return err
 }
 
-func pollForLeader(ctx context.Context, logger Logger, cosigner *cosmos.SidecarProcess, expectedLeader string) error {
+// pollForLeader polls for the given cosigner to become the leader.
+func pollForLeader(ctx context.Context, t *testing.T, cosigner *cosmos.SidecarProcess, expectedLeader string) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -276,7 +231,7 @@ func pollForLeader(ctx context.Context, logger Logger, cosigner *cosmos.SidecarP
 		select {
 		case <-ticker.C:
 			leader, err := getLeader(ctx, cosigner)
-			logger.Logf("{%s} => current leader: {%s}, expected leader: {%s}", cosigner.Name(), leader, expectedLeader)
+			t.Logf("{%s} => current leader: {%s}, expected leader: {%s}", cosigner.Name(), leader, expectedLeader)
 			if err != nil {
 				return fmt.Errorf("failed to get leader from cosigner: %s - %w", cosigner.Name(), err)
 			}

@@ -20,6 +20,7 @@ import (
 	"go.uber.org/zap/zaptest"
 )
 
+// testChainSingleNodeAndHorcruxSingle tests a single chain with a single horcrux (single-sign mode) validator and single node validators for the rest.
 func testChainSingleNodeAndHorcruxSingle(
 	t *testing.T,
 	totalValidators int, // total number of validators on chain (one horcrux + single node for the rest)
@@ -34,6 +35,7 @@ func testChainSingleNodeAndHorcruxSingle(
 	requireHealthyValidator(t, chain.Validators[0], pubKey.Address())
 }
 
+// startChainSingleNodeAndHorcruxSingle starts a single chain with a single horcrux (single-sign mode) validator and single node validators for the rest.
 func startChainSingleNodeAndHorcruxSingle(
 	ctx context.Context,
 	t *testing.T,
@@ -46,14 +48,21 @@ func startChainSingleNodeAndHorcruxSingle(
 	var chain *cosmos.CosmosChain
 	var pubKey crypto.PubKey
 
-	startChain(
-		ctx, t, logger, client, network, &chain, totalValidators, totalSentries, modifyGenesisStrictUptime,
-		preGenesisSingleNodeAndHorcruxSingle(ctx, logger, client, network, &chain, &pubKey),
+	startChains(
+		ctx, t, logger, client, network,
+		chainWrapper{
+			chain:           &chain,
+			totalValidators: totalValidators,
+			totalSentries:   totalSentries,
+			modifyGenesis:   modifyGenesisStrictUptime,
+			preGenesis:      preGenesisSingleNodeAndHorcruxSingle(ctx, logger, client, network, &chain, &pubKey),
+		},
 	)
 
 	return chain, pubKey
 }
 
+// preGenesisSingleNodeAndHorcruxSingle performs the pre-genesis setup to convert the first validator to a horcrux (single-sign mode) validator.
 func preGenesisSingleNodeAndHorcruxSingle(
 	ctx context.Context,
 	logger *zap.Logger,
@@ -98,6 +107,7 @@ func preGenesisSingleNodeAndHorcruxSingle(
 	}
 }
 
+// writeConfigAndKeysSingle writes the config and keys for a horcrux single signer to the sidecar's docker volume.
 func writeConfigAndKeysSingle(
 	ctx context.Context,
 	chainID string,
