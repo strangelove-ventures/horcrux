@@ -18,34 +18,36 @@ func CreateCosignerEd25519ShardsFromFile(priv string, threshold, shards uint8) (
 	if err != nil {
 		return nil, err
 	}
-	return CreateCosignerEd25519Shards(pv, threshold, shards)
+	return CreateCosignerEd25519Shards(pv, threshold, shards), nil
 }
 
 // CreateCosignerEd25519Shards creates CosignerEd25519Key objects from a privval.FilePVKey
-func CreateCosignerEd25519Shards(pv privval.FilePVKey, threshold, shards uint8) (out []CosignerEd25519Key, err error) {
+func CreateCosignerEd25519Shards(pv privval.FilePVKey, threshold, shards uint8) []CosignerEd25519Key {
 	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(pv.PrivKey.Bytes()[:32]), threshold, shards)
+	out := make([]CosignerEd25519Key, shards)
 	for i, shard := range privShards {
-		out = append(out, CosignerEd25519Key{
+		out[i] = CosignerEd25519Key{
 			PubKey:       pv.PubKey,
 			PrivateShard: shard,
 			ID:           i + 1,
-		})
+		}
 	}
-	return out, nil
+	return out
 }
 
 // CreateCosignerRSAShards generate  CosignerRSAKey objects
-func CreateCosignerRSAShards(shards int) (out []CosignerRSAKey, err error) {
+func CreateCosignerRSAShards(shards int) ([]CosignerRSAKey, error) {
 	rsaKeys, pubKeys, err := makeRSAKeys(shards)
 	if err != nil {
 		return nil, err
 	}
+	out := make([]CosignerRSAKey, shards)
 	for i, key := range rsaKeys {
-		out = append(out, CosignerRSAKey{
+		out[i] = CosignerRSAKey{
 			ID:      i + 1,
 			RSAKey:  *key,
 			RSAPubs: pubKeys,
-		})
+		}
 	}
 	return out, nil
 }
@@ -80,23 +82,24 @@ func WriteCosignerRSAShardFile(cosigner CosignerRSAKey, file string) error {
 	return os.WriteFile(file, jsonBytes, 0600)
 }
 
-// CreateCosignerRSAShards generate  CosignerRSAKey objects
-func CreateCosignerECIESShards(shards int) (out []CosignerECIESKey, err error) {
-	rsaKeys, pubKeys, err := makeECIESKeys(shards)
+// CreateCosignerECIESShards generates CosignerECIESKey objects
+func CreateCosignerECIESShards(shards int) ([]CosignerECIESKey, error) {
+	eciesKeys, pubKeys, err := makeECIESKeys(shards)
 	if err != nil {
 		return nil, err
 	}
-	for i, key := range rsaKeys {
-		out = append(out, CosignerECIESKey{
+	out := make([]CosignerECIESKey, shards)
+	for i, key := range eciesKeys {
+		out[i] = CosignerECIESKey{
 			ID:        i + 1,
 			ECIESKey:  key,
 			ECIESPubs: pubKeys,
-		})
+		}
 	}
 	return out, nil
 }
 
-// WriteCosignerRSAShardFile writes a cosigner RSA key to a given file name
+// WriteCosignerECIESShardFile writes a cosigner ECIES key to a given file name
 func WriteCosignerECIESShardFile(cosigner CosignerECIESKey, file string) error {
 	jsonBytes, err := json.Marshal(&cosigner)
 	if err != nil {
