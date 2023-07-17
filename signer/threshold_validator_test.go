@@ -2,8 +2,6 @@ package signer
 
 import (
 	"bytes"
-	"crypto/rand"
-	"crypto/rsa"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -18,8 +16,10 @@ import (
 	cometrand "github.com/cometbft/cometbft/libs/rand"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	comet "github.com/cometbft/cometbft/types"
+	ecies "github.com/ecies/go/v2"
 	"github.com/stretchr/testify/require"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
+	"golang.org/x/sync/errgroup"
 )
 
 func TestThresholdValidator2of2(t *testing.T) {
@@ -71,19 +71,19 @@ func loadKeyForLocalCosigner(
 }
 
 func testThresholdValidator(t *testing.T, threshold, total uint8) {
-	rsaKeys := make([]*rsa.PrivateKey, total)
-	pubKeys := make([]CosignerRSAPubKey, total)
+	eciesKeys := make([]*ecies.PrivateKey, total)
+	pubKeys := make([]CosignerECIESPubKey, total)
 	cosigners := make([]*LocalCosigner, total)
 
 	for i := uint8(0); i < total; i++ {
-		rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
+		eciesKey, err := ecies.GenerateKey()
 		require.NoError(t, err)
 
-		rsaKeys[i] = rsaKey
+		eciesKeys[i] = eciesKey
 
-		pubKeys[i] = CosignerRSAPubKey{
+		pubKeys[i] = CosignerECIESPubKey{
 			ID:        int(i) + 1,
-			PublicKey: rsaKey.PublicKey,
+			PublicKey: eciesKey.PublicKey,
 		}
 	}
 
@@ -93,6 +93,14 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 	tmpDir := t.TempDir()
 
+	cosignersConfig := make(CosignersConfig, total)
+
+	for i, pubKey := range pubKeys {
+		cosignersConfig[i] = CosignerConfig{
+			ShardID: pubKey.ID,
+		}
+	}
+
 	for i, pubKey := range pubKeys {
 		cosignerDir := filepath.Join(tmpDir, fmt.Sprintf("cosigner_%d", pubKey.ID))
 		err := os.MkdirAll(cosignerDir, 0777)
@@ -101,15 +109,25 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 		cosignerConfig := &RuntimeConfig{
 			HomeDir:  cosignerDir,
 			StateDir: cosignerDir,
+			Config: Config{
+				ThresholdModeConfig: &ThresholdModeConfig{
+					Threshold: int(threshold),
+					Cosigners: cosignersConfig,
+				},
+			},
 		}
 
 		cosigner := NewLocalCosigner(
+			cometlog.NewNopLogger(),
 			cosignerConfig,
-			CosignerRSAKey{
-				ID:     pubKey.ID,
-				RSAKey: *rsaKeys[i],
-			},
-			pubKeys, "", threshold,
+			NewCosignerSecurityECIES(
+				CosignerECIESKey{
+					ID:       pubKey.ID,
+					ECIESKey: eciesKeys[i],
+				},
+				pubKeys,
+			),
+			"",
 		)
 		require.NoError(t, err)
 
@@ -232,12 +250,85 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	require.Error(t, err, "double sign!")
 
 	proposal = cometproto.Proposal{
-		Height: 1,
-		Round:  21,
-		Type:   cometproto.ProposalType,
+		Height:    1,
+		Round:     21,
+		Type:      cometproto.ProposalType,
+		Timestamp: time.Now(),
 	}
 
+	proposalClone := proposal
+	proposalClone.Timestamp = proposal.Timestamp.Add(2 * time.Millisecond)
+
+	proposalClone2 := proposal
+	proposalClone2.Timestamp = proposal.Timestamp.Add(4 * time.Millisecond)
+
+	var eg errgroup.Group
+
+	eg.Go(func() error {
+		return newValidator.SignProposal(testChainID, &proposal)
+	})
+	eg.Go(func() error {
+		return newValidator.SignProposal(testChainID, &proposalClone)
+	})
+	eg.Go(func() error {
+		return newValidator.SignProposal(testChainID, &proposalClone2)
+	})
 	// signing higher block now should succeed
-	err = newValidator.SignProposal(testChainID, &proposal)
+	err = eg.Wait()
 	require.NoError(t, err)
+
+	// Sign some votes from multiple sentries
+	for i := 2; i < 50; i++ {
+		prevote := cometproto.Vote{
+			Height:    int64(i),
+			Round:     0,
+			Type:      cometproto.PrevoteType,
+			Timestamp: time.Now(),
+		}
+
+		prevoteClone := prevote
+		prevoteClone.Timestamp = prevote.Timestamp.Add(2 * time.Millisecond)
+
+		prevoteClone2 := prevote
+		prevoteClone2.Timestamp = prevote.Timestamp.Add(4 * time.Millisecond)
+
+		eg.Go(func() error {
+			return newValidator.SignVote(testChainID, &prevote)
+		})
+		eg.Go(func() error {
+			return newValidator.SignVote(testChainID, &prevoteClone)
+		})
+		eg.Go(func() error {
+			return newValidator.SignVote(testChainID, &prevoteClone2)
+		})
+
+		err = eg.Wait()
+		require.NoError(t, err)
+
+		precommit := cometproto.Vote{
+			Height:    int64(i),
+			Round:     0,
+			Type:      cometproto.PrecommitType,
+			Timestamp: time.Now(),
+		}
+
+		precommitClone := precommit
+		precommitClone.Timestamp = precommit.Timestamp.Add(2 * time.Millisecond)
+
+		precommitClone2 := precommit
+		precommitClone2.Timestamp = precommit.Timestamp.Add(4 * time.Millisecond)
+
+		eg.Go(func() error {
+			return newValidator.SignVote(testChainID, &precommit)
+		})
+		eg.Go(func() error {
+			return newValidator.SignVote(testChainID, &precommitClone)
+		})
+		eg.Go(func() error {
+			return newValidator.SignVote(testChainID, &precommitClone2)
+		})
+
+		err = eg.Wait()
+		require.NoError(t, err)
+	}
 }

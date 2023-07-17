@@ -2,357 +2,124 @@ package signer
 
 import (
 	"bytes"
-	"crypto"
 	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha256"
 	"errors"
 	"fmt"
-	"sync"
 
-	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	cometjson "github.com/cometbft/cometbft/libs/json"
 	"gitlab.com/unit410/edwards25519"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
-// ThresholdSignerSoft implements the interface and signs the message for each local signer.
-// ThresholdSignerSoft is the implementation of a soft sign signer at the local level.
+var _ ThresholdSigner = &ThresholdSignerSoft{}
+
 type ThresholdSignerSoft struct {
-	pubKeyBytes []byte
-	key         CosignerEd25519Key
-	rsaKey      CosignerRSAKey
-	// total signers
-	total     uint8
-	threshold uint8
-	// Height, Round, Step, Timestamp --> metadata
-	hrsMeta map[HRSTKey]HrsMetadata
-
-	pendingDiskWG sync.WaitGroup
+	privateKeyShard []byte
+	pubKey          []byte
+	threshold       uint8
+	total           uint8
 }
 
-// NewThresholdSignerSoft constructs a ThresholdSigner
-// that signs using the local key share file.
-func NewThresholdSignerSoft(key CosignerEd25519Key, rsaKey CosignerRSAKey, threshold, total uint8) ThresholdSigner {
-	softSigner := &ThresholdSignerSoft{
-		key:       key,
-		rsaKey:    rsaKey,
-		hrsMeta:   make(map[HRSTKey]HrsMetadata),
-		total:     total,
-		threshold: threshold,
-	}
-
-	// cache the public key bytes for signing operations.
-	// Ensures casting else it will naturally panic.
-	ed25519Key := softSigner.key.PubKey.(cometcryptoed25519.PubKey)
-	softSigner.pubKeyBytes = make([]byte, len(ed25519Key))
-	softSigner.pubKeyBytes = ed25519Key[:]
-
-	return softSigner
-}
-
-func (softSigner *ThresholdSignerSoft) Stop() {
-	softSigner.waitForSignStatesToFlushToDisk()
-}
-
-func (softSigner *ThresholdSignerSoft) waitForSignStatesToFlushToDisk() {
-	softSigner.pendingDiskWG.Wait()
-}
-
-// Implements ThresholdSigner
-func (softSigner *ThresholdSignerSoft) Type() string {
-	return SignerTypeSoftSign
-}
-
-// Implements ThresholdSigner
-func (softSigner *ThresholdSignerSoft) GetID() (int, error) {
-	return softSigner.key.ID, nil
-}
-
-// Implements ThresholdSigner
-func (softSigner *ThresholdSignerSoft) Sign(
-	req CosignerSignRequest, m *LastSignStateWrapper) (CosignerSignResponse, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	res := CosignerSignResponse{}
-	lss := m.LastSignState
-
-	hrst, err := UnpackHRST(req.SignBytes)
+func NewThresholdSignerSoft(config *RuntimeConfig, id int, chainID string) (*ThresholdSignerSoft, error) {
+	keyFile, err := config.KeyFileExistsCosigner(chainID)
 	if err != nil {
-		return res, err
+		return nil, err
 	}
 
-	sameHRS, err := lss.CheckHRS(hrst)
+	key, err := LoadCosignerEd25519Key(keyFile)
 	if err != nil {
-		return res, err
-	}
-	// If the HRS is the same the sign bytes may still differ by timestamp
-	// It is ok to re-sign a different timestamp if that is the only difference in the sign bytes
-	// same HRS, and only differ by timestamp  its ok to sign again
-	if sameHRS {
-		if bytes.Equal(req.SignBytes, lss.SignBytes) {
-			res.EphemeralPublic = lss.EphemeralPublic
-			res.Signature = lss.Signature
-			return res, nil
-		} else if err := lss.OnlyDifferByTimestamp(req.SignBytes); err != nil {
-			return res, err // same HRS, and only differ by timestamp  its ok to sign again
-		}
+		return nil, fmt.Errorf("error reading cosigner key: %s", err)
 	}
 
-	meta, ok := softSigner.hrsMeta[hrst]
-	if !ok {
-		return res, errors.New("no metadata at HRS")
+	if key.ID != id {
+		return nil, fmt.Errorf("key shard ID (%d) in (%s) does not match cosigner ID (%d)", key.ID, keyFile, id)
 	}
 
-	shareParts := make([]tsed25519.Scalar, 0)
-	publicKeys := make([]tsed25519.Element, 0)
-
-	// calculate secret and public keys
-	for _, c := range meta.Cosigners {
-		if len(c.Share) == 0 {
-			continue
-		}
-		shareParts = append(shareParts, c.Share)
-		publicKeys = append(publicKeys, c.EphemeralSecretPublicKey)
+	s := ThresholdSignerSoft{
+		privateKeyShard: key.PrivateShard,
+		pubKey:          key.PubKey.Bytes(),
+		threshold:       uint8(config.Config.ThresholdModeConfig.Threshold),
+		total:           uint8(len(config.Config.ThresholdModeConfig.Cosigners)),
 	}
 
-	ephemeralShare := tsed25519.AddScalars(shareParts)
-	ephemeralPublic := tsed25519.AddElements(publicKeys)
+	return &s, nil
+}
 
-	// check bounds for ephemeral share to avoid passing out of bounds valids to SignWithShare
+func (s *ThresholdSignerSoft) PubKey() []byte {
+	return s.pubKey
+}
 
-	if len(ephemeralShare) != 32 {
-		return res, errors.New("ephemeral share is out of bounds")
-	}
-
-	var scalarBytes [32]byte
-	copy(scalarBytes[:], ephemeralShare)
-	if !edwards25519.ScMinimal(&scalarBytes) {
-		return res, errors.New("ephemeral share is out of bounds")
+func (s *ThresholdSignerSoft) Sign(nonces []Nonce, payload []byte) ([]byte, error) {
+	nonceShare, noncePub, err := s.sumNonces(nonces)
+	if err != nil {
+		return nil, fmt.Errorf("failed to combine nonces: %w", err)
 	}
 
 	sig := tsed25519.SignWithShare(
-		req.SignBytes, softSigner.key.PrivateShard, ephemeralShare, softSigner.pubKeyBytes, ephemeralPublic)
-
-	m.LastSignState.EphemeralPublic = ephemeralPublic
-	err = m.LastSignState.Save(SignStateConsensus{
-		Height:    hrst.Height,
-		Round:     hrst.Round,
-		Step:      hrst.Step,
-		Signature: sig,
-		SignBytes: req.SignBytes,
-	}, &softSigner.pendingDiskWG)
-	if err != nil {
-		var isSameHRSError *SameHRSError
-		if !errors.As(err, &isSameHRSError) {
-			return res, err
-		}
-	}
-
-	for existingKey := range softSigner.hrsMeta {
-		// delete any HRS lower than our signed level
-		// we will not be providing parts for any lower HRS
-		if existingKey.Less(hrst) {
-			delete(softSigner.hrsMeta, existingKey)
-		}
-	}
-
-	res.EphemeralPublic = ephemeralPublic
-	res.Signature = sig
-	return res, nil
+		payload, s.privateKeyShard, nonceShare, s.pubKey, noncePub)
+	return append(noncePub, sig...), nil
 }
 
-// Implements ThresholdSigner
-func (softSigner *ThresholdSignerSoft) DealShares(
-	req CosignerGetEphemeralSecretPartRequest) (HrsMetadata, error) {
-	hrsKey := HRSTKey{
-		Height:    req.Height,
-		Round:     req.Round,
-		Step:      req.Step,
-		Timestamp: req.Timestamp.UnixNano(),
+func (s *ThresholdSignerSoft) sumNonces(nonces []Nonce) (tsed25519.Scalar, tsed25519.Element, error) {
+	shareParts := make([]tsed25519.Scalar, len(nonces))
+	publicKeys := make([]tsed25519.Element, len(nonces))
+
+	for i, n := range nonces {
+		shareParts[i] = n.Share
+		publicKeys[i] = n.PubKey
 	}
 
-	meta, ok := softSigner.hrsMeta[hrsKey]
-	if ok {
-		return meta, nil
+	nonceShare := tsed25519.AddScalars(shareParts)
+	noncePub := tsed25519.AddElements(publicKeys)
+
+	// check bounds for ephemeral share to avoid passing out of bounds valids to SignWithShare
+	if len(nonceShare) != 32 {
+		return nil, nil, errors.New("ephemeral share is out of bounds")
 	}
 
+	var scalarBytes [32]byte
+	copy(scalarBytes[:], nonceShare)
+	if !edwards25519.ScMinimal(&scalarBytes) {
+		return nil, nil, errors.New("ephemeral share is out of bounds")
+	}
+
+	return nonceShare, noncePub, nil
+}
+
+func (s *ThresholdSignerSoft) GenerateNonces() (Nonces, error) {
 	secret := make([]byte, 32)
 	if _, err := rand.Read(secret); err != nil {
-		return HrsMetadata{}, err
+		return Nonces{}, err
 	}
 
-	meta = HrsMetadata{
-		Secret:    secret,
-		Cosigners: make([]CosignerMetadata, softSigner.total),
+	nonces := Nonces{
+		PubKey: tsed25519.ScalarMultiplyBase(secret),
+		Shares: make([][]byte, s.total),
 	}
 
-	// split this secret with shamirs
-	// !! dealt shares need to be saved because dealing produces different shares each time!
-	meta.DealtShares = tsed25519.DealShares(meta.Secret, softSigner.threshold, softSigner.total)
+	shares := tsed25519.DealShares(secret, s.threshold, s.total)
 
-	softSigner.hrsMeta[hrsKey] = meta
+	for i, s := range shares {
+		nonces.Shares[i] = s
+	}
 
-	return meta, nil
+	return nonces, nil
 }
 
-// Get the ephemeral secret part for an ephemeral share
-// The ephemeral secret part is encrypted for the receiver
-// Implements ThresholdSigner
-func (softSigner *ThresholdSignerSoft) GetEphemeralSecretPart(
-	req CosignerGetEphemeralSecretPartRequest, m *LastSignStateWrapper, pubKeys map[int]CosignerRSAPubKey) (
-	CosignerEphemeralSecretPart, error) {
+func (s *ThresholdSignerSoft) CombineSignatures(signatures []PartialSignature) ([]byte, error) {
+	sigIds := make([]int, len(signatures))
+	shareSigs := make([][]byte, len(signatures))
+	var ephPub []byte
 
-	res := CosignerEphemeralSecretPart{}
-
-	// protects the meta map
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	hrst := HRSTKey{
-		Height:    req.Height,
-		Round:     req.Round,
-		Step:      req.Step,
-		Timestamp: req.Timestamp.UnixNano(),
-	}
-
-	meta, ok := softSigner.hrsMeta[hrst]
-	// generate metadata placeholder
-	if !ok {
-		newMeta, err := softSigner.DealShares(CosignerGetEphemeralSecretPartRequest{
-			ChainID:   req.ChainID,
-			Height:    req.Height,
-			Round:     req.Round,
-			Step:      req.Step,
-			Timestamp: req.Timestamp,
-		})
-
-		if err != nil {
-			return res, err
+	for i, sig := range signatures {
+		sigIds[i] = sig.ID
+		if i == 0 {
+			ephPub = sig.Signature[:32]
+		} else if !bytes.Equal(sig.Signature[:32], ephPub) {
+			return nil, fmt.Errorf("ephemeral public keys do not match")
 		}
-
-		meta = newMeta
-		softSigner.hrsMeta[hrst] = meta
+		shareSigs[i] = sig.Signature[32:]
 	}
+	combinedSig := tsed25519.CombineShares(s.total, sigIds, shareSigs)
 
-	ourEphPublicKey := tsed25519.ScalarMultiplyBase(meta.Secret)
-
-	// set our values
-	meta.Cosigners[softSigner.key.ID-1].Share = meta.DealtShares[softSigner.key.ID-1]
-	meta.Cosigners[softSigner.key.ID-1].EphemeralSecretPublicKey = ourEphPublicKey
-
-	// grab the info for the ID being requested
-	pubKey, ok := pubKeys[req.ID]
-	if !ok {
-		return res, errors.New("unknown cosigner ID")
-	}
-
-	sharePart := meta.DealtShares[req.ID-1]
-
-	// use RSA public to encrypt user's share part
-	encrypted, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, &pubKey.PublicKey, sharePart, nil)
-	if err != nil {
-		return res, err
-	}
-
-	res.SourceID = softSigner.key.ID
-	res.SourceEphemeralSecretPublicKey = ourEphPublicKey
-	res.EncryptedSharePart = encrypted
-
-	// sign the response payload with our private key
-	// cosigners can verify the signature to confirm sender validity
-
-	jsonBytes, err := cometjson.Marshal(res)
-
-	if err != nil {
-		return res, err
-	}
-
-	digest := sha256.Sum256(jsonBytes)
-	signature, err := rsa.SignPSS(rand.Reader, &softSigner.rsaKey.RSAKey, crypto.SHA256, digest[:], nil)
-
-	if err != nil {
-		return res, err
-	}
-
-	res.SourceSig = signature
-
-	res.DestinationID = req.ID
-
-	return res, nil
-}
-
-// Store an ephemeral secret share part provided by another cosigner (signer)
-// Implements ThresholdSigner
-func (softSigner *ThresholdSignerSoft) SetEphemeralSecretPart(
-	req CosignerSetEphemeralSecretPartRequest, m *LastSignStateWrapper, pubKeys map[int]CosignerRSAPubKey) error {
-
-	// Verify the source signature
-	if req.SourceSig == nil {
-		return errors.New("SourceSig field is required")
-	}
-
-	digestMsg := CosignerEphemeralSecretPart{
-		SourceID: req.SourceID,
-		// DestinationID:                  0,
-		SourceEphemeralSecretPublicKey: req.SourceEphemeralSecretPublicKey,
-		EncryptedSharePart:             req.EncryptedSharePart,
-		// SourceSig:                      []byte{},
-	}
-
-	digestBytes, err := cometjson.Marshal(digestMsg)
-	if err != nil {
-		return err
-	}
-
-	digest := sha256.Sum256(digestBytes)
-	pubKey, ok := pubKeys[req.SourceID]
-
-	if !ok {
-		return fmt.Errorf("unknown cosigner: %d", req.SourceID)
-	}
-
-	err = rsa.VerifyPSS(&pubKey.PublicKey, crypto.SHA256, digest[:], req.SourceSig, nil)
-	if err != nil {
-		return err
-	}
-
-	// protects the meta map
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	hrst := HRSTKey{
-		Height:    req.Height,
-		Round:     req.Round,
-		Step:      req.Step,
-		Timestamp: req.Timestamp.UnixNano(),
-	}
-
-	meta, ok := softSigner.hrsMeta[hrst] // generate metadata placeholder, softSigner.HrsMeta[hrst] is non-addressable
-	if !ok {
-		newMeta, err := softSigner.DealShares(CosignerGetEphemeralSecretPartRequest{
-			ChainID: req.ChainID,
-			Height:  req.Height,
-			Round:   req.Round,
-			Step:    req.Step,
-		})
-		if err != nil {
-			return err
-		}
-		meta = newMeta
-		softSigner.hrsMeta[hrst] = meta // updates the metadata placeholder
-	}
-
-	// decrypt share
-	sharePart, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, &softSigner.rsaKey.RSAKey, req.EncryptedSharePart, nil)
-	if err != nil {
-		return err
-	}
-	// set slot
-	// Share & EphemeralSecretPublicKey is a SLICE so its a valid change of the shared struct softSigner!
-	meta.Cosigners[req.SourceID-1].Share = sharePart
-	meta.Cosigners[req.SourceID-1].EphemeralSecretPublicKey = req.SourceEphemeralSecretPublicKey
-
-	return nil
+	return append(ephPub, combinedSig...), nil
 }

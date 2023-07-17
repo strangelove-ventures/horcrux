@@ -138,7 +138,12 @@ func (m *multiResolver) resolverBuilder(
 	rawTarget string,
 	opts resolver.BuildOptions,
 ) error {
-	u, err := url.Parse(rawTarget)
+	parsable := rawTarget
+	if !strings.Contains(rawTarget, "://") {
+		parsable = "tcp://" + rawTarget
+	}
+
+	u, err := url.Parse(parsable)
 	if err != nil {
 		return err
 	}

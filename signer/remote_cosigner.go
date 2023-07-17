@@ -76,10 +76,10 @@ func (cosigner *RemoteCosigner) getGRPCClient() (proto.CosignerGRPCClient, *grpc
 }
 
 // Implements the cosigner interface
-func (cosigner *RemoteCosigner) GetEphemeralSecretParts(
+func (cosigner *RemoteCosigner) GetNonces(
 	chainID string,
 	req HRSTKey,
-) (*CosignerEphemeralSecretPartsResponse, error) {
+) (*CosignerNoncesResponse, error) {
 	client, conn, err := cosigner.getGRPCClient()
 	if err != nil {
 		return nil, err
@@ -87,21 +87,21 @@ func (cosigner *RemoteCosigner) GetEphemeralSecretParts(
 	defer conn.Close()
 	context, cancelFunc := getContext()
 	defer cancelFunc()
-	res, err := client.GetEphemeralSecretParts(context, &proto.CosignerGRPCGetEphemeralSecretPartsRequest{
+	res, err := client.GetNonces(context, &proto.CosignerGRPCGetNoncesRequest{
 		ChainID: chainID,
 		Hrst:    req.toProto(),
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &CosignerEphemeralSecretPartsResponse{
-		EncryptedSecrets: CosignerEphemeralSecretPartsFromProto(res.GetEncryptedSecrets()),
+	return &CosignerNoncesResponse{
+		Nonces: CosignerNoncesFromProto(res.GetNonces()),
 	}, nil
 }
 
 // Implements the cosigner interface
-func (cosigner *RemoteCosigner) SetEphemeralSecretPartsAndSign(
-	req CosignerSetEphemeralSecretPartsAndSignRequest) (*CosignerSignResponse, error) {
+func (cosigner *RemoteCosigner) SetNoncesAndSign(
+	req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error) {
 	client, conn, err := cosigner.getGRPCClient()
 	if err != nil {
 		return nil, err
@@ -109,18 +109,18 @@ func (cosigner *RemoteCosigner) SetEphemeralSecretPartsAndSign(
 	defer conn.Close()
 	context, cancelFunc := getContext()
 	defer cancelFunc()
-	res, err := client.SetEphemeralSecretPartsAndSign(context, &proto.CosignerGRPCSetEphemeralSecretPartsAndSignRequest{
-		ChainID:          req.ChainID,
-		EncryptedSecrets: CosignerEphemeralSecretParts(req.EncryptedSecrets).toProto(),
-		Hrst:             req.HRST.toProto(),
-		SignBytes:        req.SignBytes,
+	res, err := client.SetNoncesAndSign(context, &proto.CosignerGRPCSetNoncesAndSignRequest{
+		ChainID:   req.ChainID,
+		Nonces:    CosignerNonces(req.Nonces).toProto(),
+		Hrst:      req.HRST.toProto(),
+		SignBytes: req.SignBytes,
 	})
 	if err != nil {
 		return nil, err
 	}
 	return &CosignerSignResponse{
-		EphemeralPublic: res.GetEphemeralPublic(),
-		Timestamp:       time.Unix(0, res.GetTimestamp()),
-		Signature:       res.GetSignature(),
+		NoncePublic: res.GetNoncePublic(),
+		Timestamp:   time.Unix(0, res.GetTimestamp()),
+		Signature:   res.GetSignature(),
 	}, nil
 }
