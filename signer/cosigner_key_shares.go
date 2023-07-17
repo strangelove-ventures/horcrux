@@ -10,6 +10,7 @@ import (
 	"github.com/cometbft/cometbft/privval"
 	ecies "github.com/ecies/go/v2"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
+	"golang.org/x/sync/errgroup"
 )
 
 // CreateCosignerEd25519ShardsFromFile creates CosignerEd25519Key objects from a priv_validator_key.json file
@@ -35,7 +36,7 @@ func CreateCosignerEd25519Shards(pv privval.FilePVKey, threshold, shards uint8) 
 	return out
 }
 
-// CreateCosignerRSAShards generate  CosignerRSAKey objects
+// CreateCosignerRSAShards generate  CosignerRSAKey objects.
 func CreateCosignerRSAShards(shards int) ([]CosignerRSAKey, error) {
 	rsaKeys, pubKeys, err := makeRSAKeys(shards)
 	if err != nil {
@@ -52,7 +53,7 @@ func CreateCosignerRSAShards(shards int) ([]CosignerRSAKey, error) {
 	return out, nil
 }
 
-// ReadPrivValidatorFile reads in a privval.FilePVKey from a given file
+// ReadPrivValidatorFile reads in a privval.FilePVKey from a given file.
 func ReadPrivValidatorFile(priv string) (out privval.FilePVKey, err error) {
 	var bz []byte
 	if bz, err = os.ReadFile(priv); err != nil {
@@ -64,7 +65,7 @@ func ReadPrivValidatorFile(priv string) (out privval.FilePVKey, err error) {
 	return
 }
 
-// WriteCosignerEd25519ShardFile writes a cosigner Ed25519 key to a given file name
+// WriteCosignerEd25519ShardFile writes a cosigner Ed25519 key to a given file name.
 func WriteCosignerEd25519ShardFile(cosigner CosignerEd25519Key, file string) error {
 	jsonBytes, err := json.Marshal(&cosigner)
 	if err != nil {
@@ -73,7 +74,7 @@ func WriteCosignerEd25519ShardFile(cosigner CosignerEd25519Key, file string) err
 	return os.WriteFile(file, jsonBytes, 0600)
 }
 
-// WriteCosignerRSAShardFile writes a cosigner RSA key to a given file name
+// WriteCosignerRSAShardFile writes a cosigner RSA key to a given file name.
 func WriteCosignerRSAShardFile(cosigner CosignerRSAKey, file string) error {
 	jsonBytes, err := json.Marshal(&cosigner)
 	if err != nil {
@@ -82,7 +83,7 @@ func WriteCosignerRSAShardFile(cosigner CosignerRSAKey, file string) error {
 	return os.WriteFile(file, jsonBytes, 0600)
 }
 
-// CreateCosignerECIESShards generates CosignerECIESKey objects
+// CreateCosignerECIESShards generates CosignerECIESKey objects.
 func CreateCosignerECIESShards(shards int) ([]CosignerECIESKey, error) {
 	eciesKeys, pubKeys, err := makeECIESKeys(shards)
 	if err != nil {
@@ -99,7 +100,7 @@ func CreateCosignerECIESShards(shards int) ([]CosignerECIESKey, error) {
 	return out, nil
 }
 
-// WriteCosignerECIESShardFile writes a cosigner ECIES key to a given file name
+// WriteCosignerECIESShardFile writes a cosigner ECIES key to a given file name.
 func WriteCosignerECIESShardFile(cosigner CosignerECIESKey, file string) error {
 	jsonBytes, err := json.Marshal(&cosigner)
 	if err != nil {
@@ -111,28 +112,39 @@ func WriteCosignerECIESShardFile(cosigner CosignerECIESKey, file string) error {
 func makeRSAKeys(num int) (rsaKeys []*rsa.PrivateKey, pubKeys []*rsa.PublicKey, err error) {
 	rsaKeys = make([]*rsa.PrivateKey, num)
 	pubKeys = make([]*rsa.PublicKey, num)
+	var eg errgroup.Group
+	bitSize := 4096
 	for i := 0; i < num; i++ {
-		bitSize := 4096
-		rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
-		if err != nil {
-			return rsaKeys, pubKeys, err
-		}
-		rsaKeys[i] = rsaKey
-		pubKeys[i] = &rsaKey.PublicKey
+		i := i
+		eg.Go(func() error {
+			rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
+			if err != nil {
+				return err
+			}
+			rsaKeys[i] = rsaKey
+			pubKeys[i] = &rsaKey.PublicKey
+
+			return nil
+		})
 	}
-	return
+	return rsaKeys, pubKeys, eg.Wait()
 }
 
 func makeECIESKeys(num int) ([]*ecies.PrivateKey, []*ecies.PublicKey, error) {
 	eciesKeys := make([]*ecies.PrivateKey, num)
 	pubKeys := make([]*ecies.PublicKey, num)
+	var eg errgroup.Group
 	for i := 0; i < num; i++ {
-		eciesKey, err := ecies.GenerateKey()
-		if err != nil {
-			return nil, nil, err
-		}
-		eciesKeys[i] = eciesKey
-		pubKeys[i] = eciesKey.PublicKey
+		i := i
+		eg.Go(func() error {
+			eciesKey, err := ecies.GenerateKey()
+			if err != nil {
+				return err
+			}
+			eciesKeys[i] = eciesKey
+			pubKeys[i] = eciesKey.PublicKey
+			return nil
+		})
 	}
-	return eciesKeys, pubKeys, nil
+	return eciesKeys, pubKeys, eg.Wait()
 }

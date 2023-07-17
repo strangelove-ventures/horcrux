@@ -8,68 +8,53 @@ import (
 )
 
 func TestCosignerECIES(t *testing.T) {
-	key1, err := ecies.GenerateKey()
-	require.NoError(t, err)
+	t.Parallel()
 
-	key2, err := ecies.GenerateKey()
-	require.NoError(t, err)
+	keys := make([]*ecies.PrivateKey, 3)
+	pubKeys := make([]CosignerECIESPubKey, 3)
 
-	key3, err := ecies.GenerateKey()
-	require.NoError(t, err)
+	for i := 0; i < 3; i++ {
+		key, err := ecies.GenerateKey()
+		require.NoError(t, err)
 
-	pubKeys := []CosignerECIESPubKey{
-		{
-			ID:        1,
-			PublicKey: key1.PublicKey,
-		},
-		{
-			ID:        2,
-			PublicKey: key2.PublicKey,
-		},
-		{
-			ID:        3,
-			PublicKey: key3.PublicKey,
-		},
+		keys[i] = key
+
+		pubKeys[i] = CosignerECIESPubKey{
+			ID:        i + 1,
+			PublicKey: key.PublicKey,
+		}
 	}
 
-	s1 := NewCosignerSecurityECIES(
-		CosignerECIESKey{
-			ID:       1,
-			ECIESKey: key1,
-		},
-		pubKeys,
-	)
+	securities := make([]CosignerSecurity, 3)
 
-	s2 := NewCosignerSecurityECIES(
-		CosignerECIESKey{
-			ID:       2,
-			ECIESKey: key2,
+	for i := 0; i < 3; i++ {
+		securities[i] = NewCosignerSecurityECIES(CosignerECIESKey{
+			ID:       i + 1,
+			ECIESKey: keys[i],
 		},
-		pubKeys,
-	)
+			pubKeys)
+	}
 
-	s3 := NewCosignerSecurityECIES(
-		CosignerECIESKey{
-			ID:       3,
-			ECIESKey: key3,
-		},
-		pubKeys,
-	)
+	err := testCosignerSecurity(t, securities)
+	require.ErrorContains(t, err, "cannot decrypt ciphertext: cipher: message authentication failed")
+}
 
+func testCosignerSecurity(t *testing.T, securities []CosignerSecurity) error {
 	var (
 		mockPub   = []byte("mock_pub")
 		mockShare = []byte("mock_share")
 	)
 
-	nonce, err := s1.EncryptAndSign(2, mockPub, mockShare)
+	nonce, err := securities[0].EncryptAndSign(2, mockPub, mockShare)
 	require.NoError(t, err)
 
-	decryptedPub, decryptedShare, err := s2.DecryptAndVerify(1, nonce.PubKey, nonce.Share, nonce.Signature)
+	decryptedPub, decryptedShare, err := securities[1].DecryptAndVerify(1, nonce.PubKey, nonce.Share, nonce.Signature)
 	require.NoError(t, err)
 
 	require.Equal(t, mockPub, decryptedPub)
 	require.Equal(t, mockShare, decryptedShare)
 
-	_, _, err = s3.DecryptAndVerify(1, nonce.PubKey, nonce.Share, nonce.Signature)
-	require.ErrorContains(t, err, "cannot decrypt ciphertext: cipher: message authentication failed")
+	_, _, err = securities[2].DecryptAndVerify(1, nonce.PubKey, nonce.Share, nonce.Signature)
+
+	return err
 }

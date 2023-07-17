@@ -33,6 +33,8 @@ func TestLocalCosignerSignRSA3of5(t *testing.T) {
 }
 
 func testLocalCosignerSignRSA(t *testing.T, threshold, total uint8) {
+	t.Parallel()
+
 	security := make([]CosignerSecurity, total)
 
 	keys := make([]*rsa.PrivateKey, total)
@@ -70,6 +72,8 @@ func TestLocalCosignerSignECIES3of5(t *testing.T) {
 }
 
 func testLocalCosignerSignECIES(t *testing.T, threshold, total uint8) {
+	t.Parallel()
+
 	security := make([]CosignerSecurity, total)
 
 	keys := make([]*ecies.PrivateKey, total)

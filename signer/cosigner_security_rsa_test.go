@@ -9,68 +9,33 @@ import (
 )
 
 func TestCosignerRSA(t *testing.T) {
-	key1, err := rsa.GenerateKey(rand.Reader, bitSize)
-	require.NoError(t, err)
+	t.Parallel()
 
-	key2, err := rsa.GenerateKey(rand.Reader, bitSize)
-	require.NoError(t, err)
+	keys := make([]*rsa.PrivateKey, 3)
+	pubKeys := make([]CosignerRSAPubKey, 3)
 
-	key3, err := rsa.GenerateKey(rand.Reader, bitSize)
-	require.NoError(t, err)
+	for i := 0; i < 3; i++ {
+		key, err := rsa.GenerateKey(rand.Reader, bitSize)
+		require.NoError(t, err)
 
-	pubKeys := []CosignerRSAPubKey{
-		{
-			ID:        1,
-			PublicKey: key1.PublicKey,
-		},
-		{
-			ID:        2,
-			PublicKey: key2.PublicKey,
-		},
-		{
-			ID:        3,
-			PublicKey: key3.PublicKey,
-		},
+		keys[i] = key
+
+		pubKeys[i] = CosignerRSAPubKey{
+			ID:        i + 1,
+			PublicKey: key.PublicKey,
+		}
 	}
 
-	s1 := NewCosignerSecurityRSA(
-		CosignerRSAKey{
-			ID:     1,
-			RSAKey: *key1,
+	securities := make([]CosignerSecurity, 3)
+
+	for i := 0; i < 3; i++ {
+		securities[i] = NewCosignerSecurityRSA(CosignerRSAKey{
+			ID:     i + 1,
+			RSAKey: *keys[i],
 		},
-		pubKeys,
-	)
+			pubKeys)
+	}
 
-	s2 := NewCosignerSecurityRSA(
-		CosignerRSAKey{
-			ID:     2,
-			RSAKey: *key2,
-		},
-		pubKeys,
-	)
-
-	s3 := NewCosignerSecurityRSA(
-		CosignerRSAKey{
-			ID:     3,
-			RSAKey: *key3,
-		},
-		pubKeys,
-	)
-
-	var (
-		mockPub   = []byte("mock_pub")
-		mockShare = []byte("mock_share")
-	)
-
-	nonce, err := s1.EncryptAndSign(2, mockPub, mockShare)
-	require.NoError(t, err)
-
-	decryptedPub, decryptedShare, err := s2.DecryptAndVerify(1, nonce.PubKey, nonce.Share, nonce.Signature)
-	require.NoError(t, err)
-
-	require.Equal(t, mockPub, decryptedPub)
-	require.Equal(t, mockShare, decryptedShare)
-
-	_, _, err = s3.DecryptAndVerify(1, nonce.PubKey, nonce.Share, nonce.Signature)
+	err := testCosignerSecurity(t, securities)
 	require.ErrorIs(t, rsa.ErrDecryption, err)
 }

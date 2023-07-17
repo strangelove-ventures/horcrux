@@ -104,7 +104,7 @@ func LoadCosignerECIESKey(file string) (CosignerECIESKey, error) {
 func NewCosignerSecurityECIES(key CosignerECIESKey, eciesPubKeys []CosignerECIESPubKey) *CosignerSecurityECIES {
 	c := &CosignerSecurityECIES{
 		key:          key,
-		eciesPubKeys: make(map[int]CosignerECIESPubKey),
+		eciesPubKeys: make(map[int]CosignerECIESPubKey, len(eciesPubKeys)),
 	}
 
 	for _, pubKey := range eciesPubKeys {
@@ -188,6 +188,11 @@ func (c *CosignerSecurityECIES) DecryptAndVerify(
 	encryptedNonceShare []byte,
 	signature []byte,
 ) ([]byte, []byte, error) {
+	pubKey, ok := c.eciesPubKeys[id]
+	if !ok {
+		return nil, nil, fmt.Errorf("unknown cosigner: %d", id)
+	}
+
 	digestMsg := CosignerNonce{
 		SourceID: id,
 		PubKey:   encryptedNoncePub,
@@ -200,10 +205,6 @@ func (c *CosignerSecurityECIES) DecryptAndVerify(
 	}
 
 	digest := sha256.Sum256(digestBytes)
-	pubKey, ok := c.eciesPubKeys[id]
-	if !ok {
-		return nil, nil, fmt.Errorf("unknown cosigner: %d", id)
-	}
 
 	validSignature := ecdsa.VerifyASN1((*ecdsa.PublicKey)(pubKey.PublicKey), digest[:], signature)
 	if !validSignature {

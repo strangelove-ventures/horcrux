@@ -28,7 +28,10 @@ func rootCmd() *cobra.Command {
 
 	rsaCmd := createCosignerRSAShardsCmd()
 	rsaCmd.Deprecated = `
-ECIES is recommended for cosigner-to-cosigner encryption since it is much faster.
+ECIES is recommended for cosigner-to-cosigner encryption since it is faster for the same security as RSA.
+Horcrux ECIES uses secp256k1 with a bit size of 256, which is considered to be as secure as RSA with
+a bit size of 3072. Horcrux RSA uses a bit size of 4096.
+
 To use ECIES instead, run:
 horcrux create-ecies-shards
 `

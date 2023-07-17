@@ -32,7 +32,10 @@ func NewThresholdValidator(
 		var rsaErr error
 		security, rsaErr = config.CosignerSecurityRSA()
 		if rsaErr != nil {
-			return nil, nil, errors.Join(eciesErr, rsaErr)
+			return nil, nil, errors.Join(
+				fmt.Errorf("failed to initialize cosigner ECIES security: %w", eciesErr),
+				fmt.Errorf("failed to initialize cosigner RSA security: %w", rsaErr),
+			)
 		}
 	}
 

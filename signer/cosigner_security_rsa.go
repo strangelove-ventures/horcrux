@@ -186,6 +186,11 @@ func (c *CosignerSecurityRSA) DecryptAndVerify(
 	encryptedNonceShare []byte,
 	signature []byte,
 ) ([]byte, []byte, error) {
+	pubKey, ok := c.rsaPubKeys[id]
+	if !ok {
+		return nil, nil, fmt.Errorf("unknown cosigner: %d", id)
+	}
+
 	digestMsg := CosignerNonce{
 		SourceID: id,
 		PubKey:   encryptedNoncePub,
@@ -198,10 +203,6 @@ func (c *CosignerSecurityRSA) DecryptAndVerify(
 	}
 
 	digest := sha256.Sum256(digestBytes)
-	pubKey, ok := c.rsaPubKeys[id]
-	if !ok {
-		return nil, nil, fmt.Errorf("unknown cosigner: %d", id)
-	}
 
 	err = rsa.VerifyPSS(&pubKey.PublicKey, crypto.SHA256, digest[:], signature, nil)
 	if err != nil {
