@@ -91,26 +91,26 @@ $ horcrux config init --node "tcp://10.168.0.1:1234" --node "tcp://10.168.0.2:12
 
 ### 3. Generate cosigner communication encryption keys
 
-Horcrux uses RSA 4096 keys to encrypt cosigner-to-cosigner p2p communication. This is done by encrypting the payloads that are sent over GRPC between cosigners. Open your shell to a working directory and generate the RSA keys that will be used on each cosigner using the `horcrux` CLI on your local machine.
+Horcrux uses secp256k1 keys to encrypt (ECIES) and sign (ECDSA) cosigner-to-cosigner p2p communication. This is done by encrypting the payloads that are sent over GRPC between cosigners. Open your shell to a working directory and generate the ECIES keys that will be used on each cosigner using the `horcrux` CLI on your local machine.
 
 ```bash
-$ horcrux create-rsa-shards --shards 3
-Created RSA Shard cosigner_1/rsa_keys.json
-Created RSA Shard cosigner_2/rsa_keys.json
-Created RSA Shard cosigner_3/rsa_keys.json
+$ horcrux create-ecies-shards --shards 3
+Created ECIES Shard cosigner_1/ecies_keys.json
+Created ECIES Shard cosigner_2/ecies_keys.json
+Created ECIES Shard cosigner_3/ecies_keys.json
 
 $ ls -R
 .:
 cosigner_1  cosigner_2  cosigner_3
 
 ./cosigner_1:
-rsa_keys.json
+ecies_keys.json
 
 ./cosigner_2:
-rsa_keys.json
+ecies_keys.json
 
 ./cosigner_3:
-rsa_keys.json
+ecies_keys.json
 ```
 
 ### 4. Shard `priv_validator_key.json` for each chain.
@@ -130,13 +130,13 @@ $ ls -R
 cosigner_1  cosigner_2  cosigner_3
 
 ./cosigner_1:
-cosmoshub-4_shard.json  rsa_keys.json
+cosmoshub-4_shard.json  ecies_keys.json
 
 ./cosigner_2:
-cosmoshub-4_shard.json  rsa_keys.json
+cosmoshub-4_shard.json  ecies_keys.json
 
 ./cosigner_3:
-cosmoshub-4_shard.json  rsa_keys.json
+cosmoshub-4_shard.json  ecies_keys.json
 ```
 
 If you will be signing for multiple chains with this single horcrux cluster, repeat this step with the `priv_validator_key.json` for each additional chain ID.
@@ -145,7 +145,7 @@ If you will be signing for multiple chains with this single horcrux cluster, rep
 
 The files need to be moved their corresponding signer nodes in the `~/.horcrux/` directory. It is important to make sure the files for the cosigner `{id}` (in `cosigner_{id}`) are placed on the corresponding cosigner node. If not, the cluster will not produce valid signatures. If you have named your nodes with their index as the signer index, as in this guide, this operation should be easy to check.
 
-At the end of this step, each of your horcrux nodes should have a `~/.horcrux/{chain-id}_shard.json` file for each `chain-id` with the contents matching the appropriate `cosigner_{id}/{chain-id}_shard.json` file corresponding to the node number. Additionally, each of your horcrux nodes should have a `~/.horcrux/rsa_keys.json` file with the contents matching the appropriate `cosigner_{id}/rsa_keys.json` file corresponding to the node number.
+At the end of this step, each of your horcrux nodes should have a `~/.horcrux/{chain-id}_shard.json` file for each `chain-id` with the contents matching the appropriate `cosigner_{id}/{chain-id}_shard.json` file corresponding to the node number. Additionally, each of your horcrux nodes should have a `~/.horcrux/ecies_keys.json` file with the contents matching the appropriate `cosigner_{id}/ecies_keys.json` file corresponding to the node number.
 
 ### 6. Halt your validator node and supply signer state data `horcrux` nodes
 
