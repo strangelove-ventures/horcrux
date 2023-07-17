@@ -27,12 +27,12 @@ func testChainSingleNodeAndHorcruxSingle(
 	totalSentries int, // number of sentry nodes for the single horcrux validator
 ) {
 	ctx := context.Background()
-	chain, pubKey := startChainSingleNodeAndHorcruxSingle(ctx, t, totalValidators, totalSentries)
+	cw, pubKey := startChainSingleNodeAndHorcruxSingle(ctx, t, totalValidators, totalSentries)
 
-	err := testutil.WaitForBlocks(ctx, 20, chain)
+	err := testutil.WaitForBlocks(ctx, 20, cw.chain)
 	require.NoError(t, err)
 
-	requireHealthyValidator(t, chain.Validators[0], pubKey.Address())
+	requireHealthyValidator(t, cw.chain.Validators[0], pubKey.Address())
 }
 
 // startChainSingleNodeAndHorcruxSingle starts a single chain with a single horcrux (single-sign mode) validator and single node validators for the rest.
@@ -41,25 +41,22 @@ func startChainSingleNodeAndHorcruxSingle(
 	t *testing.T,
 	totalValidators int, // total number of validators on chain (one horcrux + single node for the rest)
 	totalSentries int, // number of sentry nodes for the single horcrux validator
-) (*cosmos.CosmosChain, crypto.PubKey) {
+) (*chainWrapper, crypto.PubKey) {
 	client, network := interchaintest.DockerSetup(t)
 	logger := zaptest.NewLogger(t)
 
-	var chain *cosmos.CosmosChain
 	var pubKey crypto.PubKey
 
-	startChains(
-		ctx, t, logger, client, network,
-		chainWrapper{
-			chain:           &chain,
-			totalValidators: totalValidators,
-			totalSentries:   totalSentries,
-			modifyGenesis:   modifyGenesisStrictUptime,
-			preGenesis:      preGenesisSingleNodeAndHorcruxSingle(ctx, logger, client, network, &chain, &pubKey),
-		},
-	)
+	cw := &chainWrapper{
+		totalValidators: totalValidators,
+		totalSentries:   totalSentries,
+		modifyGenesis:   modifyGenesisStrictUptime,
+		preGenesis:      preGenesisSingleNodeAndHorcruxSingle(ctx, logger, client, network, &pubKey),
+	}
 
-	return chain, pubKey
+	startChains(ctx, t, logger, client, network, cw)
+
+	return cw, pubKey
 }
 
 // preGenesisSingleNodeAndHorcruxSingle performs the pre-genesis setup to convert the first validator to a horcrux (single-sign mode) validator.
@@ -68,42 +65,43 @@ func preGenesisSingleNodeAndHorcruxSingle(
 	logger *zap.Logger,
 	client *client.Client,
 	network string,
-	chain **cosmos.CosmosChain,
-	pubKey *crypto.PubKey) func(ibc.ChainConfig) error {
-	return func(cc ibc.ChainConfig) error {
-		horcruxValidator := (*chain).Validators[0]
+	pubKey *crypto.PubKey) func(*chainWrapper) func(ibc.ChainConfig) error {
+	return func(cw *chainWrapper) func(ibc.ChainConfig) error {
+		return func(cc ibc.ChainConfig) error {
+			horcruxValidator := cw.chain.Validators[0]
 
-		pvKey, err := getPrivvalKey(ctx, horcruxValidator)
-		if err != nil {
-			return err
-		}
-
-		*pubKey = pvKey.PubKey
-
-		sentries := append(cosmos.ChainNodes{horcruxValidator}, (*chain).FullNodes...)
-
-		singleSigner, err := horcruxSidecar(ctx, horcruxValidator, "signer", client, network, "--accept-risk")
-		if err != nil {
-			return err
-		}
-
-		chainNodes := make(signer.ChainNodes, len(sentries))
-		for i, sentry := range sentries {
-			chainNodes[i] = signer.ChainNode{
-				PrivValAddr: fmt.Sprintf("tcp://%s:1234", sentry.HostName()),
+			pvKey, err := getPrivvalKey(ctx, horcruxValidator)
+			if err != nil {
+				return err
 			}
-		}
 
-		config := signer.Config{
-			SignMode:   signer.SignModeSingle,
-			ChainNodes: chainNodes,
-		}
+			*pubKey = pvKey.PubKey
 
-		if err := writeConfigAndKeysSingle(ctx, (*chain).Config().ChainID, singleSigner, config, pvKey); err != nil {
-			return err
-		}
+			sentries := append(cosmos.ChainNodes{horcruxValidator}, cw.chain.FullNodes...)
 
-		return enablePrivvalListener(ctx, logger, sentries, client)
+			singleSigner, err := horcruxSidecar(ctx, horcruxValidator, "signer", client, network, true, "--accept-risk")
+			if err != nil {
+				return err
+			}
+
+			chainNodes := make(signer.ChainNodes, len(sentries))
+			for i, sentry := range sentries {
+				chainNodes[i] = signer.ChainNode{
+					PrivValAddr: fmt.Sprintf("tcp://%s:1234", sentry.HostName()),
+				}
+			}
+
+			config := signer.Config{
+				SignMode:   signer.SignModeSingle,
+				ChainNodes: chainNodes,
+			}
+
+			if err := writeConfigAndKeysSingle(ctx, cw.chain.Config().ChainID, singleSigner, config, pvKey); err != nil {
+				return err
+			}
+
+			return enablePrivvalListener(ctx, logger, sentries, client)
+		}
 	}
 }
 

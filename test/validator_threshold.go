@@ -29,12 +29,12 @@ func testChainSingleNodeAndHorcruxThreshold(
 	sentriesPerSigner int, // how many sentries should each horcrux signer connect to (min: 1, max: totalSentries)
 ) {
 	ctx := context.Background()
-	chain, pubKey := startChainSingleNodeAndHorcruxThreshold(ctx, t, totalValidators, totalSigners, threshold, totalSentries, sentriesPerSigner)
+	cw, pubKey := startChainSingleNodeAndHorcruxThreshold(ctx, t, totalValidators, totalSigners, threshold, totalSentries, sentriesPerSigner)
 
-	err := testutil.WaitForBlocks(ctx, 20, chain)
+	err := testutil.WaitForBlocks(ctx, 20, cw.chain)
 	require.NoError(t, err)
 
-	requireHealthyValidator(t, chain.Validators[0], pubKey.Address())
+	requireHealthyValidator(t, cw.chain.Validators[0], pubKey.Address())
 }
 
 // startChainSingleNodeAndHorcruxThreshold starts a single chain with a single horcrux (threshold mode) validator and single node validators for the rest of the validators.
@@ -46,25 +46,24 @@ func startChainSingleNodeAndHorcruxThreshold(
 	threshold uint8, // key shard threshold, and therefore how many horcrux signers must participate to sign a block
 	totalSentries int, // number of sentry nodes for the single horcrux validator
 	sentriesPerSigner int, // how many sentries should each horcrux signer connect to (min: 1, max: totalSentries)
-) (*cosmos.CosmosChain, crypto.PubKey) {
+) (*chainWrapper, crypto.PubKey) {
 	client, network := interchaintest.DockerSetup(t)
 	logger := zaptest.NewLogger(t)
 
 	var chain *cosmos.CosmosChain
 	var pubKey crypto.PubKey
 
-	startChains(
-		ctx, t, logger, client, network,
-		chainWrapper{
-			chain:           &chain,
-			totalValidators: totalValidators,
-			totalSentries:   totalSentries - 1,
-			modifyGenesis:   modifyGenesisStrictUptime,
-			preGenesis:      preGenesisSingleNodeAndHorcruxThreshold(ctx, logger, client, network, totalSigners, threshold, sentriesPerSigner, &chain, &pubKey),
-		},
-	)
+	cw := &chainWrapper{
+		chain:           chain,
+		totalValidators: totalValidators,
+		totalSentries:   totalSentries - 1,
+		modifyGenesis:   modifyGenesisStrictUptime,
+		preGenesis:      preGenesisSingleNodeAndHorcruxThreshold(ctx, logger, client, network, totalSigners, threshold, sentriesPerSigner, &pubKey),
+	}
 
-	return chain, pubKey
+	startChains(ctx, t, logger, client, network, cw)
+
+	return cw, pubKey
 }
 
 // preGenesisSingleNodeAndHorcruxThreshold performs the pre-genesis setup to convert the first validator to a horcrux (threshold mode) validator.
@@ -76,31 +75,32 @@ func preGenesisSingleNodeAndHorcruxThreshold(
 	totalSigners int, // total number of signers for the single horcrux validator
 	threshold uint8, // key shard threshold, and therefore how many horcrux signers must participate to sign a block
 	sentriesPerSigner int, // how many sentries should each horcrux signer connect to (min: 1, max: totalSentries)
-	chain **cosmos.CosmosChain,
-	pubKey *crypto.PubKey) func(ibc.ChainConfig) error {
-	return func(cc ibc.ChainConfig) error {
-		horcruxValidator := (*chain).Validators[0]
+	pubKey *crypto.PubKey) func(*chainWrapper) func(ibc.ChainConfig) error {
+	return func(cw *chainWrapper) func(ibc.ChainConfig) error {
+		return func(cc ibc.ChainConfig) error {
+			horcruxValidator := cw.chain.Validators[0]
 
-		sentries := append(cosmos.ChainNodes{horcruxValidator}, (*chain).FullNodes...)
+			sentries := append(cosmos.ChainNodes{horcruxValidator}, cw.chain.FullNodes...)
 
-		pvPubKey, err := convertValidatorToHorcrux(
-			ctx,
-			logger,
-			client,
-			network,
-			horcruxValidator,
-			totalSigners,
-			threshold,
-			sentries,
-			sentriesPerSigner,
-		)
-		if err != nil {
-			return err
+			pvPubKey, err := convertValidatorToHorcrux(
+				ctx,
+				logger,
+				client,
+				network,
+				horcruxValidator,
+				totalSigners,
+				threshold,
+				sentries,
+				sentriesPerSigner,
+			)
+			if err != nil {
+				return err
+			}
+
+			*pubKey = pvPubKey
+
+			return nil
 		}
-
-		*pubKey = pvPubKey
-
-		return nil
 	}
 }
 
@@ -114,40 +114,42 @@ func preGenesisAllHorcruxThreshold(
 	threshold uint8, // key shard threshold, and therefore how many horcrux signers must participate to sign a block
 	sentriesPerValidator int, // how many sentries for each horcrux validator (min: sentriesPerSigner, max: totalSentries)
 	sentriesPerSigner int, // how many sentries should each horcrux signer connect to (min: 1, max: sentriesPerValidator)
-	chain **cosmos.CosmosChain,
-	pubKeys []crypto.PubKey) func(ibc.ChainConfig) error {
-	return func(cc ibc.ChainConfig) error {
-		fnsPerVal := sentriesPerValidator - 1 // minus 1 for the validator itself
-		var eg errgroup.Group
-		for i, validator := range (*chain).Validators {
-			validator := validator
-			i := i
-			sentries := append(cosmos.ChainNodes{validator}, (*chain).FullNodes[i*fnsPerVal:(i+1)*fnsPerVal]...)
 
-			eg.Go(func() error {
-				pvPubKey, err := convertValidatorToHorcrux(
-					ctx,
-					logger,
-					client,
-					network,
-					validator,
-					totalSigners,
-					threshold,
-					sentries,
-					sentriesPerSigner,
-				)
+	pubKeys []crypto.PubKey) func(*chainWrapper) func(ibc.ChainConfig) error {
+	return func(cw *chainWrapper) func(ibc.ChainConfig) error {
+		return func(cc ibc.ChainConfig) error {
+			fnsPerVal := sentriesPerValidator - 1 // minus 1 for the validator itself
+			var eg errgroup.Group
+			for i, validator := range cw.chain.Validators {
+				validator := validator
+				i := i
+				sentries := append(cosmos.ChainNodes{validator}, cw.chain.FullNodes[i*fnsPerVal:(i+1)*fnsPerVal]...)
 
-				if err != nil {
-					return err
-				}
+				eg.Go(func() error {
+					pvPubKey, err := convertValidatorToHorcrux(
+						ctx,
+						logger,
+						client,
+						network,
+						validator,
+						totalSigners,
+						threshold,
+						sentries,
+						sentriesPerSigner,
+					)
 
-				pubKeys[i] = pvPubKey
+					if err != nil {
+						return err
+					}
 
-				return nil
-			})
+					pubKeys[i] = pvPubKey
+
+					return nil
+				})
+			}
+
+			return eg.Wait()
 		}
-
-		return eg.Wait()
 	}
 }
 
@@ -179,7 +181,7 @@ func convertValidatorToHorcrux(
 	cosigners := make(signer.CosignersConfig, totalSigners)
 
 	for i := 0; i < totalSigners; i++ {
-		_, err := horcruxSidecar(ctx, validator, fmt.Sprintf("cosigner-%d", i+1), client, network)
+		_, err := horcruxSidecar(ctx, validator, fmt.Sprintf("cosigner-%d", i+1), client, network, true)
 		if err != nil {
 			return nil, err
 		}
@@ -212,7 +214,10 @@ func convertValidatorToHorcrux(
 			ChainNodes: chainNodes,
 		}
 
-		if err := writeConfigAndKeysThreshold(ctx, cosigner, config, eciesShards[i], chainEd25519Key{chainID: validator.Chain.Config().ChainID, key: ed25519Shards[i]}); err != nil {
+		if err := writeConfigAndKeysThreshold(
+			ctx, cosigner, config, eciesShards[i],
+			chainEd25519Shard{chainID: validator.Chain.Config().ChainID, key: ed25519Shards[i]},
+		); err != nil {
 			return nil, err
 		}
 	}
@@ -232,8 +237,8 @@ func getShardedPrivvalKey(ctx context.Context, node *cosmos.ChainNode, threshold
 	return ed25519Shards, pvKey.PubKey, nil
 }
 
-// chainEd25519Key is a wrapper for a chain ID and an ed25519 consensus key.
-type chainEd25519Key struct {
+// chainEd25519Shard is a wrapper for a chain ID and a shard of an ed25519 consensus key.
+type chainEd25519Shard struct {
 	chainID string
 	key     signer.CosignerEd25519Key
 }
@@ -244,7 +249,7 @@ func writeConfigAndKeysThreshold(
 	cosigner *cosmos.SidecarProcess,
 	config signer.Config,
 	eciesKey signer.CosignerECIESKey,
-	ed25519Keys ...chainEd25519Key,
+	ed25519Shards ...chainEd25519Shard,
 ) error {
 	configBz, err := json.Marshal(config)
 	if err != nil {
@@ -264,7 +269,7 @@ func writeConfigAndKeysThreshold(
 		return fmt.Errorf("failed to write ecies_keys.json: %w", err)
 	}
 
-	for _, key := range ed25519Keys {
+	for _, key := range ed25519Shards {
 		ed25519KeyBz, err := json.Marshal(&key.key)
 		if err != nil {
 			return fmt.Errorf("failed to marshal ed25519 shard: %w", err)

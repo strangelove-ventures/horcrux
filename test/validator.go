@@ -41,11 +41,11 @@ const (
 
 // chainWrapper holds the initial configuration for a chain to start from genesis.
 type chainWrapper struct {
-	chain           **cosmos.CosmosChain
+	chain           *cosmos.CosmosChain
 	totalValidators int // total number of validators on chain at genesis
 	totalSentries   int // number of additional sentry nodes
 	modifyGenesis   func(cc ibc.ChainConfig, b []byte) ([]byte, error)
-	preGenesis      func(ibc.ChainConfig) error
+	preGenesis      func(*chainWrapper) func(ibc.ChainConfig) error
 }
 
 // startChains starts the given chains locally within docker composed of containers.
@@ -55,7 +55,7 @@ func startChains(
 	logger *zap.Logger,
 	client *client.Client,
 	network string,
-	chains ...chainWrapper,
+	chains ...*chainWrapper,
 ) {
 	err := BuildHorcruxImage(ctx, client)
 	require.NoError(t, err)
@@ -69,7 +69,7 @@ func startChains(
 			NumFullNodes:  &c.totalSentries,
 			ChainConfig: ibc.ChainConfig{
 				ModifyGenesis: c.modifyGenesis,
-				PreGenesis:    c.preGenesis,
+				PreGenesis:    c.preGenesis(c),
 			},
 		}
 	}
@@ -83,7 +83,7 @@ func startChains(
 
 	for i, c := range cfChains {
 		chain := c.(*cosmos.CosmosChain)
-		*chains[i].chain = chain
+		chains[i].chain = chain
 		ic.AddChain(chain)
 	}
 
@@ -91,8 +91,6 @@ func startChains(
 		TestName:  t.Name(),
 		Client:    client,
 		NetworkID: network,
-		// BlockDatabaseFile: interchaintest.DefaultBlockDatabaseFilepath(),
-		SkipPathCreation: false,
 	})
 	require.NoError(t, err)
 
@@ -126,11 +124,11 @@ func modifyGenesisSlashingUptime(
 }
 
 // horcruxSidecar creates a horcrux sidecar process that will start when the chain starts.
-func horcruxSidecar(ctx context.Context, node *cosmos.ChainNode, name string, client *client.Client, network string, startupFlags ...string) (*cosmos.SidecarProcess, error) {
+func horcruxSidecar(ctx context.Context, node *cosmos.ChainNode, name string, client *client.Client, network string, preStart bool, startupFlags ...string) (*cosmos.SidecarProcess, error) {
 	startCmd := []string{binary, "start"}
 	startCmd = append(startCmd, startupFlags...)
 	if err := node.NewSidecarProcess(
-		ctx, true, name, client, network,
+		ctx, preStart, name, client, network,
 		ibc.DockerImage{Repository: signerImage, Version: "latest", UidGid: signerImageUidGid},
 		signerImageHomeDir, []string{signerPortDocker}, startCmd,
 	); err != nil {

@@ -3,6 +3,7 @@ package test
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/cometbft/cometbft/crypto"
@@ -96,8 +97,6 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	client, network := interchaintest.DockerSetup(t)
 	logger := zaptest.NewLogger(t)
 
-	var chain *cosmos.CosmosChain
-
 	const (
 		totalValidators    = 2
 		signedBlocksWindow = 10
@@ -112,14 +111,15 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	// allow 50% missed blocks in 10 block signed blocks window (5 missed blocks before slashing).
 	modifyGenesis := modifyGenesisSlashingUptime(signedBlocksWindow, minSignedPerWindow)
 
-	startChains(ctx, t, logger, client, network, chainWrapper{
-		chain:           &chain,
+	cw := &chainWrapper{
 		totalValidators: totalValidators,
 		modifyGenesis:   modifyGenesis,
-	})
+	}
+
+	startChains(ctx, t, logger, client, network, cw)
 
 	// validator to upgrade to horcrux
-	v := chain.Validators[0]
+	v := cw.chain.Validators[0]
 
 	err := v.StopContainer(ctx)
 	require.NoError(t, err)
@@ -130,10 +130,10 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	err = v.StartContainer(ctx)
 	require.NoError(t, err)
 
-	err = testutil.WaitForBlocks(ctx, 20, chain)
+	err = testutil.WaitForBlocks(ctx, 20, cw.chain)
 	require.NoError(t, err)
 
-	requireHealthyValidator(t, chain.Validators[0], pubKey.Address())
+	requireHealthyValidator(t, cw.chain.Validators[0], pubKey.Address())
 }
 
 // TestDownedSigners2of3 tests taking down 2 nodes at a time in the 2/3 threshold horcrux cluster for a period of time.
@@ -149,11 +149,11 @@ func TestDownedSigners2of3(t *testing.T) {
 		sentriesPerSigner = 3
 	)
 
-	chain, pubKey := startChainSingleNodeAndHorcruxThreshold(
+	cw, pubKey := startChainSingleNodeAndHorcruxThreshold(
 		ctx, t, totalValidators, totalSigners, threshold, totalSentries, sentriesPerSigner,
 	)
 
-	ourValidator := chain.Validators[0]
+	ourValidator := cw.chain.Validators[0]
 	requireHealthyValidator(t, ourValidator, pubKey.Address())
 
 	cosigners := ourValidator.Sidecars
@@ -164,7 +164,7 @@ func TestDownedSigners2of3(t *testing.T) {
 		require.NoError(t, cosigner.StopContainer(ctx))
 
 		t.Logf("{%s} -> Waiting for blocks after stopping cosigner {%s}", ourValidator.Name(), cosigner.Name())
-		require.NoError(t, testutil.WaitForBlocks(ctx, 5, chain))
+		require.NoError(t, testutil.WaitForBlocks(ctx, 5, cw.chain))
 
 		requireHealthyValidator(t, ourValidator, pubKey.Address())
 
@@ -172,7 +172,7 @@ func TestDownedSigners2of3(t *testing.T) {
 		require.NoError(t, cosigner.StartContainer(ctx))
 
 		t.Logf("{%s} -> Waiting for blocks after restarting cosigner {%s}", ourValidator.Name(), cosigner.Name())
-		require.NoError(t, testutil.WaitForBlocks(ctx, 5, chain))
+		require.NoError(t, testutil.WaitForBlocks(ctx, 5, cw.chain))
 
 		requireHealthyValidator(t, ourValidator, pubKey.Address())
 	}
@@ -190,11 +190,11 @@ func TestDownedSigners3of5(t *testing.T) {
 		sentriesPerSigner = 3
 	)
 
-	chain, pubKey := startChainSingleNodeAndHorcruxThreshold(
+	cw, pubKey := startChainSingleNodeAndHorcruxThreshold(
 		ctx, t, totalValidators, totalSigners, threshold, totalSentries, sentriesPerSigner,
 	)
 
-	ourValidator := chain.Validators[0]
+	ourValidator := cw.chain.Validators[0]
 	requireHealthyValidator(t, ourValidator, pubKey.Address())
 
 	cosigners := ourValidator.Sidecars
@@ -220,13 +220,13 @@ func TestDownedSigners3of5(t *testing.T) {
 		}
 
 		t.Logf("{%s} -> Waiting for blocks after stopping cosigner {%s}", ourValidator.Name(), cosigner2.Name())
-		require.NoError(t, testutil.WaitForBlocks(ctx, 5, chain))
+		require.NoError(t, testutil.WaitForBlocks(ctx, 5, cw.chain))
 
 		requireHealthyValidator(t, ourValidator, pubKey.Address())
 
 		t.Logf("{%s} -> Restarting cosigner...", cosigner1.Name())
 		require.NoError(t, cosigner1.StartContainer(ctx))
-		require.NoError(t, testutil.WaitForBlocks(ctx, 5, chain))
+		require.NoError(t, testutil.WaitForBlocks(ctx, 5, cw.chain))
 
 		requireHealthyValidator(t, ourValidator, pubKey.Address())
 	}
@@ -244,11 +244,11 @@ func TestLeaderElection2of3(t *testing.T) {
 		sentriesPerSigner = 3
 	)
 
-	chain, pubKey := startChainSingleNodeAndHorcruxThreshold(
+	cw, pubKey := startChainSingleNodeAndHorcruxThreshold(
 		ctx, t, totalValidators, totalSigners, threshold, totalSentries, sentriesPerSigner,
 	)
 
-	ourValidator := chain.Validators[0]
+	ourValidator := cw.chain.Validators[0]
 	requireHealthyValidator(t, ourValidator, pubKey.Address())
 
 	cosigners := ourValidator.Sidecars
@@ -289,7 +289,7 @@ func TestLeaderElection2of3(t *testing.T) {
 			}
 		}
 
-		require.NoError(t, testutil.WaitForBlocks(ctx, 5, chain))
+		require.NoError(t, testutil.WaitForBlocks(ctx, 5, cw.chain))
 
 		requireHealthyValidator(t, ourValidator, pubKey.Address())
 	}
@@ -309,24 +309,23 @@ func TestChainPureHorcrux(t *testing.T) {
 		sentriesPerSigner    = 1
 	)
 
-	var chain *cosmos.CosmosChain
 	pubKeys := make([]crypto.PubKey, totalValidators)
+	cw := &chainWrapper{
+		totalValidators: totalValidators,
+		totalSentries:   1 + totalValidators*(sentriesPerValidator-1),
+		modifyGenesis:   modifyGenesisStrictUptime,
+		preGenesis:      preGenesisAllHorcruxThreshold(ctx, logger, client, network, signersPerValidator, threshold, sentriesPerValidator, sentriesPerSigner, pubKeys),
+	}
 
 	startChains(
-		ctx, t, logger, client, network, chainWrapper{
-			chain:           &chain,
-			totalValidators: totalValidators,
-			totalSentries:   1 + totalValidators*(sentriesPerValidator-1),
-			modifyGenesis:   modifyGenesisStrictUptime,
-			preGenesis:      preGenesisAllHorcruxThreshold(ctx, logger, client, network, signersPerValidator, threshold, sentriesPerValidator, sentriesPerSigner, &chain, pubKeys),
-		},
+		ctx, t, logger, client, network, cw,
 	)
 
-	err := testutil.WaitForBlocks(ctx, 20, chain)
+	err := testutil.WaitForBlocks(ctx, 20, cw.chain)
 	require.NoError(t, err)
 
 	for _, p := range pubKeys {
-		requireHealthyValidator(t, chain.Validators[0], p.Address())
+		requireHealthyValidator(t, cw.chain.Validators[0], p.Address())
 	}
 }
 
@@ -336,154 +335,163 @@ func TestMultipleChainHorcrux(t *testing.T) {
 	client, network := interchaintest.DockerSetup(t)
 	logger := zaptest.NewLogger(t)
 
-	var chain1, chain2 *cosmos.CosmosChain
-	pubKeys := make([]crypto.PubKey, 2)
-
-	oneDoneChan := make(chan struct{}, 1)
-
 	const (
-		totalSigners      = 3
-		threshold         = 2
-		sentriesPerSigner = 1
+		totalChains          = 2
+		validatorsPerChain   = 2
+		sentriesPerValidator = 3
+		totalSigners         = 3
+		threshold            = 2
+		sentriesPerSigner    = 1
 	)
+
+	chainWrappers := make([]*chainWrapper, totalChains)
+	pubKeys := make([]crypto.PubKey, totalChains)
+	chainConfigs := make([]*cosignerChainConfig, totalChains)
+	preGenesises := make([]func(*chainWrapper) func(ibc.ChainConfig) error, totalChains)
+
+	for i := 0; i < totalChains; i++ {
+		chainConfigs[i] = &cosignerChainConfig{
+			sentries: make([]cosmos.ChainNodes, sentriesPerSigner),
+			shards:   make([]signer.CosignerEd25519Key, totalSigners),
+		}
+	}
+
+	cosignerSidecars := make(cosmos.SidecarProcesses, totalSigners)
 
 	eciesShards, err := signer.CreateCosignerECIESShards(totalSigners)
 	require.NoError(t, err)
 
-	cosignerConfig := make([]signer.Config, totalSigners)
+	var wg sync.WaitGroup
+	wg.Add(totalChains)
 
-	var chain1Shards []signer.CosignerEd25519Key
+	for i, chainConfig := range chainConfigs {
+		i := i
+		chainConfig := chainConfig
+		preGenesises[i] = func(cw *chainWrapper) func(ibc.ChainConfig) error {
+			return func(cc ibc.ChainConfig) error {
+				defer wg.Done()
 
-	preGenesis1 := func(cc ibc.ChainConfig) error {
-		validator := (*chain1).Validators[0]
+				firstSentry := cw.chain.Validators[0]
+				sentries := append(cosmos.ChainNodes{firstSentry}, cw.chain.FullNodes...)
 
-		sentries := append(cosmos.ChainNodes{validator}, (*chain1).FullNodes...)
+				sentriesForCosigner := getSentriesForCosignerConnection(sentries, totalSigners, sentriesPerSigner)
+				chainConfig.sentries = sentriesForCosigner
 
-		sentriesForCosigners := getSentriesForCosignerConnection(sentries, totalSigners, sentriesPerSigner)
+				chainConfig.chainID = cw.chain.Config().ChainID
 
-		ed25519Shards, pvPubKey, err := getShardedPrivvalKey(ctx, validator, threshold, uint8(totalSigners))
-		if err != nil {
-			return err
-		}
-
-		chain1Shards = ed25519Shards
-
-		cosigners := make(signer.CosignersConfig, totalSigners)
-
-		for i := 0; i < totalSigners; i++ {
-			_, err := horcruxSidecar(ctx, validator, fmt.Sprintf("cosigner-%d", i+1), client, network)
-			if err != nil {
-				return err
-			}
-
-			cosigners[i] = signer.CosignerConfig{
-				ShardID: i + 1,
-				P2PAddr: fmt.Sprintf("tcp://%s:%s", validator.Sidecars[i].HostName(), signerPort),
-			}
-		}
-
-		for i := 0; i < totalSigners; i++ {
-			sentriesForCosigner := sentriesForCosigners[i]
-			chainNodes := make(signer.ChainNodes, len(sentriesForCosigner))
-			for i, sentry := range sentriesForCosigner {
-				chainNodes[i] = signer.ChainNode{
-					PrivValAddr: fmt.Sprintf("tcp://%s:1234", sentry.HostName()),
+				ed25519Shards, pvPubKey, err := getShardedPrivvalKey(ctx, firstSentry, threshold, uint8(totalSigners))
+				if err != nil {
+					return err
 				}
-			}
 
-			cosignerConfig[i] = signer.Config{
-				SignMode: signer.SignModeThreshold,
-				ThresholdModeConfig: &signer.ThresholdModeConfig{
-					Threshold:   int(threshold),
-					Cosigners:   cosigners,
-					GRPCTimeout: "1500ms",
-					RaftTimeout: "1500ms",
-				},
-				ChainNodes: chainNodes,
+				chainConfig.shards = ed25519Shards
+
+				pubKeys[i] = pvPubKey
+
+				if i == 0 {
+					for j := 0; j < totalSigners; j++ {
+						cosigner, err := horcruxSidecar(ctx, firstSentry, fmt.Sprintf("cosigner-%d", j+1), client, network, false)
+						if err != nil {
+							return err
+						}
+
+						cosignerSidecars[j] = cosigner
+					}
+				}
+
+				return enablePrivvalListener(ctx, logger, sentries, client)
 			}
 		}
-
-		if err := enablePrivvalListener(ctx, logger, sentries, client); err != nil {
-			return err
-		}
-
-		pubKeys[0] = pvPubKey
-
-		close(oneDoneChan)
-
-		return nil
 	}
 
-	preGenesis2 := func(cc ibc.ChainConfig) error {
-		<-oneDoneChan
+	go configureAndStartSidecars(ctx, t, eciesShards, cosignerSidecars, threshold, &wg, chainConfigs...)
 
-		validator := (*chain2).Validators[0]
-		chain1Validator := (*chain1).Validators[0]
-
-		sentries := append(cosmos.ChainNodes{validator}, (*chain2).FullNodes...)
-
-		sentriesForCosigners := getSentriesForCosignerConnection(sentries, totalSigners, sentriesPerSigner)
-
-		ed25519Shards, pvPubKey, err := getShardedPrivvalKey(ctx, validator, threshold, uint8(totalSigners))
-		if err != nil {
-			return err
+	for i := 0; i < totalChains; i++ {
+		chainWrappers[i] = &chainWrapper{
+			totalValidators: validatorsPerChain,
+			totalSentries:   sentriesPerValidator - 1,
+			modifyGenesis:   modifyGenesisStrictUptime,
+			preGenesis:      preGenesises[i],
 		}
-
-		for i := 0; i < totalSigners; i++ {
-			cosigner := chain1Validator.Sidecars[i]
-
-			sentriesForCosigner := sentriesForCosigners[i]
-			chainNodes := make(signer.ChainNodes, len(sentriesForCosigner))
-			for i, sentry := range sentriesForCosigner {
-				chainNodes[i] = signer.ChainNode{
-					PrivValAddr: fmt.Sprintf("tcp://%s:1234", sentry.HostName()),
-				}
-			}
-
-			cosignerConfig[i].ChainNodes = append(cosignerConfig[i].ChainNodes, chainNodes...)
-
-			if err := writeConfigAndKeysThreshold(ctx, cosigner, cosignerConfig[i], eciesShards[i],
-				chainEd25519Key{
-					chainID: chain1Validator.Chain.Config().ChainID,
-					key:     chain1Shards[i],
-				},
-				chainEd25519Key{
-					chainID: validator.Chain.Config().ChainID,
-					key:     ed25519Shards[i],
-				},
-			); err != nil {
-				return err
-			}
-		}
-
-		if err := enablePrivvalListener(ctx, logger, sentries, client); err != nil {
-			return err
-		}
-
-		pubKeys[1] = pvPubKey
-
-		return nil
 	}
 
-	startChains(ctx, t, logger, client, network,
-		chainWrapper{
-			chain:           &chain1,
-			totalValidators: 2,
-			totalSentries:   2,
-			modifyGenesis:   modifyGenesisStrictUptime,
-			preGenesis:      preGenesis1,
-		},
-		chainWrapper{
-			chain:           &chain2,
-			totalValidators: 2,
-			totalSentries:   2,
-			modifyGenesis:   modifyGenesisStrictUptime,
-			preGenesis:      preGenesis2,
-		},
-	)
+	startChains(ctx, t, logger, client, network, chainWrappers...)
 
-	testutil.WaitForBlocks(ctx, 20, chain1, chain2)
+	testutil.WaitForBlocks(ctx, 20)
 
-	requireHealthyValidator(t, chain1.Validators[0], pubKeys[0].Address())
-	requireHealthyValidator(t, chain2.Validators[0], pubKeys[1].Address())
+	for i, p := range pubKeys {
+		requireHealthyValidator(t, chainWrappers[i].chain.Validators[0], p.Address())
+	}
+}
+
+type cosignerChainConfig struct {
+	chainID  string
+	shards   []signer.CosignerEd25519Key
+	sentries []cosmos.ChainNodes
+}
+
+func configureAndStartSidecars(
+	ctx context.Context,
+	t *testing.T,
+	eciesShards []signer.CosignerECIESKey,
+	cosignerSidecars cosmos.SidecarProcesses,
+	threshold int,
+	wg *sync.WaitGroup,
+	chainConfigs ...*cosignerChainConfig,
+) {
+	wg.Wait()
+
+	totalSigners := len(cosignerSidecars)
+
+	cosignersConfig := make(signer.CosignersConfig, totalSigners)
+	for i, cosigner := range cosignerSidecars {
+		cosignersConfig[i] = signer.CosignerConfig{
+			ShardID: i + 1,
+			P2PAddr: fmt.Sprintf("tcp://%s:%s", cosigner.HostName(), signerPort),
+		}
+	}
+
+	for i, cosigner := range cosignerSidecars {
+		numSentries := 0
+		for _, chainConfig := range chainConfigs {
+			numSentries += len(chainConfig.sentries[i])
+		}
+
+		chainNodes := make(signer.ChainNodes, 0, numSentries)
+
+		ed25519Shards := make([]chainEd25519Shard, len(chainConfigs))
+
+		for j, chainConfig := range chainConfigs {
+			for _, sentry := range chainConfig.sentries[i] {
+				chainNodes = append(chainNodes, signer.ChainNode{
+					PrivValAddr: fmt.Sprintf("tcp://%s:1234", sentry.HostName()),
+				})
+			}
+
+			ed25519Shards[j] = chainEd25519Shard{
+				chainID: chainConfig.chainID,
+				key:     chainConfig.shards[i],
+			}
+		}
+
+		config := signer.Config{
+			SignMode: signer.SignModeThreshold,
+			ThresholdModeConfig: &signer.ThresholdModeConfig{
+				Threshold:   threshold,
+				Cosigners:   cosignersConfig,
+				GRPCTimeout: "1500ms",
+				RaftTimeout: "1500ms",
+			},
+			ChainNodes: chainNodes,
+		}
+
+		err := writeConfigAndKeysThreshold(ctx, cosigner, config, eciesShards[i], ed25519Shards...)
+		require.NoError(t, err)
+
+		err = cosigner.CreateContainer(ctx)
+		require.NoError(t, err)
+
+		err = cosigner.StartContainer(ctx)
+		require.NoError(t, err)
+	}
 }
