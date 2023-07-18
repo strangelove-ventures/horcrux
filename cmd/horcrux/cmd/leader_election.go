@@ -140,7 +140,7 @@ func getLeaderCmd() *cobra.Command {
 			}
 
 			if p2pListen == "" {
-				return fmt.Errorf("cosigner config does not exist for our shard ID %d", key.ID)
+				return fmt.Errorf("cosigner config does not exist for our shard ID %d", id)
 			}
 
 			retryOpts := []grpcretry.CallOption{
