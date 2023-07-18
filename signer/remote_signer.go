@@ -72,79 +72,99 @@ func (rs *ReconnRemoteSigner) OnStop() {
 	rs.privVal.Stop()
 }
 
-func (rs *ReconnRemoteSigner) dial(ctx context.Context) (net.Conn, error) {
+func (rs *ReconnRemoteSigner) establishConnection(ctx context.Context) (net.Conn, error) {
 	proto, address := cometnet.ProtocolAndAddress(rs.address)
-	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
-	defer cancel()
 	netConn, err := rs.dialer.DialContext(ctx, proto, address)
 	if err != nil {
 
-		return nil, err
+		return nil, fmt.Errorf("dial error: %w", err)
 	}
 
-	return netConn, nil
+	conn, err := cometp2pconn.MakeSecretConnection(netConn, rs.privKey)
+	if err != nil {
+		return nil, fmt.Errorf("secret connection error: %w", err)
+	}
+
+	return conn, nil
+}
+
+type conWrapper struct {
+	conn net.Conn
+}
+
+func (rs *ReconnRemoteSigner) attemptConnection(ctx context.Context, cw *conWrapper, connected chan<- bool) {
+	conn, err := rs.establishConnection(ctx)
+	if err != nil {
+		sentryConnectTries.Add(float64(1))
+		totalSentryConnectTries.Inc()
+
+		rs.Logger.Error("Error establishing connection", "err", err)
+		return
+	}
+
+	cw.conn = conn
+
+	sentryConnectTries.Set(0)
+
+	rs.Logger.Info("Connected to Sentry", "address", rs.address)
+	connected <- true
+
 }
 
 // main loop for ReconnRemoteSigner
 func (rs *ReconnRemoteSigner) loop(ctx context.Context) {
-	var conn net.Conn
+	var cw conWrapper
 	for {
 		if !rs.IsRunning() {
-			if conn != nil {
-				if err := conn.Close(); err != nil {
+			if cw.conn != nil {
+				if err := cw.conn.Close(); err != nil {
 					rs.Logger.Error("Close", "err", err.Error()+"closing listener failed")
 				}
 			}
 			return
 		}
 
-		for conn == nil {
-			netConn, err := rs.dial(ctx)
-			if err != nil {
-				sentryConnectTries.Add(float64(1))
-				totalSentryConnectTries.Inc()
-				rs.Logger.Error("Dialing", "err", err)
-				rs.Logger.Info("Retrying", "sleep (s)", 3, "address", rs.address)
-				time.Sleep(time.Second * 1)
-				continue
-			}
-			sentryConnectTries.Set(0)
+		ticker := time.NewTicker(1 * time.Second)
+		connected := make(chan bool)
 
-			rs.Logger.Info("Connected to Sentry", "address", rs.address)
-			conn, err = cometp2pconn.MakeSecretConnection(netConn, rs.privKey)
-			if err != nil {
-				conn = nil
-				rs.Logger.Error("Secret Conn", "err", err)
-				rs.Logger.Info("Retrying", "sleep (s)", 3, "address", rs.address)
-				time.Sleep(time.Second * 1)
-				continue
+	ConnLoop:
+		for cw.conn == nil {
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			go rs.attemptConnection(ctx, &cw, connected)
+			select {
+			case <-connected:
+				break ConnLoop
+			case <-ticker.C:
+				cancel()
+				rs.Logger.Info("Retrying", "sleep (s)", 1, "address", rs.address)
 			}
 		}
 
 		// since dialing can take time, we check running again
 		if !rs.IsRunning() {
-			if err := conn.Close(); err != nil {
+			if err := cw.conn.Close(); err != nil {
 				rs.Logger.Error("Close", "err", err.Error()+"closing listener failed")
 			}
 			return
 		}
 
-		req, err := ReadMsg(conn)
+		req, err := ReadMsg(cw.conn)
 		if err != nil {
 			rs.Logger.Error("readMsg", "err", err)
-			conn.Close()
-			conn = nil
+			cw.conn.Close()
+			cw.conn = nil
 			continue
 		}
 
 		// handleRequest handles request errors. We always send back a response
 		res := rs.handleRequest(req)
 
-		err = WriteMsg(conn, res)
+		err = WriteMsg(cw.conn, res)
 		if err != nil {
 			rs.Logger.Error("writeMsg", "err", err)
-			conn.Close()
-			conn = nil
+			cw.conn.Close()
+			cw.conn = nil
 		}
 	}
 }
