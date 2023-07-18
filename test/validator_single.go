@@ -79,7 +79,7 @@ func preGenesisSingleNodeAndHorcruxSingle(
 
 			sentries := append(cosmos.ChainNodes{horcruxValidator}, cw.chain.FullNodes...)
 
-			singleSigner, err := horcruxSidecar(ctx, horcruxValidator, "signer", client, network, true, "--accept-risk")
+			singleSigner, err := horcruxSidecar(ctx, horcruxValidator, "signer", client, network, "--accept-risk")
 			if err != nil {
 				return err
 			}
@@ -97,6 +97,14 @@ func preGenesisSingleNodeAndHorcruxSingle(
 			}
 
 			if err := writeConfigAndKeysSingle(ctx, cw.chain.Config().ChainID, singleSigner, config, pvKey); err != nil {
+				return err
+			}
+
+			if err := singleSigner.CreateContainer(ctx); err != nil {
+				return err
+			}
+
+			if err := singleSigner.StartContainer(ctx); err != nil {
 				return err
 			}
 

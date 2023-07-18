@@ -364,12 +364,13 @@ func TestMultipleChainHorcrux(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(totalChains)
 
+	cosignersStarted := make(chan struct{}, 1)
+
 	for i, chainConfig := range chainConfigs {
 		i := i
 		chainConfig := chainConfig
 		preGenesises[i] = func(cw *chainWrapper) func(ibc.ChainConfig) error {
 			return func(cc ibc.ChainConfig) error {
-				defer wg.Done()
 
 				firstSentry := cw.chain.Validators[0]
 				sentries := append(cosmos.ChainNodes{firstSentry}, cw.chain.FullNodes...)
@@ -381,6 +382,7 @@ func TestMultipleChainHorcrux(t *testing.T) {
 
 				ed25519Shards, pvPubKey, err := getShardedPrivvalKey(ctx, firstSentry, threshold, uint8(totalSigners))
 				if err != nil {
+					wg.Done()
 					return err
 				}
 
@@ -390,8 +392,9 @@ func TestMultipleChainHorcrux(t *testing.T) {
 
 				if i == 0 {
 					for j := 0; j < totalSigners; j++ {
-						cosigner, err := horcruxSidecar(ctx, firstSentry, fmt.Sprintf("cosigner-%d", j+1), client, network, false)
+						cosigner, err := horcruxSidecar(ctx, firstSentry, fmt.Sprintf("cosigner-%d", j+1), client, network)
 						if err != nil {
+							wg.Done()
 							return err
 						}
 
@@ -399,12 +402,22 @@ func TestMultipleChainHorcrux(t *testing.T) {
 					}
 				}
 
-				return enablePrivvalListener(ctx, logger, sentries, client)
+				if err := enablePrivvalListener(ctx, logger, sentries, client); err != nil {
+					wg.Done()
+					return err
+				}
+
+				wg.Done()
+
+				// wait for all cosigners to be started before continuing to start the chain.
+				<-cosignersStarted
+
+				return nil
 			}
 		}
 	}
 
-	go configureAndStartSidecars(ctx, t, eciesShards, cosignerSidecars, threshold, &wg, chainConfigs...)
+	go configureAndStartSidecars(ctx, t, eciesShards, cosignerSidecars, threshold, &wg, cosignersStarted, chainConfigs...)
 
 	for i := 0; i < totalChains; i++ {
 		chainWrappers[i] = &chainWrapper{
@@ -437,8 +450,10 @@ func configureAndStartSidecars(
 	cosignerSidecars cosmos.SidecarProcesses,
 	threshold int,
 	wg *sync.WaitGroup,
+	cosignersStarted chan struct{},
 	chainConfigs ...*cosignerChainConfig,
 ) {
+	// wait for pre-genesis to finish from all chains
 	wg.Wait()
 
 	totalSigners := len(cosignerSidecars)
@@ -450,6 +465,8 @@ func configureAndStartSidecars(
 			P2PAddr: fmt.Sprintf("tcp://%s:%s", cosigner.HostName(), signerPort),
 		}
 	}
+
+	var eg errgroup.Group
 
 	for i, cosigner := range cosignerSidecars {
 		numSentries := 0
@@ -485,13 +502,25 @@ func configureAndStartSidecars(
 			ChainNodes: chainNodes,
 		}
 
-		err := writeConfigAndKeysThreshold(ctx, cosigner, config, eciesShards[i], ed25519Shards...)
-		require.NoError(t, err)
+		cosigner := cosigner
+		i := i
 
-		err = cosigner.CreateContainer(ctx)
-		require.NoError(t, err)
+		// configure and start cosigner in parallel
+		eg.Go(func() error {
+			if err := writeConfigAndKeysThreshold(ctx, cosigner, config, eciesShards[i], ed25519Shards...); err != nil {
+				return err
+			}
 
-		err = cosigner.StartContainer(ctx)
-		require.NoError(t, err)
+			if err := cosigner.CreateContainer(ctx); err != nil {
+				return err
+			}
+
+			return cosigner.StartContainer(ctx)
+		})
 	}
+
+	require.NoError(t, eg.Wait())
+
+	// signal to pre-genesis that all cosigners have been started and chain start can proceed.
+	close(cosignersStarted)
 }

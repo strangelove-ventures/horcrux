@@ -1,6 +1,7 @@
 package signer
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"time"
@@ -62,7 +63,7 @@ func NewReconnRemoteSigner(
 
 // OnStart implements cmn.Service.
 func (rs *ReconnRemoteSigner) OnStart() error {
-	go rs.loop()
+	go rs.loop(context.Background())
 	return nil
 }
 
@@ -71,8 +72,21 @@ func (rs *ReconnRemoteSigner) OnStop() {
 	rs.privVal.Stop()
 }
 
+func (rs *ReconnRemoteSigner) dial(ctx context.Context) (net.Conn, error) {
+	proto, address := cometnet.ProtocolAndAddress(rs.address)
+	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
+	defer cancel()
+	netConn, err := rs.dialer.DialContext(ctx, proto, address)
+	if err != nil {
+
+		return nil, err
+	}
+
+	return netConn, nil
+}
+
 // main loop for ReconnRemoteSigner
-func (rs *ReconnRemoteSigner) loop() {
+func (rs *ReconnRemoteSigner) loop(ctx context.Context) {
 	var conn net.Conn
 	for {
 		if !rs.IsRunning() {
@@ -85,14 +99,13 @@ func (rs *ReconnRemoteSigner) loop() {
 		}
 
 		for conn == nil {
-			proto, address := cometnet.ProtocolAndAddress(rs.address)
-			netConn, err := rs.dialer.Dial(proto, address)
+			netConn, err := rs.dial(ctx)
 			if err != nil {
 				sentryConnectTries.Add(float64(1))
 				totalSentryConnectTries.Inc()
 				rs.Logger.Error("Dialing", "err", err)
 				rs.Logger.Info("Retrying", "sleep (s)", 3, "address", rs.address)
-				time.Sleep(time.Second * 3)
+				time.Sleep(time.Second * 1)
 				continue
 			}
 			sentryConnectTries.Set(0)
@@ -103,7 +116,7 @@ func (rs *ReconnRemoteSigner) loop() {
 				conn = nil
 				rs.Logger.Error("Secret Conn", "err", err)
 				rs.Logger.Info("Retrying", "sleep (s)", 3, "address", rs.address)
-				time.Sleep(time.Second * 3)
+				time.Sleep(time.Second * 1)
 				continue
 			}
 		}

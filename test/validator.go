@@ -128,11 +128,11 @@ func modifyGenesisSlashingUptime(
 }
 
 // horcruxSidecar creates a horcrux sidecar process that will start when the chain starts.
-func horcruxSidecar(ctx context.Context, node *cosmos.ChainNode, name string, client *client.Client, network string, preStart bool, startupFlags ...string) (*cosmos.SidecarProcess, error) {
+func horcruxSidecar(ctx context.Context, node *cosmos.ChainNode, name string, client *client.Client, network string, startupFlags ...string) (*cosmos.SidecarProcess, error) {
 	startCmd := []string{binary, "start"}
 	startCmd = append(startCmd, startupFlags...)
 	if err := node.NewSidecarProcess(
-		ctx, preStart, name, client, network,
+		ctx, false, name, client, network,
 		ibc.DockerImage{Repository: signerImage, Version: "latest", UidGid: signerImageUidGid},
 		signerImageHomeDir, []string{signerPortDocker}, startCmd,
 	); err != nil {

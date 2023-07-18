@@ -181,7 +181,7 @@ func convertValidatorToHorcrux(
 	cosigners := make(signer.CosignersConfig, totalSigners)
 
 	for i := 0; i < totalSigners; i++ {
-		_, err := horcruxSidecar(ctx, validator, fmt.Sprintf("cosigner-%d", i+1), client, network, true)
+		_, err := horcruxSidecar(ctx, validator, fmt.Sprintf("cosigner-%d", i+1), client, network)
 		if err != nil {
 			return nil, err
 		}
@@ -192,6 +192,7 @@ func convertValidatorToHorcrux(
 		}
 	}
 
+	var eg errgroup.Group
 	for i := 0; i < totalSigners; i++ {
 		cosigner := validator.Sidecars[i]
 
@@ -214,12 +215,26 @@ func convertValidatorToHorcrux(
 			ChainNodes: chainNodes,
 		}
 
-		if err := writeConfigAndKeysThreshold(
-			ctx, cosigner, config, eciesShards[i],
-			chainEd25519Shard{chainID: validator.Chain.Config().ChainID, key: ed25519Shards[i]},
-		); err != nil {
-			return nil, err
-		}
+		i := i
+
+		eg.Go(func() error {
+			if err := writeConfigAndKeysThreshold(
+				ctx, cosigner, config, eciesShards[i],
+				chainEd25519Shard{chainID: validator.Chain.Config().ChainID, key: ed25519Shards[i]},
+			); err != nil {
+				return err
+			}
+
+			if err := cosigner.CreateContainer(ctx); err != nil {
+				return err
+			}
+
+			return cosigner.StartContainer(ctx)
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		return nil, err
 	}
 
 	return pvPubKey, enablePrivvalListener(ctx, logger, sentries, client)
