@@ -1,42 +1,59 @@
 package signer
 
 import (
+	"bytes"
+	"crypto/rand"
+	"encoding/json"
 	"testing"
 
-	ecies "github.com/ecies/go/v2"
+	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 )
 
 func TestCosignerECIES(t *testing.T) {
 	t.Parallel()
 
 	keys := make([]*ecies.PrivateKey, 3)
-	pubKeys := make([]CosignerECIESPubKey, 3)
+	pubs := make([]*ecies.PublicKey, 3)
 
 	for i := 0; i < 3; i++ {
-		key, err := ecies.GenerateKey()
+		key, err := ecies.GenerateKey(rand.Reader, secp256k1.S256(), nil)
 		require.NoError(t, err)
 
 		keys[i] = key
-
-		pubKeys[i] = CosignerECIESPubKey{
-			ID:        i + 1,
-			PublicKey: key.PublicKey,
-		}
+		pubs[i] = &key.PublicKey
 	}
 
 	securities := make([]CosignerSecurity, 3)
 
 	for i := 0; i < 3; i++ {
-		securities[i] = NewCosignerSecurityECIES(CosignerECIESKey{
-			ID:       i + 1,
-			ECIESKey: keys[i],
-		},
-			pubKeys)
+		key := CosignerECIESKey{
+			ID:        i + 1,
+			ECIESKey:  keys[i],
+			ECIESPubs: pubs,
+		}
+		securities[i] = NewCosignerSecurityECIES(key)
+
+		bz, err := json.Marshal(&key)
+		require.NoError(t, err)
+
+		var key2 CosignerECIESKey
+		require.NoError(t, json.Unmarshal(bz, &key2))
+		require.Equal(t, key, key2)
+
+		require.True(t, bytes.Equal(key.ECIESKey.D.Bytes(), key2.ECIESKey.D.Bytes()))
+
+		for i := 0; i < 3; i++ {
+			require.True(t, bytes.Equal(key.ECIESPubs[i].X.Bytes(), key2.ECIESPubs[i].X.Bytes()))
+			require.True(t, bytes.Equal(key.ECIESPubs[i].Y.Bytes(), key2.ECIESPubs[i].Y.Bytes()))
+		}
 	}
 
 	err := testCosignerSecurity(t, securities)
-	require.ErrorContains(t, err, "cannot decrypt ciphertext: cipher: message authentication failed")
+	require.ErrorContains(t, err, "ecies: invalid message")
+	require.ErrorContains(t, err, "failed to decrypt")
 }
 
 func testCosignerSecurity(t *testing.T, securities []CosignerSecurity) error {
@@ -57,4 +74,59 @@ func testCosignerSecurity(t *testing.T, securities []CosignerSecurity) error {
 	_, _, err = securities[2].DecryptAndVerify(1, nonce.PubKey, nonce.Share, nonce.Signature)
 
 	return err
+}
+
+func BenchmarkCosignerECIES(b *testing.B) {
+	keys := make([]*ecies.PrivateKey, 3)
+	pubs := make([]*ecies.PublicKey, 3)
+
+	for i := 0; i < 3; i++ {
+		key, err := ecies.GenerateKey(rand.Reader, secp256k1.S256(), nil)
+		require.NoError(b, err)
+
+		keys[i] = key
+		pubs[i] = &key.PublicKey
+	}
+
+	securities := make([]CosignerSecurity, 3)
+
+	for i := 0; i < 3; i++ {
+		securities[i] = NewCosignerSecurityECIES(CosignerECIESKey{
+			ID:        i + 1,
+			ECIESKey:  keys[i],
+			ECIESPubs: pubs,
+		})
+	}
+
+	for i := 0; i < b.N; i++ {
+		var eg errgroup.Group
+		for i, security := range securities {
+			security := security
+			i := i
+			eg.Go(func() error {
+				var nestedEg errgroup.Group
+				for j, security2 := range securities {
+					if i == j {
+						continue
+					}
+					security2 := security2
+					j := j
+					nestedEg.Go(func() error {
+						n, err := security.EncryptAndSign(j+1, []byte("mock_pub"), []byte("mock_share"))
+						if err != nil {
+							return err
+						}
+
+						_, _, err = security2.DecryptAndVerify(i+1, n.PubKey, n.Share, n.Signature)
+						if err != nil {
+							return err
+						}
+						return nil
+					})
+				}
+				return nestedEg.Wait()
+			})
+		}
+		require.NoErrorf(b, eg.Wait(), "success count: %d", i)
+	}
 }

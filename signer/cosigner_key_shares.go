@@ -8,7 +8,8 @@ import (
 
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/cometbft/cometbft/privval"
-	ecies "github.com/ecies/go/v2"
+	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 	"golang.org/x/sync/errgroup"
 )
@@ -137,12 +138,12 @@ func makeECIESKeys(num int) ([]*ecies.PrivateKey, []*ecies.PublicKey, error) {
 	for i := 0; i < num; i++ {
 		i := i
 		eg.Go(func() error {
-			eciesKey, err := ecies.GenerateKey()
+			eciesKey, err := ecies.GenerateKey(rand.Reader, secp256k1.S256(), nil)
 			if err != nil {
 				return err
 			}
 			eciesKeys[i] = eciesKey
-			pubKeys[i] = eciesKey.PublicKey
+			pubKeys[i] = &eciesKey.PublicKey
 			return nil
 		})
 	}

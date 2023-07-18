@@ -2,6 +2,7 @@ package signer
 
 import (
 	"bytes"
+	"crypto/rand"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -16,7 +17,8 @@ import (
 	cometrand "github.com/cometbft/cometbft/libs/rand"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	comet "github.com/cometbft/cometbft/types"
-	ecies "github.com/ecies/go/v2"
+	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/stretchr/testify/require"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 	"golang.org/x/sync/errgroup"
@@ -72,19 +74,16 @@ func loadKeyForLocalCosigner(
 
 func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	eciesKeys := make([]*ecies.PrivateKey, total)
-	pubKeys := make([]CosignerECIESPubKey, total)
+	pubKeys := make([]*ecies.PublicKey, total)
 	cosigners := make([]*LocalCosigner, total)
 
 	for i := uint8(0); i < total; i++ {
-		eciesKey, err := ecies.GenerateKey()
+		eciesKey, err := ecies.GenerateKey(rand.Reader, secp256k1.S256(), nil)
 		require.NoError(t, err)
 
 		eciesKeys[i] = eciesKey
 
-		pubKeys[i] = CosignerECIESPubKey{
-			ID:        int(i) + 1,
-			PublicKey: eciesKey.PublicKey,
-		}
+		pubKeys[i] = &eciesKey.PublicKey
 	}
 
 	privateKey := cometcryptoed25519.GenPrivKey()
@@ -95,14 +94,14 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 	cosignersConfig := make(CosignersConfig, total)
 
-	for i, pubKey := range pubKeys {
+	for i := range pubKeys {
 		cosignersConfig[i] = CosignerConfig{
-			ShardID: pubKey.ID,
+			ShardID: i + 1,
 		}
 	}
 
-	for i, pubKey := range pubKeys {
-		cosignerDir := filepath.Join(tmpDir, fmt.Sprintf("cosigner_%d", pubKey.ID))
+	for i := range pubKeys {
+		cosignerDir := filepath.Join(tmpDir, fmt.Sprintf("cosigner_%d", i+1))
 		err := os.MkdirAll(cosignerDir, 0777)
 		require.NoError(t, err)
 
@@ -122,10 +121,10 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 			cosignerConfig,
 			NewCosignerSecurityECIES(
 				CosignerECIESKey{
-					ID:       pubKey.ID,
-					ECIESKey: eciesKeys[i],
+					ID:        i + 1,
+					ECIESKey:  eciesKeys[i],
+					ECIESPubs: pubKeys,
 				},
-				pubKeys,
 			),
 			"",
 		)
