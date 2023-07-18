@@ -62,6 +62,10 @@ func startChains(
 
 	cs := make([]*interchaintest.ChainSpec, len(chains))
 	for i, c := range chains {
+		var preGenesis func(ibc.ChainConfig) error
+		if c.preGenesis != nil {
+			preGenesis = c.preGenesis(c)
+		}
 		cs[i] = &interchaintest.ChainSpec{
 			Name:          testChain,
 			Version:       testChainVersion,
@@ -69,7 +73,7 @@ func startChains(
 			NumFullNodes:  &c.totalSentries,
 			ChainConfig: ibc.ChainConfig{
 				ModifyGenesis: c.modifyGenesis,
-				PreGenesis:    c.preGenesis(c),
+				PreGenesis:    preGenesis,
 			},
 		}
 	}
