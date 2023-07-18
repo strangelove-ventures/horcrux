@@ -107,20 +107,34 @@ func getLeaderCmd() *cobra.Command {
 				return fmt.Errorf("threshold mode configuration has no cosigners")
 			}
 
-			keyFile, err := config.KeyFileExistsCosignerRSA()
-			if err != nil {
-				return err
-			}
+			var id int
 
-			key, err := signer.LoadCosignerRSAKey(keyFile)
-			if err != nil {
-				return fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
+			keyFile, err := config.KeyFileExistsCosignerECIES()
+			if err == nil {
+				key, err := signer.LoadCosignerECIESKey(keyFile)
+				if err != nil {
+					return fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
+				}
+
+				id = key.ID
+			} else {
+				keyFile, err := config.KeyFileExistsCosignerRSA()
+				if err != nil {
+					return err
+				}
+
+				key, err := signer.LoadCosignerRSAKey(keyFile)
+				if err != nil {
+					return fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
+				}
+
+				id = key.ID
 			}
 
 			var p2pListen string
 
 			for _, c := range thresholdCfg.Cosigners {
-				if c.ShardID == key.ID {
+				if c.ShardID == id {
 					p2pListen = c.P2PAddr
 				}
 			}
