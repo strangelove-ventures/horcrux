@@ -3,7 +3,6 @@ package signer
 import (
 	"bytes"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -365,8 +364,6 @@ func (pv *ThresholdValidator) waitForPeerNonces(
 	missedNonces.WithLabelValues(peer.GetAddress()).Set(0)
 	timedCosignerNonceLag.WithLabelValues(peer.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
 
-	noncesBz, _ := json.Marshal(peerNonces.Nonces)
-	pv.logger.Debug("Adding nonces for peer", "peer", peer.GetID(), "nonces", string(noncesBz))
 	// Check so that wg.Done is not called more than (threshold - 1) times which causes hardlock
 	thresholdPeersMutex.Lock()
 	if len(nonces) < pv.threshold-1 {
@@ -417,11 +414,9 @@ func (pv *ThresholdValidator) waitForPeerSetNoncesAndSign(
 	})
 
 	if err != nil {
-		noncesBz, _ := json.Marshal(peerNonces)
 		pv.logger.Error(
 			"Sign error",
 			"cosigner", peerID,
-			"nonces", string(noncesBz),
 			"err", err.Error(),
 		)
 		return
