@@ -430,7 +430,12 @@ func TestMultipleChainHorcrux(t *testing.T) {
 
 	startChains(ctx, t, logger, client, network, chainWrappers...)
 
-	testutil.WaitForBlocks(ctx, 20)
+	chains := make([]testutil.ChainHeighter, totalChains)
+	for i, cw := range chainWrappers {
+		chains[i] = cw.chain
+	}
+
+	testutil.WaitForBlocks(ctx, 20, chains...)
 
 	for i, p := range pubKeys {
 		requireHealthyValidator(t, chainWrappers[i].chain.Validators[0], p.Address())
