@@ -6,6 +6,9 @@ all: install
 LD_FLAGS = -X github.com/strangelove-ventures/horcrux/cmd/horcrux/cmd.Version=$(VERSION) \
 	-X github.com/strangelove-ventures/horcrux/cmd/horcrux/cmd.Commit=$(COMMIT)
 
+LD_FLAGS += $(LDFLAGS)
+LD_FLAGS := $(strip $(LD_FLAGS))
+
 BUILD_FLAGS := -ldflags '$(LD_FLAGS)'
 
 build:

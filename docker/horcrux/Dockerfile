@@ -1,24 +1,72 @@
-FROM --platform=$BUILDPLATFORM golang:1.20-alpine AS build-env
+FROM --platform=$BUILDPLATFORM golang:1.20-alpine3.16 AS build-env
 
-ENV PACKAGES make git
+RUN apk add --update --no-cache curl make git libc-dev bash gcc linux-headers eudev-dev
 
-RUN apk add --no-cache $PACKAGES
+ARG TARGETARCH
+ARG BUILDARCH
 
-WORKDIR /go/src/github.com/strangelove-ventures/horcrux
+RUN if [ "${TARGETARCH}" = "arm64" ] && [ "${BUILDARCH}" != "arm64" ]; then \
+        wget -c https://musl.cc/aarch64-linux-musl-cross.tgz -O - | tar -xzvv --strip-components 1 -C /usr; \
+    elif [ "${TARGETARCH}" = "amd64" ] && [ "${BUILDARCH}" != "amd64" ]; then \
+        wget -c https://musl.cc/x86_64-linux-musl-cross.tgz -O - | tar -xzvv --strip-components 1 -C /usr; \
+    fi
+
+WORKDIR /horcrux
 
 ADD . .
 
-ARG TARGETARCH
-ARG TARGETOS
+RUN if [ "${TARGETARCH}" = "arm64" ] && [ "${BUILDARCH}" != "arm64" ]; then \
+        export CC=aarch64-linux-musl-gcc CXX=aarch64-linux-musl-g++;\
+    elif [ "${TARGETARCH}" = "amd64" ] && [ "${BUILDARCH}" != "amd64" ]; then \
+        export CC=x86_64-linux-musl-gcc CXX=x86_64-linux-musl-g++; \
+    fi; \
+    GOOS=linux GOARCH=$TARGETARCH CGO_ENABLED=1 LDFLAGS='-linkmode external -extldflags "-static"' make install
 
-RUN export GOOS=${TARGETOS} GOARCH=${TARGETARCH} && make build
+RUN if [ -d "/go/bin/linux_${TARGETARCH}" ]; then mv /go/bin/linux_${TARGETARCH}/* /go/bin/; fi
 
-FROM alpine:edge
+# Use minimal busybox from infra-toolkit image for final scratch image
+FROM ghcr.io/strangelove-ventures/infra-toolkit:v0.0.6 AS busybox-min
+RUN addgroup --gid 2345 -S horcrux && adduser --uid 2345 -S horcrux -G horcrux
 
-RUN apk add --no-cache ca-certificates
+# Use ln and rm from full featured busybox for assembling final image
+FROM busybox:1.34.1-musl AS busybox-full
 
-WORKDIR /root
+# Build final image from scratch
+FROM scratch
 
-COPY --from=build-env /go/src/github.com/strangelove-ventures/horcrux/build/horcrux  /usr/bin/horcrux
+LABEL org.opencontainers.image.source="https://github.com/cosmos/horcrux"
 
-CMD ["horcrux"]
+WORKDIR /bin
+
+# Install ln (for making hard links) and rm (for cleanup) from full busybox image (will be deleted, only needed for image assembly)
+COPY --from=busybox-full /bin/ln /bin/rm ./
+
+# Install minimal busybox image as shell binary (will create hardlinks for the rest of the binaries to this data)
+COPY --from=busybox-min /busybox/busybox /bin/sh
+
+# Add hard links for read-only utils, then remove ln and rm
+# Will then only have one copy of the busybox minimal binary file with all utils pointing to the same underlying inode
+RUN ln sh pwd && \
+    ln sh ls && \
+    ln sh cat && \
+    ln sh less && \
+    ln sh grep && \
+    ln sh sleep && \
+    ln sh env && \
+    ln sh tar && \
+    ln sh tee && \
+    ln sh du && \
+    rm ln rm
+
+# Install chain binaries
+COPY --from=build-env /go/bin/horcrux /bin
+
+# Install trusted CA certificates
+COPY --from=busybox-min /etc/ssl/cert.pem /etc/ssl/cert.pem
+
+# Install horcrux user
+COPY --from=busybox-min /etc/passwd /etc/passwd
+COPY --from=busybox-min --chown=2345:2345 /home/horcrux /home/horcrux
+
+WORKDIR /home/horcrux
+USER horcrux

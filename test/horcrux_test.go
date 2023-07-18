@@ -1,10 +1,19 @@
 package test
 
 import (
+	"context"
+	"fmt"
+	"sync"
 	"testing"
-	"time"
 
+	"github.com/cometbft/cometbft/crypto"
+	"github.com/strangelove-ventures/horcrux/signer"
+	interchaintest "github.com/strangelove-ventures/interchaintest/v7"
+	"github.com/strangelove-ventures/interchaintest/v7/chain/cosmos"
+	"github.com/strangelove-ventures/interchaintest/v7/ibc"
+	"github.com/strangelove-ventures/interchaintest/v7/testutil"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zaptest"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -13,307 +22,253 @@ const (
 	maxSpecificElectionRetries = 3
 )
 
-func testChainSingleNodeAndHorcrux(
-	t *testing.T,
-	totalValidators int, // total number of validators on chain (one horcrux + single node for the rest)
-	totalSigners int, // total number of signers for the single horcrux validator
-	threshold uint8, // key shard threshold, and therefore how many horcrux signers must participate to sign a block
-	totalSentries int, // number of sentry nodes for the single horcrux validator
-	sentriesPerSigner int, // how many sentries should each horcrux signer connect to (min: 1, max: totalSentries)
-) {
-	ctx, home, pool, network := SetupTestRun(t)
-
-	chain := getSimdChain(chainID, totalSentries)
-
-	// setup a horcrux validator for us
-	ourValidator, err := NewHorcruxValidator(t, pool, network, home, 0, totalSigners, threshold, chain)
-	require.NoError(t, err)
-
-	// other vals are single node (non-horcrux)
-	chain.NumSentries = 1
-	otherValidatorNodes := GetValidators(1, totalValidators-1, home, chain, pool, network, t)
-
-	// start our validator's horcrux cluster
-	require.NoError(t, ourValidator.StartHorcruxCluster(sentriesPerSigner))
-
-	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	require.NoError(t, Genesis(ctx, t, chain, otherValidatorNodes, []*Node{}, []*Validator{ourValidator}))
-
-	// Wait for all nodes to get to given block height
-	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries[chainID]).WaitForHeight(5))
-
-	require.NoError(t, ourValidator.WaitForConsecutiveBlocks(chainID, 10))
-
-	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
-	require.NoError(t, ourValidator.EnsureNotSlashed(chainID))
+// Test2Of3SignerOneSentry will spin up a chain with one single-node validator and one horcrux validator
+// the horcrux validator will have three cosigner nodes with a threshold of two, and one sentry node
+func Test2Of3SignerOneSentry(t *testing.T) {
+	testChainSingleNodeAndHorcruxThreshold(t, 2, 3, 2, 1, 1)
 }
 
-// Test4Of7SignerTwoSentries will spin up a chain with three single-node validators and one horcrux validator
-// the horcrux validator will have seven signer nodes with a threshold of four, and two sentry nodes
-// checks that no slashing occurs
-func Test4Of7SignerTwoSentries(t *testing.T) {
-	t.Parallel()
-	testChainSingleNodeAndHorcrux(t, 4, 7, 4, 2, 2)
-}
-
-// Test2Of3SignerTwoSentries will spin up a chain with three single-node validators and one horcrux validator
-// the horcrux validator will have three signer nodes with a threshold of two, and two sentry nodes
+// Test2Of3SignerTwoSentries will spin up a chain with one single-node validator and one horcrux validator
+// the horcrux validator will have three cosigner nodes with a threshold of two, and two sentry nodes
 // checks that no slashing occurs
 func Test2Of3SignerTwoSentries(t *testing.T) {
-	t.Parallel()
-	testChainSingleNodeAndHorcrux(t, 4, 3, 2, 2, 2)
+	testChainSingleNodeAndHorcruxThreshold(t, 2, 3, 2, 2, 2)
 }
 
-// Test2Of3SignerUniqueSentry will spin up a chain with three single-node validators and one horcrux validator
-// the horcrux validator will have three signer nodes with a threshold of two, and one sentry node
-// checks that no slashing occurs
-func Test2Of3SignerUniqueSentry(t *testing.T) {
-	t.Parallel()
-	testChainSingleNodeAndHorcrux(t, 4, 3, 2, 1, 1)
+// Test2Of3SignerThreeSentries will spin up a chain with one single-node validator and one horcrux validator
+// the horcrux validator will have three cosigner nodes with a threshold of two, and three sentry nodes
+// where each cosigner connects to all sentries
+func Test2Of3SignerThreeSentries(t *testing.T) {
+	testChainSingleNodeAndHorcruxThreshold(t, 2, 3, 2, 3, 3)
 }
 
-// TestSingleSignerTwoSentries will spin up a chain with four validators & one sentry node, stop one validator & the
-// sentry node, configure those two nodes to be relays for the remote signer, spin up a single remote signer, restart
-// the validator/sentry node and check that no slashing occurs
+// Test2Of3SignerThreeSentriesUniqueConnection will spin up a chain with one single-node validator and one horcrux validator
+// the horcrux validator will have three cosigner nodes with a threshold of two, and three sentry nodes
+// where each cosigner only connects to one sentry
+func Test2Of3SignerThreeSentriesUniqueConnection(t *testing.T) {
+	testChainSingleNodeAndHorcruxThreshold(t, 2, 3, 2, 3, 1)
+}
+
+// Test2Of3SignerOneSentry will spin up a chain with one single-node validator and one horcrux validator
+// the horcrux validator will have three cosigner nodes with a threshold of two, and one sentry node
+func Test3Of5SignerOneSentry(t *testing.T) {
+	testChainSingleNodeAndHorcruxThreshold(t, 2, 5, 3, 1, 1)
+}
+
+// Test3Of5SignerTwoSentries will spin up a chain with one single-node validator and one horcrux validator
+// the horcrux validator will have five cosigner nodes with a threshold of three, and two sentry nodes
+// where each cosigner connects to all sentries.
+func Test3Of5SignerTwoSentries(t *testing.T) {
+	testChainSingleNodeAndHorcruxThreshold(t, 2, 5, 3, 2, 2)
+}
+
+// Test3Of5SignerFiveSentries will spin up a chain with one single-node validator and one horcrux validator
+// the horcrux validator will have five cosigner nodes with a threshold of three, and five sentry nodes
+// where each cosigner connects to all sentries.
+func Test3Of5SignerFiveSentries(t *testing.T) {
+	testChainSingleNodeAndHorcruxThreshold(t, 2, 5, 3, 5, 5)
+}
+
+// Test3Of5SignerFiveSentriesUniqueConnection will spin up a chain with one single-node validator and one horcrux validator
+// the horcrux validator will have three cosigner nodes with a threshold of two, and three sentry nodes
+// where each cosigner only connects to one sentry.
+func Test3Of5SignerFiveSentriesUniqueConnection(t *testing.T) {
+	testChainSingleNodeAndHorcruxThreshold(t, 2, 5, 3, 5, 1)
+}
+
+// Test4Of7SignerTwoSentries will spin up a chain with one single-node validator and one horcrux validator
+// the horcrux validator will have seven cosigner nodes with a threshold of four, and two sentry nodes
+// where each cosigner connects to all sentries.
+func Test4Of7SignerTwoSentries(t *testing.T) {
+	testChainSingleNodeAndHorcruxThreshold(t, 2, 7, 4, 2, 2)
+}
+
+// TestSingleSignerTwoSentries will spin up a chain with one single-node validator and one horcrux single
+// signer validator.
 func TestSingleSignerTwoSentries(t *testing.T) {
-	t.Parallel()
-	ctx, home, pool, network := SetupTestRun(t)
-
-	const (
-		totalValidators = 4
-		totalSentries   = 2
-		totalSigners    = 1
-	)
-	chain := getSimdChain(chainID, totalSentries)
-
-	// get total sentries nodes for our validator
-	ourValidatorNodes := GetValidators(0, 1, home, chain, pool, network, t)
-
-	// using the first node for account and consensus key to create gentx
-	ourValidatorAccountNode := ourValidatorNodes[0]
-
-	// other vals are single node (non-horcrux)
-	chain.NumSentries = 1
-	otherValidatorNodes := GetValidators(1, totalValidators-1, home, chain, pool, network, t)
-
-	// nodes that will be used for account and consensus key to create gentx
-	validatorAccountNodes := GetAllNodes([]*Node{ourValidatorAccountNode}, otherValidatorNodes)
-
-	// nodes that will initially be setup as simple fullnodes, then enable privval listener
-	// not used for gentx tasks. In this case it is only our val's second node
-	// both of ourValidatorNodes are sentries, but for initial setup only the first one is used for gentx.
-	sentries := []*Node{ourValidatorNodes[1]}
-
-	// initialize horcrux signer nodes for our validator
-	signers := MakeSigners(0, totalSigners, home, pool, network, t)
-
-	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	require.NoError(t, Genesis(ctx, t, chain, validatorAccountNodes, sentries, []*Validator{}))
-
-	allNodes := GetAllNodes(validatorAccountNodes, sentries)
-
-	// Wait for all nodes to get to given block height
-	require.NoError(t, allNodes.WaitForHeight(5))
-
-	// start remote signer
-	require.NoError(t, StartSingleSignerContainers(signers, ourValidatorAccountNode, ourValidatorNodes))
-
-	// Stop the validator node and sentry node before upgrading to horcrux
-	t.Logf("{%s} -> Stopping Node...", ourValidatorAccountNode.Name())
-	require.NoError(t, ourValidatorAccountNode.StopAndRemoveContainer(false))
-
-	t.Logf("{%s} -> Stopping Node...", sentries[0].Name())
-	require.NoError(t, sentries[0].StopAndRemoveContainer(false))
-
-	time.Sleep(5 * time.Second) // wait for all containers to stop
-
-	// wait for all signers to be reachable on port 2222
-	require.NoError(t, signers.GetHosts().WaitForAllToStart(t, 10))
-
-	// modify node config to listen for private validator connections
-	ourValidatorAccountNode.SetPrivValListen(allNodes.PeerString())
-	sentries[0].SetPrivValListen(allNodes.PeerString())
-
-	// restart node and ensure that signer cluster is connected by
-	// checking if the node continues to miss blocks or is slashed
-	t.Logf("{%s} -> Restarting Node...", ourValidatorAccountNode.Name())
-	t.Logf("{%s} -> Restarting Node...", sentries[0].Name())
-
-	require.NoError(t, ourValidatorAccountNode.Start(ctx, nil))
-	require.NoError(t, sentries[0].Start(ctx, nil))
-
-	// wait for our validator and all sentries to be reachable
-	hosts := ourValidatorAccountNode.GetHosts()
-	hosts = append(hosts, sentries[0].GetHosts()...)
-	require.NoError(t, hosts.WaitForAllToStart(t, 10))
-
-	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidatorAccountNode.Name())
-	ourPrivVal, err := ourValidatorAccountNode.GetPrivVal()
-	require.NoError(t, err)
-
-	require.NoError(t, ourValidatorAccountNode.EnsureNotSlashed(ourPrivVal.PubKey.Address()))
+	testChainSingleNodeAndHorcruxSingle(t, 2, 2)
 }
 
-// TestUpgradeValidatorToHorcrux will spin up a chain with four validators, stop one validator, configure that validator
+// TestUpgradeValidatorToHorcrux will spin up a chain with two validators, stop one validator, configure that validator
 // to be a relay for the remote signer cluster, spin up a 2/3 threshold signer cluster, restart the validator and check
-// that no slashing occurs
+// that no slashing occurs.
 func TestUpgradeValidatorToHorcrux(t *testing.T) {
-	t.Parallel()
-	ctx, home, pool, network := SetupTestRun(t)
+	ctx := context.Background()
+	client, network := interchaintest.DockerSetup(t)
+	logger := zaptest.NewLogger(t)
 
 	const (
-		totalValidators   = 4
-		totalSigners      = 3
-		threshold         = 2
-		sentriesPerSigner = 1
+		totalValidators    = 2
+		signedBlocksWindow = 10
+		minSignedPerWindow = 0.5
+		totalSigners       = 3
+		threshold          = 2
+		sentriesPerSigner  = 1
 	)
-	chain := getSimdChain(chainID, sentriesPerSigner)
 
-	// initially all vals are single node (non-horcrux)
-	validators := GetValidators(0, totalValidators, home, chain, pool, network, t)
+	// slightly more lenient uptime requirement than modifyGenesisStrictUptime to account for
+	// the time it takes to upgrade the validator, where a few missed blocks is expected.
+	// allow 50% missed blocks in 10 block signed blocks window (5 missed blocks before slashing).
+	modifyGenesis := modifyGenesisSlashingUptime(signedBlocksWindow, minSignedPerWindow)
 
-	// for this test we will upgrade the first validator to horcrux
-	ourValidatorNode := validators[0]
+	cw := &chainWrapper{
+		totalValidators: totalValidators,
+		modifyGenesis:   modifyGenesis,
+	}
 
-	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	require.NoError(t, Genesis(ctx, t, chain, validators, []*Node{}, []*Validator{}))
+	startChains(ctx, t, logger, client, network, cw)
 
-	// Wait for all validators to get to given block height
-	require.NoError(t, validators.WaitForHeight(5))
+	// validator to upgrade to horcrux
+	v := cw.chain.Validators[0]
 
-	// get the consensus key from our validator
-	ourValidatorPrivValKey, err := ourValidatorNode.GetPrivVal()
+	err := v.StopContainer(ctx)
 	require.NoError(t, err)
 
-	// create horcrux validator with same consensus key
-	ourValidatorUpgradedToHorcrux, err := NewHorcruxValidatorWithPrivValKey(t, pool, network, home,
-		0, 0, totalSigners, threshold, chain, ourValidatorPrivValKey)
+	pubKey, err := convertValidatorToHorcrux(ctx, logger, client, network, v, totalSigners, threshold, cosmos.ChainNodes{v}, sentriesPerSigner)
 	require.NoError(t, err)
 
-	// stop our validator node before upgrading to horcrux
-	t.Logf("{%s} -> Stopping Node...", ourValidatorNode.Name())
-	require.NoError(t, ourValidatorNode.StopAndRemoveContainer(false))
+	err = v.StartContainer(ctx)
+	require.NoError(t, err)
 
-	time.Sleep(5 * time.Second) // wait for all containers to stop
+	err = testutil.WaitForBlocks(ctx, 20, cw.chain)
+	require.NoError(t, err)
 
-	// bring in single signer node as a sentry for horcrux
-	ourValidatorUpgradedToHorcrux.Sentries[chainID] = []*Node{ourValidatorNode}
-
-	// modify node config to listen for private validator connections
-	ourValidatorNode.SetPrivValListen(validators.PeerString())
-
-	// remove priv_validator_key.json from our validator node
-	// horcrux now holds the sharded key
-	ourValidatorNode.GenNewPrivVal()
-
-	// start our new validator
-	require.NoError(t, ourValidatorUpgradedToHorcrux.StartHorcruxCluster(sentriesPerSigner))
-
-	t.Logf("{%s} -> Restarting Node...", ourValidatorNode.Name())
-	require.NoError(t, ourValidatorNode.Start(ctx, nil))
-
-	// wait for validator to be reachable
-	require.NoError(t, ourValidatorNode.GetHosts().WaitForAllToStart(t, 10))
-
-	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidatorUpgradedToHorcrux.Name())
-	require.NoError(t, ourValidatorUpgradedToHorcrux.EnsureNotSlashed(chainID))
+	requireHealthyValidator(t, cw.chain.Validators[0], pubKey.Address())
 }
+
+// TestDownedSigners2of3 tests taking down 2 nodes at a time in the 2/3 threshold horcrux cluster for a period of time.
 
 func TestDownedSigners2of3(t *testing.T) {
-	t.Parallel()
-	ctx, home, pool, network := SetupTestRun(t)
+	ctx := context.Background()
 
 	const (
-		totalValidators   = 4
-		totalSigners      = 3
-		threshold         = 2
-		sentriesPerSigner = 3
-	)
-	chain := getSimdChain(chainID, sentriesPerSigner)
-
-	// setup a horcrux validator for us
-	ourValidator, err := NewHorcruxValidator(t, pool, network, home,
-		0, totalSigners, threshold, chain)
-	require.NoError(t, err)
-
-	// remaining validators are single-node non-horcrux
-	chain.NumSentries = 1
-	otherValidatorNodes := GetValidators(1, totalValidators-1, home, chain, pool, network, t)
-
-	// start our validator's horcrux cluster
-	require.NoError(t, ourValidator.StartHorcruxCluster(sentriesPerSigner))
-
-	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	require.NoError(t, Genesis(ctx, t, chain, otherValidatorNodes, []*Node{}, []*Validator{ourValidator}))
-
-	// Wait for all nodes to get to given block height
-	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries[chainID]).WaitForHeight(5))
-
-	// Test taking down each node in the signer cluster for a period of time
-	for _, signer := range ourValidator.Signers {
-		t.Logf("{%s} -> Stopping signer...", signer.Name())
-		require.NoError(t, signer.StopAndRemoveContainer(false))
-
-		t.Logf("{%s} -> Waiting until cluster recovers from taking down signer {%s}", ourValidator.Name(), signer.Name())
-		require.NoError(t, ourValidator.WaitForConsecutiveBlocks(chainID, 10))
-
-		t.Logf("{%s} -> Restarting signer...", signer.Name())
-		require.NoError(t, signer.CreateCosignerContainer())
-		require.NoError(t, signer.StartContainer())
-		require.NoError(t, signer.GetHosts().WaitForAllToStart(t, 10)) // Wait to ensure signer is back up
-		require.NoError(t, ourValidator.WaitForConsecutiveBlocks(chainID, 10))
-	}
-	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
-	require.NoError(t, ourValidator.EnsureNotSlashed(chainID))
-}
-
-func TestLeaderElection2of3(t *testing.T) {
-	t.Parallel()
-	ctx, home, pool, network := SetupTestRun(t)
-
-	const (
-		totalValidators   = 4
+		totalValidators   = 2
 		totalSigners      = 3
 		threshold         = 2
 		totalSentries     = 3
-		sentriesPerSigner = 1
+		sentriesPerSigner = 3
 	)
-	chain := getSimdChain(chainID, totalSentries)
 
-	// setup a horcrux validator for us
-	ourValidator, err := NewHorcruxValidator(t, pool, network, home,
-		0, totalSigners, threshold, chain)
-	require.NoError(t, err)
+	cw, pubKey := startChainSingleNodeAndHorcruxThreshold(
+		ctx, t, totalValidators, totalSigners, threshold, totalSentries, sentriesPerSigner,
+	)
 
-	// remaining validators are single-node non-horcrux
-	chain.NumSentries = 1
-	otherValidatorNodes := GetValidators(1, totalValidators-1, home, chain, pool, network, t)
+	ourValidator := cw.chain.Validators[0]
+	requireHealthyValidator(t, ourValidator, pubKey.Address())
 
-	// start our validator's horcrux cluster
-	require.NoError(t, ourValidator.StartHorcruxCluster(sentriesPerSigner))
+	cosigners := ourValidator.Sidecars
 
-	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	require.NoError(t, Genesis(ctx, t, chain, otherValidatorNodes, []*Node{}, []*Validator{ourValidator}))
+	// Test taking down each node in the signer cluster for a period of time
+	for _, cosigner := range cosigners {
+		t.Logf("{%s} -> Stopping signer...", cosigner.Name())
+		require.NoError(t, cosigner.StopContainer(ctx))
 
-	// Wait for all nodes to get to given block height
-	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries[chainID]).WaitForHeight(5))
+		t.Logf("{%s} -> Waiting for blocks after stopping cosigner {%s}", ourValidator.Name(), cosigner.Name())
+		require.NoError(t, testutil.WaitForBlocks(ctx, 5, cw.chain))
+
+		requireHealthyValidator(t, ourValidator, pubKey.Address())
+
+		t.Logf("{%s} -> Restarting signer...", cosigner.Name())
+		require.NoError(t, cosigner.StartContainer(ctx))
+
+		t.Logf("{%s} -> Waiting for blocks after restarting cosigner {%s}", ourValidator.Name(), cosigner.Name())
+		require.NoError(t, testutil.WaitForBlocks(ctx, 5, cw.chain))
+
+		requireHealthyValidator(t, ourValidator, pubKey.Address())
+	}
+}
+
+// TestDownedSigners3of5 tests taking down 2 nodes at a time in the 3/5 threshold horcrux cluster for a period of time.
+func TestDownedSigners3of5(t *testing.T) {
+	ctx := context.Background()
+
+	const (
+		totalValidators   = 2
+		totalSigners      = 5
+		threshold         = 3
+		totalSentries     = 3
+		sentriesPerSigner = 3
+	)
+
+	cw, pubKey := startChainSingleNodeAndHorcruxThreshold(
+		ctx, t, totalValidators, totalSigners, threshold, totalSentries, sentriesPerSigner,
+	)
+
+	ourValidator := cw.chain.Validators[0]
+	requireHealthyValidator(t, ourValidator, pubKey.Address())
+
+	cosigners := ourValidator.Sidecars
+
+	// Test taking down 2 nodes at a time in the signer cluster for a period of time
+	for i := 0; i < len(cosigners); i++ {
+		cosigner1 := cosigners[i]
+		var cosigner2 *cosmos.SidecarProcess
+		if i < len(cosigners)-1 {
+			cosigner2 = cosigners[i+1]
+		} else {
+			cosigner2 = cosigners[0]
+		}
+		if i == 0 {
+			t.Logf("{%s} -> Stopping signer...", cosigner1.Name())
+			require.NoError(t, cosigner1.StopContainer(ctx))
+			t.Logf("{%s} -> Stopping signer...", cosigner2.Name())
+			require.NoError(t, cosigner2.StopContainer(ctx))
+			t.Logf("{%s} -> Waiting for blocks after stopping cosigner {%s}", ourValidator.Name(), cosigner1.Name())
+		} else {
+			t.Logf("{%s} -> Stopping signer...", cosigner2.Name())
+			require.NoError(t, cosigner2.StopContainer(ctx))
+		}
+
+		t.Logf("{%s} -> Waiting for blocks after stopping cosigner {%s}", ourValidator.Name(), cosigner2.Name())
+		require.NoError(t, testutil.WaitForBlocks(ctx, 5, cw.chain))
+
+		requireHealthyValidator(t, ourValidator, pubKey.Address())
+
+		t.Logf("{%s} -> Restarting cosigner...", cosigner1.Name())
+		require.NoError(t, cosigner1.StartContainer(ctx))
+		require.NoError(t, testutil.WaitForBlocks(ctx, 5, cw.chain))
+
+		requireHealthyValidator(t, ourValidator, pubKey.Address())
+	}
+}
+
+// TestLeaderElection2of3 tests electing a specific leader in a 2/3 threshold horcrux cluster.
+func TestLeaderElection2of3(t *testing.T) {
+	ctx := context.Background()
+
+	const (
+		totalValidators   = 2
+		totalSigners      = 3
+		threshold         = 2
+		totalSentries     = 3
+		sentriesPerSigner = 3
+	)
+
+	cw, pubKey := startChainSingleNodeAndHorcruxThreshold(
+		ctx, t, totalValidators, totalSigners, threshold, totalSentries, sentriesPerSigner,
+	)
+
+	ourValidator := cw.chain.Validators[0]
+	requireHealthyValidator(t, ourValidator, pubKey.Address())
+
+	cosigners := ourValidator.Sidecars
 
 	// Test electing each node in the signer cluster for a period of time
-	for _, signer := range ourValidator.Signers {
+	for _, cosigner := range cosigners {
 		var eg errgroup.Group
 
 		for i := 0; i < maxSpecificElectionRetries; i++ {
-			t.Logf("{%s} -> Electing leader...", signer.Name())
-			err := signer.TransferLeadership(ctx, signer.Index)
-			require.NoError(t, err, "failed to transfer leadership to %d", signer.Index)
+			t.Logf("{%s} -> Electing leader...", cosigner.Name())
+			err := transferLeadership(ctx, cosigner)
+			require.NoError(t, err, "failed to transfer leadership to %d", cosigner.Name())
 
-			t.Logf("{%s} -> Waiting for signed blocks with signer as leader {%s}", ourValidator.Name(), signer.Name())
+			t.Logf("{%s} -> Waiting for signed blocks with signer as leader {%s}", ourValidator.Name(), cosigner.Name())
 
 			// Make sure all cosigners have the same leader
-			for _, s := range ourValidator.Signers {
+			for _, s := range cosigners {
 				s := s
 				eg.Go(func() error {
-					return s.PollForLeader(ctx, signer.Name()+":"+signerPort)
+					return pollForLeader(ctx, t, s, cosigner.Name()+":"+signerPort)
 				})
 			}
 			if err := eg.Wait(); err == nil {
@@ -323,8 +278,8 @@ func TestLeaderElection2of3(t *testing.T) {
 			// electing a specific leader can fail, but this is okay as long as all nodes agree on one leader.
 			// will retry electing the specific leader in the next iteration.
 			var commonLeader string
-			for i, s := range ourValidator.Signers {
-				leader, err := s.GetLeader(ctx)
+			for i, s := range cosigners {
+				leader, err := getLeader(ctx, s)
 				require.NoErrorf(t, err, "failed to get leader from signer: %s", s.Name())
 				if i == 0 {
 					commonLeader = leader
@@ -334,200 +289,243 @@ func TestLeaderElection2of3(t *testing.T) {
 			}
 		}
 
-		require.NoError(t, ourValidator.WaitForConsecutiveBlocks(chainID, 8))
+		require.NoError(t, testutil.WaitForBlocks(ctx, 5, cw.chain))
+
+		requireHealthyValidator(t, ourValidator, pubKey.Address())
 	}
-	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
-	require.NoError(t, ourValidator.EnsureNotSlashed(chainID))
 }
 
-func TestDownedSigners3of5(t *testing.T) {
-	t.Parallel()
-	ctx, home, pool, network := SetupTestRun(t)
-
-	const (
-		totalValidators   = 4
-		totalSigners      = 5
-		threshold         = 3
-		totalSentries     = 2
-		sentriesPerSigner = 1
-	)
-	chain := getSimdChain(chainID, totalSentries)
-
-	// setup a horcrux validator for us
-	ourValidator, err := NewHorcruxValidator(t, pool, network, home,
-		0, totalSigners, threshold, chain)
-	require.NoError(t, err)
-
-	// remaining validators are single-node non-horcrux
-	chain.NumSentries = 1
-	otherValidatorNodes := GetValidators(1, totalValidators-1, home, chain, pool, network, t)
-
-	// start our validator's horcrux cluster
-	require.NoError(t, ourValidator.StartHorcruxCluster(sentriesPerSigner))
-
-	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	require.NoError(t, Genesis(ctx, t, chain, otherValidatorNodes, []*Node{}, []*Validator{ourValidator}))
-
-	// Wait for all nodes to get to given block height
-	require.NoError(t, GetAllNodes(otherValidatorNodes, ourValidator.Sentries[chainID]).WaitForHeight(5))
-
-	// Test taking down 2 nodes at a time in the signer cluster for a period of time
-	for i := 0; i < len(ourValidator.Signers); i++ {
-		signer1 := ourValidator.Signers[i]
-		var signer2 *Signer
-		if i < len(ourValidator.Signers)-1 {
-			signer2 = ourValidator.Signers[i+1]
-		} else {
-			signer2 = ourValidator.Signers[0]
-		}
-		if i == 0 {
-			t.Logf("{%s} -> Stopping signer...", signer1.Name())
-			require.NoError(t, signer1.StopAndRemoveContainer(false))
-			t.Logf("{%s} -> Stopping signer...", signer2.Name())
-			require.NoError(t, signer2.StopAndRemoveContainer(false))
-			t.Logf("{%s} -> Waiting until cluster recovers from taking down signer {%s}", ourValidator.Name(), signer1.Name())
-		} else {
-			t.Logf("{%s} -> Stopping signer...", signer2.Name())
-			require.NoError(t, signer2.StopAndRemoveContainer(false))
-		}
-
-		t.Logf("{%s} -> Waiting until cluster recovers from taking down signer {%s}", ourValidator.Name(), signer2.Name())
-		require.NoError(t, ourValidator.WaitForConsecutiveBlocks(chainID, 10))
-
-		t.Logf("{%s} -> Restarting signer...", signer1.Name())
-		require.NoError(t, signer1.CreateCosignerContainer())
-		require.NoError(t, signer1.StartContainer())
-		require.NoError(t, signer1.GetHosts().WaitForAllToStart(t, 10)) // Wait to ensure signer is back up
-		require.NoError(t, ourValidator.WaitForConsecutiveBlocks(chainID, 10))
-	}
-	t.Logf("{%s} -> Checking that slashing has not occurred...", ourValidator.Name())
-	require.NoError(t, ourValidator.EnsureNotSlashed(chainID))
-}
-
-// tests a chain with only horcrux validators
+// TestChainPureHorcrux tests a chain with only horcrux validators.
 func TestChainPureHorcrux(t *testing.T) {
-	t.Parallel()
-	ctx, home, pool, network := SetupTestRun(t)
-
-	const (
-		totalValidators      = 4
-		signersPerValidator  = 3
-		sentriesPerValidator = 2
-		threshold            = 2
-		sentriesPerSigner    = sentriesPerValidator
-	)
-	var chain *ChainType
-	if false {
-		// keeping this here as example of testing another chain
-		chain = getSentinelChain(ctx, chainID, sentriesPerSigner, "v0.8.3")
-	} else {
-		chain = getSimdChain(chainID, sentriesPerSigner)
-	}
-
-	var validators []*Validator
-	var startValidatorsErrGroup errgroup.Group
-
-	var allNodes Nodes
-
-	// start horcrux cluster for each validator
-	for i := 0; i < totalValidators; i++ {
-		validator, err := NewHorcruxValidator(t, pool, network, home, i,
-			signersPerValidator, threshold, chain)
-		require.NoError(t, err)
-		validators = append(validators, validator)
-		allNodes = append(allNodes, validator.Sentries[chainID]...)
-		startValidatorsErrGroup.Go(func() error {
-			return validator.StartHorcruxCluster(sentriesPerSigner)
-		})
-	}
-
-	require.NoError(t, startValidatorsErrGroup.Wait())
-
-	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	require.NoError(t, Genesis(ctx, t, chain, []*Node{}, []*Node{}, validators))
-
-	require.NoError(t, allNodes.WaitForHeight(5))
-
-	var blockWaitErrGroup errgroup.Group
-
-	// wait for all validators to sign consecutive blocks
-	for _, tv := range validators {
-		validator := tv
-		blockWaitErrGroup.Go(func() error {
-			err := validator.WaitForConsecutiveBlocks(chainID, 30)
-			if err != nil {
-				return err
-			}
-			return validator.EnsureNotSlashed(chainID)
-		})
-	}
-
-	// wait for all validators to have consecutive blocks
-	require.NoError(t, blockWaitErrGroup.Wait())
-}
-
-// tests running a validator across multiple chains with a single horcrux cluster
-func TestMultipleChainHorcrux(t *testing.T) {
-	t.Parallel()
-	ctx, home, pool, network := SetupTestRun(t)
+	ctx := context.Background()
+	client, network := interchaintest.DockerSetup(t)
+	logger := zaptest.NewLogger(t)
 
 	const (
 		totalValidators      = 2
+		sentriesPerValidator = 3
 		signersPerValidator  = 3
-		sentriesPerValidator = 2
 		threshold            = 2
-		sentriesPerSigner    = sentriesPerValidator
+		sentriesPerSigner    = 1
 	)
-	chainID1, chainID2 := "chain-1", "chain-2"
-	chain1, chain2 := getSimdChain(chainID1, sentriesPerSigner), getSimdChain(chainID2, sentriesPerSigner)
 
-	var validators []*Validator
-	var startValidatorsErrGroup errgroup.Group
+	pubKeys := make([]crypto.PubKey, totalValidators)
+	cw := &chainWrapper{
+		totalValidators: totalValidators,
+		totalSentries:   1 + totalValidators*(sentriesPerValidator-1),
+		modifyGenesis:   modifyGenesisStrictUptime,
+		preGenesis:      preGenesisAllHorcruxThreshold(ctx, logger, client, network, signersPerValidator, threshold, sentriesPerValidator, sentriesPerSigner, pubKeys),
+	}
 
-	var allNodes Nodes
+	startChains(
+		ctx, t, logger, client, network, cw,
+	)
 
-	// start horcrux cluster for each validator
-	for i := 0; i < totalValidators; i++ {
-		validator, err := NewHorcruxValidator(t, pool, network, home, i,
-			signersPerValidator, threshold, chain1, chain2)
-		require.NoError(t, err)
-		validators = append(validators, validator)
-		allNodes = append(allNodes, validator.Sentries[chainID1]...)
-		allNodes = append(allNodes, validator.Sentries[chainID2]...)
-		startValidatorsErrGroup.Go(func() error {
-			return validator.StartHorcruxCluster(sentriesPerSigner)
+	err := testutil.WaitForBlocks(ctx, 20, cw.chain)
+	require.NoError(t, err)
+
+	for _, p := range pubKeys {
+		requireHealthyValidator(t, cw.chain.Validators[0], p.Address())
+	}
+}
+
+// TestMultipleChainHorcrux tests running a validator across multiple chains with a single horcrux cluster.
+func TestMultipleChainHorcrux(t *testing.T) {
+	ctx := context.Background()
+	client, network := interchaintest.DockerSetup(t)
+	logger := zaptest.NewLogger(t)
+
+	const (
+		totalChains          = 2
+		validatorsPerChain   = 2
+		sentriesPerValidator = 3
+		totalSigners         = 3
+		threshold            = 2
+		sentriesPerSigner    = 1
+	)
+
+	chainWrappers := make([]*chainWrapper, totalChains)
+	pubKeys := make([]crypto.PubKey, totalChains)
+	chainConfigs := make([]*cosignerChainConfig, totalChains)
+	preGenesises := make([]func(*chainWrapper) func(ibc.ChainConfig) error, totalChains)
+
+	for i := 0; i < totalChains; i++ {
+		chainConfigs[i] = &cosignerChainConfig{
+			sentries: make([]cosmos.ChainNodes, sentriesPerSigner),
+			shards:   make([]signer.CosignerEd25519Key, totalSigners),
+		}
+	}
+
+	cosignerSidecars := make(cosmos.SidecarProcesses, totalSigners)
+
+	eciesShards, err := signer.CreateCosignerECIESShards(totalSigners)
+	require.NoError(t, err)
+
+	var wg sync.WaitGroup
+	wg.Add(totalChains)
+
+	cosignersStarted := make(chan struct{}, 1)
+
+	for i, chainConfig := range chainConfigs {
+		i := i
+		chainConfig := chainConfig
+		preGenesises[i] = func(cw *chainWrapper) func(ibc.ChainConfig) error {
+			return func(cc ibc.ChainConfig) error {
+
+				firstSentry := cw.chain.Validators[0]
+				sentries := append(cosmos.ChainNodes{firstSentry}, cw.chain.FullNodes...)
+
+				sentriesForCosigner := getSentriesForCosignerConnection(sentries, totalSigners, sentriesPerSigner)
+				chainConfig.sentries = sentriesForCosigner
+
+				chainConfig.chainID = cw.chain.Config().ChainID
+
+				ed25519Shards, pvPubKey, err := getShardedPrivvalKey(ctx, firstSentry, threshold, uint8(totalSigners))
+				if err != nil {
+					wg.Done()
+					return err
+				}
+
+				chainConfig.shards = ed25519Shards
+
+				pubKeys[i] = pvPubKey
+
+				if i == 0 {
+					for j := 0; j < totalSigners; j++ {
+						cosigner, err := horcruxSidecar(ctx, firstSentry, fmt.Sprintf("cosigner-%d", j+1), client, network)
+						if err != nil {
+							wg.Done()
+							return err
+						}
+
+						cosignerSidecars[j] = cosigner
+					}
+				}
+
+				if err := enablePrivvalListener(ctx, logger, sentries, client); err != nil {
+					wg.Done()
+					return err
+				}
+
+				wg.Done()
+
+				// wait for all cosigners to be started before continuing to start the chain.
+				<-cosignersStarted
+
+				return nil
+			}
+		}
+	}
+
+	go configureAndStartSidecars(ctx, t, eciesShards, cosignerSidecars, threshold, &wg, cosignersStarted, chainConfigs...)
+
+	for i := 0; i < totalChains; i++ {
+		chainWrappers[i] = &chainWrapper{
+			totalValidators: validatorsPerChain,
+			totalSentries:   sentriesPerValidator - 1,
+			modifyGenesis:   modifyGenesisStrictUptime,
+			preGenesis:      preGenesises[i],
+		}
+	}
+
+	startChains(ctx, t, logger, client, network, chainWrappers...)
+
+	chains := make([]testutil.ChainHeighter, totalChains)
+	for i, cw := range chainWrappers {
+		chains[i] = cw.chain
+	}
+
+	testutil.WaitForBlocks(ctx, 20, chains...)
+
+	for i, p := range pubKeys {
+		requireHealthyValidator(t, chainWrappers[i].chain.Validators[0], p.Address())
+	}
+}
+
+type cosignerChainConfig struct {
+	chainID  string
+	shards   []signer.CosignerEd25519Key
+	sentries []cosmos.ChainNodes
+}
+
+func configureAndStartSidecars(
+	ctx context.Context,
+	t *testing.T,
+	eciesShards []signer.CosignerECIESKey,
+	cosignerSidecars cosmos.SidecarProcesses,
+	threshold int,
+	wg *sync.WaitGroup,
+	cosignersStarted chan struct{},
+	chainConfigs ...*cosignerChainConfig,
+) {
+	// wait for pre-genesis to finish from all chains
+	wg.Wait()
+
+	totalSigners := len(cosignerSidecars)
+
+	cosignersConfig := make(signer.CosignersConfig, totalSigners)
+	for i, cosigner := range cosignerSidecars {
+		cosignersConfig[i] = signer.CosignerConfig{
+			ShardID: i + 1,
+			P2PAddr: fmt.Sprintf("tcp://%s:%s", cosigner.HostName(), signerPort),
+		}
+	}
+
+	var eg errgroup.Group
+
+	for i, cosigner := range cosignerSidecars {
+		numSentries := 0
+		for _, chainConfig := range chainConfigs {
+			numSentries += len(chainConfig.sentries[i])
+		}
+
+		chainNodes := make(signer.ChainNodes, 0, numSentries)
+
+		ed25519Shards := make([]chainEd25519Shard, len(chainConfigs))
+
+		for j, chainConfig := range chainConfigs {
+			for _, sentry := range chainConfig.sentries[i] {
+				chainNodes = append(chainNodes, signer.ChainNode{
+					PrivValAddr: fmt.Sprintf("tcp://%s:1234", sentry.HostName()),
+				})
+			}
+
+			ed25519Shards[j] = chainEd25519Shard{
+				chainID: chainConfig.chainID,
+				key:     chainConfig.shards[i],
+			}
+		}
+
+		config := signer.Config{
+			SignMode: signer.SignModeThreshold,
+			ThresholdModeConfig: &signer.ThresholdModeConfig{
+				Threshold:   threshold,
+				Cosigners:   cosignersConfig,
+				GRPCTimeout: "1500ms",
+				RaftTimeout: "1500ms",
+			},
+			ChainNodes: chainNodes,
+		}
+
+		cosigner := cosigner
+		i := i
+
+		// configure and start cosigner in parallel
+		eg.Go(func() error {
+			if err := writeConfigAndKeysThreshold(ctx, cosigner, config, eciesShards[i], ed25519Shards...); err != nil {
+				return err
+			}
+
+			if err := cosigner.CreateContainer(ctx); err != nil {
+				return err
+			}
+
+			return cosigner.StartContainer(ctx)
 		})
 	}
 
-	require.NoError(t, startValidatorsErrGroup.Wait())
+	require.NoError(t, eg.Wait())
 
-	// assemble and combine gentx to get genesis file, configure peering between sentries, then start the chain
-	require.NoError(t, Genesis(ctx, t, chain1, []*Node{}, []*Node{}, validators))
-	require.NoError(t, Genesis(ctx, t, chain2, []*Node{}, []*Node{}, validators))
-
-	require.NoError(t, allNodes.WaitForHeight(5))
-
-	var blockWaitErrGroup errgroup.Group
-
-	// wait for all validators to sign consecutive blocks on both chains
-	for _, tv := range validators {
-		validator := tv
-		blockWaitErrGroup.Go(func() error {
-			err := validator.WaitForConsecutiveBlocks(chainID1, 30)
-			if err != nil {
-				return err
-			}
-			return validator.EnsureNotSlashed(chainID1)
-		})
-		blockWaitErrGroup.Go(func() error {
-			err := validator.WaitForConsecutiveBlocks(chainID2, 30)
-			if err != nil {
-				return err
-			}
-			return validator.EnsureNotSlashed(chainID2)
-		})
-	}
-
-	// wait for all validators to have consecutive blocks
-	require.NoError(t, blockWaitErrGroup.Wait())
+	// signal to pre-genesis that all cosigners have been started and chain start can proceed.
+	close(cosignersStarted)
 }
