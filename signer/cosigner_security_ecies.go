@@ -44,9 +44,11 @@ func (key *CosignerECIESKey) MarshalJSON() ([]byte, error) {
 	privateBytes := key.ECIESKey.D.Bytes()
 	pubKeysBytes := make([][]byte, len(key.ECIESPubs))
 	for i, pubKey := range key.ECIESPubs {
-		pubKeysBytes[i] = []byte{0x04}
-		pubKeysBytes[i] = append(pubKeysBytes[i], pubKey.X.Bytes()...)
-		pubKeysBytes[i] = append(pubKeysBytes[i], pubKey.Y.Bytes()...)
+		pubBz := make([]byte, 65)
+		pubBz[0] = 0x04
+		copy(pubBz[1:33], pubKey.X.Bytes())
+		copy(pubBz[33:65], pubKey.Y.Bytes())
+		pubKeysBytes[i] = pubBz
 	}
 
 	return json.Marshal(&struct {

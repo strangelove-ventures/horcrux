@@ -1,7 +1,6 @@
 package signer
 
 import (
-	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
@@ -42,12 +41,12 @@ func TestCosignerRSA(t *testing.T) {
 		require.NoError(t, json.Unmarshal(bz, &key2))
 		require.Equal(t, key, key2)
 
-		require.True(t, bytes.Equal(key.RSAKey.N.Bytes(), key2.RSAKey.N.Bytes()))
-		require.True(t, bytes.Equal(key.RSAKey.D.Bytes(), key2.RSAKey.D.Bytes()))
+		require.Equal(t, key.RSAKey.N.Bytes(), key2.RSAKey.N.Bytes())
+		require.Equal(t, key.RSAKey.D.Bytes(), key2.RSAKey.D.Bytes())
 		require.Equal(t, key.RSAKey.E, key2.RSAKey.E)
 
 		for i := 0; i < 3; i++ {
-			require.True(t, bytes.Equal(key.RSAPubs[i].N.Bytes(), key2.RSAPubs[i].N.Bytes()))
+			require.Equal(t, key.RSAPubs[i].N.Bytes(), key2.RSAPubs[i].N.Bytes())
 			require.Equal(t, key.RSAPubs[i].E, key2.RSAPubs[i].E)
 		}
 	}
@@ -56,13 +55,13 @@ func TestCosignerRSA(t *testing.T) {
 	require.ErrorIs(t, rsa.ErrDecryption, err)
 }
 
-func BenchmarkCosignerRSA(b *testing.B) {
+func TestConcurrentIterateCosignerRSA(t *testing.T) {
 	keys := make([]*rsa.PrivateKey, 3)
 	pubKeys := make([]*rsa.PublicKey, 3)
 
 	for i := 0; i < 3; i++ {
 		key, err := rsa.GenerateKey(rand.Reader, bitSize)
-		require.NoError(b, err)
+		require.NoError(t, err)
 
 		keys[i] = key
 		pubKeys[i] = &key.PublicKey
@@ -78,7 +77,7 @@ func BenchmarkCosignerRSA(b *testing.B) {
 		})
 	}
 
-	for i := 0; i < b.N; i++ {
+	for i := 0; i < 100; i++ {
 		var eg errgroup.Group
 		for i, security := range securities {
 			security := security
@@ -107,6 +106,6 @@ func BenchmarkCosignerRSA(b *testing.B) {
 				return nestedEg.Wait()
 			})
 		}
-		require.NoErrorf(b, eg.Wait(), "success count: %d", i)
+		require.NoErrorf(t, eg.Wait(), "success count: %d", i)
 	}
 }

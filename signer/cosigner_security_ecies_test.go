@@ -1,7 +1,6 @@
 package signer
 
 import (
-	"bytes"
 	"crypto/rand"
 	"encoding/json"
 	"testing"
@@ -43,11 +42,11 @@ func TestCosignerECIES(t *testing.T) {
 		require.NoError(t, json.Unmarshal(bz, &key2))
 		require.Equal(t, key, key2)
 
-		require.True(t, bytes.Equal(key.ECIESKey.D.Bytes(), key2.ECIESKey.D.Bytes()))
+		require.Equal(t, key.ECIESKey.D.Bytes(), key2.ECIESKey.D.Bytes())
 
 		for i := 0; i < 3; i++ {
-			require.True(t, bytes.Equal(key.ECIESPubs[i].X.Bytes(), key2.ECIESPubs[i].X.Bytes()))
-			require.True(t, bytes.Equal(key.ECIESPubs[i].Y.Bytes(), key2.ECIESPubs[i].Y.Bytes()))
+			require.Equal(t, key.ECIESPubs[i].X.Bytes(), key2.ECIESPubs[i].X.Bytes())
+			require.Equal(t, key.ECIESPubs[i].Y.Bytes(), key2.ECIESPubs[i].Y.Bytes())
 		}
 	}
 
@@ -76,13 +75,17 @@ func testCosignerSecurity(t *testing.T, securities []CosignerSecurity) error {
 	return err
 }
 
-func BenchmarkCosignerECIES(b *testing.B) {
+func TestConcurrentIterateCosignerECIES(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping in short mode")
+	}
+
 	keys := make([]*ecies.PrivateKey, 3)
 	pubs := make([]*ecies.PublicKey, 3)
 
 	for i := 0; i < 3; i++ {
 		key, err := ecies.GenerateKey(rand.Reader, secp256k1.S256(), nil)
-		require.NoError(b, err)
+		require.NoError(t, err)
 
 		keys[i] = key
 		pubs[i] = &key.PublicKey
@@ -98,7 +101,7 @@ func BenchmarkCosignerECIES(b *testing.B) {
 		})
 	}
 
-	for i := 0; i < b.N; i++ {
+	for i := 0; i < 5000; i++ {
 		var eg errgroup.Group
 		for i, security := range securities {
 			security := security
@@ -127,6 +130,6 @@ func BenchmarkCosignerECIES(b *testing.B) {
 				return nestedEg.Wait()
 			})
 		}
-		require.NoErrorf(b, eg.Wait(), "success count: %d", i)
+		require.NoErrorf(t, eg.Wait(), "success count: %d", i)
 	}
 }

@@ -2,7 +2,6 @@ package signer
 
 import (
 	"bytes"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -415,8 +414,8 @@ func (pv *ThresholdValidator) waitForPeerSetNoncesAndSign(
 
 	if err != nil {
 		pv.logger.Error(
-			"Sign error",
-			"cosigner", peerID,
+			"Cosigner failed to set nonces and sign",
+			"id", peerID,
 			"err", err.Error(),
 		)
 		return
@@ -430,7 +429,6 @@ func (pv *ThresholdValidator) waitForPeerSetNoncesAndSign(
 		"height", hrst.Height,
 		"round", hrst.Round,
 		"step", hrst.Step,
-		"signature", hex.EncodeToString(sigRes.Signature),
 	)
 
 	shareSignaturesMutex.Lock()
