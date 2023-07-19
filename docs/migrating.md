@@ -91,7 +91,7 @@ $ horcrux config init --node "tcp://10.168.0.1:1234" --node "tcp://10.168.0.2:12
 
 ### 3. Generate cosigner communication encryption keys
 
-Horcrux uses secp256k1 keys to encrypt (ECIES) and sign (ECDSA) cosigner-to-cosigner p2p communication. This is done by encrypting the payloads that are sent over GRPC between cosigners. Open your shell to a working directory and generate the ECIES keys that will be used on each cosigner using the `horcrux` CLI on your local machine.
+Horcrux uses secp256k1 keys to encrypt (RSA) and sign (ECDSA) cosigner-to-cosigner p2p communication. This is done by encrypting the payloads that are sent over GRPC between cosigners. Open your shell to a working directory and generate the ECIES keys that will be used on each cosigner using the `horcrux` CLI on your local machine.
 
 ```bash
 $ horcrux create-rsa-shards --shards 3
