@@ -109,23 +109,23 @@ func getLeaderCmd() *cobra.Command {
 
 			var id int
 
-			keyFile, err := config.KeyFileExistsCosignerECIES()
-			if err == nil {
-				key, err := signer.LoadCosignerECIESKey(keyFile)
+			keyFileECIES, err := config.KeyFileExistsCosignerECIES()
+			if err != nil {
+				keyFileRSA, err := config.KeyFileExistsCosignerRSA()
 				if err != nil {
-					return fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
+					return fmt.Errorf("cosigner encryption keys not found (%s) - (%s): %w", keyFileECIES, keyFileRSA, err)
+				}
+
+				key, err := signer.LoadCosignerRSAKey(keyFileRSA)
+				if err != nil {
+					return fmt.Errorf("error reading cosigner key (%s): %w", keyFileRSA, err)
 				}
 
 				id = key.ID
 			} else {
-				keyFile, err := config.KeyFileExistsCosignerRSA()
+				key, err := signer.LoadCosignerECIESKey(keyFileECIES)
 				if err != nil {
-					return err
-				}
-
-				key, err := signer.LoadCosignerRSAKey(keyFile)
-				if err != nil {
-					return fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
+					return fmt.Errorf("error reading cosigner key (%s): %w", keyFileECIES, err)
 				}
 
 				id = key.ID
