@@ -107,26 +107,40 @@ func getLeaderCmd() *cobra.Command {
 				return fmt.Errorf("threshold mode configuration has no cosigners")
 			}
 
-			keyFile, err := config.KeyFileExistsCosignerRSA()
-			if err != nil {
-				return err
-			}
+			var id int
 
-			key, err := signer.LoadCosignerRSAKey(keyFile)
+			keyFileECIES, err := config.KeyFileExistsCosignerECIES()
 			if err != nil {
-				return fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
+				keyFileRSA, err := config.KeyFileExistsCosignerRSA()
+				if err != nil {
+					return fmt.Errorf("cosigner encryption keys not found (%s) - (%s): %w", keyFileECIES, keyFileRSA, err)
+				}
+
+				key, err := signer.LoadCosignerRSAKey(keyFileRSA)
+				if err != nil {
+					return fmt.Errorf("error reading cosigner key (%s): %w", keyFileRSA, err)
+				}
+
+				id = key.ID
+			} else {
+				key, err := signer.LoadCosignerECIESKey(keyFileECIES)
+				if err != nil {
+					return fmt.Errorf("error reading cosigner key (%s): %w", keyFileECIES, err)
+				}
+
+				id = key.ID
 			}
 
 			var p2pListen string
 
 			for _, c := range thresholdCfg.Cosigners {
-				if c.ShardID == key.ID {
+				if c.ShardID == id {
 					p2pListen = c.P2PAddr
 				}
 			}
 
 			if p2pListen == "" {
-				return fmt.Errorf("cosigner config does not exist for our shard ID %d", key.ID)
+				return fmt.Errorf("cosigner config does not exist for our shard ID %d", id)
 			}
 
 			retryOpts := []grpcretry.CallOption{

@@ -13,7 +13,8 @@ import (
 	"github.com/cometbft/cometbft/libs/log"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	comet "github.com/cometbft/cometbft/types"
-	ecies "github.com/ecies/go/v2"
+	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/stretchr/testify/require"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
@@ -38,25 +39,22 @@ func testLocalCosignerSignRSA(t *testing.T, threshold, total uint8) {
 	security := make([]CosignerSecurity, total)
 
 	keys := make([]*rsa.PrivateKey, total)
-	pubKeys := make([]CosignerRSAPubKey, total)
+	pubKeys := make([]*rsa.PublicKey, total)
 	for i := 0; i < int(total); i++ {
 		var err error
 		keys[i], err = rsa.GenerateKey(rand.Reader, bitSize)
 		require.NoError(t, err)
 
-		pubKeys[i] = CosignerRSAPubKey{
-			ID:        i + 1,
-			PublicKey: keys[i].PublicKey,
-		}
+		pubKeys[i] = &keys[i].PublicKey
 	}
 
 	for i, k := range keys {
 		security[i] = NewCosignerSecurityRSA(
 			CosignerRSAKey{
-				ID:     i + 1,
-				RSAKey: *k,
+				ID:      i + 1,
+				RSAKey:  *k,
+				RSAPubs: pubKeys,
 			},
-			pubKeys,
 		)
 	}
 
@@ -77,25 +75,22 @@ func testLocalCosignerSignECIES(t *testing.T, threshold, total uint8) {
 	security := make([]CosignerSecurity, total)
 
 	keys := make([]*ecies.PrivateKey, total)
-	pubKeys := make([]CosignerECIESPubKey, total)
+	pubKeys := make([]*ecies.PublicKey, total)
 	for i := 0; i < int(total); i++ {
 		var err error
-		keys[i], err = ecies.GenerateKey()
+		keys[i], err = ecies.GenerateKey(rand.Reader, secp256k1.S256(), nil)
 		require.NoError(t, err)
 
-		pubKeys[i] = CosignerECIESPubKey{
-			ID:        i + 1,
-			PublicKey: keys[i].PublicKey,
-		}
+		pubKeys[i] = &keys[i].PublicKey
 	}
 
 	for i, k := range keys {
 		security[i] = NewCosignerSecurityECIES(
 			CosignerECIESKey{
-				ID:       i + 1,
-				ECIESKey: k,
+				ID:        i + 1,
+				ECIESKey:  k,
+				ECIESPubs: pubKeys,
 			},
-			pubKeys,
 		)
 	}
 

@@ -6,10 +6,12 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"os"
 
 	cometjson "github.com/cometbft/cometbft/libs/json"
-	ecies "github.com/ecies/go/v2"
+	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -39,10 +41,14 @@ func (key *CosignerECIESKey) MarshalJSON() ([]byte, error) {
 	type Alias CosignerECIESKey
 
 	// marshal our private key and all public keys
-	privateBytes := key.ECIESKey
+	privateBytes := key.ECIESKey.D.Bytes()
 	pubKeysBytes := make([][]byte, len(key.ECIESPubs))
 	for i, pubKey := range key.ECIESPubs {
-		pubKeysBytes[i] = pubKey.Bytes(true)
+		pubBz := make([]byte, 65)
+		pubBz[0] = 0x04
+		copy(pubBz[1:33], pubKey.X.Bytes())
+		copy(pubBz[33:65], pubKey.Y.Bytes())
+		pubKeysBytes[i] = pubBz
 	}
 
 	return json.Marshal(&struct {
@@ -50,7 +56,7 @@ func (key *CosignerECIESKey) MarshalJSON() ([]byte, error) {
 		ECIESPubs [][]byte `json:"eciesPubs"`
 		*Alias
 	}{
-		ECIESKey:  privateBytes.Bytes(),
+		ECIESKey:  privateBytes,
 		ECIESPubs: pubKeysBytes,
 		Alias:     (*Alias)(key),
 	})
@@ -73,14 +79,21 @@ func (key *CosignerECIESKey) UnmarshalJSON(data []byte) error {
 	// unmarshal the public key bytes for each cosigner
 	key.ECIESPubs = make([]*ecies.PublicKey, len(aux.ECIESPubs))
 	for i, bytes := range aux.ECIESPubs {
-		pub, err := ecies.NewPublicKeyFromBytes(bytes)
-		if err != nil {
-			return err
+		pub := &ecies.PublicKey{
+			X:      new(big.Int).SetBytes(bytes[1:33]),
+			Y:      new(big.Int).SetBytes(bytes[33:]),
+			Curve:  secp256k1.S256(),
+			Params: ecies.ECIES_AES128_SHA256,
 		}
+
 		key.ECIESPubs[i] = pub
 	}
 
-	key.ECIESKey = ecies.NewPrivateKeyFromBytes(aux.ECIESKey)
+	key.ECIESKey = &ecies.PrivateKey{
+		PublicKey: *key.ECIESPubs[aux.ID-1],
+		D:         new(big.Int).SetBytes(aux.ECIESKey),
+	}
+
 	return nil
 }
 
@@ -101,14 +114,17 @@ func LoadCosignerECIESKey(file string) (CosignerECIESKey, error) {
 }
 
 // NewCosignerSecurityECIES creates a new CosignerSecurityECIES.
-func NewCosignerSecurityECIES(key CosignerECIESKey, eciesPubKeys []CosignerECIESPubKey) *CosignerSecurityECIES {
+func NewCosignerSecurityECIES(key CosignerECIESKey) *CosignerSecurityECIES {
 	c := &CosignerSecurityECIES{
 		key:          key,
-		eciesPubKeys: make(map[int]CosignerECIESPubKey, len(eciesPubKeys)),
+		eciesPubKeys: make(map[int]CosignerECIESPubKey, len(key.ECIESPubs)),
 	}
 
-	for _, pubKey := range eciesPubKeys {
-		c.eciesPubKeys[pubKey.ID] = pubKey
+	for i, pubKey := range key.ECIESPubs {
+		c.eciesPubKeys[i+1] = CosignerECIESPubKey{
+			ID:        i + 1,
+			PublicKey: pubKey,
+		}
 	}
 
 	return c
@@ -136,12 +152,12 @@ func (c *CosignerSecurityECIES) EncryptAndSign(id int, noncePub []byte, nonceSha
 	var eg errgroup.Group
 
 	eg.Go(func() (err error) {
-		encryptedShare, err = ecies.Encrypt(pubKey.PublicKey, nonceShare)
+		encryptedShare, err = ecies.Encrypt(rand.Reader, pubKey.PublicKey, nonceShare, nil, nil)
 		return err
 	})
 
 	eg.Go(func() (err error) {
-		encryptedPub, err = ecies.Encrypt(pubKey.PublicKey, noncePub)
+		encryptedPub, err = ecies.Encrypt(rand.Reader, pubKey.PublicKey, noncePub, nil, nil)
 		return err
 	})
 
@@ -164,10 +180,7 @@ func (c *CosignerSecurityECIES) EncryptAndSign(id int, noncePub []byte, nonceSha
 	hash := sha256.Sum256(jsonBytes)
 	signature, err := ecdsa.SignASN1(
 		rand.Reader,
-		&ecdsa.PrivateKey{
-			PublicKey: ecdsa.PublicKey(*c.key.ECIESKey.PublicKey),
-			D:         c.key.ECIESKey.D,
-		},
+		c.key.ECIESKey.ExportECDSA(),
 		hash[:],
 	)
 	if err != nil {
@@ -206,7 +219,7 @@ func (c *CosignerSecurityECIES) DecryptAndVerify(
 
 	digest := sha256.Sum256(digestBytes)
 
-	validSignature := ecdsa.VerifyASN1((*ecdsa.PublicKey)(pubKey.PublicKey), digest[:], signature)
+	validSignature := ecdsa.VerifyASN1(pubKey.PublicKey.ExportECDSA(), digest[:], signature)
 	if !validSignature {
 		return nil, nil, fmt.Errorf("signature is invalid")
 	}
@@ -217,13 +230,19 @@ func (c *CosignerSecurityECIES) DecryptAndVerify(
 	var nonceShare []byte
 
 	eg.Go(func() (err error) {
-		noncePub, err = ecies.Decrypt(c.key.ECIESKey, encryptedNoncePub)
-		return err
+		noncePub, err = c.key.ECIESKey.Decrypt(encryptedNoncePub, nil, nil)
+		if err != nil {
+			return fmt.Errorf("failed to decrypt nonce pub: %w", err)
+		}
+		return nil
 	})
 
 	eg.Go(func() (err error) {
-		nonceShare, err = ecies.Decrypt(c.key.ECIESKey, encryptedNonceShare)
-		return err
+		nonceShare, err = c.key.ECIESKey.Decrypt(encryptedNonceShare, nil, nil)
+		if err != nil {
+			return fmt.Errorf("failed to decrypt nonce share: %w", err)
+		}
+		return nil
 	})
 
 	if err := eg.Wait(); err != nil {
