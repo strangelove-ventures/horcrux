@@ -106,14 +106,17 @@ func LoadCosignerRSAKey(file string) (CosignerRSAKey, error) {
 }
 
 // NewCosignerSecurityRSA creates a new CosignerSecurityRSA.
-func NewCosignerSecurityRSA(key CosignerRSAKey, rsaPubKeys []CosignerRSAPubKey) *CosignerSecurityRSA {
+func NewCosignerSecurityRSA(key CosignerRSAKey) *CosignerSecurityRSA {
 	c := &CosignerSecurityRSA{
 		key:        key,
 		rsaPubKeys: make(map[int]CosignerRSAPubKey),
 	}
 
-	for _, pubKey := range rsaPubKeys {
-		c.rsaPubKeys[pubKey.ID] = pubKey
+	for i, pubKey := range key.RSAPubs {
+		c.rsaPubKeys[i+1] = CosignerRSAPubKey{
+			ID:        i + 1,
+			PublicKey: *pubKey,
+		}
 	}
 
 	return c

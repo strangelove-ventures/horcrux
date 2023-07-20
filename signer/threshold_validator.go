@@ -347,27 +347,26 @@ func (pv *ThresholdValidator) waitForPeerNonces(
 	peer Cosigner,
 	hrst HRSTKey,
 	wg *sync.WaitGroup,
-	encryptedNoncesThresholdMap map[Cosigner][]CosignerNonce,
+	nonces map[Cosigner][]CosignerNonce,
 	thresholdPeersMutex *sync.Mutex,
 ) {
 	peerStartTime := time.Now()
-	ephemeralSecretParts, err := peer.GetNonces(chainID, hrst)
+	peerNonces, err := peer.GetNonces(chainID, hrst)
 	if err != nil {
-
 		// Significant missing shares may lead to signature failure
 		missedNonces.WithLabelValues(peer.GetAddress()).Add(float64(1))
 		totalMissedNonces.WithLabelValues(peer.GetAddress()).Inc()
-		pv.logger.Error("Error getting secret parts", "peer", peer.GetID(), "err", err)
+		pv.logger.Error("Error getting nonces", "cosigner", peer.GetID(), "err", err)
 		return
 	}
 	// Significant missing shares may lead to signature failure
 	missedNonces.WithLabelValues(peer.GetAddress()).Set(0)
 	timedCosignerNonceLag.WithLabelValues(peer.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
 
-	// Check so that getEphemeralWaitGroup.Done is not called more than (threshold - 1) times which causes hardlock
+	// Check so that wg.Done is not called more than (threshold - 1) times which causes hardlock
 	thresholdPeersMutex.Lock()
-	if len(encryptedNoncesThresholdMap) < pv.threshold-1 {
-		(encryptedNoncesThresholdMap)[peer] = ephemeralSecretParts.Nonces
+	if len(nonces) < pv.threshold-1 {
+		nonces[peer] = peerNonces.Nonces
 		defer wg.Done()
 	}
 	thresholdPeersMutex.Unlock()
@@ -414,7 +413,11 @@ func (pv *ThresholdValidator) waitForPeerSetNoncesAndSign(
 	})
 
 	if err != nil {
-		pv.logger.Error("Sign error", err.Error())
+		pv.logger.Error(
+			"Cosigner failed to set nonces and sign",
+			"id", peerID,
+			"err", err.Error(),
+		)
 		return
 	}
 

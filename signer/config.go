@@ -122,18 +122,7 @@ func (c RuntimeConfig) CosignerSecurityECIES() (*CosignerSecurityECIES, error) {
 		return nil, fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
 	}
 
-	pubKeys := make([]CosignerECIESPubKey, len(key.ECIESPubs))
-	for i, pk := range key.ECIESPubs {
-		pubKeys[i] = CosignerECIESPubKey{
-			ID:        i + 1,
-			PublicKey: pk,
-		}
-	}
-
-	return NewCosignerSecurityECIES(
-		key,
-		pubKeys,
-	), nil
+	return NewCosignerSecurityECIES(key), nil
 }
 
 func (c RuntimeConfig) CosignerSecurityRSA() (*CosignerSecurityRSA, error) {
@@ -147,18 +136,7 @@ func (c RuntimeConfig) CosignerSecurityRSA() (*CosignerSecurityRSA, error) {
 		return nil, fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
 	}
 
-	pubKeys := make([]CosignerRSAPubKey, len(key.RSAPubs))
-	for i, pk := range key.RSAPubs {
-		pubKeys[i] = CosignerRSAPubKey{
-			ID:        i + 1,
-			PublicKey: *pk,
-		}
-	}
-
-	return NewCosignerSecurityRSA(
-		key,
-		pubKeys,
-	), nil
+	return NewCosignerSecurityRSA(key), nil
 }
 
 func (c RuntimeConfig) cachedKeyDirectory() string {
