@@ -1,7 +1,6 @@
 package signer
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -313,7 +312,7 @@ func CosignersFromFlag(cosigners []string) (out []CosignerConfig, err error) {
 		out = append(out, CosignerConfig{ShardID: i + 1, P2PAddr: c})
 	}
 	if len(errs) > 0 {
-		return nil, errors.Join(errs...)
+		return nil, nil
 	}
 	return out, nil
 }
