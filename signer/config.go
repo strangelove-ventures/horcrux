@@ -53,54 +53,50 @@ func (c *Config) MustMarshalYaml() []byte {
 }
 
 func (c *Config) ValidateSingleSignerConfig() error {
-	var errs []error
 	if len(c.ChainNodes) == 0 {
-		errs = append(errs, fmt.Errorf("need to have chainNodes configured for priv-val connection"))
+		return fmt.Errorf("need to have chainNodes configured for priv-val connection")
 	}
 	if err := c.ChainNodes.Validate(); err != nil {
-		errs = append(errs, err)
+		return err
 	}
-	return errors.Join(errs...)
+	return c.ChainNodes.Validate()
 }
 
 func (c *Config) ValidateThresholdModeConfig() error {
-	var errs []error
-
 	if err := c.ValidateSingleSignerConfig(); err != nil {
-		errs = append(errs, err)
+		return err
 	}
 
 	if c.ThresholdModeConfig == nil {
-		errs = append(errs, fmt.Errorf("cosigner config can't be empty"))
+		return fmt.Errorf("cosigner config can't be empty")
 		// the rest of the checks depend on non-nil c.ThresholdModeConfig
-		return errors.Join(errs...)
 	}
 
 	numShards := len(c.ThresholdModeConfig.Cosigners)
 
 	if c.ThresholdModeConfig.Threshold <= numShards/2 {
-		errs = append(errs, fmt.Errorf("threshold (%d) must be greater than number of shards (%d) / 2",
-			c.ThresholdModeConfig.Threshold, numShards))
+		return fmt.Errorf("threshold (%d) must be greater than number of shards (%d) / 2",
+			c.ThresholdModeConfig.Threshold, numShards)
 	}
 
 	if numShards < c.ThresholdModeConfig.Threshold {
-		errs = append(errs, fmt.Errorf("number of shards (%d) must be greater or equal to threshold (%d)",
-			numShards, c.ThresholdModeConfig.Threshold))
+		return fmt.Errorf("number of shards (%d) must be greater or equal to threshold (%d)",
+			numShards, c.ThresholdModeConfig.Threshold)
 	}
 
 	if _, err := time.ParseDuration(c.ThresholdModeConfig.RaftTimeout); err != nil {
-		errs = append(errs, fmt.Errorf("invalid raftTimeout: %w", err))
+		return fmt.Errorf("invalid raftTimeout: %w", err)
 	}
 
 	if _, err := time.ParseDuration(c.ThresholdModeConfig.GRPCTimeout); err != nil {
-		errs = append(errs, fmt.Errorf("invalid grpcTimeout: %w", err))
+		return fmt.Errorf("invalid grpcTimeout: %w", err)
 	}
 
 	if err := c.ThresholdModeConfig.Cosigners.Validate(); err != nil {
-		errs = append(errs, err)
+		return err
 	}
 
-	return errors.Join(errs...)
+	return c.ThresholdModeConfig.Cosigners.Validate()
 }
 
 type RuntimeConfig struct {
@@ -250,10 +246,9 @@ type CosignerConfig struct {
 type CosignersConfig []CosignerConfig
 
 func (cosigners CosignersConfig) Validate() error {
-	var errs []error
 	// Check IDs to make sure none are duplicated
 	if dupl := duplicateCosigners(cosigners); len(dupl) != 0 {
-		errs = append(errs, fmt.Errorf("found duplicate cosigner shard ID(s) in args: %v", dupl))
+		return fmt.Errorf("found duplicate cosigner shard ID(s) in args: %v", dupl)
 	}
 
 	shards := len(cosigners)
@@ -261,33 +256,32 @@ func (cosigners CosignersConfig) Validate() error {
 	// Make sure that the cosigner IDs match the number of cosigners.
 	for _, cosigner := range cosigners {
 		if cosigner.ShardID < 1 || cosigner.ShardID > shards {
-			errs = append(errs, fmt.Errorf("cosigner shard ID %d in args is out of range, must be between 1 and %d, inclusive",
-				cosigner.ShardID, shards))
+			return fmt.Errorf("cosigner shard ID %d in args is out of range, must be between 1 and %d, inclusive",
+				cosigner.ShardID, shards)
 		}
 
 		url, err := url.Parse(cosigner.P2PAddr)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to parse cosigner (shard ID: %d) p2p address: %w", cosigner.ShardID, err))
-			continue
+			return fmt.Errorf("failed to parse cosigner (shard ID: %d) p2p address: %w", cosigner.ShardID, err)
 		}
 
 		host, _, err := net.SplitHostPort(url.Host)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to parse cosigner (shard ID: %d) host port: %w", cosigner.ShardID, err))
-			continue
+			return fmt.Errorf("failed to parse cosigner (shard ID: %d) host port: %w", cosigner.ShardID, err)
 		}
+
 		if host == "0.0.0.0" {
-			errs = append(errs, fmt.Errorf("host cannot be 0.0.0.0, must be reachable from other cosigners"))
+			return fmt.Errorf("host cannot be 0.0.0.0, must be reachable from other cosigners")
 		}
 	}
 
 	// Check that exactly {num-shards} cosigners are in the list
 	if len(cosigners) != shards {
-		errs = append(errs, fmt.Errorf("incorrect number of cosigners. expected (%d shards = %d cosigners)",
-			shards, shards))
+		return fmt.Errorf("incorrect number of cosigners. expected (%d shards = %d cosigners)",
+			shards, shards)
 	}
 
-	return errors.Join(errs...)
+	return nil
 }
 
 func duplicateCosigners(cosigners []CosignerConfig) (duplicates map[int][]string) {
@@ -336,13 +330,12 @@ func (cn ChainNode) Validate() error {
 type ChainNodes []ChainNode
 
 func (cns ChainNodes) Validate() error {
-	var errs []error
 	for _, cn := range cns {
 		if err := cn.Validate(); err != nil {
-			errs = append(errs, err)
+			return err
 		}
 	}
-	return errors.Join(errs...)
+	return nil
 }
 
 func ChainNodesFromFlag(nodes []string) (ChainNodes, error) {
