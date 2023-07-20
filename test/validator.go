@@ -33,6 +33,9 @@ const (
 	signerPort       = "2222"
 	signerPortDocker = signerPort + "/tcp"
 
+	debugPort       = "8453"
+	debugPortDocker = debugPort + "/tcp"
+
 	signerImage        = "horcrux-test"
 	binary             = "horcrux"
 	signerImageUidGid  = "2345:2345"
@@ -134,7 +137,7 @@ func horcruxSidecar(ctx context.Context, node *cosmos.ChainNode, name string, cl
 	if err := node.NewSidecarProcess(
 		ctx, false, name, client, network,
 		ibc.DockerImage{Repository: signerImage, Version: "latest", UidGid: signerImageUidGid},
-		signerImageHomeDir, []string{signerPortDocker}, startCmd,
+		signerImageHomeDir, []string{signerPortDocker, debugPortDocker}, startCmd,
 	); err != nil {
 		return nil, err
 	}
@@ -248,7 +251,7 @@ func pollForLeader(ctx context.Context, t *testing.T, cosigner *cosmos.SidecarPr
 
 // getLeader returns the current raft leader.
 func getLeader(ctx context.Context, cosigner *cosmos.SidecarProcess) (string, error) {
-	ports, err := cosigner.GetHostPorts(ctx, signerPortDocker)
+	ports, err := cosigner.GetHostPorts(ctx, signerPortDocker, debugPortDocker)
 	if err != nil {
 		return "", err
 	}

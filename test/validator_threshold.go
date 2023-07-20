@@ -4,10 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"testing"
+	"time"
 
 	"github.com/cometbft/cometbft/crypto"
 	"github.com/docker/docker/client"
+	dto "github.com/prometheus/client_model/go"
+	"github.com/prometheus/common/expfmt"
 	"github.com/strangelove-ventures/horcrux/signer"
 	interchaintest "github.com/strangelove-ventures/interchaintest/v7"
 	"github.com/strangelove-ventures/interchaintest/v7/chain/cosmos"
@@ -31,10 +35,14 @@ func testChainSingleNodeAndHorcruxThreshold(
 	ctx := context.Background()
 	cw, pubKey := startChainSingleNodeAndHorcruxThreshold(ctx, t, totalValidators, totalSigners, threshold, totalSentries, sentriesPerSigner)
 
+	ourValidator := cw.chain.Validators[0]
+	cosigners := ourValidator.Sidecars
+	go getCosingerMetrics(ctx, cosigners)
+
 	err := testutil.WaitForBlocks(ctx, 20, cw.chain)
 	require.NoError(t, err)
 
-	requireHealthyValidator(t, cw.chain.Validators[0], pubKey.Address())
+	requireHealthyValidator(t, ourValidator, pubKey.Address())
 }
 
 // startChainSingleNodeAndHorcruxThreshold starts a single chain with a single horcrux (threshold mode) validator and single node validators for the rest of the validators.
@@ -213,6 +221,7 @@ func convertValidatorToHorcrux(
 				RaftTimeout: "1500ms",
 			},
 			ChainNodes: chainNodes,
+			DebugAddr:  fmt.Sprintf("0.0.0.0:%s", debugPort),
 		}
 
 		i := i
@@ -355,4 +364,54 @@ func getSentriesForCosignerConnection(sentries cosmos.ChainNodes, numSigners int
 		}
 	}
 	return peers
+}
+func getCosingerMetrics(ctx context.Context, cosigners cosmos.SidecarProcesses) {
+	for _, s := range cosigners {
+		s := s
+		ticker := time.NewTicker(time.Second)
+
+		go func() {
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					m, err := getMetrics(ctx, s)
+					if err != nil {
+						fmt.Printf("{%s} -> Error getting metrics : %v", s.Name(), err)
+					}
+					fmt.Println("Got Metrics", m)
+				}
+			}
+		}()
+	}
+}
+
+func getMetrics(ctx context.Context, cosigner *cosmos.SidecarProcess) (map[string]*dto.MetricFamily, error) {
+
+	debugAddr, err := cosigner.GetHostPorts(ctx, debugPortDocker)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, "GET", "http://"+debugAddr[0]+"/metrics", nil)
+
+	if err != nil {
+
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var parser expfmt.TextParser
+	mf, err := parser.TextToMetricFamilies(resp.Body)
+	if err != nil {
+
+		return nil, err
+	}
+
+	return mf, nil
 }
