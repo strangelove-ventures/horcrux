@@ -251,7 +251,7 @@ func pollForLeader(ctx context.Context, t *testing.T, cosigner *cosmos.SidecarPr
 
 // getLeader returns the current raft leader.
 func getLeader(ctx context.Context, cosigner *cosmos.SidecarProcess) (string, error) {
-	ports, err := cosigner.GetHostPorts(ctx, signerPortDocker, debugPortDocker)
+	ports, err := cosigner.GetHostPorts(ctx, signerPortDocker)
 	if err != nil {
 		return "", err
 	}

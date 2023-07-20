@@ -37,7 +37,7 @@ func testChainSingleNodeAndHorcruxThreshold(
 
 	ourValidator := cw.chain.Validators[0]
 	cosigners := ourValidator.Sidecars
-	go getCosingerMetrics(ctx, cosigners)
+	go getCosignerMetrics(ctx, cosigners)
 
 	err := testutil.WaitForBlocks(ctx, 20, cw.chain)
 	require.NoError(t, err)
@@ -365,7 +365,7 @@ func getSentriesForCosignerConnection(sentries cosmos.ChainNodes, numSigners int
 	}
 	return peers
 }
-func getCosingerMetrics(ctx context.Context, cosigners cosmos.SidecarProcesses) {
+func getCosignerMetrics(ctx context.Context, cosigners cosmos.SidecarProcesses) {
 	for _, s := range cosigners {
 		s := s
 		ticker := time.NewTicker(time.Second)
