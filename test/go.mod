@@ -1,11 +1,13 @@
 module github.com/strangelove-ventures/horcrux/test
 
-go 1.20
+go 1.19
 
 require (
 	github.com/cometbft/cometbft v0.37.2
 	github.com/cosmos/cosmos-sdk v0.47.3
 	github.com/docker/docker v24.0.1+incompatible
+	github.com/prometheus/client_model v0.3.0
+	github.com/prometheus/common v0.42.0
 	github.com/strangelove-ventures/horcrux v0.0.0
 	github.com/strangelove-ventures/interchaintest/v7 v7.0.0-20230716013647-d66f6a196303
 	github.com/stretchr/testify v1.8.4
@@ -182,8 +184,6 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.15.0 // indirect
-	github.com/prometheus/client_model v0.3.0 // indirect
-	github.com/prometheus/common v0.42.0 // indirect
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/rakyll/statik v0.1.7 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
