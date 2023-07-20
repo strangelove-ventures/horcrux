@@ -140,7 +140,6 @@ func (key *v2CosignerKey) UnmarshalJSON(data []byte) error {
 }
 
 func (key *v2CosignerKey) validate() error {
-	var errs []error
 	if key.PubKey == nil || len(key.PubKey.Bytes()) == 0 {
 		return fmt.Errorf("pub_key cannot be empty")
 	}
