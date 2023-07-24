@@ -52,12 +52,12 @@ func (c *Cond) WaitWithTimeout(t time.Duration) {
 // NotifyChan returns a channel that can be used to wait for next Broadcast() call.
 func (c *Cond) NotifyChan() <-chan struct{} {
 	ptr := c.p.Load()
-	return *((*chan struct{})(ptr))
+	return *ptr
 }
 
 // Broadcast notifies all waiting goroutines that something has changed.
 func (c *Cond) Broadcast() {
 	n := make(chan struct{})
 	p := c.p.Swap(&n)
-	close(*(*chan struct{})(p))
+	close(*p)
 }
