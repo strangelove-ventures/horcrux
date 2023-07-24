@@ -7,3 +7,4 @@ private_share_*
 rsa_keys.json
 priv_validator_key.json
 dist/
+go.work.sum

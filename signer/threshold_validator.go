@@ -39,6 +39,8 @@ type ThresholdValidator struct {
 	logger log.Logger
 
 	pendingDiskWG sync.WaitGroup
+
+	maxWaitForSameBlockAttempts int
 }
 
 type ChainSignState struct {
@@ -58,18 +60,20 @@ func NewThresholdValidator(
 	config *RuntimeConfig,
 	threshold int,
 	grpcTimeout time.Duration,
+	maxWaitForSameBlockAttempts int,
 	myCosigner *LocalCosigner,
 	peerCosigners []Cosigner,
 	raftStore *RaftStore,
 ) *ThresholdValidator {
 	return &ThresholdValidator{
-		logger:        logger,
-		config:        config,
-		threshold:     threshold,
-		grpcTimeout:   grpcTimeout,
-		myCosigner:    myCosigner,
-		peerCosigners: peerCosigners,
-		raftStore:     raftStore,
+		logger:                      logger,
+		config:                      config,
+		threshold:                   threshold,
+		grpcTimeout:                 grpcTimeout,
+		maxWaitForSameBlockAttempts: maxWaitForSameBlockAttempts,
+		myCosigner:                  myCosigner,
+		peerCosigners:               peerCosigners,
+		raftStore:                   raftStore,
 	}
 }
 
@@ -149,9 +153,9 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, block
 	// the cond.Broadcast().
 	css.lastSignState.cond.L.Lock()
 	defer css.lastSignState.cond.L.Unlock()
-	for {
+	for i := 0; i < pv.maxWaitForSameBlockAttempts; i++ {
 		// block until sign state is saved. It will notify and unblock when block is next signed.
-		css.lastSignState.cond.Wait()
+		css.lastSignState.cond.WaitWithTimeout(pv.grpcTimeout)
 
 		// check if HRS exists in cache now
 		ssc, ok := css.lastSignState.cache[block.HRSKey()]
@@ -188,6 +192,11 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, block
 			"latest_step", latest.Step,
 		)
 	}
+
+	return nil, existingTimestamp, fmt.Errorf(
+		"exceeded max attempts waiting for block to be signed. height: %d, round: %d, step: %d",
+		height, round, step,
+	)
 }
 
 // notifyBlockSignError will alert any waiting goroutines that an error
