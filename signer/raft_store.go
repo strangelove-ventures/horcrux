@@ -31,6 +31,8 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
+var _ Leader = (*RaftStore)(nil)
+
 const (
 	retainSnapshotCount = 2
 )
@@ -206,7 +208,7 @@ func (s *RaftStore) Emit(key string, value interface{}) error {
 
 // Set sets the value for the given key.
 func (s *RaftStore) Set(key, value string) error {
-	if s.raft.State() != raft.Leader {
+	if !s.IsLeader() {
 		return fmt.Errorf("not leader")
 	}
 
@@ -278,8 +280,16 @@ func (s *RaftStore) Join(nodeID, addr string) error {
 	return nil
 }
 
+func (s *RaftStore) IsLeader() bool {
+	return s.raft.State() == raft.Leader
+}
+
 func (s *RaftStore) GetLeader() raft.ServerAddress {
 	return s.raft.Leader()
+}
+
+func (s *RaftStore) ShareSigned(lss ChainSignStateConsensus) error {
+	return s.Emit(raftEventLSS, lss)
 }
 
 type fsm RaftStore

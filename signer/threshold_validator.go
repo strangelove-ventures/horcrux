@@ -13,7 +13,6 @@ import (
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	cometrpcjsontypes "github.com/cometbft/cometbft/rpc/jsonrpc/types"
 	comet "github.com/cometbft/cometbft/types"
-	"github.com/hashicorp/raft"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 )
 
@@ -34,7 +33,7 @@ type ThresholdValidator struct {
 	// peer cosigners
 	peerCosigners []Cosigner
 
-	raftStore *RaftStore
+	leader Leader
 
 	logger log.Logger
 
@@ -63,7 +62,7 @@ func NewThresholdValidator(
 	maxWaitForSameBlockAttempts int,
 	myCosigner *LocalCosigner,
 	peerCosigners []Cosigner,
-	raftStore *RaftStore,
+	leader Leader,
 ) *ThresholdValidator {
 	return &ThresholdValidator{
 		logger:                      logger,
@@ -73,7 +72,7 @@ func NewThresholdValidator(
 		maxWaitForSameBlockAttempts: maxWaitForSameBlockAttempts,
 		myCosigner:                  myCosigner,
 		peerCosigners:               peerCosigners,
-		raftStore:                   raftStore,
+		leader:                      leader,
 	}
 }
 
@@ -571,10 +570,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 
 	// Only the leader can execute this function. Followers can handle the requests,
 	// but they just need to proxy the request to the raft leader
-	if pv.raftStore.raft == nil {
-		return nil, stamp, errors.New("raft not yet initialized")
-	}
-	if pv.raftStore.raft.State() != raft.Leader {
+	if !pv.leader.IsLeader() {
 		pv.logger.Debug("I am not the raft leader. Proxying request to the leader",
 			"chain_id", chainID,
 			"height", height,
@@ -582,7 +578,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 			"step", step,
 		)
 		totalNotRaftLeader.Inc()
-		signRes, err := pv.raftStore.LeaderSignBlock(CosignerSignBlockRequest{
+		signRes, err := pv.leader.SignBlock(CosignerSignBlockRequest{
 			ChainID: chainID,
 			Block:   block,
 		})
@@ -769,7 +765,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	}
 
 	// Emit last signed state to cluster
-	err = pv.raftStore.Emit(raftEventLSS, newLss)
+	err = pv.leader.ShareSigned(newLss)
 	if err != nil {
 		pv.logger.Error("Error emitting LSS", err.Error())
 	}
