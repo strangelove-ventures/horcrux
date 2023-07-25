@@ -4,7 +4,6 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -141,24 +140,23 @@ func (key *v2CosignerKey) UnmarshalJSON(data []byte) error {
 }
 
 func (key *v2CosignerKey) validate() error {
-	var errs []error
 	if key.PubKey == nil || len(key.PubKey.Bytes()) == 0 {
-		errs = append(errs, fmt.Errorf("pub_key cannot be empty"))
+		return fmt.Errorf("pub_key cannot be empty")
 	}
 	if len(key.ShareKey) == 0 {
-		errs = append(errs, fmt.Errorf("secret_share cannot be empty"))
+		return fmt.Errorf("secret_share cannot be empty")
 	}
 	if err := key.RSAKey.Validate(); err != nil {
-		errs = append(errs, fmt.Errorf("rsa_key is invalid: %w", err))
+		return fmt.Errorf("rsa_key is invalid: %w", err)
 	}
 	if key.ID == 0 {
-		errs = append(errs, fmt.Errorf("id cannot be zero"))
+		return fmt.Errorf("id cannot be zero")
 	}
 	if len(key.RSAPubs) == 0 {
-		errs = append(errs, fmt.Errorf("cosigner keys cannot be empty"))
+		return fmt.Errorf("cosigner keys cannot be empty")
 	}
 
-	return errors.Join(errs...)
+	return nil
 }
 
 func migrateCmd() *cobra.Command {

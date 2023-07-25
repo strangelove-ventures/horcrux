@@ -16,7 +16,6 @@ limitations under the License.
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -78,39 +77,39 @@ func createCosignerEd25519ShardsCmd() *cobra.Command {
 			var errs []error
 
 			if keyFile == "" {
-				errs = append(errs, fmt.Errorf("key-file flag must not be empty"))
+				return fmt.Errorf("key-file flag must not be empty")
 			}
 
 			if chainID == "" {
-				errs = append(errs, fmt.Errorf("chain-id flag must not be empty"))
+				return fmt.Errorf("chain-id flag must not be empty")
 			}
 
 			if threshold == 0 {
-				errs = append(errs, fmt.Errorf("threshold flag must be > 0, <= --shards, and > --shards/2"))
+				return fmt.Errorf("threshold flag must be > 0, <= --shards, and > --shards/2")
 			}
 
 			if shards == 0 {
-				errs = append(errs, fmt.Errorf("shards flag must be greater than zero"))
+				return fmt.Errorf("shards flag must be greater than zero")
 			}
 
 			if _, err := os.Stat(keyFile); err != nil {
-				errs = append(errs, fmt.Errorf("error accessing priv_validator_key file(%s): %w", keyFile, err))
+				return fmt.Errorf("error accessing priv_validator_key file(%s): %w", keyFile, err)
 			}
 
 			if threshold > shards {
-				errs = append(errs, fmt.Errorf(
+				return fmt.Errorf(
 					"threshold cannot be greater than total shards, got [threshold](%d) > [shards](%d)",
 					threshold, shards,
-				))
+				)
 			}
 
 			if threshold <= shards/2 {
-				errs = append(errs, fmt.Errorf("threshold must be greater than total shards "+
-					"divided by 2, got [threshold](%d) <= [shards](%d) / 2", threshold, shards))
+				return fmt.Errorf("threshold must be greater than total shards "+
+					"divided by 2, got [threshold](%d) <= [shards](%d) / 2", threshold, shards)
 			}
 
 			if len(errs) > 0 {
-				return errors.Join(errs...)
+				return nil
 			}
 
 			csKeys, err := signer.CreateCosignerEd25519ShardsFromFile(keyFile, threshold, shards)
