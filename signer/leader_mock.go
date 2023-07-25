@@ -46,7 +46,7 @@ func (m *MockLeader) SignBlock(req CosignerSignBlockRequest) (*CosignerSignBlock
 	block := &Block{
 		Height:    req.Block.Height,
 		Round:     req.Block.Round,
-		Step:      int8(req.Block.Step),
+		Step:      req.Block.Step,
 		SignBytes: req.Block.SignBytes,
 		Timestamp: req.Block.Timestamp,
 	}
@@ -59,6 +59,6 @@ func (m *MockLeader) SignBlock(req CosignerSignBlockRequest) (*CosignerSignBlock
 	}, nil
 }
 
-func (m *MockLeader) ShareSigned(lss ChainSignStateConsensus) error {
+func (m *MockLeader) ShareSigned(_ ChainSignStateConsensus) error {
 	return nil
 }

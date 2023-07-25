@@ -369,7 +369,7 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 			t.Log("No leader")
 
 			// time without a leader
-			time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond)
+			time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond) //nolint:gosec
 
 			newLeader := thresholdValidators[i%len(thresholdValidators)]
 			for _, l := range leaders {
@@ -378,7 +378,7 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 			t.Logf("New leader: %d", newLeader.myCosigner.GetID())
 
 			// time with new leader
-			time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond)
+			time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond) //nolint:gosec
 		}
 	}()
 
@@ -394,7 +394,7 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 			go func() {
 				defer wg.Done()
 				// stagger signing requests with random sleep
-				time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond)
+				time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond) //nolint:gosec
 
 				proposal := cometproto.Proposal{
 					Height: 1 + int64(i),
@@ -430,7 +430,7 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 			go func() {
 				defer wg.Done()
 				// stagger signing requests with random sleep
-				time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond)
+				time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond) //nolint:gosec
 
 				preVote := cometproto.Vote{
 					Height: 1 + int64(i),
@@ -466,7 +466,7 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 			go func() {
 				defer wg.Done()
 				// stagger signing requests with random sleep
-				time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond)
+				time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond) //nolint:gosec
 
 				preCommit := cometproto.Vote{
 					Height: 1 + int64(i),
