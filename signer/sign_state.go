@@ -14,6 +14,7 @@ import (
 	"github.com/cometbft/cometbft/libs/tempfile"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	"github.com/gogo/protobuf/proto"
+	"github.com/strangelove-ventures/horcrux/signer/cond"
 )
 
 const (
@@ -63,7 +64,7 @@ type SignState struct {
 	// mu protects the cache and is used for signaling with cond.
 	mu    sync.RWMutex
 	cache map[HRSKey]SignStateConsensus
-	cond  *sync.Cond
+	cond  *cond.Cond
 }
 
 func (signState *SignState) existingSignatureOrErrorIfRegression(hrst HRSTKey, signBytes []byte) ([]byte, error) {
@@ -318,7 +319,7 @@ func (signState *SignState) FreshCache() *SignState {
 		filePath: signState.filePath,
 	}
 
-	newSignState.cond = sync.NewCond(&newSignState.mu)
+	newSignState.cond = cond.New(&newSignState.mu)
 
 	newSignState.cache[HRSKey{
 		Height: signState.Height,
@@ -368,7 +369,7 @@ func LoadOrCreateSignState(filepath string) (*SignState, error) {
 			filePath: filepath,
 			cache:    make(map[HRSKey]SignStateConsensus),
 		}
-		state.cond = sync.NewCond(&state.mu)
+		state.cond = cond.New(&state.mu)
 
 		jsonBytes, err := cometjson.MarshalIndent(state, "", "  ")
 		if err != nil {

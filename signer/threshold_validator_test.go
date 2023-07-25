@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"crypto/rand"
 	"fmt"
+	mrand "math/rand"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"os"
@@ -40,18 +42,6 @@ func TestThresholdValidator3of5(t *testing.T) {
 	testThresholdValidator(t, 3, 5)
 }
 
-func getMockRaftStore(cosigner Cosigner, tmpDir string) *RaftStore {
-	return &RaftStore{
-		NodeID:      "1",
-		RaftDir:     tmpDir,
-		RaftBind:    "127.0.0.1:0",
-		RaftTimeout: 1 * time.Second,
-		m:           make(map[string]string),
-		logger:      nil,
-		cosigner:    cosigner.(*LocalCosigner),
-	}
-}
-
 func loadKeyForLocalCosigner(
 	cosigner *LocalCosigner,
 	pubKey cometcrypto.PubKey,
@@ -73,71 +63,7 @@ func loadKeyForLocalCosigner(
 }
 
 func testThresholdValidator(t *testing.T, threshold, total uint8) {
-	eciesKeys := make([]*ecies.PrivateKey, total)
-	pubKeys := make([]*ecies.PublicKey, total)
-	cosigners := make([]*LocalCosigner, total)
-
-	for i := uint8(0); i < total; i++ {
-		eciesKey, err := ecies.GenerateKey(rand.Reader, secp256k1.S256(), nil)
-		require.NoError(t, err)
-
-		eciesKeys[i] = eciesKey
-
-		pubKeys[i] = &eciesKey.PublicKey
-	}
-
-	privateKey := cometcryptoed25519.GenPrivKey()
-	privKeyBytes := privateKey[:]
-	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
-
-	tmpDir := t.TempDir()
-
-	cosignersConfig := make(CosignersConfig, total)
-
-	for i := range pubKeys {
-		cosignersConfig[i] = CosignerConfig{
-			ShardID: i + 1,
-		}
-	}
-
-	for i := range pubKeys {
-		cosignerDir := filepath.Join(tmpDir, fmt.Sprintf("cosigner_%d", i+1))
-		err := os.MkdirAll(cosignerDir, 0777)
-		require.NoError(t, err)
-
-		cosignerConfig := &RuntimeConfig{
-			HomeDir:  cosignerDir,
-			StateDir: cosignerDir,
-			Config: Config{
-				ThresholdModeConfig: &ThresholdModeConfig{
-					Threshold: int(threshold),
-					Cosigners: cosignersConfig,
-				},
-			},
-		}
-
-		cosigner := NewLocalCosigner(
-			cometlog.NewNopLogger(),
-			cosignerConfig,
-			NewCosignerSecurityECIES(
-				CosignerECIESKey{
-					ID:        i + 1,
-					ECIESKey:  eciesKeys[i],
-					ECIESPubs: pubKeys,
-				},
-			),
-			"",
-		)
-		require.NoError(t, err)
-
-		cosigners[i] = cosigner
-
-		err = loadKeyForLocalCosigner(cosigner, privateKey.PubKey(), testChainID, privShards[i])
-		require.NoError(t, err)
-
-		err = loadKeyForLocalCosigner(cosigner, privateKey.PubKey(), testChainID2, privShards[i])
-		require.NoError(t, err)
-	}
+	cosigners, pubKey := getTestLocalCosigners(t, threshold, total)
 
 	thresholdCosigners := make([]Cosigner, 0, threshold-1)
 
@@ -149,28 +75,24 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 		}
 	}
 
-	raftStore := getMockRaftStore(cosigners[0], tmpDir)
+	leader := &MockLeader{id: 1}
 
 	validator := NewThresholdValidator(
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
 		cosigners[0].config,
 		int(threshold),
 		time.Second,
+		1,
 		cosigners[0],
 		thresholdCosigners,
-		raftStore,
+		leader,
 	)
 	defer validator.Stop()
 
+	leader.leader = validator
+
 	err := validator.LoadSignStateIfNecessary(testChainID)
 	require.NoError(t, err)
-
-	raftStore.SetThresholdValidator(validator)
-
-	_, err = raftStore.Open()
-	require.NoError(t, err)
-
-	time.Sleep(3 * time.Second) // Ensure there is a leader
 
 	proposal := cometproto.Proposal{
 		Height: 1,
@@ -183,7 +105,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	err = validator.SignProposal(testChainID, &proposal)
 	require.NoError(t, err)
 
-	require.True(t, privateKey.PubKey().VerifySignature(signBytes, proposal.Signature))
+	require.True(t, pubKey.VerifySignature(signBytes, proposal.Signature))
 
 	firstSignature := proposal.Signature
 
@@ -239,9 +161,10 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 		cosigners[0].config,
 		int(threshold),
 		time.Second,
+		1,
 		cosigners[0],
 		thresholdCosigners,
-		raftStore,
+		leader,
 	)
 	defer newValidator.Stop()
 
@@ -330,4 +253,250 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 		err = eg.Wait()
 		require.NoError(t, err)
 	}
+}
+
+func getTestLocalCosigners(t *testing.T, threshold, total uint8) ([]*LocalCosigner, cometcrypto.PubKey) {
+	eciesKeys := make([]*ecies.PrivateKey, total)
+	pubKeys := make([]*ecies.PublicKey, total)
+	cosigners := make([]*LocalCosigner, total)
+
+	for i := uint8(0); i < total; i++ {
+		eciesKey, err := ecies.GenerateKey(rand.Reader, secp256k1.S256(), nil)
+		require.NoError(t, err)
+
+		eciesKeys[i] = eciesKey
+
+		pubKeys[i] = &eciesKey.PublicKey
+	}
+
+	privateKey := cometcryptoed25519.GenPrivKey()
+	privKeyBytes := privateKey[:]
+	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
+
+	tmpDir := t.TempDir()
+
+	cosignersConfig := make(CosignersConfig, total)
+
+	for i := range pubKeys {
+		cosignersConfig[i] = CosignerConfig{
+			ShardID: i + 1,
+		}
+	}
+
+	for i := range pubKeys {
+		cosignerDir := filepath.Join(tmpDir, fmt.Sprintf("cosigner_%d", i+1))
+		err := os.MkdirAll(cosignerDir, 0777)
+		require.NoError(t, err)
+
+		cosignerConfig := &RuntimeConfig{
+			HomeDir:  cosignerDir,
+			StateDir: cosignerDir,
+			Config: Config{
+				ThresholdModeConfig: &ThresholdModeConfig{
+					Threshold: int(threshold),
+					Cosigners: cosignersConfig,
+				},
+			},
+		}
+
+		cosigner := NewLocalCosigner(
+			cometlog.NewNopLogger(),
+			cosignerConfig,
+			NewCosignerSecurityECIES(
+				CosignerECIESKey{
+					ID:        i + 1,
+					ECIESKey:  eciesKeys[i],
+					ECIESPubs: pubKeys,
+				},
+			),
+			"",
+		)
+		require.NoError(t, err)
+
+		cosigners[i] = cosigner
+
+		err = loadKeyForLocalCosigner(cosigner, privateKey.PubKey(), testChainID, privShards[i])
+		require.NoError(t, err)
+
+		err = loadKeyForLocalCosigner(cosigner, privateKey.PubKey(), testChainID2, privShards[i])
+		require.NoError(t, err)
+	}
+
+	return cosigners, privateKey.PubKey()
+}
+
+func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) {
+	cosigners, pubKey := getTestLocalCosigners(t, threshold, total)
+
+	thresholdValidators := make([]*ThresholdValidator, 0, total)
+	var leader *ThresholdValidator
+	leaders := make([]*MockLeader, total)
+	for i, cosigner := range cosigners {
+		peers := make([]Cosigner, 0, len(cosigners)-1)
+		for j, otherCosigner := range cosigners {
+			if i != j {
+				peers = append(peers, otherCosigner)
+			}
+		}
+		leaders[i] = &MockLeader{id: cosigner.GetID(), leader: leader}
+		tv := NewThresholdValidator(
+			cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
+			cosigner.config,
+			int(threshold),
+			time.Second,
+			1,
+			cosigner,
+			peers,
+			leaders[i],
+		)
+		if i == 0 {
+			leader = tv
+			leaders[i].leader = tv
+		}
+		thresholdValidators = append(thresholdValidators, tv)
+		defer tv.Stop()
+
+		err := tv.LoadSignStateIfNecessary(testChainID)
+		require.NoError(t, err)
+	}
+
+	go func() {
+		for i := 0; true; i++ {
+			// simulate leader election
+			for _, l := range leaders {
+				l.SetLeader(nil)
+			}
+			t.Log("No leader")
+
+			// time without a leader
+			time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond) //nolint:gosec
+
+			newLeader := thresholdValidators[i%len(thresholdValidators)]
+			for _, l := range leaders {
+				l.SetLeader(newLeader)
+			}
+			t.Logf("New leader: %d", newLeader.myCosigner.GetID())
+
+			// time with new leader
+			time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond) //nolint:gosec
+		}
+	}()
+
+	// sign 20 blocks (proposal, prevote, precommit)
+	for i := 0; i < 20; i++ {
+		var wg sync.WaitGroup
+		wg.Add(len(thresholdValidators))
+		var mu sync.Mutex
+		success := false
+		for _, tv := range thresholdValidators {
+			tv := tv
+
+			go func() {
+				defer wg.Done()
+				// stagger signing requests with random sleep
+				time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond) //nolint:gosec
+
+				proposal := cometproto.Proposal{
+					Height: 1 + int64(i),
+					Round:  1,
+					Type:   cometproto.ProposalType,
+				}
+
+				if err := tv.SignProposal(testChainID, &proposal); err != nil {
+					t.Log("Proposal sign failed", "error", err)
+					return
+				}
+
+				signBytes := comet.ProposalSignBytes(testChainID, &proposal)
+
+				if !pubKey.VerifySignature(signBytes, proposal.Signature) {
+					t.Log("Proposal signature verification failed")
+					return
+				}
+
+				mu.Lock()
+				defer mu.Unlock()
+				success = true
+			}()
+		}
+
+		wg.Wait()
+		require.True(t, success) // at least one should succeed so that the block is not missed.
+		wg.Add(len(thresholdValidators))
+		success = false
+		for _, tv := range thresholdValidators {
+			tv := tv
+
+			go func() {
+				defer wg.Done()
+				// stagger signing requests with random sleep
+				time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond) //nolint:gosec
+
+				preVote := cometproto.Vote{
+					Height: 1 + int64(i),
+					Round:  1,
+					Type:   cometproto.PrevoteType,
+				}
+
+				if err := tv.SignVote(testChainID, &preVote); err != nil {
+					t.Log("PreVote sign failed", "error", err)
+					return
+				}
+
+				signBytes := comet.VoteSignBytes(testChainID, &preVote)
+
+				if !pubKey.VerifySignature(signBytes, preVote.Signature) {
+					t.Log("PreVote signature verification failed")
+					return
+				}
+
+				mu.Lock()
+				defer mu.Unlock()
+				success = true
+			}()
+		}
+
+		wg.Wait()
+		require.True(t, success) // at least one should succeed so that the block is not missed.
+		wg.Add(len(thresholdValidators))
+		success = false
+		for _, tv := range thresholdValidators {
+			tv := tv
+
+			go func() {
+				defer wg.Done()
+				// stagger signing requests with random sleep
+				time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond) //nolint:gosec
+
+				preCommit := cometproto.Vote{
+					Height: 1 + int64(i),
+					Round:  1,
+					Type:   cometproto.PrecommitType,
+				}
+
+				if err := tv.SignVote(testChainID, &preCommit); err != nil {
+					t.Log("PreCommit sign failed", "error", err)
+					return
+				}
+
+				signBytes := comet.VoteSignBytes(testChainID, &preCommit)
+
+				if !pubKey.VerifySignature(signBytes, preCommit.Signature) {
+					t.Log("PreCommit signature verification failed")
+					return
+				}
+
+				mu.Lock()
+				defer mu.Unlock()
+				success = true
+			}()
+		}
+
+		wg.Wait()
+		require.True(t, success) // at least one should succeed so that the block is not missed.
+	}
+}
+
+func TestThresholdValidatorLeaderElection2of3(t *testing.T) {
+	testThresholdValidatorLeaderElection(t, 2, 3)
 }

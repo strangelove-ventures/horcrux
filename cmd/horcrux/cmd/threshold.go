@@ -11,6 +11,8 @@ import (
 	"github.com/strangelove-ventures/horcrux/signer"
 )
 
+const maxWaitForSameBlockAttempts = 3
+
 func NewThresholdValidator(
 	logger cometlog.Logger,
 ) ([]cometservice.Service, *signer.ThresholdValidator, error) {
@@ -82,6 +84,7 @@ func NewThresholdValidator(
 		&config,
 		thresholdCfg.Threshold,
 		grpcTimeout,
+		maxWaitForSameBlockAttempts,
 		localCosigner,
 		remoteCosigners,
 		raftStore,
