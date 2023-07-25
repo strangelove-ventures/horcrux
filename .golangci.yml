@@ -97,7 +97,8 @@ linters-settings:
         alias: raftgrpctransport
       - pkg: github.com/hashicorp/raft-boltdb/v2
         alias: boltdb
-
+      - pkg: math/rand
+        alias: mrand
   maligned:
     suggest-new: true
   govet:

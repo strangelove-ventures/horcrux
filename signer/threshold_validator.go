@@ -13,7 +13,6 @@ import (
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	cometrpcjsontypes "github.com/cometbft/cometbft/rpc/jsonrpc/types"
 	comet "github.com/cometbft/cometbft/types"
-	"github.com/hashicorp/raft"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 )
 
@@ -34,11 +33,13 @@ type ThresholdValidator struct {
 	// peer cosigners
 	peerCosigners []Cosigner
 
-	raftStore *RaftStore
+	leader Leader
 
 	logger log.Logger
 
 	pendingDiskWG sync.WaitGroup
+
+	maxWaitForSameBlockAttempts int
 }
 
 type ChainSignState struct {
@@ -58,18 +59,20 @@ func NewThresholdValidator(
 	config *RuntimeConfig,
 	threshold int,
 	grpcTimeout time.Duration,
+	maxWaitForSameBlockAttempts int,
 	myCosigner *LocalCosigner,
 	peerCosigners []Cosigner,
-	raftStore *RaftStore,
+	leader Leader,
 ) *ThresholdValidator {
 	return &ThresholdValidator{
-		logger:        logger,
-		config:        config,
-		threshold:     threshold,
-		grpcTimeout:   grpcTimeout,
-		myCosigner:    myCosigner,
-		peerCosigners: peerCosigners,
-		raftStore:     raftStore,
+		logger:                      logger,
+		config:                      config,
+		threshold:                   threshold,
+		grpcTimeout:                 grpcTimeout,
+		maxWaitForSameBlockAttempts: maxWaitForSameBlockAttempts,
+		myCosigner:                  myCosigner,
+		peerCosigners:               peerCosigners,
+		leader:                      leader,
 	}
 }
 
@@ -149,9 +152,9 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, block
 	// the cond.Broadcast().
 	css.lastSignState.cond.L.Lock()
 	defer css.lastSignState.cond.L.Unlock()
-	for {
+	for i := 0; i < pv.maxWaitForSameBlockAttempts; i++ {
 		// block until sign state is saved. It will notify and unblock when block is next signed.
-		css.lastSignState.cond.Wait()
+		css.lastSignState.cond.WaitWithTimeout(pv.grpcTimeout)
 
 		// check if HRS exists in cache now
 		ssc, ok := css.lastSignState.cache[block.HRSKey()]
@@ -188,6 +191,11 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, block
 			"latest_step", latest.Step,
 		)
 	}
+
+	return nil, existingTimestamp, fmt.Errorf(
+		"exceeded max attempts waiting for block to be signed. height: %d, round: %d, step: %d",
+		height, round, step,
+	)
 }
 
 // notifyBlockSignError will alert any waiting goroutines that an error
@@ -562,10 +570,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 
 	// Only the leader can execute this function. Followers can handle the requests,
 	// but they just need to proxy the request to the raft leader
-	if pv.raftStore.raft == nil {
-		return nil, stamp, errors.New("raft not yet initialized")
-	}
-	if pv.raftStore.raft.State() != raft.Leader {
+	if !pv.leader.IsLeader() {
 		pv.logger.Debug("I am not the raft leader. Proxying request to the leader",
 			"chain_id", chainID,
 			"height", height,
@@ -573,7 +578,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 			"step", step,
 		)
 		totalNotRaftLeader.Inc()
-		signRes, err := pv.raftStore.LeaderSignBlock(CosignerSignBlockRequest{
+		signRes, err := pv.leader.SignBlock(CosignerSignBlockRequest{
 			ChainID: chainID,
 			Block:   block,
 		})
@@ -760,7 +765,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	}
 
 	// Emit last signed state to cluster
-	err = pv.raftStore.Emit(raftEventLSS, newLss)
+	err = pv.leader.ShareSigned(newLss)
 	if err != nil {
 		pv.logger.Error("Error emitting LSS", err.Error())
 	}
