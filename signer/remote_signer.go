@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"sync"
 	"time"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
@@ -76,6 +75,9 @@ func (rs *ReconnRemoteSigner) OnStop() {
 }
 
 func (rs *ReconnRemoteSigner) establishConnection(ctx context.Context) (net.Conn, error) {
+	ctx, cancel := context.WithTimeout(ctx, connRetrySec*time.Second)
+	defer cancel()
+
 	proto, address := cometnet.ProtocolAndAddress(rs.address)
 	netConn, err := rs.dialer.DialContext(ctx, proto, address)
 	if err != nil {
@@ -95,27 +97,6 @@ type conWrapper struct {
 	conn net.Conn
 }
 
-func (rs *ReconnRemoteSigner) attemptConnection(ctx context.Context, cancel func(), mu sync.Locker, cw *conWrapper, connected chan<- bool) {
-	mu.Lock()
-	defer mu.Unlock()
-	defer cancel()
-	conn, err := rs.establishConnection(ctx)
-	if err != nil {
-		sentryConnectTries.Add(float64(1))
-		totalSentryConnectTries.Inc()
-
-		rs.Logger.Error("Error establishing connection", "err", err)
-		return
-	}
-
-	cw.conn = conn
-
-	sentryConnectTries.Set(0)
-
-	rs.Logger.Info("Connected to Sentry", "address", rs.address)
-	connected <- true
-}
-
 // main loop for ReconnRemoteSigner
 func (rs *ReconnRemoteSigner) loop(ctx context.Context) {
 	var cw conWrapper
@@ -129,21 +110,24 @@ func (rs *ReconnRemoteSigner) loop(ctx context.Context) {
 			return
 		}
 
-		ticker := time.NewTicker(connRetrySec * time.Second)
-		connected := make(chan bool)
-
-		var mu sync.Mutex // used to make sure only one connection attempt can happen concurrently
-	ConnLoop:
-		for cw.conn == nil {
-			ctx, cancel := context.WithCancel(ctx)
-			go rs.attemptConnection(ctx, cancel, &mu, &cw, connected)
-			select {
-			case <-connected:
-				break ConnLoop
-			case <-ticker.C:
-				cancel()
-				rs.Logger.Info("Retrying", "sleep (s)", connRetrySec, "address", rs.address)
+		var conn net.Conn
+		for conn == nil {
+			var err error
+			conn, err = rs.establishConnection(ctx)
+			if err == nil {
+				sentryConnectTries.Set(0)
+				rs.Logger.Info("Connected to Sentry", "address", rs.address)
+				break
 			}
+
+			sentryConnectTries.Add(float64(1))
+			totalSentryConnectTries.Inc()
+			rs.Logger.Error(
+				"Error establishing connection, will retry",
+				"sleep (s)", connRetrySec,
+				"address", rs.address,
+				"err", err,
+			)
 		}
 
 		// since dialing can take time, we check running again
