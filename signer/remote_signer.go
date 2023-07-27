@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
@@ -17,6 +18,8 @@ import (
 	cometprotoprivval "github.com/cometbft/cometbft/proto/tendermint/privval"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 )
+
+const connRetrySec = 2
 
 // PrivValidator is a wrapper for tendermint PrivValidator,
 // with additional Stop method for safe shutdown.
@@ -76,12 +79,12 @@ func (rs *ReconnRemoteSigner) establishConnection(ctx context.Context) (net.Conn
 	proto, address := cometnet.ProtocolAndAddress(rs.address)
 	netConn, err := rs.dialer.DialContext(ctx, proto, address)
 	if err != nil {
-
 		return nil, fmt.Errorf("dial error: %w", err)
 	}
 
 	conn, err := cometp2pconn.MakeSecretConnection(netConn, rs.privKey)
 	if err != nil {
+		netConn.Close()
 		return nil, fmt.Errorf("secret connection error: %w", err)
 	}
 
@@ -92,7 +95,10 @@ type conWrapper struct {
 	conn net.Conn
 }
 
-func (rs *ReconnRemoteSigner) attemptConnection(ctx context.Context, cw *conWrapper, connected chan<- bool) {
+func (rs *ReconnRemoteSigner) attemptConnection(ctx context.Context, cancel func(), mu sync.Locker, cw *conWrapper, connected chan<- bool) {
+	mu.Lock()
+	defer mu.Unlock()
+	defer cancel()
 	conn, err := rs.establishConnection(ctx)
 	if err != nil {
 		sentryConnectTries.Add(float64(1))
@@ -108,7 +114,6 @@ func (rs *ReconnRemoteSigner) attemptConnection(ctx context.Context, cw *conWrap
 
 	rs.Logger.Info("Connected to Sentry", "address", rs.address)
 	connected <- true
-
 }
 
 // main loop for ReconnRemoteSigner
@@ -124,20 +129,20 @@ func (rs *ReconnRemoteSigner) loop(ctx context.Context) {
 			return
 		}
 
-		ticker := time.NewTicker(1 * time.Second)
+		ticker := time.NewTicker(connRetrySec * time.Second)
 		connected := make(chan bool)
 
+		var mu sync.Mutex // used to make sure only one connection attempt can happen concurrently
 	ConnLoop:
 		for cw.conn == nil {
 			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-			go rs.attemptConnection(ctx, &cw, connected)
+			go rs.attemptConnection(ctx, cancel, &mu, &cw, connected)
 			select {
 			case <-connected:
 				break ConnLoop
 			case <-ticker.C:
 				cancel()
-				rs.Logger.Info("Retrying", "sleep (s)", 1, "address", rs.address)
+				rs.Logger.Info("Retrying", "sleep (s)", connRetrySec, "address", rs.address)
 			}
 		}
 
