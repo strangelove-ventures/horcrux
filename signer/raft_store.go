@@ -281,10 +281,16 @@ func (s *RaftStore) Join(nodeID, addr string) error {
 }
 
 func (s *RaftStore) IsLeader() bool {
+	if s == nil || s.raft == nil {
+		return false
+	}
 	return s.raft.State() == raft.Leader
 }
 
 func (s *RaftStore) GetLeader() raft.ServerAddress {
+	if s == nil || s.raft == nil {
+		return ""
+	}
 	return s.raft.Leader()
 }
 
