@@ -93,24 +93,15 @@ func (rs *ReconnRemoteSigner) establishConnection(ctx context.Context) (net.Conn
 	return conn, nil
 }
 
-type conWrapper struct {
-	conn net.Conn
-}
-
 // main loop for ReconnRemoteSigner
 func (rs *ReconnRemoteSigner) loop(ctx context.Context) {
-	var cw conWrapper
+	var conn net.Conn
 	for {
 		if !rs.IsRunning() {
-			if cw.conn != nil {
-				if err := cw.conn.Close(); err != nil {
-					rs.Logger.Error("Close", "err", err.Error()+"closing listener failed")
-				}
-			}
+			rs.closeConn(conn)
 			return
 		}
 
-		var conn net.Conn
 		for conn == nil {
 			var err error
 			conn, err = rs.establishConnection(ctx)
@@ -132,28 +123,34 @@ func (rs *ReconnRemoteSigner) loop(ctx context.Context) {
 
 		// since dialing can take time, we check running again
 		if !rs.IsRunning() {
-			if err := cw.conn.Close(); err != nil {
-				rs.Logger.Error("Close", "err", err.Error()+"closing listener failed")
-			}
+			rs.closeConn(conn)
 			return
 		}
 
-		req, err := ReadMsg(cw.conn)
+		req, err := ReadMsg(conn)
 		if err != nil {
-			rs.Logger.Error("readMsg", "err", err)
-			cw.conn.Close()
-			cw.conn = nil
+			rs.Logger.Error(
+				"Failed to read message from connection",
+				"address", rs.address,
+				"err", err,
+			)
+			rs.closeConn(conn)
+			conn = nil
 			continue
 		}
 
 		// handleRequest handles request errors. We always send back a response
 		res := rs.handleRequest(req)
 
-		err = WriteMsg(cw.conn, res)
+		err = WriteMsg(conn, res)
 		if err != nil {
-			rs.Logger.Error("writeMsg", "err", err)
-			cw.conn.Close()
-			cw.conn = nil
+			rs.Logger.Error(
+				"Failed to write message to connection",
+				"address", rs.address,
+				"err", err,
+			)
+			rs.closeConn(conn)
+			conn = nil
 		}
 	}
 }
@@ -398,4 +395,16 @@ func StartRemoteSigners(
 		services = append(services, s)
 	}
 	return services, err
+}
+
+func (rs *ReconnRemoteSigner) closeConn(conn net.Conn) {
+	if conn == nil {
+		return
+	}
+	if err := conn.Close(); err != nil {
+		rs.Logger.Error("Failed to close connection to chain node",
+			"address", rs.address,
+			"err", err,
+		)
+	}
 }
