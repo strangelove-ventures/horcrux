@@ -102,6 +102,7 @@ func (rs *ReconnRemoteSigner) loop(ctx context.Context) {
 			return
 		}
 
+		retries := 0
 		for conn == nil {
 			var err error
 			conn, err = rs.establishConnection(ctx)
@@ -111,12 +112,14 @@ func (rs *ReconnRemoteSigner) loop(ctx context.Context) {
 				break
 			}
 
-			sentryConnectTries.Add(float64(1))
+			sentryConnectTries.Add(1)
 			totalSentryConnectTries.Inc()
+			retries++
 			rs.Logger.Error(
 				"Error establishing connection, will retry",
 				"sleep (s)", connRetrySec,
 				"address", rs.address,
+				"attempt", retries,
 				"err", err,
 			)
 		}
