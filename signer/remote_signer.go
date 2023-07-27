@@ -105,9 +105,11 @@ func (rs *ReconnRemoteSigner) loop(ctx context.Context) {
 		retries := 0
 		for conn == nil {
 			var err error
+			timer := time.NewTimer(connRetrySec * time.Second)
 			conn, err = rs.establishConnection(ctx)
 			if err == nil {
 				sentryConnectTries.Set(0)
+				timer.Stop()
 				rs.Logger.Info("Connected to Sentry", "address", rs.address)
 				break
 			}
@@ -122,6 +124,12 @@ func (rs *ReconnRemoteSigner) loop(ctx context.Context) {
 				"attempt", retries,
 				"err", err,
 			)
+			select {
+			case <-ctx.Done():
+				return
+			case <-timer.C:
+				continue
+			}
 		}
 
 		// since dialing can take time, we check running again
