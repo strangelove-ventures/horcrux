@@ -17,7 +17,8 @@ builds:
       - amd64
       - arm64
     env:
-      - CGO_ENABLED=0  
+      - CGO_ENABLED=1
+      - LDFLAGS='-linkmode external -extldflags "-static"'
 
 checksum:
   name_template: SHA256SUMS-{{.Version}}.txt
