@@ -14,7 +14,7 @@ import (
 	"github.com/cometbft/cometbft/libs/tempfile"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	"github.com/gogo/protobuf/proto"
-	"github.com/strangelove-ventures/horcrux/signer/cond"
+	"github.com/strangelove-ventures/horcrux/pkg/cond"
 )
 
 const (

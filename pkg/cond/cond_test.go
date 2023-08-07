@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/strangelove-ventures/horcrux/signer/cond"
+	"github.com/strangelove-ventures/horcrux/pkg/cond"
 	"github.com/stretchr/testify/require"
 )
 

@@ -1,7 +1,7 @@
 package signer
 
 import (
-	"github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/strangelove-ventures/horcrux/pkg/proto"
 )
 
 // HRSKey represents the key for the HRS metadata map.

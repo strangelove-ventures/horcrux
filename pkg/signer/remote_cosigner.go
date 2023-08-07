@@ -7,7 +7,7 @@ import (
 	"time"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
-	"github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/strangelove-ventures/horcrux/pkg/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )

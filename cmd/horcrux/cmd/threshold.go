@@ -6,9 +6,10 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/strangelove-ventures/horcrux/pkg/signer"
+
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	cometservice "github.com/cometbft/cometbft/libs/service"
-	"github.com/strangelove-ventures/horcrux/signer"
 )
 
 const maxWaitForSameBlockAttempts = 3

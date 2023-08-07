@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             v3.21.6
-// source: signer/proto/cosigner_grpc_server.proto
+// source: pkg/proto/cosigner_grpc_server.proto
 
 package proto
 
@@ -245,5 +245,5 @@ var CosignerGRPC_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "signer/proto/cosigner_grpc_server.proto",
+	Metadata: "pkg/proto/cosigner_grpc_server.proto",
 }

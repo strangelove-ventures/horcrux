@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/strangelove-ventures/horcrux/pkg/signer"
+
 	"github.com/cometbft/cometbft/crypto"
 	cometprivval "github.com/cometbft/cometbft/privval"
 	"github.com/cosmos/cosmos-sdk/types/bech32"
 	"github.com/spf13/cobra"
-	"github.com/strangelove-ventures/horcrux/signer"
 )
 
 type AddressCmdOutput struct {

@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/strangelove-ventures/horcrux/pkg/signer"
+
 	"github.com/cometbft/cometbft/crypto"
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/cometbft/cometbft/privval"
 	"github.com/docker/docker/client"
-	"github.com/strangelove-ventures/horcrux/signer"
 	interchaintest "github.com/strangelove-ventures/interchaintest/v7"
 	"github.com/strangelove-ventures/interchaintest/v7/chain/cosmos"
 	"github.com/strangelove-ventures/interchaintest/v7/ibc"

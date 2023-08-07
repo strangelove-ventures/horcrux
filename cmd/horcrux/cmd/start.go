@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/strangelove-ventures/horcrux/pkg/signer"
+
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/cometbft/cometbft/libs/service"
 	"github.com/spf13/cobra"
-	"github.com/strangelove-ventures/horcrux/signer"
 )
 
 func startCmd() *cobra.Command {

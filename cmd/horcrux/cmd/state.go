@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/cobra"
-	"github.com/strangelove-ventures/horcrux/signer"
+	"github.com/strangelove-ventures/horcrux/pkg/signer"
 
 	cometjson "github.com/cometbft/cometbft/libs/json"
+	"github.com/spf13/cobra"
 )
 
 // Snippet Taken from https://raw.githubusercontent.com/cometbft/cometbft/main/privval/file.go

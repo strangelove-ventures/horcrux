@@ -6,8 +6,9 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/strangelove-ventures/horcrux/pkg/signer"
+
 	"github.com/cometbft/cometbft/crypto"
-	"github.com/strangelove-ventures/horcrux/signer"
 	interchaintest "github.com/strangelove-ventures/interchaintest/v7"
 	"github.com/strangelove-ventures/interchaintest/v7/chain/cosmos"
 	"github.com/strangelove-ventures/interchaintest/v7/ibc"

@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package = "github.com/strangelove-ventures/horcrux/signer/proto";
+option go_package = "github.com/strangelove-ventures/horcrux/pkg/proto";
 
 package proto;
 

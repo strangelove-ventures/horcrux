@@ -20,8 +20,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/strangelove-ventures/horcrux/pkg/signer"
+
 	"github.com/spf13/cobra"
-	"github.com/strangelove-ventures/horcrux/signer"
 )
 
 func createCosignerDirectoryIfNecessary(out string, id int) (string, error) {

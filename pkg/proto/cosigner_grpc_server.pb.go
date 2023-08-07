@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.28.1
 // 	protoc        v3.21.6
-// source: signer/proto/cosigner_grpc_server.proto
+// source: pkg/proto/cosigner_grpc_server.proto
 
 package proto
 
