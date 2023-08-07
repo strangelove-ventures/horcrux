@@ -38,11 +38,11 @@ build-horcrux-docker:
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 mkfile_dir := $(dir $(mkfile_path))
 
-signer-proto:
+pkg-proto:
 	docker run \
 	  --rm \
 	  -u $(shell id -u ${USER}):$(shell id -g ${USER}) \
-		--mount type=bind,source=$(mkfile_dir)/signer/proto,target=/horcrux/signer/proto \
+		--mount type=bind,source=$(mkfile_dir)/pkg/proto,target=/horcrux/pkg/proto \
 		--entrypoint protoc \
 		namely/protoc-all \
 		--go_out=/horcrux \
