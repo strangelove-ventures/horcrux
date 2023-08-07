@@ -2,40 +2,74 @@ name: "Release"
 
 on:
   push:
-    branches: 
-      - "RC[0-9]/**"
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+" # Push events to matching v*, i.e. v1.0, v20.15.10
       - "v[0-9]+.[0-9]+.[0-9]+-beta[0-9]+"
       - "v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+"
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
 jobs:
-  goreleaser:
+  build-and-push-image:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
 
-      - uses: actions/setup-go@v4
-        with:
-          go-version: '^1.19'
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
 
-      - run: echo ":rocket::rocket::rocket:" > ../release_notes.md 
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
-      - name: Build
-        uses: goreleaser/goreleaser-action@v4
+      - name: Log in to the Container registry
+        uses: docker/login-action@v2
         with:
-          version: latest
-          args: build --skip-validate   # skip validate skips initial sanity checks in order to be able to fully run
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Release
-        uses: goreleaser/goreleaser-action@v4
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v4
         with:
-          version: latest
-          args: release --rm-dist --release-notes=../release_notes.md
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          file: docker/horcrux/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  draft-release:
+    needs: build-and-push-image
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+    - name: Copy Binary
+      run: |
+        docker create -it --entrypoint sh --name amd --platform linux/amd64 ${{ env.REGISTRY }}/${{ github.repository }}:${{ github.ref_name }}
+        docker create -it --entrypoint sh --name arm --platform linux/arm64 ${{ env.REGISTRY }}/${{ github.repository }}:${{ github.ref_name }}
+        docker cp amd:/bin/horcrux ./horcrux_linux-amd64
+        docker cp arm:/bin/horcrux ./horcrux_linux-arm64
+        sha256sum ./horcrux_linux-amd64 > ./horcrux_sha256.txt
+        sha256sum ./horcrux_linux-arm64 >> ./horcrux_sha256.txt
+    
+    - name: Draft Release
+      uses: softprops/action-gh-release@v1        
+      with:
+        draft: true
+        files: |
+          horcrux_linux-amd64
+          horcrux_linux-arm64
+          horcrux_sha256.txt
