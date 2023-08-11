@@ -18,6 +18,14 @@ import (
 
 var _ PrivValidator = &ThresholdValidator{}
 
+type ValidatorSignBlockRequest struct {
+	ChainID string
+	Block   *Block
+}
+
+type ValidatorSignBlockResponse struct {
+	Signature []byte
+}
 type ThresholdValidator struct {
 	config *RuntimeConfig
 
@@ -233,7 +241,7 @@ func (pv *ThresholdValidator) GetPubKey(chainID string) (crypto.PubKey, error) {
 }
 
 // SignVote signs a canonical representation of the vote, along with the
-// chainID. Implements PrivValidator.
+// chainID. Implements PrivValidator from Tendermint/Cometbft
 func (pv *ThresholdValidator) SignVote(chainID string, vote *cometproto.Vote) error {
 	block := &Block{
 		Height:    vote.Height,
@@ -578,7 +586,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 			"step", step,
 		)
 		totalNotRaftLeader.Inc()
-		signRes, err := pv.leader.SignBlock(CosignerSignBlockRequest{
+		signRes, err := pv.leader.SignBlock(ValidatorSignBlockRequest{
 			ChainID: chainID,
 			Block:   block,
 		})

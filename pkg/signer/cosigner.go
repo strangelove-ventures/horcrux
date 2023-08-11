@@ -14,7 +14,7 @@ type Cosigner interface {
 	// The ID is the shamir index: 1, 2, etc...
 	GetID() int
 
-	// Get the P2P URL (GRPC and Raft)
+	// GetAddress gets the P2P URL (GRPC and Raft)
 	GetAddress() string
 
 	// Get the combined public key
@@ -97,15 +97,6 @@ type CosignerSetNonceRequest struct {
 	Round     int64
 	Step      int8
 	Timestamp time.Time
-}
-
-type CosignerSignBlockRequest struct {
-	ChainID string
-	Block   *Block
-}
-
-type CosignerSignBlockResponse struct {
-	Signature []byte
 }
 
 type CosignerNoncesResponse struct {

@@ -67,7 +67,7 @@ func (s *RaftStore) getLeaderGRPCClient() (proto.CosignerGRPCClient, *grpc.Clien
 	return proto.NewCosignerGRPCClient(conn), conn, nil
 }
 
-func (s *RaftStore) SignBlock(req CosignerSignBlockRequest) (*CosignerSignBlockResponse, error) {
+func (s *RaftStore) SignBlock(req ValidatorSignBlockRequest) (*ValidatorSignBlockResponse, error) {
 	client, conn, err := s.getLeaderGRPCClient()
 	if err != nil {
 		return nil, err
@@ -82,7 +82,7 @@ func (s *RaftStore) SignBlock(req CosignerSignBlockRequest) (*CosignerSignBlockR
 	if err != nil {
 		return nil, err
 	}
-	return &CosignerSignBlockResponse{
+	return &ValidatorSignBlockResponse{
 		Signature: res.GetSignature(),
 	}, nil
 }

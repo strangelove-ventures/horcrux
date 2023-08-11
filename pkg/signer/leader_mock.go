@@ -27,7 +27,7 @@ func (m *MockLeader) SetLeader(tv *ThresholdValidator) {
 	m.leader = tv
 }
 
-func (m *MockLeader) SignBlock(req CosignerSignBlockRequest) (*CosignerSignBlockResponse, error) {
+func (m *MockLeader) SignBlock(req ValidatorSignBlockRequest) (*ValidatorSignBlockResponse, error) {
 	var l *ThresholdValidator
 	for i := 0; i < 30; i++ {
 		m.mu.Lock()
@@ -54,7 +54,7 @@ func (m *MockLeader) SignBlock(req CosignerSignBlockRequest) (*CosignerSignBlock
 	if err != nil {
 		return nil, err
 	}
-	return &CosignerSignBlockResponse{
+	return &ValidatorSignBlockResponse{
 		Signature: res,
 	}, nil
 }
