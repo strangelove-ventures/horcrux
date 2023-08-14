@@ -32,7 +32,13 @@ func createListener(nodeID string, homedir string) (string, func(), error) {
 		homedir,
 		"127.0.0.1:"+port,
 		500*time.Millisecond,
-		nil, nil, nil)
+		nil)
+
+	// Need to set pointers to avoid nil pointers.
+	var cosigners []signer.Cosigner
+	var timeDuration time.Duration
+	thresholdvalidator := signer.NewThresholdValidator(nil, nil, 0, timeDuration, 0, nil, cosigners, nil)
+	s.SetThresholdValidator(thresholdvalidator)
 
 	transportManager, err := s.Open()
 	if err != nil {

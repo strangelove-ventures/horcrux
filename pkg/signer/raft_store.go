@@ -66,7 +66,7 @@ type RaftStore struct {
 // NewRaftStore returns a new RaftStore.
 func NewRaftStore(
 	nodeID string, directory string, bindAddress string, timeout time.Duration,
-	logger log.Logger, cosigner *LocalCosigner, cosigners []Cosigner) *RaftStore {
+	logger log.Logger) *RaftStore {
 	cosignerRaftStore := &RaftStore{
 		NodeID:      nodeID,
 		RaftDir:     directory,

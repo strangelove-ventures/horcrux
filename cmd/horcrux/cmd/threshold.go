@@ -74,7 +74,7 @@ func NewThresholdValidator(
 
 	// Start RAFT store listener
 	raftStore := signer.NewRaftStore(nodeID,
-		raftDir, p2pListen, raftTimeout, logger, localCosigner, remoteCosigners)
+		raftDir, p2pListen, raftTimeout, logger)
 	if err := raftStore.Start(); err != nil {
 		return nil, nil, fmt.Errorf("error starting raft store: %w", err)
 	}
