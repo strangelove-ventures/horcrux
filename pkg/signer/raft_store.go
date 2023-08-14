@@ -31,7 +31,7 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-var _ Leader = (*RaftStore)(nil)
+var _ ILeader = (*RaftStore)(nil) // Ensure RaftStore implements ILeader
 
 const (
 	retainSnapshotCount = 2
@@ -43,7 +43,7 @@ type command struct {
 	Value string `json:"value,omitempty"`
 }
 
-// Store is a simple key-value store, where all changes are made via Raft consensus.
+// RaftStore is a simple key-value store, where all changes are made via Raft consensus.
 type RaftStore struct {
 	service.BaseService
 
@@ -51,19 +51,19 @@ type RaftStore struct {
 	RaftDir     string
 	RaftBind    string
 	RaftTimeout time.Duration
-	Cosigners   []Cosigner
+	// Cosigners   []Cosigner
 
 	mu sync.Mutex
 	m  map[string]string // The key-value store for the system.
 
 	raft *raft.Raft // The consensus mechanism
 
-	logger             log.Logger
-	cosigner           *LocalCosigner
+	logger log.Logger
+	// cosigner           *LocalCosigner
 	thresholdValidator *ThresholdValidator
 }
 
-// New returns a new Store.
+// NewRaftStore returns a new RaftStore.
 func NewRaftStore(
 	nodeID string, directory string, bindAddress string, timeout time.Duration,
 	logger log.Logger, cosigner *LocalCosigner, cosigners []Cosigner) *RaftStore {
@@ -74,8 +74,6 @@ func NewRaftStore(
 		RaftTimeout: timeout,
 		m:           make(map[string]string),
 		logger:      logger,
-		cosigner:    cosigner,
-		Cosigners:   cosigners,
 	}
 
 	cosignerRaftStore.BaseService = *service.NewBaseService(logger, "CosignerRaftStore", cosignerRaftStore)
@@ -102,7 +100,7 @@ func (s *RaftStore) init() error {
 		return err
 	}
 	grpcServer := grpc.NewServer()
-	proto.RegisterCosignerGRPCServer(grpcServer, NewGRPCServer(s.cosigner, s.thresholdValidator, s))
+	proto.RegisterCosignerGRPCServer(grpcServer, NewGRPCServer(s.thresholdValidator.myCosigner, s.thresholdValidator, s))
 	transportManager.Register(grpcServer)
 	leaderhealth.Setup(s.raft, grpcServer, []string{"Leader"})
 	raftadmin.Register(grpcServer, s.raft)
@@ -180,7 +178,8 @@ func (s *RaftStore) Open() (*raftgrpctransport.Manager, error) {
 			},
 		},
 	}
-	for _, c := range s.Cosigners {
+
+	for _, c := range s.thresholdValidator.peerCosigners {
 		configuration.Servers = append(configuration.Servers, raft.Server{
 			ID:      raft.ServerID(fmt.Sprint(c.GetID())),
 			Address: raft.ServerAddress(p2pURLToRaftAddress(c.GetAddress())),

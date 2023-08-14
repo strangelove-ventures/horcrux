@@ -31,13 +31,14 @@ func (key *CosignerEd25519Key) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 
-	return json.Marshal(&struct {
-		PubKey []byte `json:"pubKey"`
-		*Alias
-	}{
-		PubKey: protoBytes,
-		Alias:  (*Alias)(key),
-	})
+	return json.Marshal(
+		&struct {
+			PubKey []byte `json:"pubKey"`
+			*Alias
+		}{
+			PubKey: protoBytes,
+			Alias:  (*Alias)(key),
+		})
 }
 
 func (key *CosignerEd25519Key) UnmarshalJSON(data []byte) error {

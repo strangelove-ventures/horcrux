@@ -88,7 +88,7 @@ func NewThresholdValidator(
 		maxWaitForSameBlockAttempts,
 		localCosigner,
 		remoteCosigners,
-		raftStore, // raftStore implements the leader interface
+		raftStore, // raftStore implements the ILeader interface
 	)
 
 	raftStore.SetThresholdValidator(val)

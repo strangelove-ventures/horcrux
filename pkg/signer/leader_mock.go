@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-var _ Leader = (*MockLeader)(nil)
+var _ ILeader = (*MockLeader)(nil)
 
 type MockLeader struct {
 	id int

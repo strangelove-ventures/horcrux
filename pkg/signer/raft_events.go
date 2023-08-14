@@ -44,7 +44,7 @@ func (f *fsm) handleLSSEvent(value string) {
 		return
 	}
 	_ = f.thresholdValidator.SaveLastSignedState(lss.ChainID, lss.SignStateConsensus)
-	_ = f.cosigner.SaveLastSignedState(lss.ChainID, lss.SignStateConsensus)
+	_ = f.thresholdValidator.myCosigner.SaveLastSignedState(lss.ChainID, lss.SignStateConsensus)
 }
 
 func (s *RaftStore) getLeaderGRPCClient() (proto.CosignerGRPCClient, *grpc.ClientConn, error) {

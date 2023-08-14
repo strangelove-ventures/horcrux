@@ -110,7 +110,7 @@ func (rpc *GRPCServer) TransferLeadership(
 	}
 	leaderID := req.GetLeaderID()
 	if leaderID != "" {
-		for _, c := range rpc.raftStore.Cosigners {
+		for _, c := range rpc.raftStore.thresholdValidator.peerCosigners {
 			shardID := fmt.Sprint(c.GetID())
 			if shardID == leaderID {
 				raftAddress := p2pURLToRaftAddress(c.GetAddress())

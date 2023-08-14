@@ -41,7 +41,7 @@ type ThresholdValidator struct {
 	// peer cosigners
 	peerCosigners []Cosigner
 
-	leader Leader
+	leader ILeader
 
 	logger log.Logger
 
@@ -70,7 +70,7 @@ func NewThresholdValidator(
 	maxWaitForSameBlockAttempts int,
 	myCosigner *LocalCosigner,
 	peerCosigners []Cosigner,
-	leader Leader,
+	leader ILeader,
 ) *ThresholdValidator {
 	return &ThresholdValidator{
 		logger:                      logger,

@@ -1,8 +1,8 @@
 package signer
 
-// Leader is an interface for the detecting if the current node/validator/cosigner is
+// ILeader is an interface for the detecting if the current node/validator/cosigner is
 // the leader and performing leader actions.
-type Leader interface {
+type ILeader interface {
 	// IsLeader returns true if the cosigner is the leader.
 	IsLeader() bool
 
