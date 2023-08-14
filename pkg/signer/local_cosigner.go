@@ -179,7 +179,6 @@ func (cosigner *LocalCosigner) VerifySignature(chainID string, payload, signatur
 
 // Sign the sign request using the cosigner's shard
 // Return the signed bytes or an error
-// Implements Cosigner interface
 func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignResponse, error) {
 	chainID := req.ChainID
 

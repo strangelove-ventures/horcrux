@@ -567,6 +567,7 @@ func (pv *ThresholdValidator) compareBlockSignatureAgainstHRS(
 	return newStillWaitingForBlockError(chainID, blockHRS)
 }
 
+// SignBlock is the arranger of the whole signature/signing process.
 func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, time.Time, error) {
 	height, round, step, stamp, signBytes := block.Height, block.Round, block.Step, block.Timestamp, block.SignBytes
 

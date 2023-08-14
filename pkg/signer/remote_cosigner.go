@@ -99,7 +99,9 @@ func (cosigner *RemoteCosigner) GetNonces(
 	}, nil
 }
 
-// Implements the cosigner interface
+// SetNoncesAndSign implements the Cosigner interface
+// It acts as a client(!) and requests via gRPC the local cosigners
+// to set the nonces and sign the payload.
 func (cosigner *RemoteCosigner) SetNoncesAndSign(
 	req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error) {
 	client, conn, err := cosigner.getGRPCClient()
