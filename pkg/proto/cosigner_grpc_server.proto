@@ -6,7 +6,7 @@ package proto;
 // TODO: Rename it as GPRCserver. It makes more sense since we are using it for all connections. 
 // CosignerGRPC handles all the services (the server)
 service CosignerGRPC {
-	rpc SignBlock (GRPCSignBlockRequest) returns (CosignerGRPCSignBlockResponse) {}
+	rpc SignBlock (CosignerGRPCSignBlockRequest) returns (CosignerGRPCSignBlockResponse) {}
 	rpc SetNoncesAndSign (CosignerGRPCSetNoncesAndSignRequest) returns (CosignerGRPCSetNoncesAndSignResponse) {}
   rpc GetNonces (CosignerGRPCGetNoncesRequest) returns (CosignerGRPCGetNoncesResponse) {}
   rpc TransferLeadership (CosignerGRPCTransferLeadershipRequest) returns (CosignerGRPCTransferLeadershipResponse) {}
