@@ -2,6 +2,7 @@ package signer
 
 import (
 	"errors"
+	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 	"sync"
 	"time"
 )
@@ -59,6 +60,6 @@ func (m *MockLeader) SignBlock(req ValidatorSignBlockRequest) (*ValidatorSignBlo
 	}, nil
 }
 
-func (m *MockLeader) ShareSigned(_ ChainSignStateConsensus) error {
+func (m *MockLeader) ShareSigned(_ types.ChainSignStateConsensus) error {
 	return nil
 }

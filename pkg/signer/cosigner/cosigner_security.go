@@ -1,4 +1,4 @@
-package signer
+package cosigner
 
 // CosignerSecurity is an interface for the security layer of the cosigner.
 type CosignerSecurity interface {

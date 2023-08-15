@@ -2,6 +2,7 @@ package signer
 
 import (
 	"fmt"
+	cosigner "github.com/strangelove-ventures/horcrux/pkg/signer/cosigner"
 	"os"
 	"sync"
 
@@ -15,7 +16,7 @@ var _ PrivValidator = &SingleSignerValidator{}
 // SingleSignerValidator guards access to an underlying PrivValidator by using mutexes
 // for each of the PrivValidator interface functions
 type SingleSignerValidator struct {
-	config     *RuntimeConfig
+	config     *cosigner.RuntimeConfig
 	chainState sync.Map
 }
 
@@ -31,7 +32,7 @@ type SingleSignerChainState struct {
 
 // NewSingleSignerValidator constructs a validator for single-sign mode (not recommended).
 // NewThresholdValidator is recommended, but single-sign mode can be used for convenience.
-func NewSingleSignerValidator(config *RuntimeConfig) *SingleSignerValidator {
+func NewSingleSignerValidator(config *cosigner.RuntimeConfig) *SingleSignerValidator {
 	return &SingleSignerValidator{
 		config: config,
 	}
@@ -73,7 +74,6 @@ func (pv *SingleSignerValidator) loadChainStateIfNecessary(chainID string) (*Sin
 	if ok {
 		return cachedChainState.(*SingleSignerChainState), nil
 	}
-
 	keyFile := pv.config.KeyFilePathSingleSigner(chainID)
 	if _, err := os.Stat(keyFile); err != nil {
 		return nil, fmt.Errorf("failed to load key file (%s) - %w", keyFile, err)

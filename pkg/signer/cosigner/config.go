@@ -1,4 +1,4 @@
-package signer
+package cosigner
 
 import (
 	"fmt"
@@ -43,7 +43,7 @@ func (c *Config) Nodes() (out []string) {
 	return out
 }
 
-func (c *Config) MustMarshalYaml() []byte {
+func (c *Config) mustMarshalYaml() []byte {
 	out, err := yaml.Marshal(c)
 	if err != nil {
 		panic(err)
@@ -182,7 +182,7 @@ func (c RuntimeConfig) CosignerStateFile(chainID string) string {
 }
 
 func (c RuntimeConfig) WriteConfigFile() error {
-	return os.WriteFile(c.ConfigFile, c.Config.MustMarshalYaml(), 0600)
+	return os.WriteFile(c.ConfigFile, c.Config.mustMarshalYaml(), 0600)
 }
 
 func fileExists(file string) error {

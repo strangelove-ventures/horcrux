@@ -2,6 +2,7 @@ package signer
 
 import (
 	"crypto/rand"
+	cosigners "github.com/strangelove-ventures/horcrux/pkg/signer/cosigner"
 	"os"
 	"testing"
 	"time"
@@ -24,17 +25,17 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 	eciesKey, err := ecies.GenerateKey(rand.Reader, secp256k1.S256(), nil)
 	require.NoError(t, err)
 
-	key := CosignerEd25519Key{
+	key := cosigners.CosignerEd25519Key{
 		PubKey:       dummyPub,
 		PrivateShard: []byte{},
 		ID:           1,
 	}
 
-	cosigner := NewLocalCosigner(
+	cosigner := cosigners.NewLocalCosigner(
 		log.NewNopLogger(),
-		&RuntimeConfig{},
-		NewCosignerSecurityECIES(
-			CosignerECIESKey{
+		&cosigners.RuntimeConfig{},
+		cosigners.NewCosignerSecurityECIES(
+			cosigners.CosignerECIESKey{
 				ID:        key.ID,
 				ECIESKey:  eciesKey,
 				ECIESPubs: []*ecies.PublicKey{&eciesKey.PublicKey},

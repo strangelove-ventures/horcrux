@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/strangelove-ventures/horcrux/pkg/signer"
-
 	"github.com/cometbft/cometbft/crypto"
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/cometbft/cometbft/privval"
@@ -85,15 +83,15 @@ func preGenesisSingleNodeAndHorcruxSingle(
 				return err
 			}
 
-			chainNodes := make(signer.ChainNodes, len(sentries))
+			chainNodes := make(configs.ChainNodes, len(sentries))
 			for i, sentry := range sentries {
-				chainNodes[i] = signer.ChainNode{
+				chainNodes[i] = configs.ChainNode{
 					PrivValAddr: fmt.Sprintf("tcp://%s:1234", sentry.HostName()),
 				}
 			}
 
-			config := signer.Config{
-				SignMode:   signer.SignModeSingle,
+			config := configs.Config{
+				SignMode:   configs.SignModeSingle,
 				ChainNodes: chainNodes,
 			}
 
@@ -119,7 +117,7 @@ func writeConfigAndKeysSingle(
 	ctx context.Context,
 	chainID string,
 	singleSigner *cosmos.SidecarProcess,
-	config signer.Config,
+	config configs.Config,
 	pvKey privval.FilePVKey,
 ) error {
 	configBz, err := json.Marshal(config)

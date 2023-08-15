@@ -1,6 +1,7 @@
-package signer
+package cosigner
 
 import (
+	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 	"time"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
@@ -23,7 +24,7 @@ type Cosigner interface {
 	VerifySignature(chainID string, payload, signature []byte) bool
 
 	// Get nonces for all cosigner shards
-	GetNonces(chainID string, hrst HRSTKey) (*CosignerNoncesResponse, error)
+	GetNonces(chainID string, hrst types.HRSTKey) (*CosignerNoncesResponse, error)
 
 	// Sign the requested bytes
 	SetNoncesAndSign(req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error)
@@ -60,9 +61,10 @@ func (secretPart *CosignerNonce) toProto() *proto.Nonce {
 	}
 }
 
+// CosignerNonces is a list of CosignerNonce
 type CosignerNonces []CosignerNonce
 
-func (secretParts CosignerNonces) toProto() (out []*proto.Nonce) {
+func (secretParts CosignerNonces) ToProto() (out []*proto.Nonce) {
 	for _, secretPart := range secretParts {
 		out = append(out, secretPart.toProto())
 	}
@@ -106,6 +108,6 @@ type CosignerNoncesResponse struct {
 type CosignerSetNoncesAndSignRequest struct {
 	ChainID   string
 	Nonces    []CosignerNonce
-	HRST      HRSTKey
+	HRST      types.HRSTKey
 	SignBytes []byte
 }

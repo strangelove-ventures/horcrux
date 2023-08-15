@@ -3,6 +3,9 @@ package signer
 import (
 	"encoding/json"
 	"errors"
+	"github.com/strangelove-ventures/horcrux/pkg/metrics"
+	"github.com/strangelove-ventures/horcrux/pkg/signer/cosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 	"time"
 
 	"github.com/strangelove-ventures/horcrux/pkg/proto"
@@ -26,7 +29,7 @@ func (f *fsm) shouldRetain(key string) bool {
 }
 
 func (f *fsm) handleLSSEvent(value string) {
-	lss := &ChainSignStateConsensus{}
+	lss := &types.ChainSignStateConsensus{}
 	err := json.Unmarshal([]byte(value), lss)
 	if err != nil {
 		f.logger.Error(
@@ -57,7 +60,7 @@ func (s *RaftStore) getLeaderGRPCClient() (proto.CosignerGRPCClient, *grpc.Clien
 		time.Sleep(100 * time.Millisecond)
 	}
 	if leader == "" {
-		totalRaftLeaderElectiontimeout.Inc()
+		metrics.TotalRaftLeaderElectiontimeout.Inc()
 		return nil, nil, errors.New("timed out waiting for leader election to complete")
 	}
 	conn, err := grpc.Dial(leader, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -73,7 +76,7 @@ func (s *RaftStore) SignBlock(req ValidatorSignBlockRequest) (*ValidatorSignBloc
 		return nil, err
 	}
 	defer conn.Close()
-	context, cancelFunc := getContext()
+	context, cancelFunc := cosigner.GetContext()
 	defer cancelFunc()
 	res, err := client.SignBlock(context, &proto.CosignerGRPCSignBlockRequest{
 		ChainID: req.ChainID,

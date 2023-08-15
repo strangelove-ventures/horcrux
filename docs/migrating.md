@@ -50,7 +50,7 @@ When installing `horcrux` we recommend using either the [container image](https:
 The image or binary will be used on each cosigner (bare virtual machine, docker container, kubernetes pod, etc.)
 The binary should also be installed on your local machine for working with the config and key files before distributing to the cosigner nodes.
 
-Run the following on your local machine. If you are using the binary on the cosigners rather than container image, run this on each cosigner node VM also.
+Run the following on your local machine. If you are using the binary on the cosigner rather than container image, run this on each cosigner node VM also.
 ```bash
 TAG=v3.0.0
 $ wget https://github.com/strangelove-ventures/horcrux/releases/download/${TAG}/horcrux_${TAG}_linux_amd64.tar.gz
@@ -67,18 +67,18 @@ $ sudo nano /etc/systemd/system/horcrux.service
 $ sudo systemctl daemon-reload
 ```
 
-After that is done, initialize the shared configuration for the cosigners on your local machine using the `horcrux` cli. If you would like different cosigners to connect to different sentry node(s): repeat this command and modify the `--node` flag values for each cosigner, or modify the config after the initial generation.
+After that is done, initialize the shared configuration for the cosigner on your local machine using the `horcrux` cli. If you would like different cosigner to connect to different sentry node(s): repeat this command and modify the `--node` flag values for each cosigner, or modify the config after the initial generation.
 
 ```bash
 $ horcrux config init --node "tcp://10.168.0.1:1234" --node "tcp://10.168.0.2:1234" --node "tcp://10.168.0.3:1234" --cosigner "tcp://10.168.1.1:2222" --cosigner "tcp://10.168.1.2:2222" --cosigner "tcp://10.168.1.3:2222" --threshold 2 --grpc-timeout 1000ms --raft-timeout 1000ms
 ```
 
 > **Note** 
-> Note the use of multiple `--node` and `--cosigner` flags. In this example, there are 3 sentry (chain) nodes that each horcrux cosigner will connect to. There are 3 horcrux cosigners, with a threshold of 2 cosigners required to sign a valid block signature.
+> Note the use of multiple `--node` and `--cosigner` flags. In this example, there are 3 sentry (chain) nodes that each horcrux cosigner will connect to. There are 3 horcrux cosigner, with a threshold of 2 cosigner required to sign a valid block signature.
 
 #### Flags
 
-- `-c`/`--cosigner`: configures the P2P address and shard ID for cosigner nodes. Keeping the node names and the IDs the same helps avoid errors. The DNS/IP used for all of these must be reachable by the other cosigners, i.e. do not use 0.0.0.0 for the hostname.
+- `-c`/`--cosigner`: configures the P2P address and shard ID for cosigner nodes. Keeping the node names and the IDs the same helps avoid errors. The DNS/IP used for all of these must be reachable by the other cosigner, i.e. do not use 0.0.0.0 for the hostname.
 - `-n`/`--node`: configures the priv-val interface listen address for the chain sentry nodes.
 - `-k`/`--key-dir`: configures the directory for the RSA and Ed25519 private key files if you would like to use a different path than the default, `~/.horcrux`.
 - `--grpc-timeout`: configures the timeout for cosigner-to-cosigner GRPC communication. This value defaults to `1000ms`.
@@ -91,7 +91,7 @@ $ horcrux config init --node "tcp://10.168.0.1:1234" --node "tcp://10.168.0.2:12
 
 ### 3. Generate cosigner communication encryption keys
 
-Horcrux uses secp256k1 keys to encrypt (ECIES) and sign (ECDSA) cosigner-to-cosigner p2p communication. This is done by encrypting the payloads that are sent over GRPC between cosigners. Open your shell to a working directory and generate the ECIES keys that will be used on each cosigner using the `horcrux` CLI on your local machine.
+Horcrux uses secp256k1 keys to encrypt (ECIES) and sign (ECDSA) cosigner-to-cosigner p2p communication. This is done by encrypting the payloads that are sent over GRPC between cosigner. Open your shell to a working directory and generate the ECIES keys that will be used on each cosigner using the `horcrux` CLI on your local machine.
 
 ```bash
 $ horcrux create-ecies-shards --shards 3
@@ -117,7 +117,7 @@ ecies_keys.json
 
 > **CAUTION:** **The security of any key material is outside the scope of this guide. The suggested procedure here is not necessarily the one you will use. We aim to make this guide easy to understand, not necessarily the most secure. This guide assumes that your local machine is a trusted computer. The tooling here is all written in go and can be compiled and used in an airgapped setup if needed. Please open issues if you have questions about how to fit `horcrux` into your infra.**
 
-Horcrux uses threshold Ed25519 cryptography to sign a block payload on the cosigners and combine the resulting signatures to produce a signature that can be validated against your validator's Ed25519 public key. On your local machine which contains your full `priv_validator_key.json` key file(s), shard the key using the `horcrux` CLI in the same working directory as the previous command.
+Horcrux uses threshold Ed25519 cryptography to sign a block payload on the cosigner and combine the resulting signatures to produce a signature that can be validated against your validator's Ed25519 public key. On your local machine which contains your full `priv_validator_key.json` key file(s), shard the key using the `horcrux` CLI in the same working directory as the previous command.
 
 ```bash
 $ horcrux create-ed25519-shards --chain-id cosmoshub-4 --key-file /path/to/cosmoshub/priv_validator_key.json --threshold 2 --shards 3

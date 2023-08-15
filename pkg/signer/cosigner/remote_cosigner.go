@@ -1,8 +1,9 @@
-package signer
+package cosigner
 
 import (
 	"context"
 	"fmt"
+	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 	"net/url"
 	"time"
 
@@ -32,7 +33,7 @@ const (
 	rpcTimeout = 4 * time.Second
 )
 
-func getContext() (context.Context, context.CancelFunc) {
+func GetContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), rpcTimeout)
 }
 
@@ -75,21 +76,21 @@ func (cosigner *RemoteCosigner) getGRPCClient() (proto.CosignerGRPCClient, *grpc
 	return proto.NewCosignerGRPCClient(conn), conn, nil
 }
 
-// Implements the cosigner interface
+// GetNonces implements the cosigner interface
 func (cosigner *RemoteCosigner) GetNonces(
 	chainID string,
-	req HRSTKey,
+	req types.HRSTKey,
 ) (*CosignerNoncesResponse, error) {
 	client, conn, err := cosigner.getGRPCClient()
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
-	context, cancelFunc := getContext()
+	context, cancelFunc := GetContext()
 	defer cancelFunc()
 	res, err := client.GetNonces(context, &proto.CosignerGRPCGetNoncesRequest{
 		ChainID: chainID,
-		Hrst:    req.toProto(),
+		Hrst:    req.ToProto(),
 	})
 	if err != nil {
 		return nil, err
@@ -100,8 +101,8 @@ func (cosigner *RemoteCosigner) GetNonces(
 }
 
 // SetNoncesAndSign implements the Cosigner interface
-// It acts as a client(!) and requests via gRPC the local cosigners
-// to set the nonces and sign the payload.
+// It acts as a client(!) and requests via gRPC the other
+// "node's" LocalCosigner to set the nonces and sign the payload.
 func (cosigner *RemoteCosigner) SetNoncesAndSign(
 	req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error) {
 	client, conn, err := cosigner.getGRPCClient()
@@ -109,12 +110,12 @@ func (cosigner *RemoteCosigner) SetNoncesAndSign(
 		return nil, err
 	}
 	defer conn.Close()
-	context, cancelFunc := getContext()
+	context, cancelFunc := GetContext()
 	defer cancelFunc()
 	res, err := client.SetNoncesAndSign(context, &proto.CosignerGRPCSetNoncesAndSignRequest{
 		ChainID:   req.ChainID,
-		Nonces:    CosignerNonces(req.Nonces).toProto(),
-		Hrst:      req.HRST.toProto(),
+		Nonces:    CosignerNonces(req.Nonces).ToProto(),
+		Hrst:      req.HRST.ToProto(),
 		SignBytes: req.SignBytes,
 	})
 	if err != nil {

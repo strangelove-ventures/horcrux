@@ -1,9 +1,10 @@
-package signer
+package cosigner
 
 import (
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
+	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 	"os"
 	"path/filepath"
 	"testing"
@@ -105,10 +106,10 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
 	pubKey := privateKey.PubKey()
 
-	cfg := Config{
-		ThresholdModeConfig: &ThresholdModeConfig{
+	cfg := configs.Config{
+		ThresholdModeConfig: &configs.ThresholdModeConfig{
 			Threshold: int(threshold),
-			Cosigners: make(CosignersConfig, total),
+			Cosigners: make(configs.CosignersConfig, total),
 		},
 	}
 
@@ -119,7 +120,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 
 	now := time.Now()
 
-	hrst := HRSTKey{
+	hrst := types.HRSTKey{
 		Height:    1,
 		Round:     0,
 		Step:      2,
@@ -135,7 +136,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 			ID:           id,
 		}
 
-		cfg.ThresholdModeConfig.Cosigners[i] = CosignerConfig{
+		cfg.ThresholdModeConfig.Cosigners[i] = configs.CosignerConfig{
 			ShardID: id,
 		}
 
@@ -145,7 +146,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 
 		cosigner := NewLocalCosigner(
 			log.NewNopLogger(),
-			&RuntimeConfig{
+			&configs.RuntimeConfig{
 				HomeDir:  cosignerDir,
 				StateDir: cosignerDir,
 				Config:   cfg,
@@ -156,10 +157,10 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 
 		keyBz, err := key.MarshalJSON()
 		require.NoError(t, err)
-		err = os.WriteFile(cosigner.config.KeyFilePathCosigner(testChainID), keyBz, 0600)
+		err = os.WriteFile(cosigner.Config.KeyFilePathCosigner(testChainID), keyBz, 0600)
 		require.NoError(t, err)
 
-		defer cosigner.waitForSignStatesToFlushToDisk()
+		defer cosigner.WaitForSignStatesToFlushToDisk()
 
 		err = cosigner.LoadSignStateIfNecessary(testChainID)
 		require.NoError(t, err)

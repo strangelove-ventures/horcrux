@@ -1,4 +1,4 @@
-package signer
+package cosigner
 
 import (
 	"crypto/ecdsa"

@@ -3,6 +3,8 @@ package signer
 import (
 	"context"
 	"fmt"
+	cosigner "github.com/strangelove-ventures/horcrux/pkg/signer/cosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 	"time"
 
 	"github.com/hashicorp/raft"
@@ -12,14 +14,14 @@ import (
 var _ proto.CosignerGRPCServer = &GRPCServer{}
 
 type GRPCServer struct {
-	cosigner           *LocalCosigner
+	cosigner           *cosigner.LocalCosigner
 	thresholdValidator *ThresholdValidator
 	raftStore          *RaftStore
 	proto.UnimplementedCosignerGRPCServer
 }
 
 func NewGRPCServer(
-	cosigner *LocalCosigner,
+	cosigner *cosigner.LocalCosigner,
 	thresholdValidator *ThresholdValidator,
 	raftStore *RaftStore,
 ) *GRPCServer {
@@ -54,10 +56,10 @@ func (rpc *GRPCServer) SetNoncesAndSign(
 	_ context.Context,
 	req *proto.CosignerGRPCSetNoncesAndSignRequest,
 ) (*proto.CosignerGRPCSetNoncesAndSignResponse, error) {
-	res, err := rpc.cosigner.SetNoncesAndSign(CosignerSetNoncesAndSignRequest{
+	res, err := rpc.cosigner.SetNoncesAndSign(cosigner.CosignerSetNoncesAndSignRequest{
 		ChainID:   req.ChainID,
-		Nonces:    CosignerNoncesFromProto(req.GetNonces()),
-		HRST:      HRSTKeyFromProto(req.GetHrst()),
+		Nonces:    cosigner.CosignerNoncesFromProto(req.GetNonces()),
+		HRST:      types.HRSTKeyFromProto(req.GetHrst()),
 		SignBytes: req.GetSignBytes(),
 	})
 	if err != nil {
@@ -91,13 +93,13 @@ func (rpc *GRPCServer) GetNonces(
 ) (*proto.CosignerGRPCGetNoncesResponse, error) {
 	res, err := rpc.cosigner.GetNonces(
 		req.ChainID,
-		HRSTKeyFromProto(req.GetHrst()),
+		types.HRSTKeyFromProto(req.GetHrst()),
 	)
 	if err != nil {
 		return nil, err
 	}
 	return &proto.CosignerGRPCGetNoncesResponse{
-		Nonces: CosignerNonces(res.Nonces).toProto(),
+		Nonces: cosigner.CosignerNonces(res.Nonces).ToProto(),
 	}, nil
 }
 

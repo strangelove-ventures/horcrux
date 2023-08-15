@@ -14,8 +14,11 @@ import (
 	cometprivval "github.com/cometbft/cometbft/privval"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	comet "github.com/cometbft/cometbft/types"
+	pcosigner "github.com/strangelove-ventures/horcrux/pkg/signer/cosigner"
 	"github.com/stretchr/testify/require"
 )
+
+const testChainID = "test"
 
 func TestSingleSignerValidator(t *testing.T) {
 
@@ -25,7 +28,7 @@ func TestSingleSignerValidator(t *testing.T) {
 	err := os.MkdirAll(stateDir, 0700)
 	require.NoError(t, err)
 
-	runtimeConfig := &RuntimeConfig{
+	runtimeConfig := &pcosigner.RuntimeConfig{
 		HomeDir:  tmpDir,
 		StateDir: filepath.Join(tmpDir, "state"),
 	}

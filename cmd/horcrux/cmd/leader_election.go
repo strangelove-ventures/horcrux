@@ -3,9 +3,8 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/strangelove-ventures/horcrux/pkg/signer/cosigner"
 	"time"
-
-	"github.com/strangelove-ventures/horcrux/pkg/signer"
 
 	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"github.com/spf13/cobra"
@@ -117,14 +116,14 @@ func getLeaderCmd() *cobra.Command {
 					return fmt.Errorf("cosigner encryption keys not found (%s) - (%s): %w", keyFileECIES, keyFileRSA, err)
 				}
 
-				key, err := signer.LoadCosignerRSAKey(keyFileRSA)
+				key, err := cosigner.LoadCosignerRSAKey(keyFileRSA)
 				if err != nil {
 					return fmt.Errorf("error reading cosigner key (%s): %w", keyFileRSA, err)
 				}
 
 				id = key.ID
 			} else {
-				key, err := signer.LoadCosignerECIESKey(keyFileECIES)
+				key, err := cosigner.LoadCosignerECIESKey(keyFileECIES)
 				if err != nil {
 					return fmt.Errorf("error reading cosigner key (%s): %w", keyFileECIES, err)
 				}

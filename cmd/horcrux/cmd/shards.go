@@ -17,10 +17,9 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/strangelove-ventures/horcrux/pkg/signer/cosigner"
 	"os"
 	"path/filepath"
-
-	"github.com/strangelove-ventures/horcrux/pkg/signer"
 
 	"github.com/spf13/cobra"
 )
@@ -113,7 +112,7 @@ func createCosignerEd25519ShardsCmd() *cobra.Command {
 				return nil
 			}
 
-			csKeys, err := signer.CreateCosignerEd25519ShardsFromFile(keyFile, threshold, shards)
+			csKeys, err := cosigner.CreateCosignerEd25519ShardsFromFile(keyFile, threshold, shards)
 			if err != nil {
 				return err
 			}
@@ -134,7 +133,7 @@ func createCosignerEd25519ShardsCmd() *cobra.Command {
 					return err
 				}
 				filename := filepath.Join(dir, fmt.Sprintf("%s_shard.json", chainID))
-				if err = signer.WriteCosignerEd25519ShardFile(c, filename); err != nil {
+				if err = cosigner.WriteCosignerEd25519ShardFile(c, filename); err != nil {
 					return err
 				}
 				fmt.Fprintf(cmd.OutOrStdout(), "Created Ed25519 Shard %s\n", filename)
@@ -171,7 +170,7 @@ func createCosignerECIESShardsCmd() *cobra.Command {
 				return fmt.Errorf("shards must be greater than zero (%d): %w", shards, err)
 			}
 
-			csKeys, err := signer.CreateCosignerECIESShards(int(shards))
+			csKeys, err := cosigner.CreateCosignerECIESShards(int(shards))
 			if err != nil {
 				return err
 			}
@@ -192,7 +191,7 @@ func createCosignerECIESShardsCmd() *cobra.Command {
 					return err
 				}
 				filename := filepath.Join(dir, "ecies_keys.json")
-				if err = signer.WriteCosignerECIESShardFile(c, filename); err != nil {
+				if err = cosigner.WriteCosignerECIESShardFile(c, filename); err != nil {
 					return err
 				}
 				fmt.Fprintf(cmd.OutOrStdout(), "Created ECIES Shard %s\n", filename)
@@ -219,7 +218,7 @@ func createCosignerRSAShardsCmd() *cobra.Command {
 				return fmt.Errorf("shards must be greater than zero (%d): %w", shards, err)
 			}
 
-			csKeys, err := signer.CreateCosignerRSAShards(int(shards))
+			csKeys, err := cosigner.CreateCosignerRSAShards(int(shards))
 			if err != nil {
 				return err
 			}
@@ -240,7 +239,7 @@ func createCosignerRSAShardsCmd() *cobra.Command {
 					return err
 				}
 				filename := filepath.Join(dir, "rsa_keys.json")
-				if err = signer.WriteCosignerRSAShardFile(c, filename); err != nil {
+				if err = cosigner.WriteCosignerRSAShardFile(c, filename); err != nil {
 					return err
 				}
 				fmt.Fprintf(cmd.OutOrStdout(), "Created RSA Shard %s\n", filename)

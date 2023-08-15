@@ -21,9 +21,15 @@ import (
 	comet "github.com/cometbft/cometbft/types"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
+	pcosigner "github.com/strangelove-ventures/horcrux/pkg/signer/cosigner"
 	"github.com/stretchr/testify/require"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 	"golang.org/x/sync/errgroup"
+)
+
+const (
+	testChainID2 = "chain-2"
+	bitSize      = 4096
 )
 
 func TestThresholdValidator2of2(t *testing.T) {
@@ -43,12 +49,12 @@ func TestThresholdValidator3of5(t *testing.T) {
 }
 
 func loadKeyForLocalCosigner(
-	cosigner *LocalCosigner,
+	cosigner *pcosigner.LocalCosigner,
 	pubKey cometcrypto.PubKey,
 	chainID string,
 	privateShard []byte,
 ) error {
-	key := CosignerEd25519Key{
+	key := pcosigner.CosignerEd25519Key{
 		PubKey:       pubKey,
 		PrivateShard: privateShard,
 		ID:           cosigner.GetID(),
@@ -59,13 +65,13 @@ func loadKeyForLocalCosigner(
 		return err
 	}
 
-	return os.WriteFile(cosigner.config.KeyFilePathCosigner(chainID), keyBz, 0600)
+	return os.WriteFile(cosigner.Config.KeyFilePathCosigner(chainID), keyBz, 0600)
 }
 
 func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	cosigners, pubKey := getTestLocalCosigners(t, threshold, total)
 
-	thresholdCosigners := make([]Cosigner, 0, threshold-1)
+	thresholdCosigners := make([]pcosigner.Cosigner, 0, threshold-1)
 
 	for i, cosigner := range cosigners {
 		require.Equal(t, i+1, cosigner.GetID())
@@ -79,7 +85,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 	validator := NewThresholdValidator(
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
-		cosigners[0].config,
+		cosigners[0].Config,
 		int(threshold),
 		time.Second,
 		1,
@@ -158,7 +164,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	// reinitialize validator to make sure new runtime will not allow double sign
 	newValidator := NewThresholdValidator(
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
-		cosigners[0].config,
+		cosigners[0].Config,
 		int(threshold),
 		time.Second,
 		1,
@@ -255,10 +261,10 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	}
 }
 
-func getTestLocalCosigners(t *testing.T, threshold, total uint8) ([]*LocalCosigner, cometcrypto.PubKey) {
+func getTestLocalCosigners(t *testing.T, threshold, total uint8) ([]*pcosigner.LocalCosigner, cometcrypto.PubKey) {
 	eciesKeys := make([]*ecies.PrivateKey, total)
 	pubKeys := make([]*ecies.PublicKey, total)
-	cosigners := make([]*LocalCosigner, total)
+	cosigners := make([]*pcosigner.LocalCosigner, total)
 
 	for i := uint8(0); i < total; i++ {
 		eciesKey, err := ecies.GenerateKey(rand.Reader, secp256k1.S256(), nil)
@@ -275,10 +281,10 @@ func getTestLocalCosigners(t *testing.T, threshold, total uint8) ([]*LocalCosign
 
 	tmpDir := t.TempDir()
 
-	cosignersConfig := make(CosignersConfig, total)
+	cosignersConfig := make(pcosigner.CosignersConfig, total)
 
 	for i := range pubKeys {
-		cosignersConfig[i] = CosignerConfig{
+		cosignersConfig[i] = pcosigner.CosignerConfig{
 			ShardID: i + 1,
 		}
 	}
@@ -288,22 +294,22 @@ func getTestLocalCosigners(t *testing.T, threshold, total uint8) ([]*LocalCosign
 		err := os.MkdirAll(cosignerDir, 0777)
 		require.NoError(t, err)
 
-		cosignerConfig := &RuntimeConfig{
+		cosignerConfig := &pcosigner.RuntimeConfig{
 			HomeDir:  cosignerDir,
 			StateDir: cosignerDir,
-			Config: Config{
-				ThresholdModeConfig: &ThresholdModeConfig{
+			Config: pcosigner.Config{
+				ThresholdModeConfig: &pcosigner.ThresholdModeConfig{
 					Threshold: int(threshold),
 					Cosigners: cosignersConfig,
 				},
 			},
 		}
 
-		cosigner := NewLocalCosigner(
+		cosigner := pcosigner.NewLocalCosigner(
 			cometlog.NewNopLogger(),
 			cosignerConfig,
-			NewCosignerSecurityECIES(
-				CosignerECIESKey{
+			pcosigner.NewCosignerSecurityECIES(
+				pcosigner.CosignerECIESKey{
 					ID:        i + 1,
 					ECIESKey:  eciesKeys[i],
 					ECIESPubs: pubKeys,
@@ -332,7 +338,7 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 	var leader *ThresholdValidator
 	leaders := make([]*MockLeader, total)
 	for i, cosigner := range cosigners {
-		peers := make([]Cosigner, 0, len(cosigners)-1)
+		peers := make([]pcosigner.Cosigner, 0, len(cosigners)-1)
 		for j, otherCosigner := range cosigners {
 			if i != j {
 				peers = append(peers, otherCosigner)
@@ -341,7 +347,7 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 		leaders[i] = &MockLeader{id: cosigner.GetID(), leader: leader}
 		tv := NewThresholdValidator(
 			cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)).With("module", "validator"),
-			cosigner.config,
+			cosigner.Config,
 			int(threshold),
 			time.Second,
 			1,

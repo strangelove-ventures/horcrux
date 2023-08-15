@@ -3,6 +3,8 @@ package signer
 import (
 	"context"
 	"fmt"
+	"github.com/strangelove-ventures/horcrux/pkg/metrics"
+	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 	"net"
 	"time"
 
@@ -108,14 +110,14 @@ func (rs *ReconnRemoteSigner) loop(ctx context.Context) {
 			timer := time.NewTimer(connRetrySec * time.Second)
 			conn, err = rs.establishConnection(ctx)
 			if err == nil {
-				sentryConnectTries.Set(0)
+				metrics.SentryConnectTries.Set(0)
 				timer.Stop()
 				rs.Logger.Info("Connected to Sentry", "address", rs.address)
 				break
 			}
 
-			sentryConnectTries.Add(1)
-			totalSentryConnectTries.Inc()
+			metrics.SentryConnectTries.Add(1)
+			metrics.TotalSentryConnectTries.Inc()
 			retries++
 			rs.Logger.Error(
 				"Error establishing connection, will retry",
@@ -138,7 +140,7 @@ func (rs *ReconnRemoteSigner) loop(ctx context.Context) {
 			return
 		}
 
-		req, err := ReadMsg(conn)
+		req, err := types.ReadMsg(conn)
 		if err != nil {
 			rs.Logger.Error(
 				"Failed to read message from connection",
@@ -153,7 +155,7 @@ func (rs *ReconnRemoteSigner) loop(ctx context.Context) {
 		// handleRequest handles request errors. We always send back a response
 		res := rs.handleRequest(req)
 
-		err = WriteMsg(conn, res)
+		err = types.WriteMsg(conn, res)
 		if err != nil {
 			rs.Logger.Error(
 				"Failed to write message to connection",
@@ -201,7 +203,7 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *cometp
 				"validator", fmt.Sprintf("%X", vote.ValidatorAddress),
 				"reason", typedErr.msg,
 			)
-			beyondBlockErrors.Inc()
+			metrics.BeyondBlockErrors.Inc()
 		default:
 			rs.Logger.Error(
 				"Failed to sign vote",
@@ -213,7 +215,7 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *cometp
 				"validator", fmt.Sprintf("%X", vote.ValidatorAddress),
 				"error", err,
 			)
-			failedSignVote.Inc()
+			metrics.FailedSignVote.Inc()
 		}
 		msgSum.SignedVoteResponse.Error = getRemoteSignerError(err)
 		return cometprotoprivval.Message{Sum: msgSum}
@@ -235,38 +237,38 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *cometp
 	)
 
 	if vote.Type == cometproto.PrecommitType {
-		stepSize := vote.Height - previousPrecommitHeight
-		if previousPrecommitHeight != 0 && stepSize > 1 {
-			missedPrecommits.Add(float64(stepSize))
-			totalMissedPrecommits.Add(float64(stepSize))
+		stepSize := vote.Height - metrics.PreviousPrecommitHeight
+		if metrics.PreviousPrecommitHeight != 0 && stepSize > 1 {
+			metrics.MissedPrecommits.Add(float64(stepSize))
+			metrics.TotalMissedPrecommits.Add(float64(stepSize))
 		} else {
-			missedPrecommits.Set(0)
+			metrics.MissedPrecommits.Set(0)
 		}
-		previousPrecommitHeight = vote.Height // remember last PrecommitHeight
+		metrics.PreviousPrecommitHeight = vote.Height // remember last PrecommitHeight
 
-		metricsTimeKeeper.SetPreviousPrecommit(time.Now())
+		metrics.MetricsTimeKeeper.SetPreviousPrecommit(time.Now())
 
-		lastPrecommitHeight.Set(float64(vote.Height))
-		lastPrecommitRound.Set(float64(vote.Round))
-		totalPrecommitsSigned.Inc()
+		metrics.LastPrecommitHeight.Set(float64(vote.Height))
+		metrics.LastPrecommitRound.Set(float64(vote.Round))
+		metrics.TotalPrecommitsSigned.Inc()
 	}
 	if vote.Type == cometproto.PrevoteType {
 		// Determine number of heights since the last Prevote
-		stepSize := vote.Height - previousPrevoteHeight
-		if previousPrevoteHeight != 0 && stepSize > 1 {
-			missedPrevotes.Add(float64(stepSize))
-			totalMissedPrevotes.Add(float64(stepSize))
+		stepSize := vote.Height - metrics.PreviousPrevoteHeight
+		if metrics.PreviousPrevoteHeight != 0 && stepSize > 1 {
+			metrics.MissedPrevotes.Add(float64(stepSize))
+			metrics.TotalMissedPrevotes.Add(float64(stepSize))
 		} else {
-			missedPrevotes.Set(0)
+			metrics.MissedPrevotes.Set(0)
 		}
 
-		previousPrevoteHeight = vote.Height // remember last PrevoteHeight
+		metrics.PreviousPrevoteHeight = vote.Height // remember last PrevoteHeight
 
-		metricsTimeKeeper.SetPreviousPrevote(time.Now())
+		metrics.MetricsTimeKeeper.SetPreviousPrevote(time.Now())
 
-		lastPrevoteHeight.Set(float64(vote.Height))
-		lastPrevoteRound.Set(float64(vote.Round))
-		totalPrevotesSigned.Inc()
+		metrics.LastPrevoteHeight.Set(float64(vote.Height))
+		metrics.LastPrevoteRound.Set(float64(vote.Round))
+		metrics.TotalPrevotesSigned.Inc()
 	}
 
 	msgSum.SignedVoteResponse.Vote = *vote
@@ -295,7 +297,7 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(
 				"node", rs.address,
 				"reason", typedErr.msg,
 			)
-			beyondBlockErrors.Inc()
+			metrics.BeyondBlockErrors.Inc()
 		default:
 			rs.Logger.Error(
 				"Failed to sign proposal",
@@ -325,15 +327,15 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(
 		"ts", proposal.Timestamp.Unix(),
 		"node", rs.address,
 	)
-	lastProposalHeight.Set(float64(proposal.Height))
-	lastProposalRound.Set(float64(proposal.Round))
-	totalProposalsSigned.Inc()
+	metrics.LastProposalHeight.Set(float64(proposal.Height))
+	metrics.LastProposalRound.Set(float64(proposal.Round))
+	metrics.TotalProposalsSigned.Inc()
 	msgSum.SignedProposalResponse.Proposal = *proposal
 	return cometprotoprivval.Message{Sum: msgSum}
 }
 
 func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) cometprotoprivval.Message {
-	totalPubKeyRequests.Inc()
+	metrics.TotalPubKeyRequests.Inc()
 	msgSum := &cometprotoprivval.Message_PubKeyResponse{PubKeyResponse: &cometprotoprivval.PubKeyResponse{
 		PubKey: cometprotocrypto.PublicKey{},
 		Error:  nil,
@@ -390,7 +392,7 @@ func StartRemoteSigners(
 	nodes []string,
 ) ([]cometservice.Service, error) {
 	var err error
-	go StartMetrics()
+	go metrics.StartMetrics()
 	for _, node := range nodes {
 		// CometBFT requires a connection within 3 seconds of start or crashes
 		// A long timeout such as 30 seconds would cause the sentry to fail in loops

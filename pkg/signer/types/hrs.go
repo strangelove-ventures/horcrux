@@ -1,10 +1,11 @@
-package signer
+package types
 
 import (
 	"github.com/strangelove-ventures/horcrux/pkg/proto"
 )
 
 // HRSKey represents the key for the HRS metadata map.
+// Height is the block height.
 type HRSKey struct {
 	Height int64
 	Round  int64
@@ -60,7 +61,7 @@ func HRSTKeyFromProto(hrs *proto.HRST) HRSTKey {
 	}
 }
 
-func (hrst HRSTKey) toProto() *proto.HRST {
+func (hrst HRSTKey) ToProto() *proto.HRST {
 	return &proto.HRST{
 		Height:    hrst.Height,
 		Round:     hrst.Round,

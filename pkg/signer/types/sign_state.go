@@ -1,4 +1,4 @@
-package signer
+package types
 
 import (
 	"bytes"
@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	stepPropose   int8 = 1
+	StepPropose   int8 = 1
 	stepPrevote   int8 = 2
 	stepPrecommit int8 = 3
 	blocksToCache      = 3
@@ -47,7 +47,7 @@ func VoteToStep(vote *cometproto.Vote) int8 {
 }
 
 func ProposalToStep(_ *cometproto.Proposal) int8 {
-	return stepPropose
+	return StepPropose
 }
 
 // SignState stores signing information for high level watermark management.
@@ -59,17 +59,17 @@ type SignState struct {
 	Signature   []byte              `json:"signature,omitempty"`
 	SignBytes   cometbytes.HexBytes `json:"signbytes,omitempty"`
 
-	filePath string
+	FilePath string
 
-	// mu protects the cache and is used for signaling with cond.
-	mu    sync.RWMutex
-	cache map[HRSKey]SignStateConsensus
-	cond  *cond.Cond
+	// Mu protects the Cache and is used for signaling with Cond.
+	Mu    sync.RWMutex
+	Cache map[HRSKey]SignStateConsensus
+	Cond  *cond.Cond
 }
 
-func (signState *SignState) existingSignatureOrErrorIfRegression(hrst HRSTKey, signBytes []byte) ([]byte, error) {
-	signState.mu.RLock()
-	defer signState.mu.RUnlock()
+func (signState *SignState) ExistingSignatureOrErrorIfRegression(hrst HRSTKey, signBytes []byte) ([]byte, error) {
+	signState.Mu.RLock()
+	defer signState.Mu.RUnlock()
 
 	sameHRS, err := signState.CheckHRS(hrst)
 	if err != nil {
@@ -94,8 +94,8 @@ func (signState *SignState) existingSignatureOrErrorIfRegression(hrst HRSTKey, s
 }
 
 func (signState *SignState) HRSKey() HRSKey {
-	signState.mu.RLock()
-	defer signState.mu.RUnlock()
+	signState.Mu.RLock()
+	defer signState.Mu.RUnlock()
 	return HRSKey{
 		Height: signState.Height,
 		Round:  signState.Round,
@@ -156,25 +156,25 @@ func newConflictingDataError(existingSignBytes, newSignBytes []byte) *Conflictin
 // GetFromCache will return the latest signed block within the SignState
 // and the relevant SignStateConsensus from the cache, if present.
 func (signState *SignState) GetFromCache(hrs HRSKey) (HRSKey, *SignStateConsensus) {
-	signState.mu.RLock()
-	defer signState.mu.RUnlock()
+	signState.Mu.RLock()
+	defer signState.Mu.RUnlock()
 	latestBlock := signState.hrsKeyLocked()
-	if ssc, ok := signState.cache[hrs]; ok {
+	if ssc, ok := signState.Cache[hrs]; ok {
 		return latestBlock, &ssc
 	}
 	return latestBlock, nil
 }
 
-// cacheAndMarshal will cache a SignStateConsensus for it's HRS and return the marshalled bytes.
+// cacheAndMarshal will Cache a SignStateConsensus for it's HRS and return the marshalled bytes.
 func (signState *SignState) cacheAndMarshal(ssc SignStateConsensus) []byte {
-	signState.mu.Lock()
-	defer signState.mu.Unlock()
+	signState.Mu.Lock()
+	defer signState.Mu.Unlock()
 
-	signState.cache[ssc.HRSKey()] = ssc
+	signState.Cache[ssc.HRSKey()] = ssc
 
-	for hrs := range signState.cache {
+	for hrs := range signState.Cache {
 		if hrs.Height < ssc.Height-blocksToCache {
-			delete(signState.cache, hrs)
+			delete(signState.Cache, hrs)
 		}
 	}
 
@@ -211,7 +211,7 @@ func (signState *SignState) Save(
 
 	// Broadcast to waiting goroutines to notify them that an
 	// existing signature for their HRS may now be available.
-	signState.cond.Broadcast()
+	signState.Cond.Broadcast()
 
 	if pendingDiskWG != nil {
 		pendingDiskWG.Add(1)
@@ -226,9 +226,9 @@ func (signState *SignState) Save(
 	return nil
 }
 
-// Save persists the FilePvLastSignState to its filePath.
+// Save persists the FilePvLastSignState to its FilePath.
 func (signState *SignState) save(jsonBytes []byte) {
-	outFile := signState.filePath
+	outFile := signState.FilePath
 	if outFile == os.DevNull {
 		return
 	}
@@ -314,14 +314,14 @@ func (signState *SignState) FreshCache() *SignState {
 		NoncePublic: signState.NoncePublic,
 		Signature:   signState.Signature,
 		SignBytes:   signState.SignBytes,
-		cache:       make(map[HRSKey]SignStateConsensus),
+		Cache:       make(map[HRSKey]SignStateConsensus),
 
-		filePath: signState.filePath,
+		FilePath: signState.FilePath,
 	}
 
-	newSignState.cond = cond.New(&newSignState.mu)
+	newSignState.Cond = cond.New(&newSignState.Mu)
 
-	newSignState.cache[HRSKey{
+	newSignState.Cache[HRSKey{
 		Height: signState.Height,
 		Round:  signState.Round,
 		Step:   signState.Step,
@@ -350,7 +350,7 @@ func LoadSignState(filepath string) (*SignState, error) {
 		return nil, err
 	}
 
-	state.filePath = filepath
+	state.FilePath = filepath
 
 	return state.FreshCache(), nil
 }
@@ -366,10 +366,10 @@ func LoadOrCreateSignState(filepath string) (*SignState, error) {
 		// the only scenario where we want to create a new sign state file is when the file does not exist.
 		// Make an empty sign state and save it.
 		state := &SignState{
-			filePath: filepath,
-			cache:    make(map[HRSKey]SignStateConsensus),
+			FilePath: filepath,
+			Cache:    make(map[HRSKey]SignStateConsensus),
 		}
-		state.cond = cond.New(&state.mu)
+		state.Cond = cond.New(&state.Mu)
 
 		jsonBytes, err := cometjson.MarshalIndent(state, "", "  ")
 		if err != nil {
@@ -394,7 +394,7 @@ func (signState *SignStateConsensus) OnlyDifferByTimestamp(signBytes []byte) err
 }
 
 func onlyDifferByTimestamp(step int8, signStateSignBytes, signBytes []byte) error {
-	if step == stepPropose {
+	if step == StepPropose {
 		return checkProposalOnlyDifferByTimestamp(signStateSignBytes, signBytes)
 	} else if step == stepPrevote || step == stepPrecommit {
 		return checkVoteOnlyDifferByTimestamp(signStateSignBytes, signBytes)

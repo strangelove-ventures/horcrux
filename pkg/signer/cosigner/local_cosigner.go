@@ -1,10 +1,15 @@
-package signer
+package cosigner
 
 import (
 	"errors"
 	"fmt"
+
 	"sync"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/metrics"
+
+	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
@@ -19,7 +24,7 @@ var _ Cosigner = &LocalCosigner{}
 // Signing is thread safe.
 type LocalCosigner struct {
 	logger        cometlog.Logger
-	config        *RuntimeConfig
+	Config        *RuntimeConfig
 	security      CosignerSecurity
 	chainState    sync.Map
 	address       string
@@ -34,7 +39,7 @@ func NewLocalCosigner(
 ) *LocalCosigner {
 	return &LocalCosigner{
 		logger:   logger,
-		config:   config,
+		Config:   config,
 		security: security,
 		address:  address,
 	}
@@ -43,7 +48,7 @@ func NewLocalCosigner(
 type ChainState struct {
 	// lastSignState stores the last sign state for an HRS we have fully signed
 	// incremented whenever we are asked to sign an HRS
-	lastSignState *SignState
+	lastSignState *types.SignState
 
 	// Signing is thread safe - mutex is used for putting locks so only one goroutine can r/w to the function
 	mu sync.RWMutex
@@ -51,10 +56,10 @@ type ChainState struct {
 	signer ThresholdSigner
 
 	// Height, Round, Step -> metadata
-	nonces map[HRSTKey][]Nonces
+	nonces map[types.HRSTKey][]Nonces
 }
 
-func (ccs *ChainState) combinedNonces(myID int, threshold uint8, hrst HRSTKey) ([]Nonce, error) {
+func (ccs *ChainState) combinedNonces(myID int, threshold uint8, hrst types.HRSTKey) ([]Nonce, error) {
 	ccs.mu.RLock()
 	defer ccs.mu.RUnlock()
 
@@ -93,7 +98,7 @@ type CosignerGetNonceRequest struct {
 // than the current high watermark. A mutex is used to avoid concurrent state updates.
 // The disk write is scheduled in a separate goroutine which will perform an atomic write.
 // pendingDiskWG is used upon termination in pendingDiskWG to ensure all writes have completed.
-func (cosigner *LocalCosigner) SaveLastSignedState(chainID string, signState SignStateConsensus) error {
+func (cosigner *LocalCosigner) SaveLastSignedState(chainID string, signState types.SignStateConsensus) error {
 	ccs, err := cosigner.getChainState(chainID)
 	if err != nil {
 		return err
@@ -105,9 +110,9 @@ func (cosigner *LocalCosigner) SaveLastSignedState(chainID string, signState Sig
 	)
 }
 
-// waitForSignStatesToFlushToDisk waits for all state file writes queued
+// WaitForSignStatesToFlushToDisk waits for all state file writes queued
 // in SaveLastSignedState to complete before termination.
-func (cosigner *LocalCosigner) waitForSignStatesToFlushToDisk() {
+func (cosigner *LocalCosigner) WaitForSignStatesToFlushToDisk() {
 	cosigner.pendingDiskWG.Wait()
 }
 
@@ -190,14 +195,14 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	}
 
 	// This function has multiple exit points.  Only start time can be guaranteed
-	metricsTimeKeeper.SetPreviousLocalSignStart(time.Now())
+	metrics.MetricsTimeKeeper.SetPreviousLocalSignStart(time.Now())
 
-	hrst, err := UnpackHRST(req.SignBytes)
+	hrst, err := types.UnpackHRST(req.SignBytes)
 	if err != nil {
 		return res, err
 	}
 
-	existingSignature, err := ccs.lastSignState.existingSignatureOrErrorIfRegression(hrst, req.SignBytes)
+	existingSignature, err := ccs.lastSignState.ExistingSignatureOrErrorIfRegression(hrst, req.SignBytes)
 	if err != nil {
 		return res, err
 	}
@@ -207,7 +212,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		return res, nil
 	}
 
-	nonces, err := ccs.combinedNonces(cosigner.GetID(), uint8(cosigner.config.Config.ThresholdModeConfig.Threshold), hrst)
+	nonces, err := ccs.combinedNonces(cosigner.GetID(), uint8(cosigner.Config.Config.ThresholdModeConfig.Threshold), hrst)
 	if err != nil {
 		return res, err
 	}
@@ -217,7 +222,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		return res, err
 	}
 
-	err = ccs.lastSignState.Save(SignStateConsensus{
+	err = ccs.lastSignState.Save(types.SignStateConsensus{
 		Height:    hrst.Height,
 		Round:     hrst.Round,
 		Step:      hrst.Step,
@@ -226,7 +231,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	}, &cosigner.pendingDiskWG)
 
 	if err != nil {
-		if _, isSameHRSError := err.(*SameHRSError); !isSameHRSError {
+		if _, isSameHRSError := err.(*types.SameHRSError); !isSameHRSError {
 			return res, err
 		}
 	}
@@ -244,7 +249,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	res.Signature = sig
 
 	// Note - Function may return before this line so elapsed time for Finish may be multiple block times
-	metricsTimeKeeper.SetPreviousLocalSignFinish(time.Now())
+	metrics.MetricsTimeKeeper.SetPreviousLocalSignFinish(time.Now())
 
 	return res, nil
 }
@@ -257,7 +262,7 @@ func (cosigner *LocalCosigner) dealShares(req CosignerGetNonceRequest) ([]Nonces
 		return nil, err
 	}
 
-	meta := make([]Nonces, len(cosigner.config.Config.ThresholdModeConfig.Cosigners))
+	meta := make([]Nonces, len(cosigner.Config.Config.ThresholdModeConfig.Cosigners))
 
 	nonces, err := ccs.signer.GenerateNonces()
 	if err != nil {
@@ -278,21 +283,21 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 		return nil
 	}
 
-	signState, err := LoadOrCreateSignState(cosigner.config.CosignerStateFile(chainID))
+	signState, err := types.LoadOrCreateSignState(cosigner.Config.CosignerStateFile(chainID))
 	if err != nil {
 		return err
 	}
 
 	var signer ThresholdSigner
 
-	signer, err = NewThresholdSignerSoft(cosigner.config, cosigner.GetID(), chainID)
+	signer, err = NewThresholdSignerSoft(cosigner.Config, cosigner.GetID(), chainID)
 	if err != nil {
 		return err
 	}
 
 	cosigner.chainState.Store(chainID, &ChainState{
 		lastSignState: signState,
-		nonces:        make(map[HRSTKey][]Nonces),
+		nonces:        make(map[types.HRSTKey][]Nonces),
 		signer:        signer,
 	})
 
@@ -301,15 +306,15 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 
 func (cosigner *LocalCosigner) GetNonces(
 	chainID string,
-	hrst HRSTKey,
+	hrst types.HRSTKey,
 ) (*CosignerNoncesResponse, error) {
-	metricsTimeKeeper.SetPreviousLocalNonce(time.Now())
+	metrics.MetricsTimeKeeper.SetPreviousLocalNonce(time.Now())
 
 	if err := cosigner.LoadSignStateIfNecessary(chainID); err != nil {
 		return nil, err
 	}
 
-	total := len(cosigner.config.Config.ThresholdModeConfig.Cosigners)
+	total := len(cosigner.Config.Config.ThresholdModeConfig.Cosigners)
 
 	res := &CosignerNoncesResponse{
 		Nonces: make([]CosignerNonce, total-1),
@@ -364,7 +369,7 @@ func (cosigner *LocalCosigner) GetNonces(
 	return res, nil
 }
 
-func (cosigner *LocalCosigner) dealSharesIfNecessary(chainID string, hrst HRSTKey) ([]Nonces, error) {
+func (cosigner *LocalCosigner) dealSharesIfNecessary(chainID string, hrst types.HRSTKey) ([]Nonces, error) {
 	ccs, err := cosigner.getChainState(chainID)
 	if err != nil {
 		return nil, err
@@ -403,7 +408,7 @@ func (cosigner *LocalCosigner) getNonce(
 	chainID := req.ChainID
 	zero := CosignerNonce{}
 
-	hrst := HRSTKey{
+	hrst := types.HRSTKey{
 		Height:    req.Height,
 		Round:     req.Round,
 		Step:      req.Step,
@@ -446,7 +451,7 @@ func (cosigner *LocalCosigner) setNonce(req CosignerSetNonceRequest) error {
 		return err
 	}
 
-	hrst := HRSTKey{
+	hrst := types.HRSTKey{
 		Height:    req.Height,
 		Round:     req.Round,
 		Step:      req.Step,
@@ -471,7 +476,7 @@ func (cosigner *LocalCosigner) setNonce(req CosignerSetNonceRequest) error {
 
 	// set slot
 	if nonces[req.SourceID-1].Shares == nil {
-		nonces[req.SourceID-1].Shares = make([][]byte, len(cosigner.config.Config.ThresholdModeConfig.Cosigners))
+		nonces[req.SourceID-1].Shares = make([][]byte, len(cosigner.Config.Config.ThresholdModeConfig.Cosigners))
 	}
 	nonces[req.SourceID-1].Shares[cosigner.GetID()-1] = nonceShare
 	nonces[req.SourceID-1].PubKey = noncePub

@@ -15,7 +15,7 @@ Resulting in a configuration like the following:
 ```
 thresholdMode:
   threshold: 2
-  cosigners:
+  cosigner:
   - shardID: 1
     p2pAddr: tcp://localhost:5001
   - shardID: 2
@@ -97,7 +97,7 @@ signer_sign_block_threshold_lag_seconds{quantile="0.9"} 0.028546635
 signer_sign_block_threshold_lag_seconds{quantile="0.99"} 0.029730841
 ```
 
-After reaching the threshold, all cosigners should sign quickly
+After reaching the threshold, all cosigner should sign quickly
 ```
 signer_sign_block_cosigner_lag_seconds{quantile="0.5"} 0.031424561
 signer_sign_block_cosigner_lag_seconds{quantile="0.9"} 0.0407505

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/strangelove-ventures/horcrux/pkg/signer/cosigner"
 	"os"
 	"path/filepath"
 	"time"
@@ -23,11 +24,11 @@ func NewThresholdValidator(
 
 	thresholdCfg := config.Config.ThresholdModeConfig
 
-	remoteCosigners := make([]signer.Cosigner, 0, len(thresholdCfg.Cosigners)-1)
+	remoteCosigners := make([]cosigner.Cosigner, 0, len(thresholdCfg.Cosigners)-1)
 
 	var p2pListen string
 
-	var security signer.CosignerSecurity
+	var security cosigner.CosignerSecurity
 	var eciesErr error
 	security, eciesErr = config.CosignerSecurityECIES()
 	if eciesErr != nil {
@@ -42,7 +43,7 @@ func NewThresholdValidator(
 		if c.ShardID != security.GetID() {
 			remoteCosigners = append(
 				remoteCosigners,
-				signer.NewRemoteCosigner(c.ShardID, c.P2PAddr),
+				cosigner.NewRemoteCosigner(c.ShardID, c.P2PAddr),
 			)
 		} else {
 			p2pListen = c.P2PAddr
@@ -53,7 +54,7 @@ func NewThresholdValidator(
 		return nil, nil, fmt.Errorf("cosigner config does not exist for our shard ID %d", security.GetID())
 	}
 
-	localCosigner := signer.NewLocalCosigner(
+	localCosigner := cosigner.NewLocalCosigner(
 		logger,
 		&config,
 		security,
