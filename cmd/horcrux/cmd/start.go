@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	cosigners "github.com/strangelove-ventures/horcrux/pkg/signer/cosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/signer/pcosigner"
 
 	"github.com/strangelove-ventures/horcrux/pkg/signer"
 
@@ -50,12 +50,12 @@ func startCmd() *cobra.Command {
 			var services []service.Service
 
 			switch config.Config.SignMode {
-			case cosigners.SignModeThreshold:
+			case pcosigner.SignModeThreshold:
 				services, val, err = NewThresholdValidator(logger)
 				if err != nil {
 					return err
 				}
-			case cosigners.SignModeSingle:
+			case pcosigner.SignModeSingle:
 				val, err = NewSingleSignerValidator(out, acceptRisk)
 				if err != nil {
 					return err

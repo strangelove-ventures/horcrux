@@ -3,10 +3,11 @@ package signer
 import (
 	"encoding/json"
 	"errors"
-	"github.com/strangelove-ventures/horcrux/pkg/metrics"
-	"github.com/strangelove-ventures/horcrux/pkg/signer/cosigner"
-	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/metrics"
+	"github.com/strangelove-ventures/horcrux/pkg/signer/pcosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 
 	"github.com/strangelove-ventures/horcrux/pkg/proto"
 	"google.golang.org/grpc"
@@ -76,7 +77,7 @@ func (s *RaftStore) SignBlock(req ValidatorSignBlockRequest) (*ValidatorSignBloc
 		return nil, err
 	}
 	defer conn.Close()
-	context, cancelFunc := cosigner.GetContext()
+	context, cancelFunc := pcosigner.GetContext()
 	defer cancelFunc()
 	res, err := client.SignBlock(context, &proto.CosignerGRPCSignBlockRequest{
 		ChainID: req.ChainID,

@@ -14,11 +14,11 @@ import (
 	cometprivval "github.com/cometbft/cometbft/privval"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	comet "github.com/cometbft/cometbft/types"
-	pcosigner "github.com/strangelove-ventures/horcrux/pkg/signer/cosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/signer/pcosigner"
 	"github.com/stretchr/testify/require"
 )
 
-const testChainID = "test"
+// const testChainID = "test"
 
 func TestSingleSignerValidator(t *testing.T) {
 

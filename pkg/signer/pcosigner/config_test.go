@@ -1,4 +1,4 @@
-package cosigner_test
+package pcosigner_test
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	pcosigner "github.com/strangelove-ventures/horcrux/pkg/signer/cosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/signer/pcosigner"
 
 	"github.com/stretchr/testify/require"
 )

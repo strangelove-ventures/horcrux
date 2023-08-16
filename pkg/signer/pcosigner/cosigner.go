@@ -1,8 +1,9 @@
-package cosigner
+package pcosigner
 
 import (
-	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	"github.com/strangelove-ventures/horcrux/pkg/proto"
@@ -28,6 +29,10 @@ type Cosigner interface {
 
 	// Sign the requested bytes
 	SetNoncesAndSign(req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error)
+}
+
+type CosignerSignBlockResponse struct {
+	Signature []byte
 }
 
 // CosignerSignRequest is sent to a co-signer to obtain their signature for the SignBytes

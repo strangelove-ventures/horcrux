@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/strangelove-ventures/horcrux/pkg/metrics"
-	pcosigner "github.com/strangelove-ventures/horcrux/pkg/signer/cosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/signer/pcosigner"
 
 	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 
@@ -538,7 +538,7 @@ func (pv *ThresholdValidator) compareBlockSignatureAgainstSSC(
 	}
 
 	// If a proposal has already been signed for this HRS, or the sign payload is identical, return the existing signature.
-	if block.Step == types.StepPropose || bytes.Equal(signBytes, existingSignature.SignBytes) {
+	if block.Step == types.StepPropose() || bytes.Equal(signBytes, existingSignature.SignBytes) {
 		return existingSignature.Signature, block.Timestamp, nil
 	}
 

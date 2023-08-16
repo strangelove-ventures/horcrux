@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	cosigners "github.com/strangelove-ventures/horcrux/pkg/signer/cosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/signer/pcosigner"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
@@ -13,7 +13,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var config cosigners.RuntimeConfig
+var config pcosigner.RuntimeConfig
 
 func rootCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -75,7 +75,7 @@ func initConfig() {
 	} else {
 		home = config.HomeDir
 	}
-	config = cosigners.RuntimeConfig{
+	config = pcosigner.RuntimeConfig{
 		HomeDir:    home,
 		ConfigFile: filepath.Join(home, "config.yaml"),
 		StateDir:   filepath.Join(home, "state"),

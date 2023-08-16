@@ -3,12 +3,13 @@ package multiresolver_test
 import (
 	"context"
 	"fmt"
-	"github.com/strangelove-ventures/horcrux/pkg/signer/cosigner"
 	"net"
 	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/signer/pcosigner"
 
 	"github.com/strangelove-ventures/horcrux/pkg/signer"
 
@@ -36,7 +37,7 @@ func createListener(nodeID string, homedir string) (string, func(), error) {
 		nil)
 
 	// Need to set pointers to avoid nil pointers.
-	var cosigners []cosigner.Cosigner
+	var cosigners []pcosigner.Cosigner
 	var timeDuration time.Duration
 	thresholdvalidator := signer.NewThresholdValidator(nil, nil, 0, timeDuration, 0, nil, cosigners, nil)
 	s.SetThresholdValidator(thresholdvalidator)

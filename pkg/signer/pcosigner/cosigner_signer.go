@@ -1,4 +1,4 @@
-package cosigner
+package pcosigner
 
 // Interface for the local signer whether it's a soft sign or HSM
 type ThresholdSigner interface {

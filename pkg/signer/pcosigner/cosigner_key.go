@@ -1,4 +1,4 @@
-package cosigner
+package pcosigner
 
 import (
 	"encoding/json"

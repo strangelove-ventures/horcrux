@@ -21,13 +21,14 @@ import (
 	comet "github.com/cometbft/cometbft/types"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
-	pcosigner "github.com/strangelove-ventures/horcrux/pkg/signer/cosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/signer/pcosigner"
 	"github.com/stretchr/testify/require"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 	"golang.org/x/sync/errgroup"
 )
 
 const (
+	testChainID  = "chain-1"
 	testChainID2 = "chain-2"
 	bitSize      = 4096
 )
@@ -375,7 +376,7 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 			t.Log("No leader")
 
 			// time without a leader
-			time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond) //nolint:gosec
+			time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond)
 
 			newLeader := thresholdValidators[i%len(thresholdValidators)]
 			for _, l := range leaders {
@@ -384,7 +385,7 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 			t.Logf("New leader: %d", newLeader.myCosigner.GetID())
 
 			// time with new leader
-			time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond) //nolint:gosec
+			time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond)
 		}
 	}()
 
@@ -400,7 +401,7 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 			go func() {
 				defer wg.Done()
 				// stagger signing requests with random sleep
-				time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond) //nolint:gosec
+				time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond)
 
 				proposal := cometproto.Proposal{
 					Height: 1 + int64(i),
@@ -436,7 +437,7 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 			go func() {
 				defer wg.Done()
 				// stagger signing requests with random sleep
-				time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond) //nolint:gosec
+				time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond)
 
 				preVote := cometproto.Vote{
 					Height: 1 + int64(i),
@@ -472,7 +473,7 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 			go func() {
 				defer wg.Done()
 				// stagger signing requests with random sleep
-				time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond) //nolint:gosec
+				time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond)
 
 				preCommit := cometproto.Vote{
 					Height: 1 + int64(i),

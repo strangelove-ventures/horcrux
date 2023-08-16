@@ -29,7 +29,7 @@ func UnpackHRST(signBytes []byte) (HRSTKey, error) {
 	{
 		var proposal cometproto.CanonicalProposal
 		if err := protoio.UnmarshalDelimited(signBytes, &proposal); err == nil {
-			return HRSTKey{proposal.Height, proposal.Round, StepPropose, proposal.Timestamp.UnixNano()}, nil
+			return HRSTKey{proposal.Height, proposal.Round, stepPropose, proposal.Timestamp.UnixNano()}, nil
 		}
 	}
 

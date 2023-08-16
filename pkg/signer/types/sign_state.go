@@ -18,11 +18,15 @@ import (
 )
 
 const (
-	StepPropose   int8 = 1
+	stepPropose   int8 = 1
 	stepPrevote   int8 = 2
 	stepPrecommit int8 = 3
 	blocksToCache      = 3
 )
+
+func StepPropose() int8 {
+	return stepPropose
+}
 
 func CanonicalVoteToStep(vote *cometproto.CanonicalVote) int8 {
 	switch vote.Type {
@@ -47,7 +51,7 @@ func VoteToStep(vote *cometproto.Vote) int8 {
 }
 
 func ProposalToStep(_ *cometproto.Proposal) int8 {
-	return StepPropose
+	return stepPropose
 }
 
 // SignState stores signing information for high level watermark management.
@@ -68,6 +72,9 @@ type SignState struct {
 }
 
 func (signState *SignState) ExistingSignatureOrErrorIfRegression(hrst HRSTKey, signBytes []byte) ([]byte, error) {
+	return signState.existingSignatureOrErrorIfRegression(hrst, signBytes)
+}
+func (signState *SignState) existingSignatureOrErrorIfRegression(hrst HRSTKey, signBytes []byte) ([]byte, error) {
 	signState.Mu.RLock()
 	defer signState.Mu.RUnlock()
 
@@ -119,6 +126,8 @@ type SignStateConsensus struct {
 	SignBytes cometbytes.HexBytes
 }
 
+// TODO: this should maybe be a copy function instead of the pointer,
+// so it is a pointer method receiver?
 func (signState SignStateConsensus) HRSKey() HRSKey {
 	return HRSKey{
 		Height: signState.Height,
@@ -239,7 +248,6 @@ func (signState *SignState) save(jsonBytes []byte) {
 
 	err := tempfile.WriteFileAtomic(outFile, jsonBytes, 0600)
 	if err != nil {
-		fmt.Print("tempfile")
 		panic(err)
 	}
 }
@@ -349,6 +357,7 @@ func LoadSignState(filepath string) (*SignState, error) {
 
 	err = cometjson.Unmarshal(stateJSONBytes, &state)
 	if err != nil {
+		fmt.Println("Func LoadSignState Error unmarshalling sign state: ", err)
 		return nil, err
 	}
 
@@ -366,15 +375,14 @@ func LoadOrCreateSignState(filepath string) (*SignState, error) {
 			return nil, fmt.Errorf("unexpected error checking file existence (%s): %w", filepath, err)
 		}
 
-		cache := make(map[HRSKey]SignStateConsensus)
+		// cache := make(map[HRSKey]SignStateConsensus)
 		// the only scenario where we want to create a new sign state file is when the file does not exist.
 		// Make an empty sign state and save it.
 		state := &SignState{
 			FilePath: filepath,
-			Cache:    cache,
+			Cache:    make(map[HRSKey]SignStateConsensus),
 		}
 		state.Cond = cond.New(&state.Mu)
-		// fmt.Println(state)
 		// TODO: spew.Dump(state)
 		jsonBytes, err := cometjson.MarshalIndent(state, "", "  ")
 		// fmt.Println(jsonBytes)
@@ -400,7 +408,7 @@ func (signState *SignStateConsensus) OnlyDifferByTimestamp(signBytes []byte) err
 }
 
 func onlyDifferByTimestamp(step int8, signStateSignBytes, signBytes []byte) error {
-	if step == StepPropose {
+	if step == stepPropose {
 		return checkProposalOnlyDifferByTimestamp(signStateSignBytes, signBytes)
 	} else if step == stepPrevote || step == stepPrecommit {
 		return checkVoteOnlyDifferByTimestamp(signStateSignBytes, signBytes)

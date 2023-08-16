@@ -1,4 +1,4 @@
-package cosigner
+package pcosigner
 
 import (
 	"errors"
@@ -112,8 +112,13 @@ func (cosigner *LocalCosigner) SaveLastSignedState(chainID string, signState typ
 
 // WaitForSignStatesToFlushToDisk waits for all state file writes queued
 // in SaveLastSignedState to complete before termination.
-func (cosigner *LocalCosigner) WaitForSignStatesToFlushToDisk() {
+
+func (cosigner *LocalCosigner) waitForSignStatesToFlushToDisk() {
 	cosigner.pendingDiskWG.Wait()
+}
+
+func (cosigner *LocalCosigner) WaitForSignStatesToFlushToDisk() {
+	cosigner.waitForSignStatesToFlushToDisk()
 }
 
 // GetID returns the id of the cosigner

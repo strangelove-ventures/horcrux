@@ -3,9 +3,10 @@ package signer
 import (
 	"context"
 	"fmt"
-	cosigner "github.com/strangelove-ventures/horcrux/pkg/signer/cosigner"
-	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/signer/pcosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 
 	"github.com/hashicorp/raft"
 	"github.com/strangelove-ventures/horcrux/pkg/proto"
@@ -14,14 +15,14 @@ import (
 var _ proto.CosignerGRPCServer = &GRPCServer{}
 
 type GRPCServer struct {
-	cosigner           *cosigner.LocalCosigner
+	cosigner           *pcosigner.LocalCosigner
 	thresholdValidator *ThresholdValidator
 	raftStore          *RaftStore
 	proto.UnimplementedCosignerGRPCServer
 }
 
 func NewGRPCServer(
-	cosigner *cosigner.LocalCosigner,
+	cosigner *pcosigner.LocalCosigner,
 	thresholdValidator *ThresholdValidator,
 	raftStore *RaftStore,
 ) *GRPCServer {
@@ -56,9 +57,9 @@ func (rpc *GRPCServer) SetNoncesAndSign(
 	_ context.Context,
 	req *proto.CosignerGRPCSetNoncesAndSignRequest,
 ) (*proto.CosignerGRPCSetNoncesAndSignResponse, error) {
-	res, err := rpc.cosigner.SetNoncesAndSign(cosigner.CosignerSetNoncesAndSignRequest{
+	res, err := rpc.cosigner.SetNoncesAndSign(pcosigner.CosignerSetNoncesAndSignRequest{
 		ChainID:   req.ChainID,
-		Nonces:    cosigner.CosignerNoncesFromProto(req.GetNonces()),
+		Nonces:    pcosigner.CosignerNoncesFromProto(req.GetNonces()),
 		HRST:      types.HRSTKeyFromProto(req.GetHrst()),
 		SignBytes: req.GetSignBytes(),
 	})
@@ -99,7 +100,7 @@ func (rpc *GRPCServer) GetNonces(
 		return nil, err
 	}
 	return &proto.CosignerGRPCGetNoncesResponse{
-		Nonces: cosigner.CosignerNonces(res.Nonces).ToProto(),
+		Nonces: pcosigner.CosignerNonces(res.Nonces).ToProto(),
 	}, nil
 }
 

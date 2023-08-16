@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/strangelove-ventures/horcrux/pkg/signer/cosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/signer/pcosigner"
 
 	"github.com/cometbft/cometbft/crypto"
 	cometprivval "github.com/cometbft/cometbft/privval"
@@ -35,7 +35,7 @@ func addressCmd() *cobra.Command {
 			chainID := args[0]
 
 			switch config.Config.SignMode {
-			case cosigner.SignModeThreshold:
+			case pcosigner.SignModeThreshold:
 				err := config.Config.ValidateThresholdModeConfig()
 				if err != nil {
 					return err
@@ -46,13 +46,13 @@ func addressCmd() *cobra.Command {
 					return err
 				}
 
-				key, err := cosigner.LoadCosignerEd25519Key(keyFile)
+				key, err := pcosigner.LoadCosignerEd25519Key(keyFile)
 				if err != nil {
 					return fmt.Errorf("error reading cosigner key: %w, check that key is present for chain ID: %s", err, chainID)
 				}
 
 				pubKey = key.PubKey
-			case cosigner.SignModeSingle:
+			case pcosigner.SignModeSingle:
 				err := config.Config.ValidateSingleSignerConfig()
 				if err != nil {
 					return err
@@ -70,7 +70,7 @@ func addressCmd() *cobra.Command {
 
 			pubKeyAddress := pubKey.Address()
 
-			pubKeyJSON, err := cosigner.PubKey("", pubKey)
+			pubKeyJSON, err := pcosigner.PubKey("", pubKey)
 			if err != nil {
 				return err
 			}
@@ -86,7 +86,7 @@ func addressCmd() *cobra.Command {
 					return err
 				}
 				output.ValConsAddress = bech32ValConsAddress
-				pubKeyBech32, err := cosigner.PubKey(args[1], pubKey)
+				pubKeyBech32, err := pcosigner.PubKey(args[1], pubKey)
 				if err != nil {
 					return err
 				}

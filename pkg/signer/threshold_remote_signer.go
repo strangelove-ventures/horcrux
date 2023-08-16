@@ -3,10 +3,11 @@ package signer
 import (
 	"context"
 	"fmt"
-	"github.com/strangelove-ventures/horcrux/pkg/metrics"
-	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 	"net"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/metrics"
+	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"

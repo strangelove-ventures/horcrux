@@ -2,9 +2,10 @@ package signer
 
 import (
 	"errors"
-	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 	"sync"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 )
 
 var _ ILeader = (*MockLeader)(nil)
