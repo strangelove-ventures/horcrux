@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	cosigners "github.com/strangelove-ventures/horcrux/pkg/cosigner"
+	cosigners "github.com/strangelove-ventures/horcrux/pkg/signer/cosigner"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"

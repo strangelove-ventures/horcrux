@@ -186,6 +186,7 @@ func (signState *SignState) cacheAndMarshal(ssc SignStateConsensus) []byte {
 
 	jsonBytes, err := cometjson.MarshalIndent(signState, "", "  ")
 	if err != nil {
+		fmt.Print("jsonBytes")
 		panic(err)
 	}
 
@@ -238,6 +239,7 @@ func (signState *SignState) save(jsonBytes []byte) {
 
 	err := tempfile.WriteFileAtomic(outFile, jsonBytes, 0600)
 	if err != nil {
+		fmt.Print("tempfile")
 		panic(err)
 	}
 }
@@ -363,15 +365,19 @@ func LoadOrCreateSignState(filepath string) (*SignState, error) {
 		if !os.IsNotExist(err) {
 			return nil, fmt.Errorf("unexpected error checking file existence (%s): %w", filepath, err)
 		}
+
+		cache := make(map[HRSKey]SignStateConsensus)
 		// the only scenario where we want to create a new sign state file is when the file does not exist.
 		// Make an empty sign state and save it.
 		state := &SignState{
 			FilePath: filepath,
-			Cache:    make(map[HRSKey]SignStateConsensus),
+			Cache:    cache,
 		}
 		state.Cond = cond.New(&state.Mu)
-
+		// fmt.Println(state)
+		// TODO: spew.Dump(state)
 		jsonBytes, err := cometjson.MarshalIndent(state, "", "  ")
+		// fmt.Println(jsonBytes)
 		if err != nil {
 			panic(err)
 		}

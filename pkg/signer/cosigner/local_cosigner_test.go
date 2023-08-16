@@ -4,11 +4,12 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
-	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/libs/log"
@@ -106,10 +107,10 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
 	pubKey := privateKey.PubKey()
 
-	cfg := configs.Config{
-		ThresholdModeConfig: &configs.ThresholdModeConfig{
+	cfg := Config{
+		ThresholdModeConfig: &ThresholdModeConfig{
 			Threshold: int(threshold),
-			Cosigners: make(configs.CosignersConfig, total),
+			Cosigners: make(CosignersConfig, total),
 		},
 	}
 
@@ -136,7 +137,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 			ID:           id,
 		}
 
-		cfg.ThresholdModeConfig.Cosigners[i] = configs.CosignerConfig{
+		cfg.ThresholdModeConfig.Cosigners[i] = CosignerConfig{
 			ShardID: id,
 		}
 
@@ -146,7 +147,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 
 		cosigner := NewLocalCosigner(
 			log.NewNopLogger(),
-			&configs.RuntimeConfig{
+			&RuntimeConfig{
 				HomeDir:  cosignerDir,
 				StateDir: cosignerDir,
 				Config:   cfg,

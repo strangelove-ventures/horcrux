@@ -3,9 +3,10 @@ package cosigner
 import (
 	"context"
 	"fmt"
-	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 	"net/url"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	"github.com/strangelove-ventures/horcrux/pkg/proto"

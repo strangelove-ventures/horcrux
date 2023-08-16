@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/strangelove-ventures/horcrux/pkg/metrics"
-	"github.com/strangelove-ventures/horcrux/pkg/signer/cosigner"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/metrics"
+	pcosigner "github.com/strangelove-ventures/horcrux/pkg/signer/cosigner"
 
 	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 
@@ -31,7 +32,7 @@ type ValidatorSignBlockResponse struct {
 	Signature []byte
 }
 type ThresholdValidator struct {
-	config *cosigner.RuntimeConfig
+	config *pcosigner.RuntimeConfig
 
 	threshold int
 
@@ -40,10 +41,10 @@ type ThresholdValidator struct {
 	chainState sync.Map
 
 	// our own cosigner
-	myCosigner *cosigner.LocalCosigner
+	myCosigner *pcosigner.LocalCosigner
 
 	// peer cosigners
-	peerCosigners []cosigner.Cosigner
+	peerCosigners []pcosigner.Cosigner
 
 	leader ILeader
 
@@ -68,12 +69,12 @@ type ChainSignState struct {
 // NewThresholdValidator creates and returns a new ThresholdValidator
 func NewThresholdValidator(
 	logger log.Logger,
-	config *cosigner.RuntimeConfig,
+	config *pcosigner.RuntimeConfig,
 	threshold int,
 	grpcTimeout time.Duration,
 	maxWaitForSameBlockAttempts int,
-	myCosigner *cosigner.LocalCosigner,
-	peerCosigners []cosigner.Cosigner,
+	myCosigner *pcosigner.LocalCosigner,
+	peerCosigners []pcosigner.Cosigner,
 	leader ILeader,
 ) *ThresholdValidator {
 	return &ThresholdValidator{
@@ -364,10 +365,10 @@ func newSameBlockError(chainID string, hrs types.HRSKey) *SameBlockError {
 
 func (pv *ThresholdValidator) waitForPeerNonces(
 	chainID string,
-	peer cosigner.Cosigner,
+	peer pcosigner.Cosigner,
 	hrst types.HRSTKey,
 	wg *sync.WaitGroup,
-	nonces map[cosigner.Cosigner][]cosigner.CosignerNonce,
+	nonces map[pcosigner.Cosigner][]pcosigner.CosignerNonce,
 	thresholdPeersMutex *sync.Mutex,
 ) {
 	peerStartTime := time.Now()
@@ -393,9 +394,9 @@ func (pv *ThresholdValidator) waitForPeerNonces(
 }
 func (pv *ThresholdValidator) waitForPeerSetNoncesAndSign(
 	chainID string,
-	peer cosigner.Cosigner,
+	peer pcosigner.Cosigner,
 	hrst types.HRSTKey,
-	noncesMap map[cosigner.Cosigner][]cosigner.CosignerNonce,
+	noncesMap map[pcosigner.Cosigner][]pcosigner.CosignerNonce,
 	signBytes []byte,
 	shareSignatures *[][]byte,
 	shareSignaturesMutex *sync.Mutex,
@@ -403,7 +404,7 @@ func (pv *ThresholdValidator) waitForPeerSetNoncesAndSign(
 ) {
 	peerStartTime := time.Now()
 	defer wg.Done()
-	peerNonces := make([]cosigner.CosignerNonce, 0, pv.threshold-1)
+	peerNonces := make([]pcosigner.CosignerNonce, 0, pv.threshold-1)
 
 	peerID := peer.GetID()
 
@@ -425,7 +426,7 @@ func (pv *ThresholdValidator) waitForPeerSetNoncesAndSign(
 		}
 	}
 
-	sigRes, err := peer.SetNoncesAndSign(cosigner.CosignerSetNoncesAndSignRequest{
+	sigRes, err := peer.SetNoncesAndSign(pcosigner.CosignerSetNoncesAndSignRequest{
 		ChainID:   chainID,
 		Nonces:    peerNonces,
 		HRST:      hrst,
@@ -642,7 +643,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	getEphemeralWaitGroup.Add(pv.threshold - 1)
 	// Used to track how close we are to threshold
 
-	nonces := make(map[cosigner.Cosigner][]cosigner.CosignerNonce)
+	nonces := make(map[pcosigner.Cosigner][]pcosigner.CosignerNonce)
 	thresholdPeersMutex := sync.Mutex{}
 
 	for _, c := range pv.peerCosigners {
@@ -711,7 +712,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	)
 
 	// collect all valid responses into array of partial signatures
-	shareSigs := make([]cosigner.PartialSignature, 0, pv.threshold)
+	shareSigs := make([]pcosigner.PartialSignature, 0, pv.threshold)
 	for idx, shareSig := range shareSignatures {
 		if len(shareSig) == 0 {
 			continue
@@ -719,7 +720,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 
 		// we are ok to use the share signatures - complete boolean
 		// prevents future concurrent access
-		shareSigs = append(shareSigs, cosigner.PartialSignature{
+		shareSigs = append(shareSigs, pcosigner.PartialSignature{
 			ID:        idx + 1,
 			Signature: shareSig,
 		})

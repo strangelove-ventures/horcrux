@@ -282,7 +282,7 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 	if _, ok := cosigner.chainState.Load(chainID); ok {
 		return nil
 	}
-
+	// TODO: spew.Dump(cosigner.Config)
 	signState, err := types.LoadOrCreateSignState(cosigner.Config.CosignerStateFile(chainID))
 	if err != nil {
 		return err

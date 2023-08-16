@@ -10,7 +10,6 @@ package signer
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 	"io"
 	"net"
 	"net/url"
@@ -18,6 +17,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 
 	"github.com/Jille/raft-grpc-leader-rpc/leaderhealth"
 	raftgrpctransport "github.com/Jille/raft-grpc-transport"
@@ -114,6 +115,7 @@ func (s *RaftStore) OnStart() error {
 	go func() {
 		err := s.init()
 		if err != nil {
+			fmt.Println("RAFTSTORE")
 			panic(err)
 		}
 	}()

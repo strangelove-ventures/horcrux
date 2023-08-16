@@ -8,8 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/strangelove-ventures/horcrux/pkg/signer/cosigner"
-	config2 "github.com/strangelove-ventures/horcrux/pkg/signer/cosigner"
+	pcosigner "github.com/strangelove-ventures/horcrux/pkg/signer/cosigner"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
@@ -220,7 +219,7 @@ func migrateCmd() *cobra.Command {
 				return err
 			}
 
-			newEd25519Key := cosigner.CosignerEd25519Key{
+			newEd25519Key := pcosigner.CosignerEd25519Key{
 				PubKey:       legacyCosignerKey.PubKey,
 				PrivateShard: legacyCosignerKey.ShareKey,
 				ID:           legacyCosignerKey.ID,
@@ -236,7 +235,7 @@ func migrateCmd() *cobra.Command {
 				return fmt.Errorf("failed to write new Ed25519 key to %s: %w", newEd25519Path, err)
 			}
 
-			newRSAKey := cosigner.CosignerRSAKey{
+			newRSAKey := pcosigner.CosignerRSAKey{
 				RSAKey:  legacyCosignerKey.RSAKey,
 				ID:      legacyCosignerKey.ID,
 				RSAPubs: legacyCosignerKey.RSAPubs,
@@ -254,10 +253,10 @@ func migrateCmd() *cobra.Command {
 
 			// only attempt config migration if legacy config exists
 			if legacyCfgErr == nil {
-				var migratedNodes config2.ChainNodes
+				var migratedNodes pcosigner.ChainNodes
 
 				for _, n := range legacyCfg.ChainNodes {
-					migratedNodes = append(migratedNodes, config2.ChainNode{
+					migratedNodes = append(migratedNodes, pcosigner.ChainNode{
 						PrivValAddr: n.PrivValAddr,
 					})
 				}
@@ -265,17 +264,17 @@ func migrateCmd() *cobra.Command {
 				config.Config.ChainNodes = migratedNodes
 				config.Config.DebugAddr = legacyCfg.DebugAddr
 
-				signMode := config2.SignModeSingle
+				signMode := pcosigner.SignModeSingle
 
 				if legacyCfg.Cosigner != nil {
-					signMode = config2.SignModeThreshold
+					signMode = pcosigner.SignModeThreshold
 
-					var migratedCosigners config2.CosignersConfig
+					var migratedCosigners pcosigner.CosignersConfig
 
 					if legacyCfg.Cosigner.P2PListen != "" {
 						migratedCosigners = append(
 							migratedCosigners,
-							config2.CosignerConfig{
+							pcosigner.CosignerConfig{
 								ShardID: legacyCosignerKey.ID,
 								P2PAddr: legacyCfg.Cosigner.P2PListen,
 							},
@@ -283,13 +282,13 @@ func migrateCmd() *cobra.Command {
 					}
 
 					for _, c := range legacyCfg.Cosigner.Peers {
-						migratedCosigners = append(migratedCosigners, config2.CosignerConfig{
+						migratedCosigners = append(migratedCosigners, pcosigner.CosignerConfig{
 							ShardID: c.ShareID,
 							P2PAddr: c.P2PAddr,
 						})
 					}
 
-					config.Config.ThresholdModeConfig = &config2.ThresholdModeConfig{
+					config.Config.ThresholdModeConfig = &pcosigner.ThresholdModeConfig{
 						Threshold:   legacyCfg.Cosigner.Threshold,
 						Cosigners:   migratedCosigners,
 						GRPCTimeout: legacyCfg.Cosigner.Timeout,
