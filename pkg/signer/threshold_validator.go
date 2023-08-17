@@ -216,7 +216,7 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, block
 func (pv *ThresholdValidator) notifyBlockSignError(chainID string, hrs types.HRSKey) {
 	css := pv.mustLoadChainState(chainID)
 
-	css.lastSignState.Mu.Lock()
+	css.lastSignState.MuLock()
 	css.lastSignState.SetCache(hrs,
 		types.SignStateConsensus{
 			Height: hrs.Height,
@@ -225,7 +225,7 @@ func (pv *ThresholdValidator) notifyBlockSignError(chainID string, hrs types.HRS
 			// empty signature to indicate error
 		})
 
-	css.lastSignState.Mu.Unlock()
+	css.lastSignState.MuUnlock()
 	css.lastSignState.CondBroadcast()
 }
 

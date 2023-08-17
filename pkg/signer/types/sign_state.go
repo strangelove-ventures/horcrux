@@ -67,9 +67,9 @@ type SignState struct {
 	FilePath string
 
 	// Mu protects the Cache and is used for signaling with Cond.
-	Mu    sync.RWMutex
-	cache map[HRSKey]SignStateConsensus
-	cond  *cond.Cond
+	mu    sync.RWMutex                  // private to avoid marshal issues
+	cache map[HRSKey]SignStateConsensus // private to avoid marshal issues
+	cond  *cond.Cond                    // private to avoid marshal issues
 }
 
 func (signState *SignState) WaitWithTimeout(timeout time.Duration) {
@@ -83,9 +83,19 @@ func (signState *SignState) CondBroadcast() {
 func (signState *SignState) CondLlock() {
 	signState.cond.L.Lock()
 }
+
 func (signState *SignState) CondLunlock() {
 	signState.cond.L.Unlock()
 }
+
+func (signState *SignState) MuLock() {
+	signState.mu.Lock()
+}
+
+func (signState *SignState) MuUnlock() {
+	signState.mu.Unlock()
+}
+
 func (signState *SignState) GetCache(hrs HRSKey) (SignStateConsensus, bool) {
 	ssc, err := signState.cache[hrs]
 	return ssc, err
@@ -98,8 +108,8 @@ func (signState *SignState) ExistingSignatureOrErrorIfRegression(hrst HRSTKey, s
 	return signState.existingSignatureOrErrorIfRegression(hrst, signBytes)
 }
 func (signState *SignState) existingSignatureOrErrorIfRegression(hrst HRSTKey, signBytes []byte) ([]byte, error) {
-	signState.Mu.RLock()
-	defer signState.Mu.RUnlock()
+	signState.mu.RLock()
+	defer signState.mu.RUnlock()
 
 	sameHRS, err := signState.CheckHRS(hrst)
 	if err != nil {
@@ -124,8 +134,8 @@ func (signState *SignState) existingSignatureOrErrorIfRegression(hrst HRSTKey, s
 }
 
 func (signState *SignState) HRSKey() HRSKey {
-	signState.Mu.RLock()
-	defer signState.Mu.RUnlock()
+	signState.mu.RLock()
+	defer signState.mu.RUnlock()
 	return HRSKey{
 		Height: signState.Height,
 		Round:  signState.Round,
@@ -188,8 +198,8 @@ func newConflictingDataError(existingSignBytes, newSignBytes []byte) *Conflictin
 // GetFromCache will return the latest signed block within the SignState
 // and the relevant SignStateConsensus from the cache, if present.
 func (signState *SignState) GetFromCache(hrs HRSKey) (HRSKey, *SignStateConsensus) {
-	signState.Mu.RLock()
-	defer signState.Mu.RUnlock()
+	signState.mu.RLock()
+	defer signState.mu.RUnlock()
 	latestBlock := signState.hrsKeyLocked()
 	if ssc, ok := signState.cache[hrs]; ok {
 		return latestBlock, &ssc
@@ -199,8 +209,8 @@ func (signState *SignState) GetFromCache(hrs HRSKey) (HRSKey, *SignStateConsensu
 
 // cacheAndMarshal will Cache a SignStateConsensus for it's HRS and return the marshalled bytes.
 func (signState *SignState) cacheAndMarshal(ssc SignStateConsensus) []byte {
-	signState.Mu.Lock()
-	defer signState.Mu.Unlock()
+	signState.mu.Lock()
+	defer signState.mu.Unlock()
 
 	signState.cache[ssc.HRSKey()] = ssc
 
@@ -352,7 +362,7 @@ func (signState *SignState) FreshCache() *SignState {
 		FilePath: signState.FilePath,
 	}
 
-	newSignState.cond = cond.New(&newSignState.Mu)
+	newSignState.cond = cond.New(&newSignState.mu)
 
 	newSignState.cache[HRSKey{
 		Height: signState.Height,
@@ -407,7 +417,7 @@ func LoadOrCreateSignState(filepath string) (*SignState, error) {
 			FilePath: filepath,
 			cache:    make(map[HRSKey]SignStateConsensus),
 		}
-		state.cond = cond.New(&state.Mu)
+		state.cond = cond.New(&state.mu)
 
 		jsonBytes, err := cometjson.MarshalIndent(state, "", "  ")
 		if err != nil {
