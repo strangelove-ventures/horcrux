@@ -224,12 +224,7 @@ func (pv *ThresholdValidator) notifyBlockSignError(chainID string, hrs types.HRS
 			Step:   hrs.Step,
 			// empty signature to indicate error
 		})
-	//css.lastSignState[hrs] = types.SignStateConsensus{
-	//	Height: hrs.Height,
-	//	Round:  hrs.Round,
-	//	Step:   hrs.Step,
-	// empty signature to indicate error
-	//}
+
 	css.lastSignState.Mu.Unlock()
 	css.lastSignState.CondBroadcast()
 }
