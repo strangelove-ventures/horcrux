@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"fmt"
-	mrand "math/rand"
+	"math/big"
 	"path/filepath"
 	"sync"
 	"time"
@@ -375,8 +375,10 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 			}
 			t.Log("No leader")
 
+			rnd, err := rand.Int(rand.Reader, big.NewInt(50))
+			require.NoError(t, err)
 			// time without a leader
-			time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond)
+			time.Sleep(time.Duration(int(rnd.Int64())+100) * time.Millisecond)
 
 			newLeader := thresholdValidators[i%len(thresholdValidators)]
 			for _, l := range leaders {
@@ -385,7 +387,9 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 			t.Logf("New leader: %d", newLeader.myCosigner.GetID())
 
 			// time with new leader
-			time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond)
+			rnd, err = rand.Int(rand.Reader, big.NewInt(50))
+			require.NoError(t, err)
+			time.Sleep(time.Duration(int(rnd.Int64())+100) * time.Millisecond)
 		}
 	}()
 
@@ -401,7 +405,10 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 			go func() {
 				defer wg.Done()
 				// stagger signing requests with random sleep
-				time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond)
+				rnd, err := rand.Int(rand.Reader, big.NewInt(50))
+				require.NoError(t, err)
+				// ime without a leader
+				time.Sleep(time.Duration(int(rnd.Int64())+100) * time.Millisecond)
 
 				proposal := cometproto.Proposal{
 					Height: 1 + int64(i),
@@ -437,7 +444,10 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 			go func() {
 				defer wg.Done()
 				// stagger signing requests with random sleep
-				time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond)
+				rnd, err := rand.Int(rand.Reader, big.NewInt(50))
+				require.NoError(t, err)
+				// time without a leader
+				time.Sleep(time.Duration(int(rnd.Int64())+100) * time.Millisecond)
 
 				preVote := cometproto.Vote{
 					Height: 1 + int64(i),
@@ -473,7 +483,10 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 			go func() {
 				defer wg.Done()
 				// stagger signing requests with random sleep
-				time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond)
+				rnd, err := rand.Int(rand.Reader, big.NewInt(50))
+				require.NoError(t, err)
+				// time without a leader
+				time.Sleep(time.Duration(int(rnd.Int64())+100) * time.Millisecond)
 
 				preCommit := cometproto.Vote{
 					Height: 1 + int64(i),

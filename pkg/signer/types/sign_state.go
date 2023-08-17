@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	cometbytes "github.com/cometbft/cometbft/libs/bytes"
 	cometjson "github.com/cometbft/cometbft/libs/json"
@@ -14,7 +15,7 @@ import (
 	"github.com/cometbft/cometbft/libs/tempfile"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	"github.com/gogo/protobuf/proto"
-	"github.com/strangelove-ventures/horcrux/pkg/cond"
+	"github.com/strangelove-ventures/horcrux/pkg/signer/cond"
 )
 
 const (
@@ -67,8 +68,30 @@ type SignState struct {
 
 	// Mu protects the Cache and is used for signaling with Cond.
 	Mu    sync.RWMutex
-	Cache map[HRSKey]SignStateConsensus
-	Cond  *cond.Cond
+	cache map[HRSKey]SignStateConsensus
+	cond  *cond.Cond
+}
+
+func (signState *SignState) WaitWithTimeout(timeout time.Duration) {
+	signState.cond.WaitWithTimeout(timeout)
+}
+
+func (signState *SignState) CondBroadcast() {
+	signState.cond.Broadcast()
+}
+
+func (signState *SignState) CondLlock() {
+	signState.cond.L.Lock()
+}
+func (signState *SignState) CondLunlock() {
+	signState.cond.L.Unlock()
+}
+func (signState *SignState) GetCache(hrs HRSKey) (SignStateConsensus, bool) {
+	ssc, err := signState.cache[hrs]
+	return ssc, err
+}
+func (signState *SignState) SetCache(hrs HRSKey, signStateConsensus SignStateConsensus) {
+	signState.cache[hrs] = signStateConsensus
 }
 
 func (signState *SignState) ExistingSignatureOrErrorIfRegression(hrst HRSTKey, signBytes []byte) ([]byte, error) {
@@ -168,7 +191,7 @@ func (signState *SignState) GetFromCache(hrs HRSKey) (HRSKey, *SignStateConsensu
 	signState.Mu.RLock()
 	defer signState.Mu.RUnlock()
 	latestBlock := signState.hrsKeyLocked()
-	if ssc, ok := signState.Cache[hrs]; ok {
+	if ssc, ok := signState.cache[hrs]; ok {
 		return latestBlock, &ssc
 	}
 	return latestBlock, nil
@@ -179,11 +202,11 @@ func (signState *SignState) cacheAndMarshal(ssc SignStateConsensus) []byte {
 	signState.Mu.Lock()
 	defer signState.Mu.Unlock()
 
-	signState.Cache[ssc.HRSKey()] = ssc
+	signState.cache[ssc.HRSKey()] = ssc
 
-	for hrs := range signState.Cache {
+	for hrs := range signState.cache {
 		if hrs.Height < ssc.Height-blocksToCache {
-			delete(signState.Cache, hrs)
+			delete(signState.cache, hrs)
 		}
 	}
 
@@ -221,7 +244,7 @@ func (signState *SignState) Save(
 
 	// Broadcast to waiting goroutines to notify them that an
 	// existing signature for their HRS may now be available.
-	signState.Cond.Broadcast()
+	signState.cond.Broadcast()
 
 	if pendingDiskWG != nil {
 		pendingDiskWG.Add(1)
@@ -324,14 +347,14 @@ func (signState *SignState) FreshCache() *SignState {
 		NoncePublic: signState.NoncePublic,
 		Signature:   signState.Signature,
 		SignBytes:   signState.SignBytes,
-		Cache:       make(map[HRSKey]SignStateConsensus),
+		cache:       make(map[HRSKey]SignStateConsensus),
 
 		FilePath: signState.FilePath,
 	}
 
-	newSignState.Cond = cond.New(&newSignState.Mu)
+	newSignState.cond = cond.New(&newSignState.Mu)
 
-	newSignState.Cache[HRSKey{
+	newSignState.cache[HRSKey{
 		Height: signState.Height,
 		Round:  signState.Round,
 		Step:   signState.Step,
@@ -357,7 +380,7 @@ func LoadSignState(filepath string) (*SignState, error) {
 
 	err = cometjson.Unmarshal(stateJSONBytes, &state)
 	if err != nil {
-		fmt.Println("Func LoadSignState Error unmarshalling sign state: ", err)
+		// fmt.Println("Func LoadSignState Error unmarshalling sign state: ", err)
 		return nil, err
 	}
 
@@ -375,21 +398,22 @@ func LoadOrCreateSignState(filepath string) (*SignState, error) {
 			return nil, fmt.Errorf("unexpected error checking file existence (%s): %w", filepath, err)
 		}
 
-		// cache := make(map[HRSKey]SignStateConsensus)
+		fmt.Printf("\n\tNo filepath for Signstate exist for:\n\t\t%s.", filepath)
+		fmt.Printf("\n\tThis means NO(!) Signstate exists so we will create a new Signstate.\n")
+
 		// the only scenario where we want to create a new sign state file is when the file does not exist.
 		// Make an empty sign state and save it.
 		state := &SignState{
 			FilePath: filepath,
-			Cache:    make(map[HRSKey]SignStateConsensus),
+			cache:    make(map[HRSKey]SignStateConsensus),
 		}
-		state.Cond = cond.New(&state.Mu)
-		// TODO: spew.Dump(state)
+		state.cond = cond.New(&state.Mu)
+
 		jsonBytes, err := cometjson.MarshalIndent(state, "", "  ")
-		// fmt.Println(jsonBytes)
 		if err != nil {
+			fmt.Printf("cometjson.MarshalIndent: %s", err)
 			panic(err)
 		}
-
 		state.save(jsonBytes)
 		return state, nil
 	}

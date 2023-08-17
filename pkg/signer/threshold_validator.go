@@ -163,14 +163,14 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, block
 	// intended usage of cond lock prior to cond.Wait().
 	// cond.Wait() will unlock cond.L while it blocks waiting, then re-lock when unblocking from
 	// the cond.Broadcast().
-	css.lastSignState.Cond.L.Lock()
-	defer css.lastSignState.Cond.L.Unlock()
+	css.lastSignState.CondLlock()
+	defer css.lastSignState.CondLunlock()
 	for i := 0; i < pv.maxWaitForSameBlockAttempts; i++ {
 		// block until sign state is saved. It will notify and unblock when block is next signed.
-		css.lastSignState.Cond.WaitWithTimeout(pv.grpcTimeout)
+		css.lastSignState.WaitWithTimeout(pv.grpcTimeout)
 
 		// check if HRS exists in cache now
-		ssc, ok := css.lastSignState.Cache[block.HRSKey()]
+		ssc, ok := css.lastSignState.GetCache(block.HRSKey())
 		if !ok {
 			pv.logger.Debug(
 				"Block does not yet exist in cache while waiting for signature",
@@ -217,14 +217,21 @@ func (pv *ThresholdValidator) notifyBlockSignError(chainID string, hrs types.HRS
 	css := pv.mustLoadChainState(chainID)
 
 	css.lastSignState.Mu.Lock()
-	css.lastSignState.Cache[hrs] = types.SignStateConsensus{
-		Height: hrs.Height,
-		Round:  hrs.Round,
-		Step:   hrs.Step,
-		// empty signature to indicate error
-	}
+	css.lastSignState.SetCache(hrs,
+		types.SignStateConsensus{
+			Height: hrs.Height,
+			Round:  hrs.Round,
+			Step:   hrs.Step,
+			// empty signature to indicate error
+		})
+	//css.lastSignState[hrs] = types.SignStateConsensus{
+	//	Height: hrs.Height,
+	//	Round:  hrs.Round,
+	//	Step:   hrs.Step,
+	// empty signature to indicate error
+	//}
 	css.lastSignState.Mu.Unlock()
-	css.lastSignState.Cond.Broadcast()
+	css.lastSignState.CondBroadcast()
 }
 
 // Stop safely shuts down the ThresholdValidator.
