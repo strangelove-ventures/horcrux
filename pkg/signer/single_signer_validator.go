@@ -12,7 +12,7 @@ import (
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 )
 
-var _ PrivValidator = &SingleSignerValidator{}
+var _ IPrivValidator = &SingleSignerValidator{}
 
 // SingleSignerValidator guards access to an underlying PrivValidator by using mutexes
 // for each of the PrivValidator interface functions

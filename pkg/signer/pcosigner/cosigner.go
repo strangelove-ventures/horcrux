@@ -9,9 +9,9 @@ import (
 	"github.com/strangelove-ventures/horcrux/pkg/proto"
 )
 
-// Cosigner interface is a set of methods for an m-of-n threshold signature.
+// ICosigner interface is a set of methods for an m-of-n threshold signature.
 // This interface abstracts the underlying key storage and management
-type Cosigner interface {
+type ICosigner interface {
 	// Get the ID of the cosigner
 	// The ID is the shamir index: 1, 2, etc...
 	GetID() int

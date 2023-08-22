@@ -10,7 +10,7 @@ import (
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
-var _ ThresholdSigner = &ThresholdSignerSoft{}
+var _ IThresholdSigner = &ThresholdSignerSoft{}
 
 type ThresholdSignerSoft struct {
 	privateKeyShard []byte
@@ -44,7 +44,7 @@ func NewThresholdSignerSoft(config *RuntimeConfig, id int, chainID string) (*Thr
 	return &s, nil
 }
 
-func (s *ThresholdSignerSoft) PubKey() []byte {
+func (s *ThresholdSignerSoft) GetPubKey() []byte {
 	return s.pubKey
 }
 
@@ -85,6 +85,7 @@ func (s *ThresholdSignerSoft) sumNonces(nonces []Nonce) (tsed25519.Scalar, tsed2
 	return nonceShare, noncePub, nil
 }
 
+// GenerateNonces deals nonces (A Pubkey and t of n shares) for all cosigners.
 func (s *ThresholdSignerSoft) GenerateNonces() (Nonces, error) {
 	secret := make([]byte, 32)
 	if _, err := rand.Read(secret); err != nil {

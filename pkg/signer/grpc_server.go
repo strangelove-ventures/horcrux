@@ -12,12 +12,14 @@ import (
 	"github.com/strangelove-ventures/horcrux/pkg/proto"
 )
 
+// Enures that GRPCServer implements the proto.CosignerGRPCServer interface.
 var _ proto.CosignerGRPCServer = &GRPCServer{}
 
 type GRPCServer struct {
 	cosigner           *pcosigner.LocalCosigner
 	thresholdValidator *ThresholdValidator
 	raftStore          *RaftStore
+	// Promoted Fields
 	proto.UnimplementedCosignerGRPCServer
 }
 
@@ -33,6 +35,7 @@ func NewGRPCServer(
 	}
 }
 
+// SignBlock implements the CosignerGRPCServer interface.
 func (rpc *GRPCServer) SignBlock(
 	_ context.Context,
 	req *proto.CosignerGRPCSignBlockRequest,
@@ -88,6 +91,7 @@ func (rpc *GRPCServer) SetNoncesAndSign(
 	}, nil
 }
 
+// GetNonces implements the UnimplementedCosignerGRPCServer interface.
 func (rpc *GRPCServer) GetNonces(
 	_ context.Context,
 	req *proto.CosignerGRPCGetNoncesRequest,

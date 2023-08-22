@@ -37,7 +37,7 @@ func createListener(nodeID string, homedir string) (string, func(), error) {
 		nil)
 
 	// Need to set pointers to avoid nil pointers.
-	var cosigners []pcosigner.Cosigner
+	var cosigners []pcosigner.ICosigner
 	var timeDuration time.Duration
 	thresholdvalidator := signer.NewThresholdValidator(nil, nil, 0, timeDuration, 0, nil, cosigners, nil)
 	s.SetThresholdValidator(thresholdvalidator)

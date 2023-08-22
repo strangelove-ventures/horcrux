@@ -1,5 +1,6 @@
 package pcosigner
 
+// RemoteCosigner is a Cosigner implementation that uses gRPC make to request to other Cosigners
 import (
 	"context"
 	"fmt"
@@ -45,7 +46,7 @@ func (cosigner *RemoteCosigner) GetID() int {
 }
 
 // GetAddress returns the P2P URL of the remote cosigner
-// Implements the cosigner interface
+// Implements the ICosigner interface
 func (cosigner *RemoteCosigner) GetAddress() string {
 	return cosigner.address
 }
@@ -77,7 +78,8 @@ func (cosigner *RemoteCosigner) getGRPCClient() (proto.CosignerGRPCClient, *grpc
 	return proto.NewCosignerGRPCClient(conn), conn, nil
 }
 
-// GetNonces implements the cosigner interface
+// GetNonces implements the Cosigner interface
+// It uses the gRPC client to request the nonces from the other
 func (cosigner *RemoteCosigner) GetNonces(
 	chainID string,
 	req types.HRSTKey,
@@ -113,12 +115,13 @@ func (cosigner *RemoteCosigner) SetNoncesAndSign(
 	defer conn.Close()
 	context, cancelFunc := GetContext()
 	defer cancelFunc()
-	res, err := client.SetNoncesAndSign(context, &proto.CosignerGRPCSetNoncesAndSignRequest{
-		ChainID:   req.ChainID,
-		Nonces:    CosignerNonces(req.Nonces).ToProto(),
-		Hrst:      req.HRST.ToProto(),
-		SignBytes: req.SignBytes,
-	})
+	res, err := client.SetNoncesAndSign(context,
+		&proto.CosignerGRPCSetNoncesAndSignRequest{
+			ChainID:   req.ChainID,
+			Nonces:    CosignerNonces(req.Nonces).ToProto(),
+			Hrst:      req.HRST.ToProto(),
+			SignBytes: req.SignBytes,
+		})
 	if err != nil {
 		return nil, err
 	}

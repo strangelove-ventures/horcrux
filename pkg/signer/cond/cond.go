@@ -17,6 +17,8 @@ type Cond struct {
 	p atomic.Pointer[chan struct{}]
 }
 
+// New creates a new Cond instance. It requires a Locker instance to lock/unlock
+// before/after each Wait() call.
 func New(l sync.Locker) *Cond {
 	c := &Cond{
 		L: l,

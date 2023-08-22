@@ -66,7 +66,7 @@ type SignState struct {
 
 	FilePath string
 
-	// Mu protects the Cache and is used for signaling with Cond.
+	// mu protects the cache and is used for signaling with cond.
 	mu    sync.RWMutex                  // private to avoid marshal issues
 	cache map[HRSKey]SignStateConsensus // private to avoid marshal issues
 	cond  *cond.Cond                    // private to avoid marshal issues

@@ -24,7 +24,7 @@ func TestCosignerRSA(t *testing.T) {
 		pubKeys[i] = &key.PublicKey
 	}
 
-	securities := make([]CosignerSecurity, 3)
+	securities := make([]ICosignerSecurity, 3)
 
 	for i := 0; i < 3; i++ {
 		key := CosignerRSAKey{
@@ -67,7 +67,7 @@ func TestConcurrentIterateCosignerRSA(t *testing.T) {
 		pubKeys[i] = &key.PublicKey
 	}
 
-	securities := make([]CosignerSecurity, 3)
+	securities := make([]ICosignerSecurity, 3)
 
 	for i := 0; i < 3; i++ {
 		securities[i] = NewCosignerSecurityRSA(CosignerRSAKey{

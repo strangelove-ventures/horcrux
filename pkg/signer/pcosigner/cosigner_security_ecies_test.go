@@ -25,7 +25,7 @@ func TestCosignerECIES(t *testing.T) {
 		pubs[i] = &key.PublicKey
 	}
 
-	securities := make([]CosignerSecurity, 3)
+	securities := make([]ICosignerSecurity, 3)
 
 	for i := 0; i < 3; i++ {
 		key := CosignerECIESKey{
@@ -55,7 +55,7 @@ func TestCosignerECIES(t *testing.T) {
 	require.ErrorContains(t, err, "failed to decrypt")
 }
 
-func testCosignerSecurity(t *testing.T, securities []CosignerSecurity) error {
+func testCosignerSecurity(t *testing.T, securities []ICosignerSecurity) error {
 	var (
 		mockPub   = []byte("mock_pub")
 		mockShare = []byte("mock_share")
@@ -91,7 +91,7 @@ func TestConcurrentIterateCosignerECIES(t *testing.T) {
 		pubs[i] = &key.PublicKey
 	}
 
-	securities := make([]CosignerSecurity, 3)
+	securities := make([]ICosignerSecurity, 3)
 
 	for i := 0; i < 3; i++ {
 		securities[i] = NewCosignerSecurityECIES(CosignerECIESKey{

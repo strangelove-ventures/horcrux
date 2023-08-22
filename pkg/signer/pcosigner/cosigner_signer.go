@@ -1,9 +1,9 @@
 package pcosigner
 
 // Interface for the local signer whether it's a soft sign or HSM
-type ThresholdSigner interface {
-	// PubKey returns the public key bytes for the combination of all cosigners.
-	PubKey() []byte
+type IThresholdSigner interface {
+	// GetPubKey returns the public key bytes for the combination of all cosigners.
+	GetPubKey() []byte
 
 	// GenerateNonces deals nonces for all cosigners.
 	GenerateNonces() (Nonces, error)

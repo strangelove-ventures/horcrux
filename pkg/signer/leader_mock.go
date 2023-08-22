@@ -1,5 +1,6 @@
 package signer
 
+// MockLeader is a "helper" mathod for use with testing.
 import (
 	"errors"
 	"sync"

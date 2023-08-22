@@ -23,9 +23,9 @@ import (
 
 const connRetrySec = 2
 
-// PrivValidator is a wrapper for tendermint PrivValidator,
+// IPrivValidator is a wrapper for tendermint PrivValidator,
 // with additional Stop method for safe shutdown.
-type PrivValidator interface {
+type IPrivValidator interface {
 	SignVote(chainID string, vote *cometproto.Vote) error
 	SignProposal(chainID string, proposal *cometproto.Proposal) error
 	GetPubKey(chainID string) (cometcrypto.PubKey, error)
@@ -39,7 +39,7 @@ type ReconnRemoteSigner struct {
 
 	address string
 	privKey cometcryptoed25519.PrivKey
-	privVal PrivValidator
+	privVal IPrivValidator
 
 	dialer net.Dialer
 }
@@ -52,7 +52,7 @@ type ReconnRemoteSigner struct {
 func NewReconnRemoteSigner(
 	address string,
 	logger cometlog.Logger,
-	privVal PrivValidator,
+	privVal IPrivValidator,
 	dialer net.Dialer,
 ) *ReconnRemoteSigner {
 	rs := &ReconnRemoteSigner{
@@ -389,7 +389,7 @@ func getRemoteSignerError(err error) *cometprotoprivval.RemoteSignerError {
 func StartRemoteSigners(
 	services []cometservice.Service,
 	logger cometlog.Logger,
-	privVal PrivValidator,
+	privVal IPrivValidator,
 	nodes []string,
 ) ([]cometservice.Service, error) {
 	var err error

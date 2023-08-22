@@ -14,7 +14,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var _ CosignerSecurity = &CosignerSecurityRSA{}
+var _ ICosignerSecurity = &CosignerSecurityRSA{}
 
 // CosignerSecurityRSA is an implementation of CosignerSecurity using RSA for encryption and P5S for digital signature.
 type CosignerSecurityRSA struct {

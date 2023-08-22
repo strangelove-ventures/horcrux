@@ -17,7 +17,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var _ Cosigner = &LocalCosigner{}
+var _ ICosigner = &LocalCosigner{}
 
 // LocalCosigner responds to sign requests.
 // It maintains a high watermark to avoid double-signing.
@@ -25,7 +25,7 @@ var _ Cosigner = &LocalCosigner{}
 type LocalCosigner struct {
 	logger        cometlog.Logger
 	Config        *RuntimeConfig
-	security      CosignerSecurity
+	security      ICosignerSecurity
 	chainState    sync.Map
 	address       string
 	pendingDiskWG sync.WaitGroup
@@ -34,7 +34,7 @@ type LocalCosigner struct {
 func NewLocalCosigner(
 	logger cometlog.Logger,
 	config *RuntimeConfig,
-	security CosignerSecurity,
+	security ICosignerSecurity,
 	address string,
 ) *LocalCosigner {
 	return &LocalCosigner{
@@ -50,10 +50,10 @@ type ChainState struct {
 	// incremented whenever we are asked to sign an HRS
 	lastSignState *types.SignState
 
-	// Signing is thread safe - mutex is used for putting locks so only one goroutine can r/w to the function
+	// Signing is thread safe - mutex is used for putting locks so only one goroutine can r/w to the ChainState
 	mu sync.RWMutex
 	// signer generates nonces, combines nonces, signs, and verifies signatures.
-	signer ThresholdSigner
+	signer IThresholdSigner
 
 	// Height, Round, Step -> metadata
 	nonces map[types.HRSTKey][]Nonces
@@ -159,7 +159,7 @@ func (cosigner *LocalCosigner) GetPubKey(chainID string) (cometcrypto.PubKey, er
 		return nil, err
 	}
 
-	return cometcryptoed25519.PubKey(ccs.signer.PubKey()), nil
+	return cometcryptoed25519.PubKey(ccs.signer.GetPubKey()), nil
 }
 
 // CombineSignatures combines partial signatures into a full signature.
@@ -172,7 +172,7 @@ func (cosigner *LocalCosigner) CombineSignatures(chainID string, signatures []Pa
 	return ccs.signer.CombineSignatures(signatures)
 }
 
-// VerifySignature validates a signed payload against the public key.
+// VerifySignature validates a signed payload against the (persistent) public key.
 // Implements Cosigner interface
 func (cosigner *LocalCosigner) VerifySignature(chainID string, payload, signature []byte) bool {
 	if err := cosigner.LoadSignStateIfNecessary(chainID); err != nil {
@@ -184,7 +184,7 @@ func (cosigner *LocalCosigner) VerifySignature(chainID string, payload, signatur
 		return false
 	}
 
-	return cometcryptoed25519.PubKey(ccs.signer.PubKey()).VerifySignature(payload, signature)
+	return cometcryptoed25519.PubKey(ccs.signer.GetPubKey()).VerifySignature(payload, signature)
 }
 
 // Sign the sign request using the cosigner's shard
@@ -293,7 +293,7 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 		return err
 	}
 
-	var signer ThresholdSigner
+	var signer IThresholdSigner
 
 	signer, err = NewThresholdSignerSoft(cosigner.Config, cosigner.GetID(), chainID)
 	if err != nil {
@@ -309,6 +309,7 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 	return nil
 }
 
+// GetNonces returns the nonces for the given HRS
 func (cosigner *LocalCosigner) GetNonces(
 	chainID string,
 	hrst types.HRSTKey,
@@ -322,7 +323,7 @@ func (cosigner *LocalCosigner) GetNonces(
 	total := len(cosigner.Config.Config.ThresholdModeConfig.Cosigners)
 
 	res := &CosignerNoncesResponse{
-		Nonces: make([]CosignerNonce, total-1),
+		Nonces: make([]CosignerNonce, total-1), // an empty list of nonces for each cosigner except for ourselves
 	}
 
 	id := cosigner.GetID()
@@ -410,9 +411,9 @@ func (cosigner *LocalCosigner) dealSharesIfNecessary(chainID string, hrst types.
 func (cosigner *LocalCosigner) getNonce(
 	req CosignerGetNonceRequest,
 ) (CosignerNonce, error) {
+
 	chainID := req.ChainID
 	zero := CosignerNonce{}
-
 	hrst := types.HRSTKey{
 		Height:    req.Height,
 		Round:     req.Round,

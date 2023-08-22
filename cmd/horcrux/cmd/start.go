@@ -46,7 +46,7 @@ func startCmd() *cobra.Command {
 
 			acceptRisk, _ := cmd.Flags().GetBool(flagAcceptRisk)
 
-			var val signer.PrivValidator
+			var val signer.IPrivValidator
 			var services []service.Service
 
 			switch config.Config.SignMode {

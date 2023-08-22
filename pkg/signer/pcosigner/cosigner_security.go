@@ -1,7 +1,7 @@
 package pcosigner
 
-// CosignerSecurity is an interface for the security layer of the cosigner.
-type CosignerSecurity interface {
+// ICosignerSecurity is an interface for the security layer of the cosigner.
+type ICosignerSecurity interface {
 	// GetID returns the ID of the cosigner.
 	GetID() int
 

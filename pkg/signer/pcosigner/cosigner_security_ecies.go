@@ -15,7 +15,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var _ CosignerSecurity = &CosignerSecurityECIES{}
+var _ ICosignerSecurity = &CosignerSecurityECIES{}
 
 // CosignerSecurityECIES is an implementation of CosignerSecurity
 // using ECIES for encryption and ECDSA for digital signature.

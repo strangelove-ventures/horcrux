@@ -21,7 +21,7 @@ import (
 	"github.com/strangelove-ventures/horcrux/pkg/proto"
 )
 
-var _ PrivValidator = &ThresholdValidator{}
+var _ IPrivValidator = &ThresholdValidator{}
 
 type ValidatorSignBlockRequest struct {
 	ChainID string
@@ -44,7 +44,7 @@ type ThresholdValidator struct {
 	myCosigner *pcosigner.LocalCosigner
 
 	// peer cosigners
-	peerCosigners []pcosigner.Cosigner
+	peerCosigners []pcosigner.ICosigner
 
 	leader ILeader
 
@@ -74,7 +74,7 @@ func NewThresholdValidator(
 	grpcTimeout time.Duration,
 	maxWaitForSameBlockAttempts int,
 	myCosigner *pcosigner.LocalCosigner,
-	peerCosigners []pcosigner.Cosigner,
+	peerCosigners []pcosigner.ICosigner,
 	leader ILeader,
 ) *ThresholdValidator {
 	return &ThresholdValidator{
@@ -89,7 +89,7 @@ func NewThresholdValidator(
 	}
 }
 
-// SaveLastSignedState updates the high watermark height/round/step (HRS) for a completed
+// SaveLastSignedState updates the high watermark height/round/step (HRS) for a completed(!)
 // sign process if it is greater than the current high watermark. A mutex is used to avoid concurrent
 // state updates. The disk write is scheduled in a separate goroutine which will perform an atomic write.
 // pendingDiskWG is used upon termination in pendingDiskWG to ensure all writes have completed.
@@ -229,11 +229,6 @@ func (pv *ThresholdValidator) notifyBlockSignError(chainID string, hrs types.HRS
 	css.lastSignState.CondBroadcast()
 }
 
-// Stop safely shuts down the ThresholdValidator.
-func (pv *ThresholdValidator) Stop() {
-	pv.waitForSignStatesToFlushToDisk()
-}
-
 // waitForSignStatesToFlushToDisk waits for any sign states to finish writing to disk.
 func (pv *ThresholdValidator) waitForSignStatesToFlushToDisk() {
 	pv.pendingDiskWG.Wait()
@@ -241,14 +236,21 @@ func (pv *ThresholdValidator) waitForSignStatesToFlushToDisk() {
 	pv.myCosigner.WaitForSignStatesToFlushToDisk()
 }
 
+// Stop safely shuts down the ThresholdValidator.
+// Stop implements IPrivValidator from threshold_remote_signer.go
+func (pv *ThresholdValidator) Stop() {
+	pv.waitForSignStatesToFlushToDisk()
+}
+
 // GetPubKey returns the public key of the validator.
-// Implements PrivValidator.
+// Implements IPrivValidator fromt threshold_remote_signer.go
 func (pv *ThresholdValidator) GetPubKey(chainID string) (crypto.PubKey, error) {
 	return pv.myCosigner.GetPubKey(chainID)
 }
 
 // SignVote signs a canonical representation of the vote, along with the
-// chainID. Implements PrivValidator from Tendermint/Cometbft
+// chainID.
+// SignVote implements IPrivValidator fromt threshold_remote_signer.go
 func (pv *ThresholdValidator) SignVote(chainID string, vote *cometproto.Vote) error {
 	block := &Block{
 		Height:    vote.Height,
@@ -267,7 +269,8 @@ func (pv *ThresholdValidator) SignVote(chainID string, vote *cometproto.Vote) er
 }
 
 // SignProposal signs a canonical representation of the proposal, along with
-// the chainID. Implements PrivValidator.
+// the chainID.
+// SignProposal implements IPrivValidator fromt threshold_remote_signer.go
 func (pv *ThresholdValidator) SignProposal(chainID string, proposal *cometproto.Proposal) error {
 	block := &Block{
 		Height:    proposal.Height,
@@ -367,10 +370,10 @@ func newSameBlockError(chainID string, hrs types.HRSKey) *SameBlockError {
 
 func (pv *ThresholdValidator) waitForPeerNonces(
 	chainID string,
-	peer pcosigner.Cosigner,
+	peer pcosigner.ICosigner,
 	hrst types.HRSTKey,
 	wg *sync.WaitGroup,
-	nonces map[pcosigner.Cosigner][]pcosigner.CosignerNonce,
+	nonces map[pcosigner.ICosigner][]pcosigner.CosignerNonce,
 	thresholdPeersMutex *sync.Mutex,
 ) {
 	peerStartTime := time.Now()
@@ -396,9 +399,9 @@ func (pv *ThresholdValidator) waitForPeerNonces(
 }
 func (pv *ThresholdValidator) waitForPeerSetNoncesAndSign(
 	chainID string,
-	peer pcosigner.Cosigner,
+	peer pcosigner.ICosigner,
 	hrst types.HRSTKey,
-	noncesMap map[pcosigner.Cosigner][]pcosigner.CosignerNonce,
+	noncesMap map[pcosigner.ICosigner][]pcosigner.CosignerNonce,
 	signBytes []byte,
 	shareSignatures *[][]byte,
 	shareSignaturesMutex *sync.Mutex,
@@ -594,6 +597,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 			"step", step,
 		)
 		metrics.TotalNotRaftLeader.Inc()
+		// Ask the (RAFT) leader to manage the signing of the block
 		signRes, err := pv.leader.SignBlock(ValidatorSignBlockRequest{
 			ChainID: chainID,
 			Block:   block,
@@ -641,11 +645,12 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	total := uint8(numPeers + 1)
 	getEphemeralWaitGroup := sync.WaitGroup{}
 
-	// Only wait until we have threshold sigs
+	// Only wait until we have enough threshold signatures
 	getEphemeralWaitGroup.Add(pv.threshold - 1)
 	// Used to track how close we are to threshold
 
-	nonces := make(map[pcosigner.Cosigner][]pcosigner.CosignerNonce)
+	// Here the actual signing process starts from a cryptological perspective
+	nonces := make(map[pcosigner.ICosigner][]pcosigner.CosignerNonce)
 	thresholdPeersMutex := sync.Mutex{}
 
 	for _, c := range pv.peerCosigners {
@@ -660,7 +665,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 		return nil, stamp, err
 	}
 
-	// Wait for threshold cosigners to be complete
+	// Wait for cosigners to be complete
 	// A Cosigner will either respond in time, or be cancelled with timeout
 	if waitUntilCompleteOrTimeout(&getEphemeralWaitGroup, pv.grpcTimeout) {
 		pv.notifyBlockSignError(chainID, block.HRSKey())
