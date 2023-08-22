@@ -3,9 +3,10 @@ package node
 // MockLeader is a "helper" mathod for use with testing.
 import (
 	"errors"
-	"github.com/strangelove-ventures/horcrux/pkg/types"
 	"sync"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 )
 
 var _ ILeader = (*MockLeader)(nil)

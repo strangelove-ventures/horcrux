@@ -4,12 +4,13 @@ import (
 	"bufio"
 	"encoding/base64"
 	"fmt"
-	"github.com/strangelove-ventures/horcrux/pkg/types"
 	"io"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 
 	"github.com/strangelove-ventures/horcrux/pkg/node"
 

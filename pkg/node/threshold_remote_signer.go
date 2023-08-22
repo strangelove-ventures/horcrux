@@ -3,9 +3,10 @@ package node
 import (
 	"context"
 	"fmt"
-	"github.com/strangelove-ventures/horcrux/pkg/types"
 	"net"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"

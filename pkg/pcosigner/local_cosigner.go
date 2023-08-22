@@ -3,7 +3,8 @@ package pcosigner
 import (
 	"errors"
 	"fmt"
-	types2 "github.com/strangelove-ventures/horcrux/pkg/types"
+
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 
 	"sync"
 	"time"
@@ -47,7 +48,7 @@ func NewLocalCosigner(
 type ChainState struct {
 	// lastSignState stores the last sign state for an HRS we have fully signed
 	// incremented whenever we are asked to sign an HRS
-	lastSignState *types2.SignState
+	lastSignState *types.SignState
 
 	// Signing is thread safe - mutex is used for putting locks so only one goroutine can r/w to the ChainState
 	mu sync.RWMutex
@@ -55,10 +56,10 @@ type ChainState struct {
 	signer IThresholdSigner
 
 	// Height, Round, Step -> metadata
-	nonces map[types2.HRSTKey][]Nonces
+	nonces map[types.HRSTKey][]Nonces
 }
 
-func (ccs *ChainState) combinedNonces(myID int, threshold uint8, hrst types2.HRSTKey) ([]Nonce, error) {
+func (ccs *ChainState) combinedNonces(myID int, threshold uint8, hrst types.HRSTKey) ([]Nonce, error) {
 	ccs.mu.RLock()
 	defer ccs.mu.RUnlock()
 
@@ -97,7 +98,7 @@ type CosignerGetNonceRequest struct {
 // than the current high watermark. A mutex is used to avoid concurrent state updates.
 // The disk write is scheduled in a separate goroutine which will perform an atomic write.
 // pendingDiskWG is used upon termination in pendingDiskWG to ensure all writes have completed.
-func (cosigner *LocalCosigner) SaveLastSignedState(chainID string, signState types2.SignStateConsensus) error {
+func (cosigner *LocalCosigner) SaveLastSignedState(chainID string, signState types.SignStateConsensus) error {
 	ccs, err := cosigner.getChainState(chainID)
 	if err != nil {
 		return err
@@ -201,7 +202,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	// This function has multiple exit points.  Only start time can be guaranteed
 	metrics.MetricsTimeKeeper.SetPreviousLocalSignStart(time.Now())
 
-	hrst, err := types2.UnpackHRST(req.SignBytes)
+	hrst, err := types.UnpackHRST(req.SignBytes)
 	if err != nil {
 		return res, err
 	}
@@ -226,7 +227,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		return res, err
 	}
 
-	err = ccs.lastSignState.Save(types2.SignStateConsensus{
+	err = ccs.lastSignState.Save(types.SignStateConsensus{
 		Height:    hrst.Height,
 		Round:     hrst.Round,
 		Step:      hrst.Step,
@@ -235,7 +236,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	}, &cosigner.pendingDiskWG)
 
 	if err != nil {
-		if _, isSameHRSError := err.(*types2.SameHRSError); !isSameHRSError {
+		if _, isSameHRSError := err.(*types.SameHRSError); !isSameHRSError {
 			return res, err
 		}
 	}
@@ -287,7 +288,7 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 		return nil
 	}
 	// TODO: spew.Dump(cosigner.Config)
-	signState, err := types2.LoadOrCreateSignState(cosigner.Config.CosignerStateFile(chainID))
+	signState, err := types.LoadOrCreateSignState(cosigner.Config.CosignerStateFile(chainID))
 	if err != nil {
 		return err
 	}
@@ -301,7 +302,7 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 
 	cosigner.chainState.Store(chainID, &ChainState{
 		lastSignState: signState,
-		nonces:        make(map[types2.HRSTKey][]Nonces),
+		nonces:        make(map[types.HRSTKey][]Nonces),
 		signer:        signer,
 	})
 
@@ -311,7 +312,7 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 // GetNonces returns the nonces for the given HRS
 func (cosigner *LocalCosigner) GetNonces(
 	chainID string,
-	hrst types2.HRSTKey,
+	hrst types.HRSTKey,
 ) (*CosignerNoncesResponse, error) {
 	metrics.MetricsTimeKeeper.SetPreviousLocalNonce(time.Now())
 
@@ -374,7 +375,7 @@ func (cosigner *LocalCosigner) GetNonces(
 	return res, nil
 }
 
-func (cosigner *LocalCosigner) dealSharesIfNecessary(chainID string, hrst types2.HRSTKey) ([]Nonces, error) {
+func (cosigner *LocalCosigner) dealSharesIfNecessary(chainID string, hrst types.HRSTKey) ([]Nonces, error) {
 	ccs, err := cosigner.getChainState(chainID)
 	if err != nil {
 		return nil, err
@@ -413,7 +414,7 @@ func (cosigner *LocalCosigner) getNonce(
 
 	chainID := req.ChainID
 	zero := CosignerNonce{}
-	hrst := types2.HRSTKey{
+	hrst := types.HRSTKey{
 		Height:    req.Height,
 		Round:     req.Round,
 		Step:      req.Step,
@@ -456,7 +457,7 @@ func (cosigner *LocalCosigner) setNonce(req CosignerSetNonceRequest) error {
 		return err
 	}
 
-	hrst := types2.HRSTKey{
+	hrst := types.HRSTKey{
 		Height:    req.Height,
 		Round:     req.Round,
 		Step:      req.Step,

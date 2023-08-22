@@ -3,6 +3,7 @@ package test
 import (
 	"context"
 	"fmt"
+
 	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
 
 	"sync"

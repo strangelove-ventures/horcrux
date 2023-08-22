@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"crypto/rand"
 	"fmt"
-	pcosigner2 "github.com/strangelove-ventures/horcrux/pkg/pcosigner"
 	"math/big"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
 
 	"os"
 	"testing"
@@ -50,12 +51,12 @@ func TestThresholdValidator3of5(t *testing.T) {
 }
 
 func loadKeyForLocalCosigner(
-	cosigner *pcosigner2.LocalCosigner,
+	cosigner *pcosigner.LocalCosigner,
 	pubKey cometcrypto.PubKey,
 	chainID string,
 	privateShard []byte,
 ) error {
-	key := pcosigner2.CosignerEd25519Key{
+	key := pcosigner.CosignerEd25519Key{
 		PubKey:       pubKey,
 		PrivateShard: privateShard,
 		ID:           cosigner.GetID(),
@@ -72,7 +73,7 @@ func loadKeyForLocalCosigner(
 func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	cosigners, pubKey := getTestLocalCosigners(t, threshold, total)
 
-	thresholdCosigners := make([]pcosigner2.ICosigner, 0, threshold-1)
+	thresholdCosigners := make([]pcosigner.ICosigner, 0, threshold-1)
 
 	for i, cosigner := range cosigners {
 		require.Equal(t, i+1, cosigner.GetID())
@@ -262,10 +263,10 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	}
 }
 
-func getTestLocalCosigners(t *testing.T, threshold, total uint8) ([]*pcosigner2.LocalCosigner, cometcrypto.PubKey) {
+func getTestLocalCosigners(t *testing.T, threshold, total uint8) ([]*pcosigner.LocalCosigner, cometcrypto.PubKey) {
 	eciesKeys := make([]*ecies.PrivateKey, total)
 	pubKeys := make([]*ecies.PublicKey, total)
-	cosigners := make([]*pcosigner2.LocalCosigner, total)
+	cosigners := make([]*pcosigner.LocalCosigner, total)
 
 	for i := uint8(0); i < total; i++ {
 		eciesKey, err := ecies.GenerateKey(rand.Reader, secp256k1.S256(), nil)
@@ -282,10 +283,10 @@ func getTestLocalCosigners(t *testing.T, threshold, total uint8) ([]*pcosigner2.
 
 	tmpDir := t.TempDir()
 
-	cosignersConfig := make(pcosigner2.CosignersConfig, total)
+	cosignersConfig := make(pcosigner.CosignersConfig, total)
 
 	for i := range pubKeys {
-		cosignersConfig[i] = pcosigner2.CosignerConfig{
+		cosignersConfig[i] = pcosigner.CosignerConfig{
 			ShardID: i + 1,
 		}
 	}
@@ -295,22 +296,22 @@ func getTestLocalCosigners(t *testing.T, threshold, total uint8) ([]*pcosigner2.
 		err := os.MkdirAll(cosignerDir, 0777)
 		require.NoError(t, err)
 
-		cosignerConfig := &pcosigner2.RuntimeConfig{
+		cosignerConfig := &pcosigner.RuntimeConfig{
 			HomeDir:  cosignerDir,
 			StateDir: cosignerDir,
-			Config: pcosigner2.Config{
-				ThresholdModeConfig: &pcosigner2.ThresholdModeConfig{
+			Config: pcosigner.Config{
+				ThresholdModeConfig: &pcosigner.ThresholdModeConfig{
 					Threshold: int(threshold),
 					Cosigners: cosignersConfig,
 				},
 			},
 		}
 
-		cosigner := pcosigner2.NewLocalCosigner(
+		cosigner := pcosigner.NewLocalCosigner(
 			cometlog.NewNopLogger(),
 			cosignerConfig,
-			pcosigner2.NewCosignerSecurityECIES(
-				pcosigner2.CosignerECIESKey{
+			pcosigner.NewCosignerSecurityECIES(
+				pcosigner.CosignerECIESKey{
 					ID:        i + 1,
 					ECIESKey:  eciesKeys[i],
 					ECIESPubs: pubKeys,
@@ -339,7 +340,7 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 	var leader *ThresholdValidator
 	leaders := make([]*MockLeader, total)
 	for i, cosigner := range cosigners {
-		peers := make([]pcosigner2.ICosigner, 0, len(cosigners)-1)
+		peers := make([]pcosigner.ICosigner, 0, len(cosigners)-1)
 		for j, otherCosigner := range cosigners {
 			if i != j {
 				peers = append(peers, otherCosigner)

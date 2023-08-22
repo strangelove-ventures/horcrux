@@ -2,10 +2,11 @@ package types
 
 import (
 	"fmt"
-	"github.com/strangelove-ventures/horcrux/pkg/cond"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/strangelove-ventures/horcrux/pkg/cond"
 
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/stretchr/testify/require"

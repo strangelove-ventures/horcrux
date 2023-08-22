@@ -5,10 +5,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/strangelove-ventures/horcrux/pkg/cond"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/cond"
 
 	cometbytes "github.com/cometbft/cometbft/libs/bytes"
 	cometjson "github.com/cometbft/cometbft/libs/json"

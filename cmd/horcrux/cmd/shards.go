@@ -17,9 +17,10 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
 	"os"
 	"path/filepath"
+
+	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
 
 	"github.com/spf13/cobra"
 )

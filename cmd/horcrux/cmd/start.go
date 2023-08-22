@@ -2,8 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
 	"os"
+
+	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
 
 	"github.com/strangelove-ventures/horcrux/pkg/node"
 

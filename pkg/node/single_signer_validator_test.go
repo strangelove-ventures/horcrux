@@ -1,9 +1,10 @@
 package node
 
 import (
-	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
 	"path/filepath"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
 
 	"os"
 	"testing"

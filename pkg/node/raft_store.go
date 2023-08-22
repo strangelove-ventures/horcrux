@@ -103,7 +103,8 @@ func (s *RaftStore) init() error {
 	}
 	// Create a new gRPC server which is used by both the Raft, the threshold validator and the cosigner
 	grpcServer := grpc.NewServer()
-	proto.RegisterICosignerGRPCServerServer(grpcServer, NewGRPCServer(s.thresholdValidator.myCosigner, s.thresholdValidator, s))
+	proto.RegisterICosignerGRPCServerServer(grpcServer,
+		NewGRPCServer(s.thresholdValidator.myCosigner, s.thresholdValidator, s))
 	transportManager.Register(grpcServer)
 	leaderhealth.Setup(s.raft, grpcServer, []string{"Leader"})
 	raftadmin.Register(grpcServer, s.raft)
