@@ -1,6 +1,8 @@
-package signer
+package node
 
-import "github.com/strangelove-ventures/horcrux/pkg/signer/types"
+import (
+	"github.com/strangelove-ventures/horcrux/pkg/types"
+)
 
 // ILeader is an interface for the detecting if the current node/validator/cosigner is
 // the leader and performing leader actions.

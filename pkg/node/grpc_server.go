@@ -1,26 +1,26 @@
-package signer
+package node
 
 import (
 	"context"
 	"fmt"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/pkg/signer/pcosigner"
-	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
+	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 
 	"github.com/hashicorp/raft"
 	"github.com/strangelove-ventures/horcrux/pkg/proto"
 )
 
 // Enures that GRPCServer implements the proto.CosignerGRPCServer interface.
-var _ proto.CosignerGRPCServer = &GRPCServer{}
+var _ proto.ICosignerGRPCServerServer = &GRPCServer{}
 
 type GRPCServer struct {
 	cosigner           *pcosigner.LocalCosigner
 	thresholdValidator *ThresholdValidator
 	raftStore          *RaftStore
 	// Promoted Fields
-	proto.UnimplementedCosignerGRPCServer
+	proto.UnimplementedICosignerGRPCServerServer
 }
 
 func NewGRPCServer(

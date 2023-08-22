@@ -1,13 +1,12 @@
 package cmd
 
 import (
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 	"io"
 	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
-
-	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 
 	"github.com/stretchr/testify/require"
 )

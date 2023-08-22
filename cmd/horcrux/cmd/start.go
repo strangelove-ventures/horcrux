@@ -2,11 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
 	"os"
 
-	"github.com/strangelove-ventures/horcrux/pkg/signer/pcosigner"
-
-	"github.com/strangelove-ventures/horcrux/pkg/signer"
+	"github.com/strangelove-ventures/horcrux/pkg/node"
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/cometbft/cometbft/libs/service"
@@ -20,7 +19,7 @@ func startCmd() *cobra.Command {
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			err := signer.RequireNotRunning(config.PidFile)
+			err := node.RequireNotRunning(config.PidFile)
 			if err != nil {
 				return err
 			}
@@ -46,7 +45,7 @@ func startCmd() *cobra.Command {
 
 			acceptRisk, _ := cmd.Flags().GetBool(flagAcceptRisk)
 
-			var val signer.IPrivValidator
+			var val node.IPrivValidator
 			var services []service.Service
 
 			switch config.Config.SignMode {
@@ -66,12 +65,12 @@ func startCmd() *cobra.Command {
 
 			go EnableDebugAndMetrics(cmd.Context(), out)
 
-			services, err = signer.StartRemoteSigners(services, logger, val, config.Config.Nodes())
+			services, err = node.StartRemoteSigners(services, logger, val, config.Config.Nodes())
 			if err != nil {
 				return fmt.Errorf("failed to start remote signer(s): %w", err)
 			}
 
-			signer.WaitAndTerminate(logger, services, config.PidFile)
+			node.WaitAndTerminate(logger, services, config.PidFile)
 
 			return nil
 		},

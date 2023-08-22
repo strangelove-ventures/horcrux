@@ -4,15 +4,14 @@ import (
 	"bufio"
 	"encoding/base64"
 	"fmt"
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 	"io"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
-
-	"github.com/strangelove-ventures/horcrux/pkg/signer"
+	"github.com/strangelove-ventures/horcrux/pkg/node"
 
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/spf13/cobra"
@@ -91,7 +90,7 @@ func setStateCmd() *cobra.Command {
 
 			// Resetting the priv_validator_state.json should only be allowed if the
 			// signer is not running.
-			if err := signer.RequireNotRunning(config.PidFile); err != nil {
+			if err := node.RequireNotRunning(config.PidFile); err != nil {
 				return err
 			}
 
@@ -154,7 +153,7 @@ func importStateCmd() *cobra.Command {
 
 			// Resetting the priv_validator_state.json should only be allowed if the
 			// signer is not running.
-			if err := signer.RequireNotRunning(config.PidFile); err != nil {
+			if err := node.RequireNotRunning(config.PidFile); err != nil {
 				return err
 			}
 

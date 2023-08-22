@@ -4,12 +4,11 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
-
-	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/libs/log"

@@ -1,14 +1,14 @@
-package signer
+package node
 
 import (
 	"encoding/json"
 	"errors"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/pkg/metrics"
-	"github.com/strangelove-ventures/horcrux/pkg/signer/pcosigner"
-	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
+	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 
+	"github.com/strangelove-ventures/horcrux/pkg/metrics"
 	"github.com/strangelove-ventures/horcrux/pkg/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -51,7 +51,7 @@ func (f *fsm) handleLSSEvent(value string) {
 	_ = f.thresholdValidator.myCosigner.SaveLastSignedState(lss.ChainID, lss.SignStateConsensus)
 }
 
-func (s *RaftStore) getLeaderGRPCClient() (proto.CosignerGRPCClient, *grpc.ClientConn, error) {
+func (s *RaftStore) getLeaderGRPCClient() (proto.ICosignerGRPCServerClient, *grpc.ClientConn, error) {
 	var leader string
 	for i := 0; i < 30; i++ {
 		leader = string(s.GetLeader())
@@ -68,7 +68,7 @@ func (s *RaftStore) getLeaderGRPCClient() (proto.CosignerGRPCClient, *grpc.Clien
 	if err != nil {
 		return nil, nil, err
 	}
-	return proto.NewCosignerGRPCClient(conn), conn, nil
+	return proto.NewICosignerGRPCServerClient(conn), conn, nil
 }
 
 func (s *RaftStore) SignBlock(req ValidatorSignBlockRequest) (*ValidatorSignBlockResponse, error) {

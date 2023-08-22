@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	"github.com/strangelove-ventures/horcrux/pkg/proto"
@@ -63,7 +63,7 @@ func (cosigner *RemoteCosigner) VerifySignature(_ string, _, _ []byte) bool {
 	return false
 }
 
-func (cosigner *RemoteCosigner) getGRPCClient() (proto.CosignerGRPCClient, *grpc.ClientConn, error) {
+func (cosigner *RemoteCosigner) getGRPCClient() (proto.ICosignerGRPCServerClient, *grpc.ClientConn, error) {
 	var grpcAddress string
 	url, err := url.Parse(cosigner.address)
 	if err != nil {
@@ -75,7 +75,7 @@ func (cosigner *RemoteCosigner) getGRPCClient() (proto.CosignerGRPCClient, *grpc
 	if err != nil {
 		return nil, nil, err
 	}
-	return proto.NewCosignerGRPCClient(conn), conn, nil
+	return proto.NewICosignerGRPCServerClient(conn), conn, nil
 }
 
 // GetNonces implements the Cosigner interface

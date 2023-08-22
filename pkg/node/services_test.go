@@ -1,4 +1,4 @@
-package signer_test
+package node_test
 
 import (
 	"errors"
@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/pkg/signer"
+	"github.com/strangelove-ventures/horcrux/pkg/node"
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	cometservice "github.com/cometbft/cometbft/libs/service"
@@ -72,7 +72,7 @@ func TestIsRunning(t *testing.T) {
 	pidBz, err := os.ReadFile(pidFilePath)
 	require.NoError(t, err)
 
-	err = signer.RequireNotRunning(pidFilePath)
+	err = node.RequireNotRunning(pidFilePath)
 	expectedErrorMsg := fmt.Sprintf("horcrux is already running on PID: %s", strings.TrimSpace(string(pidBz)))
 	require.EqualError(t, err, expectedErrorMsg)
 }
@@ -81,7 +81,7 @@ func TestIsNotRunning(t *testing.T) {
 	homeDir := t.TempDir()
 	pidFilePath := filepath.Join(homeDir, "horcrux.pid")
 
-	err := signer.RequireNotRunning(pidFilePath)
+	err := node.RequireNotRunning(pidFilePath)
 	require.NoError(t, err)
 }
 
@@ -135,7 +135,7 @@ func TestIsRunningNonExistentPid(t *testing.T) {
 	)
 	require.NoError(t, err, "error writing pid file")
 
-	err = signer.RequireNotRunning(pidFilePath)
+	err = node.RequireNotRunning(pidFilePath)
 	expectedErrorMsg := fmt.Sprintf(`unclean shutdown detected. PID file exists at %s but PID %d is not running.
 manual deletion of PID file required`, pidFilePath, pid)
 	require.EqualError(t, err, expectedErrorMsg)
@@ -172,7 +172,7 @@ func TestConcurrentStart(t *testing.T) {
 	for i := 0; i < concurrentAttempts; i++ {
 		go func() {
 			defer recoverFromPanic()
-			signer.WaitAndTerminate(logger, services, pidFilePath)
+			node.WaitAndTerminate(logger, services, pidFilePath)
 			doneCount++
 			wg.Done()
 		}()
@@ -191,7 +191,7 @@ func TestIsRunningAndWaitForService(t *testing.T) {
 
 	var logger cometlog.Logger
 	var services []cometservice.Service
-	go func() { signer.WaitAndTerminate(logger, services, pidFilePath) }()
+	go func() { node.WaitAndTerminate(logger, services, pidFilePath) }()
 
 	// Wait for signer.WaitAndTerminate to create pidFile
 	var err error
@@ -216,7 +216,7 @@ func TestIsRunningAndWaitForService(t *testing.T) {
 	}
 	panicFunction := func() {
 		defer recoverFromPanic()
-		err = signer.RequireNotRunning(pidFilePath)
+		err = node.RequireNotRunning(pidFilePath)
 	}
 	go panicFunction()
 	wg.Wait()

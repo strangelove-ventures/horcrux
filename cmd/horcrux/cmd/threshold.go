@@ -2,13 +2,12 @@ package cmd
 
 import (
 	"fmt"
+	pcosigner2 "github.com/strangelove-ventures/horcrux/pkg/pcosigner"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/pkg/signer/pcosigner"
-
-	"github.com/strangelove-ventures/horcrux/pkg/signer"
+	"github.com/strangelove-ventures/horcrux/pkg/node"
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	cometservice "github.com/cometbft/cometbft/libs/service"
@@ -18,18 +17,18 @@ const maxWaitForSameBlockAttempts = 3
 
 func NewThresholdValidator(
 	logger cometlog.Logger,
-) ([]cometservice.Service, *signer.ThresholdValidator, error) {
+) ([]cometservice.Service, *node.ThresholdValidator, error) {
 	if err := config.Config.ValidateThresholdModeConfig(); err != nil {
 		return nil, nil, err
 	}
 
 	thresholdCfg := config.Config.ThresholdModeConfig
 
-	remoteCosigners := make([]pcosigner.ICosigner, 0, len(thresholdCfg.Cosigners)-1)
+	remoteCosigners := make([]pcosigner2.ICosigner, 0, len(thresholdCfg.Cosigners)-1)
 
 	var p2pListen string
 
-	var security pcosigner.ICosignerSecurity
+	var security pcosigner2.ICosignerSecurity
 	var eciesErr error
 	security, eciesErr = config.CosignerSecurityECIES()
 	if eciesErr != nil {
@@ -44,7 +43,7 @@ func NewThresholdValidator(
 		if c.ShardID != security.GetID() {
 			remoteCosigners = append(
 				remoteCosigners,
-				pcosigner.NewRemoteCosigner(c.ShardID, c.P2PAddr),
+				pcosigner2.NewRemoteCosigner(c.ShardID, c.P2PAddr),
 			)
 		} else {
 			p2pListen = c.P2PAddr
@@ -55,7 +54,7 @@ func NewThresholdValidator(
 		return nil, nil, fmt.Errorf("cosigner config does not exist for our shard ID %d", security.GetID())
 	}
 
-	localCosigner := pcosigner.NewLocalCosigner(
+	localCosigner := pcosigner2.NewLocalCosigner(
 		logger,
 		&config,
 		security,
@@ -75,14 +74,14 @@ func NewThresholdValidator(
 	nodeID := fmt.Sprint(security.GetID())
 
 	// Start RAFT store listener
-	raftStore := signer.NewRaftStore(nodeID,
+	raftStore := node.NewRaftStore(nodeID,
 		raftDir, p2pListen, raftTimeout, logger)
 	if err := raftStore.Start(); err != nil {
 		return nil, nil, fmt.Errorf("error starting raft store: %w", err)
 	}
 	services := []cometservice.Service{raftStore}
 
-	val := signer.NewThresholdValidator(
+	val := node.NewThresholdValidator(
 		logger,
 		&config,
 		thresholdCfg.Threshold,

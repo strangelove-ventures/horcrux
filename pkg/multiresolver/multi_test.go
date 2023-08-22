@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/pkg/signer/pcosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
 
-	"github.com/strangelove-ventures/horcrux/pkg/signer"
+	"github.com/strangelove-ventures/horcrux/pkg/node"
 
 	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"github.com/strangelove-ventures/horcrux/pkg/multiresolver"
@@ -29,7 +29,7 @@ func createListener(nodeID string, homedir string) (string, func(), error) {
 
 	port := strconv.Itoa(sock.Addr().(*net.TCPAddr).Port)
 
-	s := signer.NewRaftStore(
+	s := node.NewRaftStore(
 		nodeID,
 		homedir,
 		"127.0.0.1:"+port,
@@ -39,7 +39,7 @@ func createListener(nodeID string, homedir string) (string, func(), error) {
 	// Need to set pointers to avoid nil pointers.
 	var cosigners []pcosigner.ICosigner
 	var timeDuration time.Duration
-	thresholdvalidator := signer.NewThresholdValidator(nil, nil, 0, timeDuration, 0, nil, cosigners, nil)
+	thresholdvalidator := node.NewThresholdValidator(nil, nil, 0, timeDuration, 0, nil, cosigners, nil)
 	s.SetThresholdValidator(thresholdvalidator)
 
 	transportManager, err := s.Open()
@@ -48,7 +48,7 @@ func createListener(nodeID string, homedir string) (string, func(), error) {
 	}
 
 	grpcServer := grpc.NewServer()
-	proto.RegisterCosignerGRPCServer(grpcServer, signer.NewGRPCServer(nil, nil, s))
+	proto.RegisterICosignerGRPCServerServer(grpcServer, node.NewGRPCServer(nil, nil, s))
 	transportManager.Register(grpcServer)
 
 	go func() {
@@ -99,7 +99,7 @@ func TestMultiResolver(t *testing.T) {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancelFunc()
 
-	grpcClient := proto.NewCosignerGRPCClient(connDNS)
+	grpcClient := proto.NewICosignerGRPCServerClient(connDNS)
 	_, err = grpcClient.GetLeader(ctx, &proto.CosignerGRPCGetLeaderRequest{})
 	require.NoError(t, err)
 
@@ -112,7 +112,7 @@ func TestMultiResolver(t *testing.T) {
 	require.NoError(t, err)
 	defer connIP.Close()
 
-	grpcClient = proto.NewCosignerGRPCClient(connIP)
+	grpcClient = proto.NewICosignerGRPCServerClient(connIP)
 	_, err = grpcClient.GetLeader(ctx, &proto.CosignerGRPCGetLeaderRequest{})
 	require.NoError(t, err)
 }

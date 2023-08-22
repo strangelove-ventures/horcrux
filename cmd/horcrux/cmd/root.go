@@ -2,10 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
 	"os"
 	"path/filepath"
-
-	"github.com/strangelove-ventures/horcrux/pkg/signer/pcosigner"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"

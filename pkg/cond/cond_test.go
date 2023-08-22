@@ -1,11 +1,11 @@
 package cond_test
 
 import (
+	"github.com/strangelove-ventures/horcrux/pkg/cond"
 	"runtime"
 	"sync"
 	"testing"
 
-	"github.com/strangelove-ventures/horcrux/pkg/signer/cond"
 	"github.com/stretchr/testify/require"
 )
 

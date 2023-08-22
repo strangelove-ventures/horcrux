@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/pkg/signer/pcosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
 
 	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"github.com/spf13/cobra"
@@ -70,7 +70,7 @@ horcrux elect 2 # elect specific leader`,
 			ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancelFunc()
 
-			grpcClient := proto.NewCosignerGRPCClient(conn)
+			grpcClient := proto.NewICosignerGRPCServerClient(conn)
 			_, err = grpcClient.TransferLeadership(
 				ctx,
 				&proto.CosignerGRPCTransferLeadershipRequest{LeaderID: leaderID},
@@ -167,7 +167,7 @@ func getLeaderCmd() *cobra.Command {
 			ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancelFunc()
 
-			grpcClient := proto.NewCosignerGRPCClient(conn)
+			grpcClient := proto.NewICosignerGRPCServerClient(conn)
 
 			res, err := grpcClient.GetLeader(ctx, &proto.CosignerGRPCGetLeaderRequest{})
 			if err != nil {

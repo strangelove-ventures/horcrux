@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	pcosigner "github.com/strangelove-ventures/horcrux/pkg/signer/pcosigner"
+	pcosigner "github.com/strangelove-ventures/horcrux/pkg/pcosigner"
 
 	"github.com/cometbft/cometbft/crypto"
 	"github.com/docker/docker/client"

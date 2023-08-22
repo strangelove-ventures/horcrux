@@ -1,13 +1,11 @@
-package signer
+package node
 
 import (
 	"context"
 	"fmt"
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 	"net"
 	"time"
-
-	"github.com/strangelove-ventures/horcrux/pkg/metrics"
-	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
@@ -19,6 +17,7 @@ import (
 	cometprotocrypto "github.com/cometbft/cometbft/proto/tendermint/crypto"
 	cometprotoprivval "github.com/cometbft/cometbft/proto/tendermint/privval"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	"github.com/strangelove-ventures/horcrux/pkg/metrics"
 )
 
 const connRetrySec = 2

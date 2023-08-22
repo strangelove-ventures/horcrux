@@ -5,7 +5,7 @@
 //
 // Distributed consensus is provided via the Raft algorithm, specifically the
 // Hashicorp implementation.
-package signer
+package node
 
 import (
 	"encoding/json"
@@ -18,7 +18,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 
 	"github.com/Jille/raft-grpc-leader-rpc/leaderhealth"
 	raftgrpctransport "github.com/Jille/raft-grpc-transport"
@@ -103,7 +103,7 @@ func (s *RaftStore) init() error {
 	}
 	// Create a new gRPC server which is used by both the Raft, the threshold validator and the cosigner
 	grpcServer := grpc.NewServer()
-	proto.RegisterCosignerGRPCServer(grpcServer, NewGRPCServer(s.thresholdValidator.myCosigner, s.thresholdValidator, s))
+	proto.RegisterICosignerGRPCServerServer(grpcServer, NewGRPCServer(s.thresholdValidator.myCosigner, s.thresholdValidator, s))
 	transportManager.Register(grpcServer)
 	leaderhealth.Setup(s.raft, grpcServer, []string{"Leader"})
 	raftadmin.Register(grpcServer, s.raft)

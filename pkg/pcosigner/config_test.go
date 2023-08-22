@@ -2,13 +2,12 @@ package pcosigner_test
 
 import (
 	"fmt"
+	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
 	"io/fs"
 	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/strangelove-ventures/horcrux/pkg/signer/pcosigner"
 
 	"github.com/stretchr/testify/require"
 )

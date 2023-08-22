@@ -1,6 +1,7 @@
-package signer
+package node
 
 import (
+	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
 	"path/filepath"
 	"time"
 
@@ -14,7 +15,6 @@ import (
 	cometprivval "github.com/cometbft/cometbft/privval"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	comet "github.com/cometbft/cometbft/types"
-	"github.com/strangelove-ventures/horcrux/pkg/signer/pcosigner"
 	"github.com/stretchr/testify/require"
 )
 

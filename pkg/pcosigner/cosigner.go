@@ -1,9 +1,8 @@
 package pcosigner
 
 import (
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 	"time"
-
-	"github.com/strangelove-ventures/horcrux/pkg/signer/types"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	"github.com/strangelove-ventures/horcrux/pkg/proto"

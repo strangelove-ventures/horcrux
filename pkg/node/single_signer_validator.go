@@ -1,11 +1,10 @@
-package signer
+package node
 
 import (
 	"fmt"
+	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
 	"os"
 	"sync"
-
-	"github.com/strangelove-ventures/horcrux/pkg/signer/pcosigner"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometprivval "github.com/cometbft/cometbft/privval"
