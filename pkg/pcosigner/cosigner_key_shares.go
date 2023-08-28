@@ -27,7 +27,8 @@ func CreateCosignerEd25519ShardsFromFile(priv string, threshold, shards uint8) (
 // by splitting the secret using Shamir secret sharing.
 func CreateCosignerEd25519Shards(pv privval.FilePVKey, threshold, shards uint8) []CosignerEd25519Key {
 	// tsed25519.DealShares splits the secret using Shamir Secret Sharing (Note its: no verifiable secret sharing)
-	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(pv.PrivKey.Bytes()[:32]), threshold, shards) // privshards is shamir shares
+	// privshards is shamir shares
+	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(pv.PrivKey.Bytes()[:32]), threshold, shards)
 	out := make([]CosignerEd25519Key, shards)
 	for i, shard := range privShards {
 		out[i] = CosignerEd25519Key{

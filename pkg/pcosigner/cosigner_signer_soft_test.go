@@ -63,8 +63,8 @@ func TestSignthreshold25519(test *testing.T) {
 	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(test, err)
 
-	// persistent_shares is the privateKey split into 3 shamir parts
-	persistent_shares := tsed25519.DealShares(tsed25519.ExpandSecret(privateKey.Seed()), 2, 3)
+	// persistentshares is the privateKey split into 3 shamir parts
+	persistentshares := tsed25519.DealShares(tsed25519.ExpandSecret(privateKey.Seed()), 2, 3)
 
 	// each player generates secret Ri
 	r1 := make([]byte, 32)
@@ -92,12 +92,13 @@ func TestSignthreshold25519(test *testing.T) {
 	ephPublicKey := tsed25519.AddElements([]tsed25519.Element{pub1, pub2, pub3})
 
 	// Double check Pubkey
-	persistent_shares_pub1 := tsed25519.ScalarMultiplyBase(persistent_shares[0])
-	persistent_shares_pub2 := tsed25519.ScalarMultiplyBase(persistent_shares[1])
-	persistent_shares_pub3 := tsed25519.ScalarMultiplyBase(persistent_shares[2])
+	persistentSharesPub1 := tsed25519.ScalarMultiplyBase(persistentshares[0])
+	persistentSharesPub2 := tsed25519.ScalarMultiplyBase(persistentshares[1])
+	persistentSharesPub3 := tsed25519.ScalarMultiplyBase(persistentshares[2])
 
 	// A=A1+A2+...An = A=s1⋅B+s2⋅B+...sn⋅B
-	publicKey_2 := tsed25519.AddElements([]tsed25519.Element{persistent_shares_pub1, persistent_shares_pub2, persistent_shares_pub3})
+	publicKey2 := tsed25519.AddElements(
+		[]tsed25519.Element{persistentSharesPub1, persistentSharesPub2, persistentSharesPub3})
 	// require.Equal(test, publicKey, publicKey_2)
 
 	// each player sends s(i)_{j} to corresponding other player j (i.e. s(1)_{2} to player 2)
@@ -107,31 +108,35 @@ func TestSignthreshold25519(test *testing.T) {
 	s3 := tsed25519.AddScalars([]tsed25519.Scalar{shares1[2], shares2[2], shares3[2]})
 
 	_, _ = fmt.Printf("public keys: %x\n", publicKey)
-	_, _ = fmt.Printf("public keys: %x\n", publicKey_2)
+	_, _ = fmt.Printf("public keys: %x\n", publicKey2)
 	_, err = fmt.Printf("eph pub: %x\n", ephPublicKey)
 	if err != nil {
 		panic(err)
 	}
 	// fmt.Printf("eph secret: %x\n", ephemeralPublic)
 
-	shareSig1 := tsed25519.SignWithShare(message, persistent_shares[0], s1, publicKey, ephPublicKey)
-	shareSig2 := tsed25519.SignWithShare(message, persistent_shares[1], s2, publicKey, ephPublicKey)
-	shareSig3 := tsed25519.SignWithShare(message, persistent_shares[2], s3, publicKey, ephPublicKey)
+	shareSig1 := tsed25519.SignWithShare(message, persistentshares[0], s1, publicKey, ephPublicKey)
+	shareSig2 := tsed25519.SignWithShare(message, persistentshares[1], s2, publicKey, ephPublicKey)
+	shareSig3 := tsed25519.SignWithShare(message, persistentshares[2], s3, publicKey, ephPublicKey)
 
 	{
 		combinedSig := tsed25519.CombineShares(3, []int{1, 2, 3}, [][]byte{shareSig1, shareSig2, shareSig3})
-		signature := append(ephPublicKey, combinedSig...)
+		var signature []byte
+		signature = append(signature, ephPublicKey...)
+		signature = append(signature, combinedSig...)
 		fmt.Println(hex.EncodeToString(signature))
-		fmt.Println(ed25519.Verify(publicKey, message, signature[:]))
+		fmt.Println(ed25519.Verify(publicKey, message, signature))
 
-		if !ed25519.Verify(publicKey, message, signature[:]) {
+		if !ed25519.Verify(publicKey, message, signature) {
 			test.Error("Invalid Signature for signer [1,2,3]")
 		}
 	}
 	{
 		combinedSig := tsed25519.CombineShares(3, []int{1, 2}, [][]byte{shareSig1, shareSig2})
-		signature := append(ephPublicKey, combinedSig...)
-		if !ed25519.Verify(publicKey, message, signature[:]) {
+		var signature []byte
+		signature = append(signature, ephPublicKey...)
+		signature = append(signature, combinedSig...)
+		if !ed25519.Verify(publicKey, message, signature) {
 			test.Error("Invalid Signature for signer [1,2]")
 		}
 	}

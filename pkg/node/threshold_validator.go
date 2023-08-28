@@ -649,6 +649,8 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	// Used to track how close we are to threshold
 
 	// Here the actual signing process starts from a cryptological perspective
+	// TODO: This process should be factored out. It is not the responsibility of the validator to know
+	// how to arrange signature of a block. It should be a separate component that is injected into the validator.
 	nonces := make(map[ICosigner][]pcosigner.CosignerNonce)
 	thresholdPeersMutex := sync.Mutex{}
 
