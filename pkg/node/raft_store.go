@@ -53,7 +53,6 @@ type RaftStore struct {
 	RaftDir     string
 	RaftBind    string
 	RaftTimeout time.Duration
-	// Cosigners   []Cosigner
 
 	mu sync.Mutex
 	m  map[string]string // The key-value store for the system.
@@ -61,7 +60,7 @@ type RaftStore struct {
 	raft *raft.Raft // The consensus mechanism
 
 	logger log.Logger
-	// cosigner           *LocalCosigner
+
 	thresholdValidator *ThresholdValidator
 }
 

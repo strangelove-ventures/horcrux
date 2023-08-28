@@ -5,31 +5,8 @@ import (
 
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 
-	cometcrypto "github.com/cometbft/cometbft/crypto"
 	"github.com/strangelove-ventures/horcrux/pkg/proto"
 )
-
-// ICosigner interface is a set of methods for an m-of-n threshold signature.
-// This interface abstracts the underlying key storage and management
-type ICosigner interface {
-	// Get the ID of the cosigner
-	// The ID is the shamir index: 1, 2, etc...
-	GetID() int
-
-	// GetAddress gets the P2P URL (GRPC and Raft)
-	GetAddress() string
-
-	// Get the combined public key
-	GetPubKey(chainID string) (cometcrypto.PubKey, error)
-
-	VerifySignature(chainID string, payload, signature []byte) bool
-
-	// Get nonces for all cosigner shards
-	GetNonces(chainID string, hrst types.HRSTKey) (*CosignerNoncesResponse, error)
-
-	// Sign the requested bytes
-	SetNoncesAndSign(req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error)
-}
 
 type CosignerSignBlockResponse struct {
 	Signature []byte

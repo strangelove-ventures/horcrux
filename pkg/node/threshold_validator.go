@@ -43,7 +43,7 @@ type ThresholdValidator struct {
 	myCosigner *pcosigner.LocalCosigner
 
 	// peer cosigners
-	peerCosigners []pcosigner.ICosigner
+	peerCosigners []ICosigner
 
 	leader ILeader
 
@@ -73,7 +73,7 @@ func NewThresholdValidator(
 	grpcTimeout time.Duration,
 	maxWaitForSameBlockAttempts int,
 	myCosigner *pcosigner.LocalCosigner,
-	peerCosigners []pcosigner.ICosigner,
+	peerCosigners []ICosigner,
 	leader ILeader,
 ) *ThresholdValidator {
 	return &ThresholdValidator{
@@ -369,10 +369,10 @@ func newSameBlockError(chainID string, hrs types.HRSKey) *SameBlockError {
 
 func (pv *ThresholdValidator) waitForPeerNonces(
 	chainID string,
-	peer pcosigner.ICosigner,
+	peer ICosigner,
 	hrst types.HRSTKey,
 	wg *sync.WaitGroup,
-	nonces map[pcosigner.ICosigner][]pcosigner.CosignerNonce,
+	nonces map[ICosigner][]pcosigner.CosignerNonce,
 	thresholdPeersMutex *sync.Mutex,
 ) {
 	peerStartTime := time.Now()
@@ -398,9 +398,9 @@ func (pv *ThresholdValidator) waitForPeerNonces(
 }
 func (pv *ThresholdValidator) waitForPeerSetNoncesAndSign(
 	chainID string,
-	peer pcosigner.ICosigner,
+	peer ICosigner,
 	hrst types.HRSTKey,
-	noncesMap map[pcosigner.ICosigner][]pcosigner.CosignerNonce,
+	noncesMap map[ICosigner][]pcosigner.CosignerNonce,
 	signBytes []byte,
 	shareSignatures *[][]byte,
 	shareSignaturesMutex *sync.Mutex,
@@ -649,14 +649,18 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	// Used to track how close we are to threshold
 
 	// Here the actual signing process starts from a cryptological perspective
-	nonces := make(map[pcosigner.ICosigner][]pcosigner.CosignerNonce)
+	nonces := make(map[ICosigner][]pcosigner.CosignerNonce)
 	thresholdPeersMutex := sync.Mutex{}
 
+	// From each cosigner peer we are requesting the nonce.
+	// This is done asynchronously.
+	// pv.waitForPeersNonces uses GRPC to get the nonce from the peer.
 	for _, c := range pv.peerCosigners {
 		go pv.waitForPeerNonces(chainID, c, hrst, &getEphemeralWaitGroup,
 			nonces, &thresholdPeersMutex)
 	}
 
+	// Requesting a nonce from our own cosigner (a.k.a. the local cosigner)
 	myNonces, err := pv.myCosigner.GetNonces(chainID, hrst)
 	if err != nil {
 		pv.notifyBlockSignError(chainID, block.HRSKey())
@@ -738,7 +742,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 		return nil, stamp, errors.New("not enough co-signers")
 	}
 
-	// assemble into final signature
+	// assemble the partial signatures into a valid signature
 	signature, err := pv.myCosigner.CombineSignatures(chainID, shareSigs)
 	if err != nil {
 		pv.notifyBlockSignError(chainID, block.HRSKey())

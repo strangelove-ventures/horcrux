@@ -12,11 +12,13 @@ import (
 
 var _ IThresholdSigner = &ThresholdSignerSoft{}
 
+// ThresholdSignerSoft is a soft implementation of the IThresholdSigner interface.
 type ThresholdSignerSoft struct {
-	privateKeyShard []byte
-	pubKey          []byte
-	threshold       uint8
-	total           uint8
+	privateKeyShard []byte // privateKeyShard is our persistent private key shard
+	pubKey          []byte // pubKey is our persistent public key
+	threshold       uint8  // threshold is the number of t cosigners required to sign, t
+	total           uint8  // total is the total number n of cosigners
+
 }
 
 func NewThresholdSignerSoft(config *RuntimeConfig, id int, chainID string) (*ThresholdSignerSoft, error) {
@@ -44,6 +46,7 @@ func NewThresholdSignerSoft(config *RuntimeConfig, id int, chainID string) (*Thr
 	return &s, nil
 }
 
+// GetPubkey implements the IThresholdSigner interface
 func (s *ThresholdSignerSoft) GetPubKey() []byte {
 	return s.pubKey
 }
@@ -59,6 +62,7 @@ func (s *ThresholdSignerSoft) Sign(nonces []Nonce, payload []byte) ([]byte, erro
 	return append(noncePub, sig...), nil
 }
 
+// Note: sumNonces sums the "working secret"
 func (s *ThresholdSignerSoft) sumNonces(nonces []Nonce) (tsed25519.Scalar, tsed25519.Element, error) {
 	shareParts := make([]tsed25519.Scalar, len(nonces))
 	publicKeys := make([]tsed25519.Element, len(nonces))
@@ -85,7 +89,7 @@ func (s *ThresholdSignerSoft) sumNonces(nonces []Nonce) (tsed25519.Scalar, tsed2
 	return nonceShare, noncePub, nil
 }
 
-// GenerateNonces deals nonces (A Pubkey and t of n shares) for all cosigners.
+// GenerateNonces deals nonces (A Pubkey and t of n shares) for all the cosigners.
 func (s *ThresholdSignerSoft) GenerateNonces() (Nonces, error) {
 	secret := make([]byte, 32)
 	if _, err := rand.Read(secret); err != nil {
@@ -97,6 +101,7 @@ func (s *ThresholdSignerSoft) GenerateNonces() (Nonces, error) {
 		Shares: make([][]byte, s.total),
 	}
 
+	// Splits the secret with Shamir secret sharing
 	shares := tsed25519.DealShares(secret, s.threshold, s.total)
 
 	for i, s := range shares {

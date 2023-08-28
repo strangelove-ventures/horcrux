@@ -73,7 +73,7 @@ func loadKeyForLocalCosigner(
 func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	cosigners, pubKey := getTestLocalCosigners(t, threshold, total)
 
-	thresholdCosigners := make([]pcosigner.ICosigner, 0, threshold-1)
+	thresholdCosigners := make([]ICosigner, 0, threshold-1)
 
 	for i, cosigner := range cosigners {
 		require.Equal(t, i+1, cosigner.GetID())
@@ -279,6 +279,7 @@ func getTestLocalCosigners(t *testing.T, threshold, total uint8) ([]*pcosigner.L
 
 	privateKey := cometcryptoed25519.GenPrivKey()
 	privKeyBytes := privateKey[:]
+	// DealShares splits the secret by using Shamir Secret Sharing (Note its not verifiable secret sharing)
 	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
 
 	tmpDir := t.TempDir()
@@ -340,7 +341,7 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 	var leader *ThresholdValidator
 	leaders := make([]*MockLeader, total)
 	for i, cosigner := range cosigners {
-		peers := make([]pcosigner.ICosigner, 0, len(cosigners)-1)
+		peers := make([]ICosigner, 0, len(cosigners)-1)
 		for j, otherCosigner := range cosigners {
 			if i != j {
 				peers = append(peers, otherCosigner)

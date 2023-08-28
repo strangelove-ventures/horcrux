@@ -24,8 +24,8 @@ func NewThresholdValidator(
 	}
 
 	thresholdCfg := config.Config.ThresholdModeConfig
-
-	remoteCosigners := make([]pcosigner.ICosigner, 0, len(thresholdCfg.Cosigners)-1)
+	// NOTE: Shouldnt this be a list of concrete type instead of interface type?
+	remoteCosigners := make([]node.ICosigner, 0, len(thresholdCfg.Cosigners)-1)
 
 	var p2pListen string
 

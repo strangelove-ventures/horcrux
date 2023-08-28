@@ -17,17 +17,16 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var _ ICosigner = &LocalCosigner{}
-
-// LocalCosigner responds to sign requests.
-// It maintains a high watermark to avoid double-signing.
-// Signing is thread safe.
+// LocalCosigner "responds" to sign requests from RemoteCosigner
+//   - LocalCosigner maintains a high watermark to avoid double-signing.
+//   - Signing is thread safe.
+//   - LocalCosigner implements the ICosigner interface
 type LocalCosigner struct {
 	logger        cometlog.Logger
 	Config        *RuntimeConfig
 	security      ICosignerSecurity
-	chainState    sync.Map
-	address       string
+	chainStateMap sync.Map // chainstate is a used for map[ChainID] -> *ChainState
+	address       string   // TODO: What address are you referring to?
 	pendingDiskWG sync.WaitGroup
 }
 
@@ -45,6 +44,7 @@ func NewLocalCosigner(
 	}
 }
 
+// ChainState
 type ChainState struct {
 	// lastSignState stores the last sign state for an HRS we have fully signed
 	// incremented whenever we are asked to sign an HRS
@@ -94,7 +94,7 @@ type CosignerGetNonceRequest struct {
 	Timestamp time.Time
 }
 
-// Save updates the high watermark height/round/step (HRS) if it is greater
+// SaveLastSignedState updates the high watermark height/round/step (HRS) if it is greater
 // than the current high watermark. A mutex is used to avoid concurrent state updates.
 // The disk write is scheduled in a separate goroutine which will perform an atomic write.
 // pendingDiskWG is used upon termination in pendingDiskWG to ensure all writes have completed.
@@ -134,7 +134,7 @@ func (cosigner *LocalCosigner) GetAddress() string {
 }
 
 func (cosigner *LocalCosigner) getChainState(chainID string) (*ChainState, error) {
-	cs, ok := cosigner.chainState.Load(chainID)
+	cs, ok := cosigner.chainStateMap.Load(chainID)
 	if !ok {
 		return nil, fmt.Errorf("failed to load chain state for %s", chainID)
 	}
@@ -284,7 +284,7 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 		return fmt.Errorf("chain id cannot be empty")
 	}
 
-	if _, ok := cosigner.chainState.Load(chainID); ok {
+	if _, ok := cosigner.chainStateMap.Load(chainID); ok {
 		return nil
 	}
 	// TODO: spew.Dump(cosigner.Config)
@@ -300,7 +300,7 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 		return err
 	}
 
-	cosigner.chainState.Store(chainID, &ChainState{
+	cosigner.chainStateMap.Store(chainID, &ChainState{
 		lastSignState: signState,
 		nonces:        make(map[types.HRSTKey][]Nonces),
 		signer:        signer,
@@ -309,6 +309,8 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 	return nil
 }
 
+// GetNonces implements the ICosigner interface.
+//
 // GetNonces returns the nonces for the given HRS
 func (cosigner *LocalCosigner) GetNonces(
 	chainID string,

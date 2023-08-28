@@ -1,6 +1,6 @@
 package pcosigner
 
-// RemoteCosigner is a Cosigner implementation that uses gRPC make to request to other Cosigners
+// RemoteCosigner is a Cosigner implementation that uses gRPC make to request from other Cosigners
 import (
 	"context"
 	"fmt"
@@ -15,7 +15,12 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// RemoteCosigner uses CosignerGRPC to request signing from a remote cosigner
+// RemoteCosigner uses CosignerGRPC to request/query a signing process from a LocalCosigner
+//
+//   - RemoteCosigner acts as a client(!) and requests via gRPC the other
+//     "node's" LocalCosigner to set the nonces and sign the payload and respons.
+//   - RemoteCosigner --> gRPC --> LocalCosigner
+//   - RemoteCosigner implements the Cosigner interface
 type RemoteCosigner struct {
 	id      int
 	address string
@@ -58,7 +63,7 @@ func (cosigner *RemoteCosigner) GetPubKey(_ string) (cometcrypto.PubKey, error) 
 }
 
 // VerifySignature validates a signed payload against the public key.
-// Implements Cosigner interface
+// Implements ICosigner interface
 func (cosigner *RemoteCosigner) VerifySignature(_ string, _, _ []byte) bool {
 	return false
 }
@@ -84,6 +89,7 @@ func (cosigner *RemoteCosigner) GetNonces(
 	chainID string,
 	req types.HRSTKey,
 ) (*CosignerNoncesResponse, error) {
+
 	client, conn, err := cosigner.getGRPCClient()
 	if err != nil {
 		return nil, err
@@ -91,10 +97,13 @@ func (cosigner *RemoteCosigner) GetNonces(
 	defer conn.Close()
 	context, cancelFunc := GetContext()
 	defer cancelFunc()
-	res, err := client.GetNonces(context, &proto.CosignerGRPCGetNoncesRequest{
-		ChainID: chainID,
-		Hrst:    req.ToProto(),
-	})
+	res, err := client.GetNonces(
+		context,
+		&proto.CosignerGRPCGetNoncesRequest{
+			ChainID: chainID,
+			Hrst:    req.ToProto(),
+		},
+	)
 	if err != nil {
 		return nil, err
 	}

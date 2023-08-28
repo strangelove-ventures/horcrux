@@ -16,26 +16,28 @@ import (
 var _ proto.ICosignerGRPCServerServer = &GRPCServer{}
 
 type GRPCServer struct {
-	cosigner           *pcosigner.LocalCosigner
-	thresholdValidator *ThresholdValidator
-	raftStore          *RaftStore
-	// Promoted Fields
+	cosigner           *pcosigner.LocalCosigner // The "node's" LocalCosigner
+	thresholdValidator *ThresholdValidator      // The "node's" ThresholdValidator
+	raftStore          *RaftStore               // The "node's" RaftStore
+	// Promoted Fields is embedded to have forward compatiblitity
 	proto.UnimplementedICosignerGRPCServerServer
 }
 
+// NewGRPCServer returns a new GRPCServer.
 func NewGRPCServer(
 	cosigner *pcosigner.LocalCosigner,
 	thresholdValidator *ThresholdValidator,
 	raftStore *RaftStore,
 ) *GRPCServer {
 	return &GRPCServer{
+		// TODO: This is a hack to get around the fact that the cosigner is not a?
 		cosigner:           cosigner,
 		thresholdValidator: thresholdValidator,
 		raftStore:          raftStore,
 	}
 }
 
-// SignBlock implements the CosignerGRPCServer interface.
+// SignBlock "pseudo-implements" the ICosignerGRPCServer interface in pkg/proto/cosigner_grpc_server_grpc.pb.go
 func (rpc *GRPCServer) SignBlock(
 	_ context.Context,
 	req *proto.CosignerGRPCSignBlockRequest,
@@ -47,6 +49,7 @@ func (rpc *GRPCServer) SignBlock(
 		SignBytes: req.Block.GetSignBytes(),
 		Timestamp: time.Unix(0, req.Block.GetTimestamp()),
 	}
+	// this
 	res, _, err := rpc.thresholdValidator.SignBlock(req.ChainID, block)
 	if err != nil {
 		return nil, err
@@ -60,12 +63,13 @@ func (rpc *GRPCServer) SetNoncesAndSign(
 	_ context.Context,
 	req *proto.CosignerGRPCSetNoncesAndSignRequest,
 ) (*proto.CosignerGRPCSetNoncesAndSignResponse, error) {
-	res, err := rpc.cosigner.SetNoncesAndSign(pcosigner.CosignerSetNoncesAndSignRequest{
-		ChainID:   req.ChainID,
-		Nonces:    pcosigner.CosignerNoncesFromProto(req.GetNonces()),
-		HRST:      types.HRSTKeyFromProto(req.GetHrst()),
-		SignBytes: req.GetSignBytes(),
-	})
+	res, err := rpc.cosigner.SetNoncesAndSign(
+		pcosigner.CosignerSetNoncesAndSignRequest{
+			ChainID:   req.ChainID,
+			Nonces:    pcosigner.CosignerNoncesFromProto(req.GetNonces()),
+			HRST:      types.HRSTKeyFromProto(req.GetHrst()),
+			SignBytes: req.GetSignBytes(),
+		})
 	if err != nil {
 		rpc.raftStore.logger.Error(
 			"Failed to sign with shard",
@@ -91,7 +95,7 @@ func (rpc *GRPCServer) SetNoncesAndSign(
 	}, nil
 }
 
-// GetNonces implements the UnimplementedCosignerGRPCServer interface.
+// GetNonces implements the ICosignerGRPCServer interface.
 func (rpc *GRPCServer) GetNonces(
 	_ context.Context,
 	req *proto.CosignerGRPCGetNoncesRequest,
@@ -108,6 +112,7 @@ func (rpc *GRPCServer) GetNonces(
 	}, nil
 }
 
+// TransferLeadership pseudo-implements the ICosignerGRPCServer interface in pkg/proto/cosigner_grpc_server_grpc.pb.go
 func (rpc *GRPCServer) TransferLeadership(
 	_ context.Context,
 	req *proto.CosignerGRPCTransferLeadershipRequest,
@@ -132,6 +137,8 @@ func (rpc *GRPCServer) TransferLeadership(
 	return &proto.CosignerGRPCTransferLeadershipResponse{}, nil
 }
 
+// GetLeader pseudo-implements the ICosignerGRPCServer interface in pkg/proto/cosigner_grpc_server_grpc.pb.go
+// GetLeader gets the current raft cluster leader and send it as respons.
 func (rpc *GRPCServer) GetLeader(
 	context.Context,
 	*proto.CosignerGRPCGetLeaderRequest,
