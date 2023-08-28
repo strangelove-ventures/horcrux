@@ -98,7 +98,7 @@ func TestSignthreshold25519(test *testing.T) {
 
 	// A=A1+A2+...An = A=s1⋅B+s2⋅B+...sn⋅B
 	publicKey_2 := tsed25519.AddElements([]tsed25519.Element{persistent_shares_pub1, persistent_shares_pub2, persistent_shares_pub3})
-	//require.Equal(test, publicKey, publicKey_2)
+	// require.Equal(test, publicKey, publicKey_2)
 
 	// each player sends s(i)_{j} to corresponding other player j (i.e. s(1)_{2} to player 2)
 	// each player sums all s(i)_{j}, i=1 ... n, j= self id to form their working secret
@@ -112,7 +112,7 @@ func TestSignthreshold25519(test *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	//fmt.Printf("eph secret: %x\n", ephemeralPublic)
+	// fmt.Printf("eph secret: %x\n", ephemeralPublic)
 
 	shareSig1 := tsed25519.SignWithShare(message, persistent_shares[0], s1, publicKey, ephPublicKey)
 	shareSig2 := tsed25519.SignWithShare(message, persistent_shares[1], s2, publicKey, ephPublicKey)
