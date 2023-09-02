@@ -52,10 +52,9 @@ The binary should also be installed on your local machine for working with the c
 
 Run the following on your local machine. If you are using the binary on the cosigners rather than container image, run this on each cosigner node VM also.
 ```bash
-TAG=v3.0.0
-$ wget https://github.com/strangelove-ventures/horcrux/releases/download/${TAG}/horcrux_${TAG}_linux_amd64.tar.gz
-$ tar -xzf horcrux_${TAG}_linux_amd64.tar.gz
-$ sudo mv horcrux /usr/bin/horcrux && rm horcrux_${TAG}_linux_amd64.tar.gz README.md LICENSE.md
+TAG=v3.1.0
+$ wget https://github.com/strangelove-ventures/horcrux/releases/download/${TAG}/horcrux_linux-amd64
+$ sudo mv horcrux_linux-amd64 /usr/bin/horcrux
 ```
 
 For each cosigner node (not required on local machine): once the binary is installed in `/usr/bin`, install the `systemd` unit file. You can find an [example here](./horcrux.service):
