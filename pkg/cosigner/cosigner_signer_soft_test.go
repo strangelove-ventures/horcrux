@@ -1,4 +1,4 @@
-package pcosigner
+package cosigner
 
 import (
 	"crypto/ed25519"

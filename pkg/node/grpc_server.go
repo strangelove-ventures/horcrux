@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 
 	"github.com/hashicorp/raft"
@@ -16,21 +16,20 @@ import (
 var _ proto.ICosignerGRPCServerServer = &GRPCServer{}
 
 type GRPCServer struct {
-	cosigner           *pcosigner.LocalCosigner // The "node's" LocalCosigner
-	thresholdValidator *ThresholdValidator      // The "node's" ThresholdValidator
-	raftStore          *RaftStore               // The "node's" RaftStore
+	cosigner           *cosigner.LocalCosigner // The "node's" LocalCosigner
+	thresholdValidator *ThresholdValidator     // The "node's" ThresholdValidator
+	raftStore          *RaftStore              // The "node's" RaftStore
 	// Promoted Fields is embedded to have forward compatiblitity
 	proto.UnimplementedICosignerGRPCServerServer
 }
 
 // NewGRPCServer returns a new GRPCServer.
 func NewGRPCServer(
-	cosigner *pcosigner.LocalCosigner,
+	cosigner *cosigner.LocalCosigner,
 	thresholdValidator *ThresholdValidator,
 	raftStore *RaftStore,
 ) *GRPCServer {
 	return &GRPCServer{
-		// TODO: This is a hack to get around the fact that the cosigner is not a?
 		cosigner:           cosigner,
 		thresholdValidator: thresholdValidator,
 		raftStore:          raftStore,
@@ -64,9 +63,9 @@ func (rpc *GRPCServer) SetNoncesAndSign(
 	req *proto.CosignerGRPCSetNoncesAndSignRequest,
 ) (*proto.CosignerGRPCSetNoncesAndSignResponse, error) {
 	res, err := rpc.cosigner.SetNoncesAndSign(
-		pcosigner.CosignerSetNoncesAndSignRequest{
+		cosigner.SetNoncesAndSignRequest{
 			ChainID:   req.ChainID,
-			Nonces:    pcosigner.CosignerNoncesFromProto(req.GetNonces()),
+			Nonces:    cosigner.CosignNoncesFromProto(req.GetNonces()),
 			HRST:      types.HRSTKeyFromProto(req.GetHrst()),
 			SignBytes: req.GetSignBytes(),
 		})
@@ -108,7 +107,7 @@ func (rpc *GRPCServer) GetNonces(
 		return nil, err
 	}
 	return &proto.CosignerGRPCGetNoncesResponse{
-		Nonces: pcosigner.CosignerNonces(res.Nonces).ToProto(),
+		Nonces: cosigner.CosignNonces(res.Nonces).ToProto(),
 	}, nil
 }
 

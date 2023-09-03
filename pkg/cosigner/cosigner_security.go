@@ -1,4 +1,4 @@
-package pcosigner
+package cosigner
 
 // ICosignerSecurity is an interface for the security layer of the cosigner.
 type ICosignerSecurity interface {
@@ -10,7 +10,7 @@ type ICosignerSecurity interface {
 		id int,
 		noncePub []byte,
 		nonceShare []byte,
-	) (CosignerNonce, error)
+	) (CosignNonce, error)
 
 	// DecryptAndVerify decrypts the nonce and verifies the signature to authenticate the source cosigner.
 	DecryptAndVerify(

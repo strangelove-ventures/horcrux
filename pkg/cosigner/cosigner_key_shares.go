@@ -1,4 +1,4 @@
-package pcosigner
+package cosigner
 
 import (
 	"crypto/rand"
@@ -14,8 +14,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// CreateCosignerEd25519ShardsFromFile creates CosignerEd25519Key objects from a priv_validator_key.json file
-func CreateCosignerEd25519ShardsFromFile(priv string, threshold, shards uint8) ([]CosignerEd25519Key, error) {
+// CreateCosignerEd25519ShardsFromFile creates CosignEd25519Key objects from a priv_validator_key.json file
+func CreateCosignerEd25519ShardsFromFile(priv string, threshold, shards uint8) ([]CosignEd25519Key, error) {
 	pv, err := ReadPrivValidatorFile(priv)
 	if err != nil {
 		return nil, err
@@ -23,15 +23,15 @@ func CreateCosignerEd25519ShardsFromFile(priv string, threshold, shards uint8) (
 	return CreateCosignerEd25519Shards(pv, threshold, shards), nil
 }
 
-// CreateCosignerEd25519Shards creates CosignerEd25519Key objects from a privval.FilePVKey
+// CreateCosignerEd25519Shards creates CosignEd25519Key objects from a privval.FilePVKey
 // by splitting the secret using Shamir secret sharing.
-func CreateCosignerEd25519Shards(pv privval.FilePVKey, threshold, shards uint8) []CosignerEd25519Key {
+func CreateCosignerEd25519Shards(pv privval.FilePVKey, threshold, shards uint8) []CosignEd25519Key {
 	// tsed25519.DealShares splits the secret using Shamir Secret Sharing (Note its: no verifiable secret sharing)
 	// privshards is shamir shares
 	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(pv.PrivKey.Bytes()[:32]), threshold, shards)
-	out := make([]CosignerEd25519Key, shards)
+	out := make([]CosignEd25519Key, shards)
 	for i, shard := range privShards {
-		out[i] = CosignerEd25519Key{
+		out[i] = CosignEd25519Key{
 			PubKey:       pv.PubKey,
 			PrivateShard: shard,
 			ID:           i + 1,
@@ -40,15 +40,15 @@ func CreateCosignerEd25519Shards(pv privval.FilePVKey, threshold, shards uint8) 
 	return out
 }
 
-// CreateCosignerRSAShards generate  CosignerRSAKey objects.
-func CreateCosignerRSAShards(shards int) ([]CosignerRSAKey, error) {
+// CreateCosignerRSAShards generate  CosignRSAKey objects.
+func CreateCosignerRSAShards(shards int) ([]CosignRSAKey, error) {
 	rsaKeys, pubKeys, err := makeRSAKeys(shards)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]CosignerRSAKey, shards)
+	out := make([]CosignRSAKey, shards)
 	for i, key := range rsaKeys {
-		out[i] = CosignerRSAKey{
+		out[i] = CosignRSAKey{
 			ID:      i + 1,
 			RSAKey:  *key,
 			RSAPubs: pubKeys,
@@ -70,7 +70,7 @@ func ReadPrivValidatorFile(priv string) (out privval.FilePVKey, err error) {
 }
 
 // WriteCosignerEd25519ShardFile writes a cosigner Ed25519 key to a given file name.
-func WriteCosignerEd25519ShardFile(cosigner CosignerEd25519Key, file string) error {
+func WriteCosignerEd25519ShardFile(cosigner CosignEd25519Key, file string) error {
 	jsonBytes, err := json.Marshal(&cosigner)
 	if err != nil {
 		return err
@@ -79,7 +79,7 @@ func WriteCosignerEd25519ShardFile(cosigner CosignerEd25519Key, file string) err
 }
 
 // WriteCosignerRSAShardFile writes a cosigner RSA key to a given file name.
-func WriteCosignerRSAShardFile(cosigner CosignerRSAKey, file string) error {
+func WriteCosignerRSAShardFile(cosigner CosignRSAKey, file string) error {
 	jsonBytes, err := json.Marshal(&cosigner)
 	if err != nil {
 		return err
@@ -87,15 +87,15 @@ func WriteCosignerRSAShardFile(cosigner CosignerRSAKey, file string) error {
 	return os.WriteFile(file, jsonBytes, 0600)
 }
 
-// CreateCosignerECIESShards generates CosignerECIESKey objects.
-func CreateCosignerECIESShards(shards int) ([]CosignerECIESKey, error) {
+// CreateCosignerECIESShards generates CosignEciesKey objects.
+func CreateCosignerECIESShards(shards int) ([]CosignEciesKey, error) {
 	eciesKeys, pubKeys, err := makeECIESKeys(shards)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]CosignerECIESKey, shards)
+	out := make([]CosignEciesKey, shards)
 	for i, key := range eciesKeys {
-		out[i] = CosignerECIESKey{
+		out[i] = CosignEciesKey{
 			ID:        i + 1,
 			ECIESKey:  key,
 			ECIESPubs: pubKeys,
@@ -104,8 +104,8 @@ func CreateCosignerECIESShards(shards int) ([]CosignerECIESKey, error) {
 	return out, nil
 }
 
-// WriteCosignerECIESShardFile writes a cosigner ECIES key to a given file name.
-func WriteCosignerECIESShardFile(cosigner CosignerECIESKey, file string) error {
+// WriteCosignECIESShardFile writes a cosigner ECIES key to a given file name.
+func WriteCosignECIESShardFile(cosigner CosignEciesKey, file string) error {
 	jsonBytes, err := json.Marshal(&cosigner)
 	if err != nil {
 		return err

@@ -1,4 +1,4 @@
-package pcosigner
+package cosigner
 
 import (
 	"crypto"
@@ -14,29 +14,29 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var _ ICosignerSecurity = &CosignerSecurityRSA{}
+var _ ICosignerSecurity = &CosignSecurityRSA{}
 
-// CosignerSecurityRSA is an implementation of CosignerSecurity using RSA for encryption and P5S for digital signature.
-type CosignerSecurityRSA struct {
-	key        CosignerRSAKey
-	rsaPubKeys map[int]CosignerRSAPubKey
+// CosignSecurityRSA is an implementation of CosignerSecurity using RSA for encryption and P5S for digital signature.
+type CosignSecurityRSA struct {
+	key        CosignRSAKey
+	rsaPubKeys map[int]CosignRSAPubKey
 }
 
-// CosignerRSAKey is a cosigner's RSA public key.
-type CosignerRSAPubKey struct {
+// CosignRSAKey is a cosigner's RSA public key.
+type CosignRSAPubKey struct {
 	ID        int
 	PublicKey rsa.PublicKey
 }
 
-// CosignerRSAKey is an RSA key for an m-of-n threshold signer, composed of a private key and n public keys.
-type CosignerRSAKey struct {
+// CosignRSAKey is an RSA key for an m-of-n threshold signer, composed of a private key and n public keys.
+type CosignRSAKey struct {
 	RSAKey  rsa.PrivateKey   `json:"rsaKey"`
 	ID      int              `json:"id"`
 	RSAPubs []*rsa.PublicKey `json:"rsaPubs"`
 }
 
-func (key *CosignerRSAKey) MarshalJSON() ([]byte, error) {
-	type Alias CosignerRSAKey
+func (key *CosignRSAKey) MarshalJSON() ([]byte, error) {
+	type Alias CosignRSAKey
 
 	// marshal our private key and all public keys
 	privateBytes := x509.MarshalPKCS1PrivateKey(&key.RSAKey)
@@ -57,8 +57,8 @@ func (key *CosignerRSAKey) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func (key *CosignerRSAKey) UnmarshalJSON(data []byte) error {
-	type Alias CosignerRSAKey
+func (key *CosignRSAKey) UnmarshalJSON(data []byte) error {
+	type Alias CosignRSAKey
 
 	aux := &struct {
 		RSAKey  []byte   `json:"rsaKey"`
@@ -89,9 +89,9 @@ func (key *CosignerRSAKey) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// LoadCosignerRSAKey loads a CosignerRSAKey from file.
-func LoadCosignerRSAKey(file string) (CosignerRSAKey, error) {
-	pvKey := CosignerRSAKey{}
+// LoadCosignRSAKey loads a CosignRSAKey from file.
+func LoadCosignRSAKey(file string) (CosignRSAKey, error) {
+	pvKey := CosignRSAKey{}
 	keyJSONBytes, err := os.ReadFile(file)
 	if err != nil {
 		return pvKey, err
@@ -106,14 +106,14 @@ func LoadCosignerRSAKey(file string) (CosignerRSAKey, error) {
 }
 
 // NewCosignerSecurityRSA creates a new CosignerSecurityRSA.
-func NewCosignerSecurityRSA(key CosignerRSAKey) *CosignerSecurityRSA {
-	c := &CosignerSecurityRSA{
+func NewCosignerSecurityRSA(key CosignRSAKey) *CosignSecurityRSA {
+	c := &CosignSecurityRSA{
 		key:        key,
-		rsaPubKeys: make(map[int]CosignerRSAPubKey),
+		rsaPubKeys: make(map[int]CosignRSAPubKey),
 	}
 
 	for i, pubKey := range key.RSAPubs {
-		c.rsaPubKeys[i+1] = CosignerRSAPubKey{
+		c.rsaPubKeys[i+1] = CosignRSAPubKey{
 			ID:        i + 1,
 			PublicKey: *pubKey,
 		}
@@ -123,13 +123,13 @@ func NewCosignerSecurityRSA(key CosignerRSAKey) *CosignerSecurityRSA {
 }
 
 // GetID returns the ID of the cosigner.
-func (c *CosignerSecurityRSA) GetID() int {
+func (c *CosignSecurityRSA) GetID() int {
 	return c.key.ID
 }
 
 // EncryptAndSign encrypts the nonce and signs it for authentication.
-func (c *CosignerSecurityRSA) EncryptAndSign(id int, noncePub []byte, nonceShare []byte) (CosignerNonce, error) {
-	nonce := CosignerNonce{
+func (c *CosignSecurityRSA) EncryptAndSign(id int, noncePub []byte, nonceShare []byte) (CosignNonce, error) {
+	nonce := CosignNonce{
 		SourceID: c.key.ID,
 	}
 
@@ -183,7 +183,7 @@ func (c *CosignerSecurityRSA) EncryptAndSign(id int, noncePub []byte, nonceShare
 
 // DecryptAndVerify decrypts the nonce and verifies
 // the signature to authenticate the source cosigner.
-func (c *CosignerSecurityRSA) DecryptAndVerify(
+func (c *CosignSecurityRSA) DecryptAndVerify(
 	id int,
 	encryptedNoncePub []byte,
 	encryptedNonceShare []byte,
@@ -194,7 +194,7 @@ func (c *CosignerSecurityRSA) DecryptAndVerify(
 		return nil, nil, fmt.Errorf("unknown cosigner: %d", id)
 	}
 
-	digestMsg := CosignerNonce{
+	digestMsg := CosignNonce{
 		SourceID: id,
 		PubKey:   encryptedNoncePub,
 		Share:    encryptedNonceShare,

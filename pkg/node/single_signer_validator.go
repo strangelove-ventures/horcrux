@@ -5,7 +5,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometprivval "github.com/cometbft/cometbft/privval"
@@ -17,7 +17,7 @@ var _ IPrivValidator = &SingleSignerValidator{}
 // SingleSignerValidator guards access to an underlying PrivValidator by using mutexes
 // for each of the PrivValidator interface functions
 type SingleSignerValidator struct {
-	config     *pcosigner.RuntimeConfig
+	config     *cosigner.RuntimeConfig
 	chainState sync.Map
 }
 
@@ -33,7 +33,7 @@ type SingleSignerChainState struct {
 
 // NewSingleSignerValidator constructs a validator for single-sign mode (not recommended).
 // NewThresholdValidator is recommended, but single-sign mode can be used for convenience.
-func NewSingleSignerValidator(config *pcosigner.RuntimeConfig) *SingleSignerValidator {
+func NewSingleSignerValidator(config *cosigner.RuntimeConfig) *SingleSignerValidator {
 	return &SingleSignerValidator{
 		config: config,
 	}

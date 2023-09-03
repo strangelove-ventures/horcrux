@@ -1,4 +1,4 @@
-package pcosigner
+package cosigner
 
 import (
 	"bytes"
@@ -22,7 +22,7 @@ type ThresholdSignerSoft struct {
 }
 
 func NewThresholdSignerSoft(config *RuntimeConfig, id int, chainID string) (*ThresholdSignerSoft, error) {
-	keyFile, err := config.KeyFileExistsCosigner(chainID)
+	keyFile, err := config.KeyFileExistsCosign(chainID)
 	if err != nil {
 		return nil, err
 	}

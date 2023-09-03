@@ -1,4 +1,4 @@
-package pcosigner
+package cosigner
 
 import (
 	"encoding/json"
@@ -11,15 +11,15 @@ import (
 	amino "github.com/tendermint/go-amino"
 )
 
-// CosignerEd25519Key is a single Ed255219 key shard for an m-of-n threshold signer.
-type CosignerEd25519Key struct {
+// CosignEd25519Key is a single Ed255219 key shard for an m-of-n threshold signer.
+type CosignEd25519Key struct {
 	PubKey       cometcrypto.PubKey `json:"pubKey"`
 	PrivateShard []byte             `json:"privateShard"`
 	ID           int                `json:"id"`
 }
 
-func (key *CosignerEd25519Key) MarshalJSON() ([]byte, error) {
-	type Alias CosignerEd25519Key
+func (key *CosignEd25519Key) MarshalJSON() ([]byte, error) {
+	type Alias CosignEd25519Key
 
 	protoPubkey, err := cometcryptoencoding.PubKeyToProto(key.PubKey)
 	if err != nil {
@@ -41,8 +41,8 @@ func (key *CosignerEd25519Key) MarshalJSON() ([]byte, error) {
 		})
 }
 
-func (key *CosignerEd25519Key) UnmarshalJSON(data []byte) error {
-	type Alias CosignerEd25519Key
+func (key *CosignEd25519Key) UnmarshalJSON(data []byte) error {
+	type Alias CosignEd25519Key
 
 	aux := &struct {
 		PubkeyBytes []byte `json:"pubKey"`
@@ -85,9 +85,9 @@ func (key *CosignerEd25519Key) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// LoadCosignerEd25519Key loads a CosignerEd25519Key from file.
-func LoadCosignerEd25519Key(file string) (CosignerEd25519Key, error) {
-	pvKey := CosignerEd25519Key{}
+// LoadCosignerEd25519Key loads a CosignEd25519Key from file.
+func LoadCosignerEd25519Key(file string) (CosignEd25519Key, error) {
+	pvKey := CosignEd25519Key{}
 	keyJSONBytes, err := os.ReadFile(file)
 	if err != nil {
 		return pvKey, err

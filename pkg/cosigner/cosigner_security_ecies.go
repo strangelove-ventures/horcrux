@@ -1,4 +1,4 @@
-package pcosigner
+package cosigner
 
 import (
 	"crypto/ecdsa"
@@ -15,30 +15,30 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var _ ICosignerSecurity = &CosignerSecurityECIES{}
+var _ ICosignerSecurity = &CosignSecurityECIES{}
 
-// CosignerSecurityECIES is an implementation of CosignerSecurity
+// CosignSecurityECIES is an implementation of CosignerSecurity
 // using ECIES for encryption and ECDSA for digital signature.
-type CosignerSecurityECIES struct {
-	key          CosignerECIESKey
-	eciesPubKeys map[int]CosignerECIESPubKey
+type CosignSecurityECIES struct {
+	key          CosignEciesKey
+	eciesPubKeys map[int]CosignECIESPubKey
 }
 
-// CosignerECIESKey is a cosigner's ECIES public key.
-type CosignerECIESPubKey struct {
+// CosignEciesKey is a cosigner's ECIES public key.
+type CosignECIESPubKey struct {
 	ID        int
 	PublicKey *ecies.PublicKey
 }
 
-// CosignerECIESKey is an ECIES key for an m-of-n threshold signer, composed of a private key and n public keys.
-type CosignerECIESKey struct {
+// CosignEciesKey is an ECIES key for an m-of-n threshold signer, composed of a private key and n public keys.
+type CosignEciesKey struct {
 	ECIESKey  *ecies.PrivateKey  `json:"eciesKey"`
 	ID        int                `json:"id"`
 	ECIESPubs []*ecies.PublicKey `json:"eciesPubs"`
 }
 
-func (key *CosignerECIESKey) MarshalJSON() ([]byte, error) {
-	type Alias CosignerECIESKey
+func (key *CosignEciesKey) MarshalJSON() ([]byte, error) {
+	type Alias CosignEciesKey
 
 	// marshal our private key and all public keys
 	privateBytes := key.ECIESKey.D.Bytes()
@@ -62,8 +62,8 @@ func (key *CosignerECIESKey) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func (key *CosignerECIESKey) UnmarshalJSON(data []byte) error {
-	type Alias CosignerECIESKey
+func (key *CosignEciesKey) UnmarshalJSON(data []byte) error {
+	type Alias CosignEciesKey
 
 	aux := &struct {
 		ECIESKey  []byte   `json:"eciesKey"`
@@ -97,9 +97,9 @@ func (key *CosignerECIESKey) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// LoadCosignerECIESKey loads a CosignerECIESKey from file.
-func LoadCosignerECIESKey(file string) (CosignerECIESKey, error) {
-	pvKey := CosignerECIESKey{}
+// LoadCosignerECIESKey loads a CosignEciesKey from file.
+func LoadCosignerECIESKey(file string) (CosignEciesKey, error) {
+	pvKey := CosignEciesKey{}
 	keyJSONBytes, err := os.ReadFile(file)
 	if err != nil {
 		return pvKey, err
@@ -113,15 +113,15 @@ func LoadCosignerECIESKey(file string) (CosignerECIESKey, error) {
 	return pvKey, nil
 }
 
-// NewCosignerSecurityECIES creates a new CosignerSecurityECIES.
-func NewCosignerSecurityECIES(key CosignerECIESKey) *CosignerSecurityECIES {
-	c := &CosignerSecurityECIES{
+// NewCosignerSecurityECIES creates a new CosignSecurityECIES.
+func NewCosignerSecurityECIES(key CosignEciesKey) *CosignSecurityECIES {
+	c := &CosignSecurityECIES{
 		key:          key,
-		eciesPubKeys: make(map[int]CosignerECIESPubKey, len(key.ECIESPubs)),
+		eciesPubKeys: make(map[int]CosignECIESPubKey, len(key.ECIESPubs)),
 	}
 
 	for i, pubKey := range key.ECIESPubs {
-		c.eciesPubKeys[i+1] = CosignerECIESPubKey{
+		c.eciesPubKeys[i+1] = CosignECIESPubKey{
 			ID:        i + 1,
 			PublicKey: pubKey,
 		}
@@ -131,13 +131,13 @@ func NewCosignerSecurityECIES(key CosignerECIESKey) *CosignerSecurityECIES {
 }
 
 // GetID returns the ID of the cosigner.
-func (c *CosignerSecurityECIES) GetID() int {
+func (c *CosignSecurityECIES) GetID() int {
 	return c.key.ID
 }
 
 // EncryptAndSign encrypts the nonce and signs it for authentication.
-func (c *CosignerSecurityECIES) EncryptAndSign(id int, noncePub []byte, nonceShare []byte) (CosignerNonce, error) {
-	nonce := CosignerNonce{
+func (c *CosignSecurityECIES) EncryptAndSign(id int, noncePub []byte, nonceShare []byte) (CosignNonce, error) {
+	nonce := CosignNonce{
 		SourceID: c.key.ID,
 	}
 
@@ -195,7 +195,7 @@ func (c *CosignerSecurityECIES) EncryptAndSign(id int, noncePub []byte, nonceSha
 
 // DecryptAndVerify decrypts the nonce and verifies
 // the signature to authenticate the source cosigner.
-func (c *CosignerSecurityECIES) DecryptAndVerify(
+func (c *CosignSecurityECIES) DecryptAndVerify(
 	id int,
 	encryptedNoncePub []byte,
 	encryptedNonceShare []byte,
@@ -206,7 +206,7 @@ func (c *CosignerSecurityECIES) DecryptAndVerify(
 		return nil, nil, fmt.Errorf("unknown cosigner: %d", id)
 	}
 
-	digestMsg := CosignerNonce{
+	digestMsg := CosignNonce{
 		SourceID: id,
 		PubKey:   encryptedNoncePub,
 		Share:    encryptedNonceShare,

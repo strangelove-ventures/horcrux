@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
 
 	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"github.com/spf13/cobra"
@@ -110,21 +110,21 @@ func getLeaderCmd() *cobra.Command {
 
 			var id int
 
-			keyFileECIES, err := config.KeyFileExistsCosignerECIES()
+			keyFileECIES, err := config.KeyFileExistsCosignECIES()
 			if err != nil {
-				keyFileRSA, err := config.KeyFileExistsCosignerRSA()
+				keyFileRSA, err := config.KeyFileExistsCosignRSA()
 				if err != nil {
 					return fmt.Errorf("cosigner encryption keys not found (%s) - (%s): %w", keyFileECIES, keyFileRSA, err)
 				}
 
-				key, err := pcosigner.LoadCosignerRSAKey(keyFileRSA)
+				key, err := cosigner.LoadCosignRSAKey(keyFileRSA)
 				if err != nil {
 					return fmt.Errorf("error reading cosigner key (%s): %w", keyFileRSA, err)
 				}
 
 				id = key.ID
 			} else {
-				key, err := pcosigner.LoadCosignerECIESKey(keyFileECIES)
+				key, err := cosigner.LoadCosignerECIESKey(keyFileECIES)
 				if err != nil {
 					return fmt.Errorf("error reading cosigner key (%s): %w", keyFileECIES, err)
 				}

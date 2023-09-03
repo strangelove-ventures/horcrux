@@ -1,4 +1,4 @@
-package pcosigner
+package cosigner
 
 import (
 	"crypto/rand"
@@ -27,7 +27,7 @@ func TestCosignerRSA(t *testing.T) {
 	securities := make([]ICosignerSecurity, 3)
 
 	for i := 0; i < 3; i++ {
-		key := CosignerRSAKey{
+		key := CosignRSAKey{
 			ID:      i + 1,
 			RSAKey:  *keys[i],
 			RSAPubs: pubKeys,
@@ -37,7 +37,7 @@ func TestCosignerRSA(t *testing.T) {
 		bz, err := json.Marshal(&key)
 		require.NoError(t, err)
 
-		var key2 CosignerRSAKey
+		var key2 CosignRSAKey
 		require.NoError(t, json.Unmarshal(bz, &key2))
 		require.Equal(t, key, key2)
 
@@ -70,7 +70,7 @@ func TestConcurrentIterateCosignerRSA(t *testing.T) {
 	securities := make([]ICosignerSecurity, 3)
 
 	for i := 0; i < 3; i++ {
-		securities[i] = NewCosignerSecurityRSA(CosignerRSAKey{
+		securities[i] = NewCosignerSecurityRSA(CosignRSAKey{
 			ID:      i + 1,
 			RSAKey:  *keys[i],
 			RSAPubs: pubKeys,

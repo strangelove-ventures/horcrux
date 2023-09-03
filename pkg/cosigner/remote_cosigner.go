@@ -1,4 +1,4 @@
-package pcosigner
+package cosigner
 
 // RemoteCosigner is a Cosigner implementation that uses gRPC make to request from other Cosigners
 import (
@@ -88,7 +88,7 @@ func (cosigner *RemoteCosigner) getGRPCClient() (proto.ICosignerGRPCServerClient
 func (cosigner *RemoteCosigner) GetNonces(
 	chainID string,
 	req types.HRSTKey,
-) (*CosignerNoncesResponse, error) {
+) (*NoncesResponse, error) {
 
 	client, conn, err := cosigner.getGRPCClient()
 	if err != nil {
@@ -107,8 +107,8 @@ func (cosigner *RemoteCosigner) GetNonces(
 	if err != nil {
 		return nil, err
 	}
-	return &CosignerNoncesResponse{
-		Nonces: CosignerNoncesFromProto(res.GetNonces()),
+	return &NoncesResponse{
+		Nonces: CosignNoncesFromProto(res.GetNonces()),
 	}, nil
 }
 
@@ -116,7 +116,7 @@ func (cosigner *RemoteCosigner) GetNonces(
 // It acts as a client(!) and requests via gRPC the other
 // "node's" LocalCosigner to set the nonces and sign the payload.
 func (cosigner *RemoteCosigner) SetNoncesAndSign(
-	req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error) {
+	req SetNoncesAndSignRequest) (*SignResponse, error) {
 	client, conn, err := cosigner.getGRPCClient()
 	if err != nil {
 		return nil, err
@@ -127,14 +127,14 @@ func (cosigner *RemoteCosigner) SetNoncesAndSign(
 	res, err := client.SetNoncesAndSign(context,
 		&proto.CosignerGRPCSetNoncesAndSignRequest{
 			ChainID:   req.ChainID,
-			Nonces:    CosignerNonces(req.Nonces).ToProto(),
+			Nonces:    CosignNonces(req.Nonces).ToProto(),
 			Hrst:      req.HRST.ToProto(),
 			SignBytes: req.SignBytes,
 		})
 	if err != nil {
 		return nil, err
 	}
-	return &CosignerSignResponse{
+	return &SignResponse{
 		NoncePublic: res.GetNoncePublic(),
 		Timestamp:   time.Unix(0, res.GetTimestamp()),
 		Signature:   res.GetSignature(),

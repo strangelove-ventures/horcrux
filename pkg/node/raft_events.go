@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 
 	"github.com/strangelove-ventures/horcrux/pkg/metrics"
@@ -77,7 +77,7 @@ func (s *RaftStore) SignBlock(req ValidatorSignBlockRequest) (*ValidatorSignBloc
 		return nil, err
 	}
 	defer conn.Close()
-	context, cancelFunc := pcosigner.GetContext()
+	context, cancelFunc := cosigner.GetContext()
 	defer cancelFunc()
 	res, err := client.SignBlock(context, &proto.CosignerGRPCSignBlockRequest{
 		ChainID: req.ChainID,

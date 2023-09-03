@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
 
 	"github.com/strangelove-ventures/horcrux/pkg/node"
 
@@ -24,17 +24,16 @@ func NewThresholdValidator(
 	}
 
 	thresholdCfg := config.Config.ThresholdModeConfig
-	// NOTE: Shouldnt this be a list of concrete type instead of interface type?
 	remoteCosigners := make([]node.ICosigner, 0, len(thresholdCfg.Cosigners)-1)
 
 	var p2pListen string
 
-	var security pcosigner.ICosignerSecurity
+	var security cosigner.ICosignerSecurity
 	var eciesErr error
-	security, eciesErr = config.CosignerSecurityECIES()
+	security, eciesErr = config.SecurityECIES()
 	if eciesErr != nil {
 		var rsaErr error
-		security, rsaErr = config.CosignerSecurityRSA()
+		security, rsaErr = config.SecurityRSA()
 		if rsaErr != nil {
 			return nil, nil, fmt.Errorf("failed to initialize cosigner ECIES / RSA security : %w / %w", eciesErr, rsaErr)
 		}
@@ -44,7 +43,7 @@ func NewThresholdValidator(
 		if c.ShardID != security.GetID() {
 			remoteCosigners = append(
 				remoteCosigners,
-				pcosigner.NewRemoteCosigner(c.ShardID, c.P2PAddr),
+				cosigner.NewRemoteCosigner(c.ShardID, c.P2PAddr),
 			)
 		} else {
 			p2pListen = c.P2PAddr
@@ -55,7 +54,7 @@ func NewThresholdValidator(
 		return nil, nil, fmt.Errorf("cosigner config does not exist for our shard ID %d", security.GetID())
 	}
 
-	localCosigner := pcosigner.NewLocalCosigner(
+	localCosigner := cosigner.NewLocalCosigner(
 		logger,
 		&config,
 		security,

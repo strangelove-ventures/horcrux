@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
 
 	"os"
 	"testing"
@@ -19,8 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// const testChainID = "test"
-
 func TestSingleSignerValidator(t *testing.T) {
 
 	tmpDir := t.TempDir()
@@ -29,7 +27,7 @@ func TestSingleSignerValidator(t *testing.T) {
 	err := os.MkdirAll(stateDir, 0700)
 	require.NoError(t, err)
 
-	runtimeConfig := &pcosigner.RuntimeConfig{
+	runtimeConfig := &cosigner.RuntimeConfig{
 		HomeDir:  tmpDir,
 		StateDir: filepath.Join(tmpDir, "state"),
 	}

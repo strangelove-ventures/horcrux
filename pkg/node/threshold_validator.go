@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 
 	"github.com/cometbft/cometbft/crypto"
@@ -31,7 +31,7 @@ type ValidatorSignBlockResponse struct {
 	Signature []byte
 }
 type ThresholdValidator struct {
-	config *pcosigner.RuntimeConfig
+	config *cosigner.RuntimeConfig
 
 	threshold int
 
@@ -40,7 +40,7 @@ type ThresholdValidator struct {
 	chainState sync.Map
 
 	// our own cosigner
-	myCosigner *pcosigner.LocalCosigner
+	myCosigner *cosigner.LocalCosigner
 
 	// peer cosigners
 	peerCosigners []ICosigner
@@ -68,11 +68,11 @@ type ChainSignState struct {
 // NewThresholdValidator creates and returns a new ThresholdValidator
 func NewThresholdValidator(
 	logger log.Logger,
-	config *pcosigner.RuntimeConfig,
+	config *cosigner.RuntimeConfig,
 	threshold int,
 	grpcTimeout time.Duration,
 	maxWaitForSameBlockAttempts int,
-	myCosigner *pcosigner.LocalCosigner,
+	myCosigner *cosigner.LocalCosigner,
 	peerCosigners []ICosigner,
 	leader ILeader,
 ) *ThresholdValidator {
@@ -372,7 +372,7 @@ func (pv *ThresholdValidator) waitForPeerNonces(
 	peer ICosigner,
 	hrst types.HRSTKey,
 	wg *sync.WaitGroup,
-	nonces map[ICosigner][]pcosigner.CosignerNonce,
+	nonces map[ICosigner][]cosigner.CosignNonce,
 	thresholdPeersMutex *sync.Mutex,
 ) {
 	peerStartTime := time.Now()
@@ -400,7 +400,7 @@ func (pv *ThresholdValidator) waitForPeerSetNoncesAndSign(
 	chainID string,
 	peer ICosigner,
 	hrst types.HRSTKey,
-	noncesMap map[ICosigner][]pcosigner.CosignerNonce,
+	noncesMap map[ICosigner][]cosigner.CosignNonce,
 	signBytes []byte,
 	shareSignatures *[][]byte,
 	shareSignaturesMutex *sync.Mutex,
@@ -408,7 +408,7 @@ func (pv *ThresholdValidator) waitForPeerSetNoncesAndSign(
 ) {
 	peerStartTime := time.Now()
 	defer wg.Done()
-	peerNonces := make([]pcosigner.CosignerNonce, 0, pv.threshold-1)
+	peerNonces := make([]cosigner.CosignNonce, 0, pv.threshold-1)
 
 	peerID := peer.GetID()
 
@@ -430,7 +430,7 @@ func (pv *ThresholdValidator) waitForPeerSetNoncesAndSign(
 		}
 	}
 
-	sigRes, err := peer.SetNoncesAndSign(pcosigner.CosignerSetNoncesAndSignRequest{
+	sigRes, err := peer.SetNoncesAndSign(cosigner.SetNoncesAndSignRequest{
 		ChainID:   chainID,
 		Nonces:    peerNonces,
 		HRST:      hrst,
@@ -649,9 +649,9 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	// Used to track how close we are to threshold
 
 	// Here the actual signing process starts from a cryptological perspective
-	// TODO: This process should be factored out. It is not the responsibility of the validator to know
+	// TODO: This process should be factored out. It is not the responsibility of the validator
 	// how to arrange signature of a block. It should be a separate component that is injected into the validator.
-	nonces := make(map[ICosigner][]pcosigner.CosignerNonce)
+	nonces := make(map[ICosigner][]cosigner.CosignNonce)
 	thresholdPeersMutex := sync.Mutex{}
 
 	// From each cosigner peer we are requesting the nonce.
@@ -724,7 +724,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	)
 
 	// collect all valid responses into array of partial signatures
-	shareSigs := make([]pcosigner.PartialSignature, 0, pv.threshold)
+	shareSigs := make([]cosigner.PartialSignature, 0, pv.threshold)
 	for idx, shareSig := range shareSignatures {
 		if len(shareSig) == 0 {
 			continue
@@ -732,7 +732,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 
 		// we are ok to use the share signatures - complete boolean
 		// prevents future concurrent access
-		shareSigs = append(shareSigs, pcosigner.PartialSignature{
+		shareSigs = append(shareSigs, cosigner.PartialSignature{
 			ID:        idx + 1,
 			Signature: shareSig,
 		})

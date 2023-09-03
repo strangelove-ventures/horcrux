@@ -409,8 +409,8 @@ func LoadOrCreateSignState(filepath string) (*SignState, error) {
 			return nil, fmt.Errorf("unexpected error checking file existence (%s): %w", filepath, err)
 		}
 
+		// print that the file does not exist to the console
 		fmt.Printf("\n\tNo filepath for Signstate exist for:\n\t\t%s.", filepath)
-		fmt.Printf("\n\tThis means NO(!) Signstate exists so we will create a new Signstate.\n")
 
 		// the only scenario where we want to create a new sign state file is when the file does not exist.
 		// Make an empty sign state and save it.

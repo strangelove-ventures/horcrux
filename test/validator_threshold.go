@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	pcosigner "github.com/strangelove-ventures/horcrux/pkg/pcosigner"
+	pcosigner "github.com/strangelove-ventures/horcrux/pkg/cosigner"
 
 	"github.com/cometbft/cometbft/crypto"
 	"github.com/docker/docker/client"
@@ -195,7 +195,7 @@ func convertValidatorToHorcrux(
 			return nil, err
 		}
 
-		cosigners[i] = pcosigner.CosignerConfig{
+		cosigners[i] = pcosigner.CosignConfig{
 			ShardID: i + 1,
 			P2PAddr: fmt.Sprintf("tcp://%s:%s", validator.Sidecars[i].HostName(), signerPort),
 		}
@@ -251,7 +251,7 @@ func convertValidatorToHorcrux(
 }
 
 // getPrivvalKey gets the privval key from the validator and creates threshold shards from it.
-func getShardedPrivvalKey(ctx context.Context, node *cosmos.ChainNode, threshold uint8, shards uint8) ([]pcosigner.CosignerEd25519Key, crypto.PubKey, error) {
+func getShardedPrivvalKey(ctx context.Context, node *cosmos.ChainNode, threshold uint8, shards uint8) ([]pcosigner.CosignEd25519Key, crypto.PubKey, error) {
 	pvKey, err := getPrivvalKey(ctx, node)
 	if err != nil {
 		return nil, nil, err
@@ -265,7 +265,7 @@ func getShardedPrivvalKey(ctx context.Context, node *cosmos.ChainNode, threshold
 // chainEd25519Shard is a wrapper for a chain ID and a shard of an ed25519 consensus key.
 type chainEd25519Shard struct {
 	chainID string
-	key     pcosigner.CosignerEd25519Key
+	key     pcosigner.CosignEd25519Key
 }
 
 // writeConfigAndKeysThreshold writes the config and keys for a horcrux cosigner to the sidecar's docker volume.
@@ -273,7 +273,7 @@ func writeConfigAndKeysThreshold(
 	ctx context.Context,
 	cosigner *cosmos.SidecarProcess,
 	config pcosigner.Config,
-	eciesKey pcosigner.CosignerECIESKey,
+	eciesKey pcosigner.CosignEciesKey,
 	ed25519Shards ...chainEd25519Shard,
 ) error {
 	configBz, err := json.Marshal(config)

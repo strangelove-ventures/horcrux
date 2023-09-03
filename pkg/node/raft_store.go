@@ -116,7 +116,7 @@ func (s *RaftStore) OnStart() error {
 	go func() {
 		err := s.init()
 		if err != nil {
-			fmt.Println("RAFTSTORE")
+			s.logger.Error("OnStart %v", err)
 			panic(err)
 		}
 	}()

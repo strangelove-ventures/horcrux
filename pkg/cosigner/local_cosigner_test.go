@@ -1,4 +1,4 @@
-package pcosigner
+package cosigner
 
 import (
 	"crypto/rand"
@@ -52,7 +52,7 @@ func testLocalCosignerSignRSA(t *testing.T, threshold, total uint8) {
 
 	for i, k := range keys {
 		security[i] = NewCosignerSecurityRSA(
-			CosignerRSAKey{
+			CosignRSAKey{
 				ID:      i + 1,
 				RSAKey:  *k,
 				RSAPubs: pubKeys,
@@ -88,7 +88,7 @@ func testLocalCosignerSignECIES(t *testing.T, threshold, total uint8) {
 
 	for i, k := range keys {
 		security[i] = NewCosignerSecurityECIES(
-			CosignerECIESKey{
+			CosignEciesKey{
 				ID:        i + 1,
 				ECIESKey:  k,
 				ECIESPubs: pubKeys,
@@ -117,7 +117,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []ICos
 	tmpDir := t.TempDir()
 
 	thresholdCosigners := make([]*LocalCosigner, threshold)
-	nonces := make([][]CosignerNonce, threshold)
+	nonces := make([][]CosignNonce, threshold)
 
 	now := time.Now()
 
@@ -131,13 +131,13 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []ICos
 	for i := 0; i < int(total); i++ {
 		id := i + 1
 
-		key := CosignerEd25519Key{
+		key := CosignEd25519Key{
 			PubKey:       pubKey,
 			PrivateShard: privShards[i],
 			ID:           id,
 		}
 
-		cfg.ThresholdModeConfig.Cosigners[i] = CosignerConfig{
+		cfg.ThresholdModeConfig.Cosigners[i] = CosignConfig{
 			ShardID: id,
 		}
 
@@ -190,7 +190,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []ICos
 	sigs := make([]PartialSignature, threshold)
 
 	for i, cosigner := range thresholdCosigners {
-		cosignerNonces := make([]CosignerNonce, 0, threshold-1)
+		cosignerNonces := make([]CosignNonce, 0, threshold-1)
 
 		for j, nonce := range nonces {
 			if i == j {
@@ -204,7 +204,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []ICos
 			}
 		}
 
-		sigRes, err := cosigner.SetNoncesAndSign(CosignerSetNoncesAndSignRequest{
+		sigRes, err := cosigner.SetNoncesAndSign(SetNoncesAndSignRequest{
 			ChainID:   testChainID,
 			Nonces:    cosignerNonces,
 			HRST:      hrst,

@@ -1,4 +1,4 @@
-package pcosigner
+package cosigner
 
 import (
 	"time"
@@ -8,24 +8,24 @@ import (
 	"github.com/strangelove-ventures/horcrux/pkg/proto"
 )
 
-type CosignerSignBlockResponse struct {
+type SignBlockResponse struct {
 	Signature []byte
 }
 
-// CosignerSignRequest is sent to a co-signer to obtain their signature for the SignBytes
+// SignRequest is sent to a co-signer to obtain their signature for the SignBytes
 // The SignBytes should be a serialized block
-type CosignerSignRequest struct {
+type SignRequest struct {
 	ChainID   string
 	SignBytes []byte
 }
 
-type CosignerSignResponse struct {
+type SignResponse struct {
 	NoncePublic []byte
 	Timestamp   time.Time
 	Signature   []byte
 }
 
-type CosignerNonce struct {
+type CosignNonce struct {
 	SourceID      int
 	DestinationID int
 	PubKey        []byte
@@ -33,7 +33,7 @@ type CosignerNonce struct {
 	Signature     []byte
 }
 
-func (secretPart *CosignerNonce) toProto() *proto.Nonce {
+func (secretPart *CosignNonce) toProto() *proto.Nonce {
 	return &proto.Nonce{
 		SourceID:      int32(secretPart.SourceID),
 		DestinationID: int32(secretPart.DestinationID),
@@ -43,18 +43,18 @@ func (secretPart *CosignerNonce) toProto() *proto.Nonce {
 	}
 }
 
-// CosignerNonces is a list of CosignerNonce
-type CosignerNonces []CosignerNonce
+// CosignNonces is a list of CosignNonce
+type CosignNonces []CosignNonce
 
-func (secretParts CosignerNonces) ToProto() (out []*proto.Nonce) {
+func (secretParts CosignNonces) ToProto() (out []*proto.Nonce) {
 	for _, secretPart := range secretParts {
 		out = append(out, secretPart.toProto())
 	}
 	return
 }
 
-func CosignerNonceFromProto(secretPart *proto.Nonce) CosignerNonce {
-	return CosignerNonce{
+func CosignNonceFromProto(secretPart *proto.Nonce) CosignNonce {
+	return CosignNonce{
 		SourceID:      int(secretPart.SourceID),
 		DestinationID: int(secretPart.DestinationID),
 		PubKey:        secretPart.PubKey,
@@ -63,15 +63,15 @@ func CosignerNonceFromProto(secretPart *proto.Nonce) CosignerNonce {
 	}
 }
 
-func CosignerNoncesFromProto(secretParts []*proto.Nonce) []CosignerNonce {
-	out := make([]CosignerNonce, len(secretParts))
+func CosignNoncesFromProto(secretParts []*proto.Nonce) []CosignNonce {
+	out := make([]CosignNonce, len(secretParts))
 	for i, secretPart := range secretParts {
-		out[i] = CosignerNonceFromProto(secretPart)
+		out[i] = CosignNonceFromProto(secretPart)
 	}
 	return out
 }
 
-type CosignerSetNonceRequest struct {
+type SetNonceRequest struct {
 	ChainID   string
 	SourceID  int
 	PubKey    []byte
@@ -83,13 +83,13 @@ type CosignerSetNonceRequest struct {
 	Timestamp time.Time
 }
 
-type CosignerNoncesResponse struct {
-	Nonces []CosignerNonce
+type NoncesResponse struct {
+	Nonces []CosignNonce
 }
 
-type CosignerSetNoncesAndSignRequest struct {
+type SetNoncesAndSignRequest struct {
 	ChainID   string
-	Nonces    []CosignerNonce
+	Nonces    []CosignNonce
 	HRST      types.HRSTKey
 	SignBytes []byte
 }

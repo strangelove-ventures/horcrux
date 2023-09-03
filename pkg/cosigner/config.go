@@ -1,4 +1,4 @@
-package pcosigner
+package cosigner
 
 import (
 	"fmt"
@@ -106,8 +106,8 @@ type RuntimeConfig struct {
 	Config     Config
 }
 
-func (c RuntimeConfig) CosignerSecurityECIES() (*CosignerSecurityECIES, error) {
-	keyFile, err := c.KeyFileExistsCosignerECIES()
+func (c RuntimeConfig) SecurityECIES() (*CosignSecurityECIES, error) {
+	keyFile, err := c.KeyFileExistsCosignECIES()
 	if err != nil {
 		return nil, err
 	}
@@ -120,13 +120,13 @@ func (c RuntimeConfig) CosignerSecurityECIES() (*CosignerSecurityECIES, error) {
 	return NewCosignerSecurityECIES(key), nil
 }
 
-func (c RuntimeConfig) CosignerSecurityRSA() (*CosignerSecurityRSA, error) {
-	keyFile, err := c.KeyFileExistsCosignerRSA()
+func (c RuntimeConfig) SecurityRSA() (*CosignSecurityRSA, error) {
+	keyFile, err := c.KeyFileExistsCosignRSA()
 	if err != nil {
 		return nil, err
 	}
 
-	key, err := LoadCosignerRSAKey(keyFile)
+	key, err := LoadCosignRSAKey(keyFile)
 	if err != nil {
 		return nil, fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
 	}
@@ -177,7 +177,7 @@ func (c RuntimeConfig) PrivValStateFile(chainID string) string {
 	return filepath.Join(c.StateDir, fmt.Sprintf("%s_priv_validator_state.json", chainID))
 }
 
-func (c RuntimeConfig) CosignerStateFile(chainID string) string {
+func (c RuntimeConfig) CosignStateFile(chainID string) string {
 	return filepath.Join(c.StateDir, fmt.Sprintf("%s_share_sign_state.json", chainID))
 }
 
@@ -205,17 +205,17 @@ func (c RuntimeConfig) KeyFileExistsSingleSigner(chainID string) (string, error)
 	return keyFile, fileExists(keyFile)
 }
 
-func (c RuntimeConfig) KeyFileExistsCosigner(chainID string) (string, error) {
+func (c RuntimeConfig) KeyFileExistsCosign(chainID string) (string, error) {
 	keyFile := c.KeyFilePathCosigner(chainID)
 	return keyFile, fileExists(keyFile)
 }
 
-func (c RuntimeConfig) KeyFileExistsCosignerRSA() (string, error) {
+func (c RuntimeConfig) KeyFileExistsCosignRSA() (string, error) {
 	keyFile := c.KeyFilePathCosignerRSA()
 	return keyFile, fileExists(keyFile)
 }
 
-func (c RuntimeConfig) KeyFileExistsCosignerECIES() (string, error) {
+func (c RuntimeConfig) KeyFileExistsCosignECIES() (string, error) {
 	keyFile := c.KeyFilePathCosignerECIES()
 	return keyFile, fileExists(keyFile)
 }
@@ -236,13 +236,13 @@ func (cfg *ThresholdModeConfig) LeaderElectMultiAddress() (string, error) {
 	return client.MultiAddress(addresses)
 }
 
-// CosignerConfig is the on disk format representing a cosigner for threshold sign mode.
-type CosignerConfig struct {
+// CosignConfig is the on disk format representing a cosigner for threshold sign mode.
+type CosignConfig struct {
 	ShardID int    `yaml:"shardID"`
 	P2PAddr string `yaml:"p2pAddr"`
 }
 
-type CosignersConfig []CosignerConfig
+type CosignersConfig []CosignConfig
 
 func (cosigners CosignersConfig) Validate() error {
 	// Check IDs to make sure none are duplicated
@@ -283,7 +283,7 @@ func (cosigners CosignersConfig) Validate() error {
 	return nil
 }
 
-func duplicateCosigners(cosigners []CosignerConfig) (duplicates map[int][]string) {
+func duplicateCosigners(cosigners []CosignConfig) (duplicates map[int][]string) {
 	idAddrs := make(map[int][]string)
 	for _, cosigner := range cosigners {
 		// Collect all addresses assigned to each cosigner.
@@ -306,10 +306,10 @@ func duplicateCosigners(cosigners []CosignerConfig) (duplicates map[int][]string
 	return idAddrs
 }
 
-func CosignersFromFlag(cosigners []string) (out []CosignerConfig, err error) {
+func CosignersFromFlag(cosigners []string) (out []CosignConfig, err error) {
 	var errs []error
 	for i, c := range cosigners {
-		out = append(out, CosignerConfig{ShardID: i + 1, P2PAddr: c})
+		out = append(out, CosignConfig{ShardID: i + 1, P2PAddr: c})
 	}
 	if len(errs) > 0 {
 		return nil, nil

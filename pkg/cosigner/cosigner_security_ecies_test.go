@@ -1,4 +1,4 @@
-package pcosigner
+package cosigner
 
 import (
 	"crypto/rand"
@@ -28,7 +28,7 @@ func TestCosignerECIES(t *testing.T) {
 	securities := make([]ICosignerSecurity, 3)
 
 	for i := 0; i < 3; i++ {
-		key := CosignerECIESKey{
+		key := CosignEciesKey{
 			ID:        i + 1,
 			ECIESKey:  keys[i],
 			ECIESPubs: pubs,
@@ -38,7 +38,7 @@ func TestCosignerECIES(t *testing.T) {
 		bz, err := json.Marshal(&key)
 		require.NoError(t, err)
 
-		var key2 CosignerECIESKey
+		var key2 CosignEciesKey
 		require.NoError(t, json.Unmarshal(bz, &key2))
 		require.Equal(t, key, key2)
 
@@ -94,7 +94,7 @@ func TestConcurrentIterateCosignerECIES(t *testing.T) {
 	securities := make([]ICosignerSecurity, 3)
 
 	for i := 0; i < 3; i++ {
-		securities[i] = NewCosignerSecurityECIES(CosignerECIESKey{
+		securities[i] = NewCosignerSecurityECIES(CosignEciesKey{
 			ID:        i + 1,
 			ECIESKey:  keys[i],
 			ECIESPubs: pubs,

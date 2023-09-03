@@ -59,7 +59,7 @@ func showStateCmd() *cobra.Command {
 				return err
 			}
 
-			cs, err := types.LoadSignState(config.CosignerStateFile(chainID))
+			cs, err := types.LoadSignState(config.CosignStateFile(chainID))
 			if err != nil {
 				return err
 			}
@@ -100,7 +100,7 @@ func setStateCmd() *cobra.Command {
 				return err
 			}
 
-			cs, err := types.LoadOrCreateSignState(config.CosignerStateFile(chainID))
+			cs, err := types.LoadOrCreateSignState(config.CosignStateFile(chainID))
 			if err != nil {
 				return err
 			}
@@ -165,7 +165,7 @@ func importStateCmd() *cobra.Command {
 			}
 
 			// shareStateFile does not exist during default config init, so create if necessary
-			cs, err := types.LoadOrCreateSignState(config.CosignerStateFile(chainID))
+			cs, err := types.LoadOrCreateSignState(config.CosignStateFile(chainID))
 			if err != nil {
 				return err
 			}

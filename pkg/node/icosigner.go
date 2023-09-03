@@ -2,7 +2,7 @@ package node
 
 import (
 	cometcrypto "github.com/cometbft/cometbft/crypto"
-	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 )
 
@@ -23,8 +23,8 @@ type ICosigner interface {
 	VerifySignature(chainID string, payload, signature []byte) bool
 
 	// GetNonces requests nonce frpm the peer cosigners
-	GetNonces(chainID string, hrst types.HRSTKey) (*pcosigner.CosignerNoncesResponse, error)
+	GetNonces(chainID string, hrst types.HRSTKey) (*cosigner.NoncesResponse, error)
 
 	// Sign the requested bytes
-	SetNoncesAndSign(req pcosigner.CosignerSetNoncesAndSignRequest) (*pcosigner.CosignerSignResponse, error)
+	SetNoncesAndSign(req cosigner.SetNoncesAndSignRequest) (*cosigner.SignResponse, error)
 }

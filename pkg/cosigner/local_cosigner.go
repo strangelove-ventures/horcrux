@@ -1,4 +1,4 @@
-package pcosigner
+package cosigner
 
 import (
 	"errors"
@@ -85,7 +85,7 @@ func (ccs *ChainState) combinedNonces(myID int, threshold uint8, hrst types.HRST
 	return combinedNonces, nil
 }
 
-type CosignerGetNonceRequest struct {
+type GetNonceRequest struct {
 	ChainID   string
 	ID        int
 	Height    int64
@@ -98,43 +98,43 @@ type CosignerGetNonceRequest struct {
 // than the current high watermark. A mutex is used to avoid concurrent state updates.
 // The disk write is scheduled in a separate goroutine which will perform an atomic write.
 // pendingDiskWG is used upon termination in pendingDiskWG to ensure all writes have completed.
-func (cosigner *LocalCosigner) SaveLastSignedState(chainID string, signState types.SignStateConsensus) error {
-	ccs, err := cosigner.getChainState(chainID)
+func (cosign *LocalCosigner) SaveLastSignedState(chainID string, signState types.SignStateConsensus) error {
+	ccs, err := cosign.getChainState(chainID)
 	if err != nil {
 		return err
 	}
 
 	return ccs.lastSignState.Save(
 		signState,
-		&cosigner.pendingDiskWG,
+		&cosign.pendingDiskWG,
 	)
 }
 
 // WaitForSignStatesToFlushToDisk waits for all state file writes queued
 // in SaveLastSignedState to complete before termination.
 
-func (cosigner *LocalCosigner) waitForSignStatesToFlushToDisk() {
-	cosigner.pendingDiskWG.Wait()
+func (cosign *LocalCosigner) waitForSignStatesToFlushToDisk() {
+	cosign.pendingDiskWG.Wait()
 }
 
-func (cosigner *LocalCosigner) WaitForSignStatesToFlushToDisk() {
-	cosigner.waitForSignStatesToFlushToDisk()
+func (cosign *LocalCosigner) WaitForSignStatesToFlushToDisk() {
+	cosign.waitForSignStatesToFlushToDisk()
 }
 
 // GetID returns the id of the cosigner
 // Implements Cosigner interface
-func (cosigner *LocalCosigner) GetID() int {
-	return cosigner.security.GetID()
+func (cosign *LocalCosigner) GetID() int {
+	return cosign.security.GetID()
 }
 
 // GetAddress returns the RPC URL of the cosigner
 // Implements Cosigner interface
-func (cosigner *LocalCosigner) GetAddress() string {
-	return cosigner.address
+func (cosign *LocalCosigner) GetAddress() string {
+	return cosign.address
 }
 
-func (cosigner *LocalCosigner) getChainState(chainID string) (*ChainState, error) {
-	cs, ok := cosigner.chainStateMap.Load(chainID)
+func (cosign *LocalCosigner) getChainState(chainID string) (*ChainState, error) {
+	cs, ok := cosign.chainStateMap.Load(chainID)
 	if !ok {
 		return nil, fmt.Errorf("failed to load chain state for %s", chainID)
 	}
@@ -149,12 +149,12 @@ func (cosigner *LocalCosigner) getChainState(chainID string) (*ChainState, error
 
 // GetPubKey returns public key of the validator.
 // Implements Cosigner interface
-func (cosigner *LocalCosigner) GetPubKey(chainID string) (cometcrypto.PubKey, error) {
-	if err := cosigner.LoadSignStateIfNecessary(chainID); err != nil {
+func (cosign *LocalCosigner) GetPubKey(chainID string) (cometcrypto.PubKey, error) {
+	if err := cosign.LoadSignStateIfNecessary(chainID); err != nil {
 		return nil, err
 	}
 
-	ccs, err := cosigner.getChainState(chainID)
+	ccs, err := cosign.getChainState(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -163,8 +163,8 @@ func (cosigner *LocalCosigner) GetPubKey(chainID string) (cometcrypto.PubKey, er
 }
 
 // CombineSignatures combines partial signatures into a full signature.
-func (cosigner *LocalCosigner) CombineSignatures(chainID string, signatures []PartialSignature) ([]byte, error) {
-	ccs, err := cosigner.getChainState(chainID)
+func (cosign *LocalCosigner) CombineSignatures(chainID string, signatures []PartialSignature) ([]byte, error) {
+	ccs, err := cosign.getChainState(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -174,12 +174,12 @@ func (cosigner *LocalCosigner) CombineSignatures(chainID string, signatures []Pa
 
 // VerifySignature validates a signed payload against the (persistent) public key.
 // Implements Cosigner interface
-func (cosigner *LocalCosigner) VerifySignature(chainID string, payload, signature []byte) bool {
-	if err := cosigner.LoadSignStateIfNecessary(chainID); err != nil {
+func (cosign *LocalCosigner) VerifySignature(chainID string, payload, signature []byte) bool {
+	if err := cosign.LoadSignStateIfNecessary(chainID); err != nil {
 		return false
 	}
 
-	ccs, err := cosigner.getChainState(chainID)
+	ccs, err := cosign.getChainState(chainID)
 	if err != nil {
 		return false
 	}
@@ -189,12 +189,12 @@ func (cosigner *LocalCosigner) VerifySignature(chainID string, payload, signatur
 
 // Sign the sign request using the cosigner's shard
 // Return the signed bytes or an error
-func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignResponse, error) {
+func (cosign *LocalCosigner) sign(req SignRequest) (SignResponse, error) {
 	chainID := req.ChainID
 
-	res := CosignerSignResponse{}
+	res := SignResponse{}
 
-	ccs, err := cosigner.getChainState(chainID)
+	ccs, err := cosign.getChainState(chainID)
 	if err != nil {
 		return res, err
 	}
@@ -217,7 +217,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		return res, nil
 	}
 
-	nonces, err := ccs.combinedNonces(cosigner.GetID(), uint8(cosigner.Config.Config.ThresholdModeConfig.Threshold), hrst)
+	nonces, err := ccs.combinedNonces(cosign.GetID(), uint8(cosign.Config.Config.ThresholdModeConfig.Threshold), hrst)
 	if err != nil {
 		return res, err
 	}
@@ -233,7 +233,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		Step:      hrst.Step,
 		Signature: sig,
 		SignBytes: req.SignBytes,
-	}, &cosigner.pendingDiskWG)
+	}, &cosign.pendingDiskWG)
 
 	if err != nil {
 		if _, isSameHRSError := err.(*types.SameHRSError); !isSameHRSError {
@@ -259,48 +259,48 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	return res, nil
 }
 
-func (cosigner *LocalCosigner) dealShares(req CosignerGetNonceRequest) ([]Nonces, error) {
+func (cosign *LocalCosigner) dealShares(req GetNonceRequest) ([]Nonces, error) {
 	chainID := req.ChainID
 
-	ccs, err := cosigner.getChainState(chainID)
+	ccs, err := cosign.getChainState(chainID)
 	if err != nil {
 		return nil, err
 	}
 
-	meta := make([]Nonces, len(cosigner.Config.Config.ThresholdModeConfig.Cosigners))
+	meta := make([]Nonces, len(cosign.Config.Config.ThresholdModeConfig.Cosigners))
 
 	nonces, err := ccs.signer.GenerateNonces()
 	if err != nil {
 		return nil, err
 	}
 
-	meta[cosigner.GetID()-1] = nonces
+	meta[cosign.GetID()-1] = nonces
 
 	return meta, nil
 }
 
-func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
+func (cosign *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 	if chainID == "" {
 		return fmt.Errorf("chain id cannot be empty")
 	}
 
-	if _, ok := cosigner.chainStateMap.Load(chainID); ok {
+	if _, ok := cosign.chainStateMap.Load(chainID); ok {
 		return nil
 	}
-	// TODO: spew.Dump(cosigner.Config)
-	signState, err := types.LoadOrCreateSignState(cosigner.Config.CosignerStateFile(chainID))
+	// TODO: spew.Dump(cosign.Config)
+	signState, err := types.LoadOrCreateSignState(cosign.Config.CosignStateFile(chainID))
 	if err != nil {
 		return err
 	}
 
 	var signer IThresholdSigner
 
-	signer, err = NewThresholdSignerSoft(cosigner.Config, cosigner.GetID(), chainID)
+	signer, err = NewThresholdSignerSoft(cosign.Config, cosign.GetID(), chainID)
 	if err != nil {
 		return err
 	}
 
-	cosigner.chainStateMap.Store(chainID, &ChainState{
+	cosign.chainStateMap.Store(chainID, &ChainState{
 		lastSignState: signState,
 		nonces:        make(map[types.HRSTKey][]Nonces),
 		signer:        signer,
@@ -312,26 +312,26 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 // GetNonces implements the ICosigner interface.
 //
 // GetNonces returns the nonces for the given HRS
-func (cosigner *LocalCosigner) GetNonces(
+func (cosign *LocalCosigner) GetNonces(
 	chainID string,
 	hrst types.HRSTKey,
-) (*CosignerNoncesResponse, error) {
+) (*NoncesResponse, error) {
 	metrics.MetricsTimeKeeper.SetPreviousLocalNonce(time.Now())
 
-	if err := cosigner.LoadSignStateIfNecessary(chainID); err != nil {
+	if err := cosign.LoadSignStateIfNecessary(chainID); err != nil {
 		return nil, err
 	}
 
-	total := len(cosigner.Config.Config.ThresholdModeConfig.Cosigners)
+	total := len(cosign.Config.Config.ThresholdModeConfig.Cosigners)
 
-	res := &CosignerNoncesResponse{
-		Nonces: make([]CosignerNonce, total-1), // an empty list of nonces for each cosigner except for ourselves
+	res := &NoncesResponse{
+		Nonces: make([]CosignNonce, total-1), // an empty list of nonces for each cosign except for ourselves
 	}
 
-	id := cosigner.GetID()
+	id := cosign.GetID()
 
 	var eg errgroup.Group
-	// getting nonces requires encrypting and signing for each cosigner,
+	// getting nonces requires encrypting and signing for each cosign,
 	// so we perform these operations in parallel.
 
 	for i := 0; i < total; i++ {
@@ -343,7 +343,7 @@ func (cosigner *LocalCosigner) GetNonces(
 		i := i
 
 		eg.Go(func() error {
-			secretPart, err := cosigner.getNonce(CosignerGetNonceRequest{
+			secretPart, err := cosign.getNonce(GetNonceRequest{
 				ChainID:   chainID,
 				ID:        peerID,
 				Height:    hrst.Height,
@@ -366,7 +366,7 @@ func (cosigner *LocalCosigner) GetNonces(
 		return nil, err
 	}
 
-	cosigner.logger.Debug(
+	cosign.logger.Debug(
 		"Generated nonces",
 		"chain_id", chainID,
 		"height", hrst.Height,
@@ -377,8 +377,8 @@ func (cosigner *LocalCosigner) GetNonces(
 	return res, nil
 }
 
-func (cosigner *LocalCosigner) dealSharesIfNecessary(chainID string, hrst types.HRSTKey) ([]Nonces, error) {
-	ccs, err := cosigner.getChainState(chainID)
+func (cosign *LocalCosigner) dealSharesIfNecessary(chainID string, hrst types.HRSTKey) ([]Nonces, error) {
+	ccs, err := cosign.getChainState(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -392,7 +392,7 @@ func (cosigner *LocalCosigner) dealSharesIfNecessary(chainID string, hrst types.
 		return nonces, nil
 	}
 
-	newNonces, err := cosigner.dealShares(CosignerGetNonceRequest{
+	newNonces, err := cosign.dealShares(GetNonceRequest{
 		ChainID:   chainID,
 		Height:    hrst.Height,
 		Round:     hrst.Round,
@@ -410,12 +410,12 @@ func (cosigner *LocalCosigner) dealSharesIfNecessary(chainID string, hrst types.
 
 // Get the ephemeral secret part for an ephemeral share
 // The ephemeral secret part is encrypted for the receiver
-func (cosigner *LocalCosigner) getNonce(
-	req CosignerGetNonceRequest,
-) (CosignerNonce, error) {
+func (cosign *LocalCosigner) getNonce(
+	req GetNonceRequest,
+) (CosignNonce, error) {
 
 	chainID := req.ChainID
-	zero := CosignerNonce{}
+	zero := CosignNonce{}
 	hrst := types.HRSTKey{
 		Height:    req.Height,
 		Round:     req.Round,
@@ -423,15 +423,15 @@ func (cosigner *LocalCosigner) getNonce(
 		Timestamp: req.Timestamp.UnixNano(),
 	}
 
-	id := cosigner.GetID()
+	id := cosign.GetID()
 
-	meta, err := cosigner.dealSharesIfNecessary(chainID, hrst)
+	meta, err := cosign.dealSharesIfNecessary(chainID, hrst)
 	if err != nil {
 		return zero, err
 	}
 
 	ourCosignerMeta := meta[id-1]
-	nonce, err := cosigner.security.EncryptAndSign(req.ID, ourCosignerMeta.PubKey, ourCosignerMeta.Shares[req.ID-1])
+	nonce, err := cosign.security.EncryptAndSign(req.ID, ourCosignerMeta.PubKey, ourCosignerMeta.Shares[req.ID-1])
 	if err != nil {
 		return zero, err
 	}
@@ -440,10 +440,10 @@ func (cosigner *LocalCosigner) getNonce(
 }
 
 // setNonce stores a nonce provided by another cosigner
-func (cosigner *LocalCosigner) setNonce(req CosignerSetNonceRequest) error {
+func (cosign *LocalCosigner) setNonce(req SetNonceRequest) error {
 	chainID := req.ChainID
 
-	ccs, err := cosigner.getChainState(chainID)
+	ccs, err := cosign.getChainState(chainID)
 	if err != nil {
 		return err
 	}
@@ -453,7 +453,7 @@ func (cosigner *LocalCosigner) setNonce(req CosignerSetNonceRequest) error {
 		return errors.New("signature field is required")
 	}
 
-	noncePub, nonceShare, err := cosigner.security.DecryptAndVerify(
+	noncePub, nonceShare, err := cosign.security.DecryptAndVerify(
 		req.SourceID, req.PubKey, req.Share, req.Signature)
 	if err != nil {
 		return err
@@ -484,32 +484,32 @@ func (cosigner *LocalCosigner) setNonce(req CosignerSetNonceRequest) error {
 
 	// set slot
 	if nonces[req.SourceID-1].Shares == nil {
-		nonces[req.SourceID-1].Shares = make([][]byte, len(cosigner.Config.Config.ThresholdModeConfig.Cosigners))
+		nonces[req.SourceID-1].Shares = make([][]byte, len(cosign.Config.Config.ThresholdModeConfig.Cosigners))
 	}
-	nonces[req.SourceID-1].Shares[cosigner.GetID()-1] = nonceShare
+	nonces[req.SourceID-1].Shares[cosign.GetID()-1] = nonceShare
 	nonces[req.SourceID-1].PubKey = noncePub
 
 	return nil
 }
 
-func (cosigner *LocalCosigner) SetNoncesAndSign(
-	req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error) {
+func (cosign *LocalCosigner) SetNoncesAndSign(
+	req SetNoncesAndSignRequest) (*SignResponse, error) {
 	chainID := req.ChainID
 
-	if err := cosigner.LoadSignStateIfNecessary(chainID); err != nil {
+	if err := cosign.LoadSignStateIfNecessary(chainID); err != nil {
 		return nil, err
 	}
 
 	var eg errgroup.Group
 
-	// setting nonces requires decrypting and verifying signature from each cosigner,
+	// setting nonces requires decrypting and verifying signature from each cosign,
 	// so we perform these operations in parallel.
 
 	for _, secretPart := range req.Nonces {
 		secretPart := secretPart
 
 		eg.Go(func() error {
-			return cosigner.setNonce(CosignerSetNonceRequest{
+			return cosign.setNonce(SetNonceRequest{
 				ChainID:   chainID,
 				SourceID:  secretPart.SourceID,
 				PubKey:    secretPart.PubKey,
@@ -527,7 +527,7 @@ func (cosigner *LocalCosigner) SetNoncesAndSign(
 		return nil, err
 	}
 
-	res, err := cosigner.sign(CosignerSignRequest{
+	res, err := cosign.sign(SignRequest{
 		ChainID:   chainID,
 		SignBytes: req.SignBytes,
 	})

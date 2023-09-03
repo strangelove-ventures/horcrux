@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/pkg/pcosigner"
-
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+
 	"github.com/cometbft/cometbft/libs/log"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,17 +26,17 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 	eciesKey, err := ecies.GenerateKey(rand.Reader, secp256k1.S256(), nil)
 	require.NoError(t, err)
 
-	key := pcosigner.CosignerEd25519Key{
+	key := cosigner.CosignEd25519Key{
 		PubKey:       dummyPub,
 		PrivateShard: []byte{},
 		ID:           1,
 	}
 
-	cosigner := pcosigner.NewLocalCosigner(
+	cosigner := cosigner.NewLocalCosigner(
 		log.NewNopLogger(),
-		&pcosigner.RuntimeConfig{},
-		pcosigner.NewCosignerSecurityECIES(
-			pcosigner.CosignerECIESKey{
+		&cosigner.RuntimeConfig{},
+		cosigner.NewCosignerSecurityECIES(
+			cosigner.CosignEciesKey{
 				ID:        key.ID,
 				ECIESKey:  eciesKey,
 				ECIESPubs: []*ecies.PublicKey{&eciesKey.PublicKey},
@@ -46,6 +46,7 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 
 	validator := &ThresholdValidator{
 		myCosigner: cosigner}
+
 	s := &RaftStore{
 		NodeID:             "1",
 		RaftDir:            tmpDir,

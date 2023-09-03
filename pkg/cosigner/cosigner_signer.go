@@ -1,4 +1,4 @@
-package pcosigner
+package cosigner
 
 // IThresholdSigner is interface for the cosigner_signer whether it's a soft sign or HSM
 type IThresholdSigner interface {
