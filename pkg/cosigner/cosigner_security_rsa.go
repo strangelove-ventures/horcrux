@@ -14,10 +14,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var _ ICosignerSecurity = &CosignSecurityRSA{}
+var _ ICosignerSecurity = &SecurityRSA{}
 
-// CosignSecurityRSA is an implementation of CosignerSecurity using RSA for encryption and P5S for digital signature.
-type CosignSecurityRSA struct {
+// SecurityRSA is an implementation of CosignerSecurity using RSA for encryption and P5S for digital signature.
+type SecurityRSA struct {
 	key        CosignRSAKey
 	rsaPubKeys map[int]CosignRSAPubKey
 }
@@ -106,8 +106,8 @@ func LoadCosignRSAKey(file string) (CosignRSAKey, error) {
 }
 
 // NewCosignerSecurityRSA creates a new CosignerSecurityRSA.
-func NewCosignerSecurityRSA(key CosignRSAKey) *CosignSecurityRSA {
-	c := &CosignSecurityRSA{
+func NewCosignerSecurityRSA(key CosignRSAKey) *SecurityRSA {
+	c := &SecurityRSA{
 		key:        key,
 		rsaPubKeys: make(map[int]CosignRSAPubKey),
 	}
@@ -123,12 +123,12 @@ func NewCosignerSecurityRSA(key CosignRSAKey) *CosignSecurityRSA {
 }
 
 // GetID returns the ID of the cosigner.
-func (c *CosignSecurityRSA) GetID() int {
+func (c *SecurityRSA) GetID() int {
 	return c.key.ID
 }
 
 // EncryptAndSign encrypts the nonce and signs it for authentication.
-func (c *CosignSecurityRSA) EncryptAndSign(id int, noncePub []byte, nonceShare []byte) (CosignNonce, error) {
+func (c *SecurityRSA) EncryptAndSign(id int, noncePub []byte, nonceShare []byte) (CosignNonce, error) {
 	nonce := CosignNonce{
 		SourceID: c.key.ID,
 	}
@@ -183,7 +183,7 @@ func (c *CosignSecurityRSA) EncryptAndSign(id int, noncePub []byte, nonceShare [
 
 // DecryptAndVerify decrypts the nonce and verifies
 // the signature to authenticate the source cosigner.
-func (c *CosignSecurityRSA) DecryptAndVerify(
+func (c *SecurityRSA) DecryptAndVerify(
 	id int,
 	encryptedNoncePub []byte,
 	encryptedNonceShare []byte,

@@ -120,7 +120,7 @@ func (c RuntimeConfig) SecurityECIES() (*CosignSecurityECIES, error) {
 	return NewCosignerSecurityECIES(key), nil
 }
 
-func (c RuntimeConfig) SecurityRSA() (*CosignSecurityRSA, error) {
+func (c RuntimeConfig) SecurityRSA() (*SecurityRSA, error) {
 	keyFile, err := c.KeyFileExistsCosignRSA()
 	if err != nil {
 		return nil, err
