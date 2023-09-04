@@ -40,6 +40,7 @@ horcrux create-ecies-shards
 	cmd.AddCommand(getLeaderCmd())
 	cmd.AddCommand(stateCmd())
 	cmd.AddCommand(versionCmd())
+	cmd.AddCommand(proxyCmd())
 
 	cmd.PersistentFlags().StringVar(
 		&config.HomeDir,
