@@ -90,47 +90,47 @@ func (c *iCosignerGRPCServerClient) GetLeader(ctx context.Context, in *CosignerG
 	return out, nil
 }
 
-// ICosignerGRPCServerServer is the server API for ICosignerGRPCServer service.
-// All implementations must embed UnimplementedICosignerGRPCServerServer
+// ICosignerGRPCServer is the server API for ICosignerGRPCServer service.
+// All implementations must embed UnimplementedICosignerGRPCServer
 // for forward compatibility
-type ICosignerGRPCServerServer interface {
+type ICosignerGRPCServer interface {
 	SignBlock(context.Context, *CosignerGRPCSignBlockRequest) (*CosignerGRPCSignBlockResponse, error)
 	SetNoncesAndSign(context.Context, *CosignerGRPCSetNoncesAndSignRequest) (*CosignerGRPCSetNoncesAndSignResponse, error)
 	GetNonces(context.Context, *CosignerGRPCGetNoncesRequest) (*CosignerGRPCGetNoncesResponse, error)
 	TransferLeadership(context.Context, *CosignerGRPCTransferLeadershipRequest) (*CosignerGRPCTransferLeadershipResponse, error)
 	GetLeader(context.Context, *CosignerGRPCGetLeaderRequest) (*CosignerGRPCGetLeaderResponse, error)
-	mustEmbedUnimplementedICosignerGRPCServerServer()
+	mustEmbedUnimplementedICosignerGRPCServer()
 }
 
-// UnimplementedICosignerGRPCServerServer must be embedded to have forward compatible implementations.
-type UnimplementedICosignerGRPCServerServer struct {
+// UnimplementedICosignerGRPCServer must be embedded to have forward compatible implementations.
+type UnimplementedICosignerGRPCServer struct {
 }
 
-func (UnimplementedICosignerGRPCServerServer) SignBlock(context.Context, *CosignerGRPCSignBlockRequest) (*CosignerGRPCSignBlockResponse, error) {
+func (UnimplementedICosignerGRPCServer) SignBlock(context.Context, *CosignerGRPCSignBlockRequest) (*CosignerGRPCSignBlockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SignBlock not implemented")
 }
-func (UnimplementedICosignerGRPCServerServer) SetNoncesAndSign(context.Context, *CosignerGRPCSetNoncesAndSignRequest) (*CosignerGRPCSetNoncesAndSignResponse, error) {
+func (UnimplementedICosignerGRPCServer) SetNoncesAndSign(context.Context, *CosignerGRPCSetNoncesAndSignRequest) (*CosignerGRPCSetNoncesAndSignResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetNoncesAndSign not implemented")
 }
-func (UnimplementedICosignerGRPCServerServer) GetNonces(context.Context, *CosignerGRPCGetNoncesRequest) (*CosignerGRPCGetNoncesResponse, error) {
+func (UnimplementedICosignerGRPCServer) GetNonces(context.Context, *CosignerGRPCGetNoncesRequest) (*CosignerGRPCGetNoncesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetNonces not implemented")
 }
-func (UnimplementedICosignerGRPCServerServer) TransferLeadership(context.Context, *CosignerGRPCTransferLeadershipRequest) (*CosignerGRPCTransferLeadershipResponse, error) {
+func (UnimplementedICosignerGRPCServer) TransferLeadership(context.Context, *CosignerGRPCTransferLeadershipRequest) (*CosignerGRPCTransferLeadershipResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method TransferLeadership not implemented")
 }
-func (UnimplementedICosignerGRPCServerServer) GetLeader(context.Context, *CosignerGRPCGetLeaderRequest) (*CosignerGRPCGetLeaderResponse, error) {
+func (UnimplementedICosignerGRPCServer) GetLeader(context.Context, *CosignerGRPCGetLeaderRequest) (*CosignerGRPCGetLeaderResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetLeader not implemented")
 }
-func (UnimplementedICosignerGRPCServerServer) mustEmbedUnimplementedICosignerGRPCServerServer() {}
+func (UnimplementedICosignerGRPCServer) mustEmbedUnimplementedICosignerGRPCServer() {}
 
-// UnsafeICosignerGRPCServerServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to ICosignerGRPCServerServer will
+// UnsafeICosignerGRPCServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ICosignerGRPCServer will
 // result in compilation errors.
-type UnsafeICosignerGRPCServerServer interface {
-	mustEmbedUnimplementedICosignerGRPCServerServer()
+type UnsafeICosignerGRPCServer interface {
+	mustEmbedUnimplementedICosignerGRPCServer()
 }
 
-func RegisterICosignerGRPCServerServer(s grpc.ServiceRegistrar, srv ICosignerGRPCServerServer) {
+func RegisterICosignerGRPCServer(s grpc.ServiceRegistrar, srv ICosignerGRPCServer) {
 	s.RegisterService(&ICosignerGRPCServer_ServiceDesc, srv)
 }
 
@@ -140,14 +140,14 @@ func _ICosignerGRPCServer_SignBlock_Handler(srv interface{}, ctx context.Context
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ICosignerGRPCServerServer).SignBlock(ctx, in)
+		return srv.(ICosignerGRPCServer).SignBlock(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
 		FullMethod: ICosignerGRPCServer_SignBlock_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ICosignerGRPCServerServer).SignBlock(ctx, req.(*CosignerGRPCSignBlockRequest))
+		return srv.(ICosignerGRPCServer).SignBlock(ctx, req.(*CosignerGRPCSignBlockRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -158,14 +158,14 @@ func _ICosignerGRPCServer_SetNoncesAndSign_Handler(srv interface{}, ctx context.
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ICosignerGRPCServerServer).SetNoncesAndSign(ctx, in)
+		return srv.(ICosignerGRPCServer).SetNoncesAndSign(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
 		FullMethod: ICosignerGRPCServer_SetNoncesAndSign_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ICosignerGRPCServerServer).SetNoncesAndSign(ctx, req.(*CosignerGRPCSetNoncesAndSignRequest))
+		return srv.(ICosignerGRPCServer).SetNoncesAndSign(ctx, req.(*CosignerGRPCSetNoncesAndSignRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -176,14 +176,14 @@ func _ICosignerGRPCServer_GetNonces_Handler(srv interface{}, ctx context.Context
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ICosignerGRPCServerServer).GetNonces(ctx, in)
+		return srv.(ICosignerGRPCServer).GetNonces(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
 		FullMethod: ICosignerGRPCServer_GetNonces_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ICosignerGRPCServerServer).GetNonces(ctx, req.(*CosignerGRPCGetNoncesRequest))
+		return srv.(ICosignerGRPCServer).GetNonces(ctx, req.(*CosignerGRPCGetNoncesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -194,14 +194,14 @@ func _ICosignerGRPCServer_TransferLeadership_Handler(srv interface{}, ctx contex
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ICosignerGRPCServerServer).TransferLeadership(ctx, in)
+		return srv.(ICosignerGRPCServer).TransferLeadership(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
 		FullMethod: ICosignerGRPCServer_TransferLeadership_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ICosignerGRPCServerServer).TransferLeadership(ctx, req.(*CosignerGRPCTransferLeadershipRequest))
+		return srv.(ICosignerGRPCServer).TransferLeadership(ctx, req.(*CosignerGRPCTransferLeadershipRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -212,14 +212,14 @@ func _ICosignerGRPCServer_GetLeader_Handler(srv interface{}, ctx context.Context
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ICosignerGRPCServerServer).GetLeader(ctx, in)
+		return srv.(ICosignerGRPCServer).GetLeader(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
 		FullMethod: ICosignerGRPCServer_GetLeader_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ICosignerGRPCServerServer).GetLeader(ctx, req.(*CosignerGRPCGetLeaderRequest))
+		return srv.(ICosignerGRPCServer).GetLeader(ctx, req.(*CosignerGRPCGetLeaderRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -229,7 +229,7 @@ func _ICosignerGRPCServer_GetLeader_Handler(srv interface{}, ctx context.Context
 // and not to be introspected or modified (even as a copy)
 var ICosignerGRPCServer_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "proto.ICosignerGRPCServer",
-	HandlerType: (*ICosignerGRPCServerServer)(nil),
+	HandlerType: (*ICosignerGRPCServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "SignBlock",

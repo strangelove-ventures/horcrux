@@ -372,7 +372,7 @@ func (pv *ThresholdValidator) waitForPeerNonces(
 	peer ICosigner,
 	hrst types.HRSTKey,
 	wg *sync.WaitGroup,
-	nonces map[ICosigner][]cosigner.CosignNonce,
+	nonces map[ICosigner][]cosigner.WrappedNonce,
 	thresholdPeersMutex *sync.Mutex,
 ) {
 	peerStartTime := time.Now()
@@ -400,7 +400,7 @@ func (pv *ThresholdValidator) waitForPeerSetNoncesAndSign(
 	chainID string,
 	peer ICosigner,
 	hrst types.HRSTKey,
-	noncesMap map[ICosigner][]cosigner.CosignNonce,
+	noncesMap map[ICosigner][]cosigner.WrappedNonce,
 	signBytes []byte,
 	shareSignatures *[][]byte,
 	shareSignaturesMutex *sync.Mutex,
@@ -408,7 +408,7 @@ func (pv *ThresholdValidator) waitForPeerSetNoncesAndSign(
 ) {
 	peerStartTime := time.Now()
 	defer wg.Done()
-	peerNonces := make([]cosigner.CosignNonce, 0, pv.threshold-1)
+	peerNonces := make([]cosigner.WrappedNonce, 0, pv.threshold-1)
 
 	peerID := peer.GetID()
 
@@ -649,9 +649,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	// Used to track how close we are to threshold
 
 	// Here the actual signing process starts from a cryptological perspective
-	// TODO: This process should be factored out. It is not the responsibility of the validator
-	// how to arrange signature of a block. It should be a separate component that is injected into the validator.
-	nonces := make(map[ICosigner][]cosigner.CosignNonce)
+	nonces := make(map[ICosigner][]cosigner.WrappedNonce)
 	thresholdPeersMutex := sync.Mutex{}
 
 	// From each cosigner peer we are requesting the nonce.

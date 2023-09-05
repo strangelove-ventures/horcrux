@@ -108,7 +108,7 @@ func (cosigner *RemoteCosigner) GetNonces(
 		return nil, err
 	}
 	return &NoncesResponse{
-		Nonces: CosignNoncesFromProto(res.GetNonces()),
+		Nonces: NoncesFromProto(res.GetNonces()),
 	}, nil
 }
 
@@ -127,7 +127,7 @@ func (cosigner *RemoteCosigner) SetNoncesAndSign(
 	res, err := client.SetNoncesAndSign(context,
 		&proto.CosignerGRPCSetNoncesAndSignRequest{
 			ChainID:   req.ChainID,
-			Nonces:    CosignNonces(req.Nonces).ToProto(),
+			Nonces:    WrappedNonces(req.Nonces).ToProto(),
 			Hrst:      req.HRST.ToProto(),
 			SignBytes: req.SignBytes,
 		})

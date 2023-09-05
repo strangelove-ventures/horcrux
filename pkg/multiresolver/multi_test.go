@@ -46,7 +46,7 @@ func createListener(nodeID string, homedir string) (string, func(), error) {
 	}
 
 	grpcServer := grpc.NewServer()
-	proto.RegisterICosignerGRPCServerServer(grpcServer, node.NewGRPCServer(nil, nil, s))
+	proto.RegisterICosignerGRPCServer(grpcServer, node.NewGRPCServer(nil, nil, s))
 	transportManager.Register(grpcServer)
 
 	go func() {

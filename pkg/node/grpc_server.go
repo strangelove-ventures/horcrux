@@ -13,14 +13,14 @@ import (
 )
 
 // Enures that GRPCServer implements the proto.CosignerGRPCServer interface.
-var _ proto.ICosignerGRPCServerServer = &GRPCServer{}
+var _ proto.ICosignerGRPCServer = &GRPCServer{}
 
 type GRPCServer struct {
 	cosigner           *cosigner.LocalCosigner // The "node's" LocalCosigner
 	thresholdValidator *ThresholdValidator     // The "node's" ThresholdValidator
 	raftStore          *RaftStore              // The "node's" RaftStore
 	// Promoted Fields is embedded to have forward compatiblitity
-	proto.UnimplementedICosignerGRPCServerServer
+	proto.UnimplementedICosignerGRPCServer
 }
 
 // NewGRPCServer returns a new GRPCServer.
@@ -65,7 +65,7 @@ func (rpc *GRPCServer) SetNoncesAndSign(
 	res, err := rpc.cosigner.SetNoncesAndSign(
 		cosigner.SetNoncesAndSignRequest{
 			ChainID:   req.ChainID,
-			Nonces:    cosigner.CosignNoncesFromProto(req.GetNonces()),
+			Nonces:    cosigner.NoncesFromProto(req.GetNonces()),
 			HRST:      types.HRSTKeyFromProto(req.GetHrst()),
 			SignBytes: req.GetSignBytes(),
 		})
@@ -107,7 +107,7 @@ func (rpc *GRPCServer) GetNonces(
 		return nil, err
 	}
 	return &proto.CosignerGRPCGetNoncesResponse{
-		Nonces: cosigner.CosignNonces(res.Nonces).ToProto(),
+		Nonces: cosigner.WrappedNonces(res.Nonces).ToProto(),
 	}, nil
 }
 

@@ -25,7 +25,8 @@ type SignResponse struct {
 	Signature   []byte
 }
 
-type CosignNonce struct {
+// WrappedNonce is wrapping the Nonce to be used in communication between cosigners
+type WrappedNonce struct {
 	SourceID      int
 	DestinationID int
 	PubKey        []byte
@@ -33,7 +34,7 @@ type CosignNonce struct {
 	Signature     []byte
 }
 
-func (secretPart *CosignNonce) toProto() *proto.Nonce {
+func (secretPart *WrappedNonce) toProto() *proto.Nonce {
 	return &proto.Nonce{
 		SourceID:      int32(secretPart.SourceID),
 		DestinationID: int32(secretPart.DestinationID),
@@ -43,18 +44,18 @@ func (secretPart *CosignNonce) toProto() *proto.Nonce {
 	}
 }
 
-// CosignNonces is a list of CosignNonce
-type CosignNonces []CosignNonce
+// WrappedNonces is a list of WrappedNonce
+type WrappedNonces []WrappedNonce
 
-func (secretParts CosignNonces) ToProto() (out []*proto.Nonce) {
+func (secretParts WrappedNonces) ToProto() (out []*proto.Nonce) {
 	for _, secretPart := range secretParts {
 		out = append(out, secretPart.toProto())
 	}
 	return
 }
 
-func CosignNonceFromProto(secretPart *proto.Nonce) CosignNonce {
-	return CosignNonce{
+func NonceFromProto(secretPart *proto.Nonce) WrappedNonce {
+	return WrappedNonce{
 		SourceID:      int(secretPart.SourceID),
 		DestinationID: int(secretPart.DestinationID),
 		PubKey:        secretPart.PubKey,
@@ -63,33 +64,21 @@ func CosignNonceFromProto(secretPart *proto.Nonce) CosignNonce {
 	}
 }
 
-func CosignNoncesFromProto(secretParts []*proto.Nonce) []CosignNonce {
-	out := make([]CosignNonce, len(secretParts))
+func NoncesFromProto(secretParts []*proto.Nonce) []WrappedNonce {
+	out := make([]WrappedNonce, len(secretParts))
 	for i, secretPart := range secretParts {
-		out[i] = CosignNonceFromProto(secretPart)
+		out[i] = NonceFromProto(secretPart)
 	}
 	return out
 }
 
-type SetNonceRequest struct {
-	ChainID   string
-	SourceID  int
-	PubKey    []byte
-	Share     []byte
-	Signature []byte
-	Height    int64
-	Round     int64
-	Step      int8
-	Timestamp time.Time
-}
-
 type NoncesResponse struct {
-	Nonces []CosignNonce
+	Nonces []WrappedNonce
 }
 
 type SetNoncesAndSignRequest struct {
 	ChainID   string
-	Nonces    []CosignNonce
+	Nonces    []WrappedNonce
 	HRST      types.HRSTKey
 	SignBytes []byte
 }

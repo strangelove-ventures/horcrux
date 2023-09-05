@@ -51,7 +51,7 @@ func TestThresholdValidator3of5(t *testing.T) {
 }
 
 func loadKeyForLocalCosigner(
-	cosign *cosigner.LocalCosigner,
+	localcosigner *cosigner.LocalCosigner,
 	pubKey cometcrypto.PubKey,
 	chainID string,
 	privateShard []byte,
@@ -59,7 +59,7 @@ func loadKeyForLocalCosigner(
 	key := cosigner.CosignEd25519Key{
 		PubKey:       pubKey,
 		PrivateShard: privateShard,
-		ID:           cosign.GetID(),
+		ID:           localcosigner.GetID(),
 	}
 
 	keyBz, err := key.MarshalJSON()
@@ -67,7 +67,7 @@ func loadKeyForLocalCosigner(
 		return err
 	}
 
-	return os.WriteFile(cosign.Config.KeyFilePathCosigner(chainID), keyBz, 0600)
+	return os.WriteFile(localcosigner.Config.KeyFilePathCosigner(chainID), keyBz, 0600)
 }
 
 func testThresholdValidator(t *testing.T, threshold, total uint8) {

@@ -89,7 +89,7 @@ func (s *ThresholdSignerSoft) sumNonces(nonces []Nonce) (tsed25519.Scalar, tsed2
 	return nonceShare, noncePub, nil
 }
 
-// GenerateNonces deals nonces (A Pubkey and t of n shares) for all the cosigners.
+// GenerateNonces deals "nonces" (A Pubkey and t of n shares) for all the cosigners.
 func (s *ThresholdSignerSoft) GenerateNonces() (Nonces, error) {
 	secret := make([]byte, 32)
 	if _, err := rand.Read(secret); err != nil {

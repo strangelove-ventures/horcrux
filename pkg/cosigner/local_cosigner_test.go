@@ -117,7 +117,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []ICos
 	tmpDir := t.TempDir()
 
 	thresholdCosigners := make([]*LocalCosigner, threshold)
-	nonces := make([][]CosignNonce, threshold)
+	nonces := make([][]WrappedNonce, threshold)
 
 	now := time.Now()
 
@@ -190,7 +190,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []ICos
 	sigs := make([]PartialSignature, threshold)
 
 	for i, cosigner := range thresholdCosigners {
-		cosignerNonces := make([]CosignNonce, 0, threshold-1)
+		cosignerNonces := make([]WrappedNonce, 0, threshold-1)
 
 		for j, nonce := range nonces {
 			if i == j {
