@@ -97,7 +97,7 @@ func TestMultiResolver(t *testing.T) {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancelFunc()
 
-	grpcClient := proto.NewICosignerGRPCServerClient(connDNS)
+	grpcClient := proto.NewICosignerGRPCClient(connDNS)
 	_, err = grpcClient.GetLeader(ctx, &proto.CosignerGRPCGetLeaderRequest{})
 	require.NoError(t, err)
 
@@ -110,7 +110,7 @@ func TestMultiResolver(t *testing.T) {
 	require.NoError(t, err)
 	defer connIP.Close()
 
-	grpcClient = proto.NewICosignerGRPCServerClient(connIP)
+	grpcClient = proto.NewICosignerGRPCClient(connIP)
 	_, err = grpcClient.GetLeader(ctx, &proto.CosignerGRPCGetLeaderRequest{})
 	require.NoError(t, err)
 }

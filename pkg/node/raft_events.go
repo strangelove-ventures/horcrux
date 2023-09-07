@@ -51,7 +51,7 @@ func (f *fsm) handleLSSEvent(value string) {
 	_ = f.thresholdValidator.myCosigner.SaveLastSignedState(lss.ChainID, lss.SignStateConsensus)
 }
 
-func (s *RaftStore) getLeaderGRPCClient() (proto.ICosignerGRPCServerClient, *grpc.ClientConn, error) {
+func (s *RaftStore) getLeaderGRPCClient() (proto.ICosignerGRPCClient, *grpc.ClientConn, error) {
 	var leader string
 	for i := 0; i < 30; i++ {
 		leader = string(s.GetLeader())
@@ -68,7 +68,7 @@ func (s *RaftStore) getLeaderGRPCClient() (proto.ICosignerGRPCServerClient, *grp
 	if err != nil {
 		return nil, nil, err
 	}
-	return proto.NewICosignerGRPCServerClient(conn), conn, nil
+	return proto.NewICosignerGRPCClient(conn), conn, nil
 }
 
 func (s *RaftStore) SignBlock(req ValidatorSignBlockRequest) (*ValidatorSignBlockResponse, error) {
