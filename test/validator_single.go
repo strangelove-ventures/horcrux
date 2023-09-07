@@ -10,7 +10,7 @@ import (
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/cometbft/cometbft/privval"
 	"github.com/docker/docker/client"
-	"github.com/strangelove-ventures/horcrux/signer"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
 	interchaintest "github.com/strangelove-ventures/interchaintest/v7"
 	"github.com/strangelove-ventures/interchaintest/v7/chain/cosmos"
 	"github.com/strangelove-ventures/interchaintest/v7/ibc"
@@ -20,7 +20,8 @@ import (
 	"go.uber.org/zap/zaptest"
 )
 
-// testChainSingleNodeAndHorcruxSingle tests a single chain with a single horcrux (single-sign mode) validator and single node validators for the rest.
+// testChainSingleNodeAndHorcruxSingle tests a single chain with a single horcrux (single-sign mode) validator and
+// single node validators for the rest.
 func testChainSingleNodeAndHorcruxSingle(
 	t *testing.T,
 	totalValidators int, // total number of validators on chain (one horcrux + single node for the rest)
@@ -84,15 +85,15 @@ func preGenesisSingleNodeAndHorcruxSingle(
 				return err
 			}
 
-			chainNodes := make(signer.ChainNodes, len(sentries))
+			chainNodes := make(cosigner.ChainNodes, len(sentries))
 			for i, sentry := range sentries {
-				chainNodes[i] = signer.ChainNode{
+				chainNodes[i] = cosigner.ChainNode{
 					PrivValAddr: fmt.Sprintf("tcp://%s:1234", sentry.HostName()),
 				}
 			}
 
-			config := signer.Config{
-				SignMode:   signer.SignModeSingle,
+			config := cosigner.Config{
+				SignMode:   cosigner.SignModeSingle,
 				ChainNodes: chainNodes,
 			}
 
@@ -118,7 +119,7 @@ func writeConfigAndKeysSingle(
 	ctx context.Context,
 	chainID string,
 	singleSigner *cosmos.SidecarProcess,
-	config signer.Config,
+	config cosigner.Config,
 	pvKey privval.FilePVKey,
 ) error {
 	configBz, err := json.Marshal(config)

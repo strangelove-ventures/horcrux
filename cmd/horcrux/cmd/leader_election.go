@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
+
 	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/client"
-	"github.com/strangelove-ventures/horcrux/signer"
-	"github.com/strangelove-ventures/horcrux/signer/multiresolver"
-	"github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/strangelove-ventures/horcrux/pkg/multiresolver"
+	"github.com/strangelove-ventures/horcrux/pkg/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -69,7 +70,7 @@ horcrux elect 2 # elect specific leader`,
 			ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancelFunc()
 
-			grpcClient := proto.NewCosignerGRPCClient(conn)
+			grpcClient := proto.NewICosignerGRPCClient(conn)
 			_, err = grpcClient.TransferLeadership(
 				ctx,
 				&proto.CosignerGRPCTransferLeadershipRequest{LeaderID: leaderID},
@@ -109,21 +110,21 @@ func getLeaderCmd() *cobra.Command {
 
 			var id int
 
-			keyFileECIES, err := config.KeyFileExistsCosignerECIES()
+			keyFileECIES, err := config.KeyFileExistsCosignECIES()
 			if err != nil {
-				keyFileRSA, err := config.KeyFileExistsCosignerRSA()
+				keyFileRSA, err := config.KeyFileExistsCosignRSA()
 				if err != nil {
 					return fmt.Errorf("cosigner encryption keys not found (%s) - (%s): %w", keyFileECIES, keyFileRSA, err)
 				}
 
-				key, err := signer.LoadCosignerRSAKey(keyFileRSA)
+				key, err := cosigner.LoadCosignRSAKey(keyFileRSA)
 				if err != nil {
 					return fmt.Errorf("error reading cosigner key (%s): %w", keyFileRSA, err)
 				}
 
 				id = key.ID
 			} else {
-				key, err := signer.LoadCosignerECIESKey(keyFileECIES)
+				key, err := cosigner.LoadCosignerECIESKey(keyFileECIES)
 				if err != nil {
 					return fmt.Errorf("error reading cosigner key (%s): %w", keyFileECIES, err)
 				}
@@ -166,7 +167,7 @@ func getLeaderCmd() *cobra.Command {
 			ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancelFunc()
 
-			grpcClient := proto.NewCosignerGRPCClient(conn)
+			grpcClient := proto.NewICosignerGRPCClient(conn)
 
 			res, err := grpcClient.GetLeader(ctx, &proto.CosignerGRPCGetLeaderRequest{})
 			if err != nil {

@@ -3,11 +3,13 @@ package test
 import (
 	"context"
 	"fmt"
+
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
+
 	"sync"
 	"testing"
 
 	"github.com/cometbft/cometbft/crypto"
-	"github.com/strangelove-ventures/horcrux/signer"
 	interchaintest "github.com/strangelove-ventures/interchaintest/v7"
 	"github.com/strangelove-ventures/interchaintest/v7/chain/cosmos"
 	"github.com/strangelove-ventures/interchaintest/v7/ibc"
@@ -23,62 +25,64 @@ const (
 )
 
 // Test2Of3SignerOneSentry will spin up a chain with one single-node validator and one horcrux validator
-// the horcrux validator will have three cosigner nodes with a threshold of two, and one sentry node
+// the horcrux validator will have three pcosigners nodes with a threshold of two, and one sentry node
 func Test2Of3SignerOneSentry(t *testing.T) {
 	testChainSingleNodeAndHorcruxThreshold(t, 2, 3, 2, 1, 1)
 }
 
 // Test2Of3SignerTwoSentries will spin up a chain with one single-node validator and one horcrux validator
-// the horcrux validator will have three cosigner nodes with a threshold of two, and two sentry nodes
+// the horcrux validator will have three pcosigners nodes with a threshold of two, and two sentry nodes
 // checks that no slashing occurs
 func Test2Of3SignerTwoSentries(t *testing.T) {
 	testChainSingleNodeAndHorcruxThreshold(t, 2, 3, 2, 2, 2)
 }
 
 // Test2Of3SignerThreeSentries will spin up a chain with one single-node validator and one horcrux validator
-// the horcrux validator will have three cosigner nodes with a threshold of two, and three sentry nodes
-// where each cosigner connects to all sentries
+// the horcrux validator will have three pcosigners nodes with a threshold of two, and three sentry nodes
+// where each pcosigners connects to all sentries
 func Test2Of3SignerThreeSentries(t *testing.T) {
 	testChainSingleNodeAndHorcruxThreshold(t, 2, 3, 2, 3, 3)
 }
 
-// Test2Of3SignerThreeSentriesUniqueConnection will spin up a chain with one single-node validator and one horcrux validator
-// the horcrux validator will have three cosigner nodes with a threshold of two, and three sentry nodes
-// where each cosigner only connects to one sentry
+// Test2Of3SignerThreeSentriesUniqueConnection will spin up a chain with one single-node validator
+// and one horcrux validator.
+// The horcrux validator will have three pcosigners nodes with a threshold of two, and three sentry nodes
+// where each pcosigners only connects to one sentry
 func Test2Of3SignerThreeSentriesUniqueConnection(t *testing.T) {
 	testChainSingleNodeAndHorcruxThreshold(t, 2, 3, 2, 3, 1)
 }
 
 // Test2Of3SignerOneSentry will spin up a chain with one single-node validator and one horcrux validator
-// the horcrux validator will have three cosigner nodes with a threshold of two, and one sentry node
+// the horcrux validator will have three pcosigners nodes with a threshold of two, and one sentry node
 func Test3Of5SignerOneSentry(t *testing.T) {
 	testChainSingleNodeAndHorcruxThreshold(t, 2, 5, 3, 1, 1)
 }
 
 // Test3Of5SignerTwoSentries will spin up a chain with one single-node validator and one horcrux validator
-// the horcrux validator will have five cosigner nodes with a threshold of three, and two sentry nodes
-// where each cosigner connects to all sentries.
+// the horcrux validator will have five pcosigners nodes with a threshold of three, and two sentry nodes
+// where each pcosigners connects to all sentries.
 func Test3Of5SignerTwoSentries(t *testing.T) {
 	testChainSingleNodeAndHorcruxThreshold(t, 2, 5, 3, 2, 2)
 }
 
 // Test3Of5SignerFiveSentries will spin up a chain with one single-node validator and one horcrux validator
-// the horcrux validator will have five cosigner nodes with a threshold of three, and five sentry nodes
-// where each cosigner connects to all sentries.
+// the horcrux validator will have five pcosigners nodes with a threshold of three, and five sentry nodes
+// where each cosign connects to all sentries.
 func Test3Of5SignerFiveSentries(t *testing.T) {
 	testChainSingleNodeAndHorcruxThreshold(t, 2, 5, 3, 5, 5)
 }
 
-// Test3Of5SignerFiveSentriesUniqueConnection will spin up a chain with one single-node validator and one horcrux validator
-// the horcrux validator will have three cosigner nodes with a threshold of two, and three sentry nodes
-// where each cosigner only connects to one sentry.
+// Test3Of5SignerFiveSentriesUniqueConnection will spin up a chain
+// with one single-node validator and one horcrux validator.
+// The horcrux validator will have three cosign nodes with a threshold of two, and three sentry nodes
+// where each cosign only connects to one sentry.
 func Test3Of5SignerFiveSentriesUniqueConnection(t *testing.T) {
 	testChainSingleNodeAndHorcruxThreshold(t, 2, 5, 3, 5, 1)
 }
 
 // Test4Of7SignerTwoSentries will spin up a chain with one single-node validator and one horcrux validator
-// the horcrux validator will have seven cosigner nodes with a threshold of four, and two sentry nodes
-// where each cosigner connects to all sentries.
+// the horcrux validator will have seven cosign nodes with a threshold of four, and two sentry nodes
+// where each cosign connects to all sentries.
 func Test4Of7SignerTwoSentries(t *testing.T) {
 	testChainSingleNodeAndHorcruxThreshold(t, 2, 7, 4, 2, 2)
 }
@@ -124,7 +128,8 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	err := v.StopContainer(ctx)
 	require.NoError(t, err)
 
-	pubKey, err := convertValidatorToHorcrux(ctx, logger, client, network, v, totalSigners, threshold, cosmos.ChainNodes{v}, sentriesPerSigner)
+	pubKey, err := convertValidatorToHorcrux(
+		ctx, logger, client, network, v, totalSigners, threshold, cosmos.ChainNodes{v}, sentriesPerSigner)
 	require.NoError(t, err)
 
 	err = v.StartContainer(ctx)
@@ -163,7 +168,7 @@ func TestDownedSigners2of3(t *testing.T) {
 		t.Logf("{%s} -> Stopping signer...", cosigner.Name())
 		require.NoError(t, cosigner.StopContainer(ctx))
 
-		t.Logf("{%s} -> Waiting for blocks after stopping cosigner {%s}", ourValidator.Name(), cosigner.Name())
+		t.Logf("{%s} -> Waiting for blocks after stopping pcosigners {%s}", ourValidator.Name(), cosigner.Name())
 		require.NoError(t, testutil.WaitForBlocks(ctx, 5, cw.chain))
 
 		requireHealthyValidator(t, ourValidator, pubKey.Address())
@@ -171,7 +176,7 @@ func TestDownedSigners2of3(t *testing.T) {
 		t.Logf("{%s} -> Restarting signer...", cosigner.Name())
 		require.NoError(t, cosigner.StartContainer(ctx))
 
-		t.Logf("{%s} -> Waiting for blocks after restarting cosigner {%s}", ourValidator.Name(), cosigner.Name())
+		t.Logf("{%s} -> Waiting for blocks after restarting pcosigners {%s}", ourValidator.Name(), cosigner.Name())
 		require.NoError(t, testutil.WaitForBlocks(ctx, 5, cw.chain))
 
 		requireHealthyValidator(t, ourValidator, pubKey.Address())
@@ -213,18 +218,18 @@ func TestDownedSigners3of5(t *testing.T) {
 			require.NoError(t, cosigner1.StopContainer(ctx))
 			t.Logf("{%s} -> Stopping signer...", cosigner2.Name())
 			require.NoError(t, cosigner2.StopContainer(ctx))
-			t.Logf("{%s} -> Waiting for blocks after stopping cosigner {%s}", ourValidator.Name(), cosigner1.Name())
+			t.Logf("{%s} -> Waiting for blocks after stopping pcosigners {%s}", ourValidator.Name(), cosigner1.Name())
 		} else {
 			t.Logf("{%s} -> Stopping signer...", cosigner2.Name())
 			require.NoError(t, cosigner2.StopContainer(ctx))
 		}
 
-		t.Logf("{%s} -> Waiting for blocks after stopping cosigner {%s}", ourValidator.Name(), cosigner2.Name())
+		t.Logf("{%s} -> Waiting for blocks after stopping pcosigners {%s}", ourValidator.Name(), cosigner2.Name())
 		require.NoError(t, testutil.WaitForBlocks(ctx, 5, cw.chain))
 
 		requireHealthyValidator(t, ourValidator, pubKey.Address())
 
-		t.Logf("{%s} -> Restarting cosigner...", cosigner1.Name())
+		t.Logf("{%s} -> Restarting pcosigners...", cosigner1.Name())
 		require.NoError(t, cosigner1.StartContainer(ctx))
 		require.NoError(t, testutil.WaitForBlocks(ctx, 5, cw.chain))
 
@@ -264,7 +269,7 @@ func TestLeaderElection2of3(t *testing.T) {
 
 			t.Logf("{%s} -> Waiting for signed blocks with signer as leader {%s}", ourValidator.Name(), cosigner.Name())
 
-			// Make sure all cosigners have the same leader
+			// Make sure all pcosigners have the same leader
 			for _, s := range cosigners {
 				s := s
 				eg.Go(func() error {
@@ -314,7 +319,8 @@ func TestChainPureHorcrux(t *testing.T) {
 		totalValidators: totalValidators,
 		totalSentries:   1 + totalValidators*(sentriesPerValidator-1),
 		modifyGenesis:   modifyGenesisStrictUptime,
-		preGenesis:      preGenesisAllHorcruxThreshold(ctx, logger, client, network, signersPerValidator, threshold, sentriesPerValidator, sentriesPerSigner, pubKeys),
+		preGenesis: preGenesisAllHorcruxThreshold(
+			ctx, logger, client, network, signersPerValidator, threshold, sentriesPerValidator, sentriesPerSigner, pubKeys),
 	}
 
 	startChains(
@@ -352,13 +358,13 @@ func TestMultipleChainHorcrux(t *testing.T) {
 	for i := 0; i < totalChains; i++ {
 		chainConfigs[i] = &cosignerChainConfig{
 			sentries: make([]cosmos.ChainNodes, sentriesPerSigner),
-			shards:   make([]signer.CosignerEd25519Key, totalSigners),
+			shards:   make([]cosigner.CosignEd25519Key, totalSigners),
 		}
 	}
 
 	cosignerSidecars := make(cosmos.SidecarProcesses, totalSigners)
 
-	eciesShards, err := signer.CreateCosignerECIESShards(totalSigners)
+	eciesShards, err := cosigner.CreateCosignerECIESShards(totalSigners)
 	require.NoError(t, err)
 
 	var wg sync.WaitGroup
@@ -392,7 +398,7 @@ func TestMultipleChainHorcrux(t *testing.T) {
 
 				if i == 0 {
 					for j := 0; j < totalSigners; j++ {
-						cosigner, err := horcruxSidecar(ctx, firstSentry, fmt.Sprintf("cosigner-%d", j+1), client, network)
+						cosigner, err := horcruxSidecar(ctx, firstSentry, fmt.Sprintf("pcosigners-%d", j+1), client, network)
 						if err != nil {
 							wg.Done()
 							return err
@@ -409,7 +415,7 @@ func TestMultipleChainHorcrux(t *testing.T) {
 
 				wg.Done()
 
-				// wait for all cosigners to be started before continuing to start the chain.
+				// wait for all pcosigners to be started before continuing to start the chain.
 				<-cosignersStarted
 
 				return nil
@@ -435,7 +441,10 @@ func TestMultipleChainHorcrux(t *testing.T) {
 		chains[i] = cw.chain
 	}
 
-	testutil.WaitForBlocks(ctx, 20, chains...)
+	err = testutil.WaitForBlocks(ctx, 20, chains...)
+	if err != nil {
+		t.Logf("Error {WaitForBlocks} ->  {%v}", err)
+	}
 
 	for i, p := range pubKeys {
 		requireHealthyValidator(t, chainWrappers[i].chain.Validators[0], p.Address())
@@ -444,14 +453,14 @@ func TestMultipleChainHorcrux(t *testing.T) {
 
 type cosignerChainConfig struct {
 	chainID  string
-	shards   []signer.CosignerEd25519Key
+	shards   []cosigner.CosignEd25519Key
 	sentries []cosmos.ChainNodes
 }
 
 func configureAndStartSidecars(
 	ctx context.Context,
 	t *testing.T,
-	eciesShards []signer.CosignerECIESKey,
+	eciesShards []cosigner.CosignEciesKey,
 	cosignerSidecars cosmos.SidecarProcesses,
 	threshold int,
 	wg *sync.WaitGroup,
@@ -463,29 +472,29 @@ func configureAndStartSidecars(
 
 	totalSigners := len(cosignerSidecars)
 
-	cosignersConfig := make(signer.CosignersConfig, totalSigners)
-	for i, cosigner := range cosignerSidecars {
-		cosignersConfig[i] = signer.CosignerConfig{
+	cosignersConfig := make(cosigner.CosignersConfig, totalSigners)
+	for i, cosign := range cosignerSidecars {
+		cosignersConfig[i] = cosigner.CosignConfig{
 			ShardID: i + 1,
-			P2PAddr: fmt.Sprintf("tcp://%s:%s", cosigner.HostName(), signerPort),
+			P2PAddr: fmt.Sprintf("tcp://%s:%s", cosign.HostName(), signerPort),
 		}
 	}
 
 	var eg errgroup.Group
 
-	for i, cosigner := range cosignerSidecars {
+	for i, cosign := range cosignerSidecars {
 		numSentries := 0
 		for _, chainConfig := range chainConfigs {
 			numSentries += len(chainConfig.sentries[i])
 		}
 
-		chainNodes := make(signer.ChainNodes, 0, numSentries)
+		chainNodes := make(cosigner.ChainNodes, 0, numSentries)
 
 		ed25519Shards := make([]chainEd25519Shard, len(chainConfigs))
 
 		for j, chainConfig := range chainConfigs {
 			for _, sentry := range chainConfig.sentries[i] {
-				chainNodes = append(chainNodes, signer.ChainNode{
+				chainNodes = append(chainNodes, cosigner.ChainNode{
 					PrivValAddr: fmt.Sprintf("tcp://%s:1234", sentry.HostName()),
 				})
 			}
@@ -496,9 +505,9 @@ func configureAndStartSidecars(
 			}
 		}
 
-		config := signer.Config{
-			SignMode: signer.SignModeThreshold,
-			ThresholdModeConfig: &signer.ThresholdModeConfig{
+		config := cosigner.Config{
+			SignMode: cosigner.SignModeThreshold,
+			ThresholdModeConfig: &cosigner.ThresholdModeConfig{
 				Threshold:   threshold,
 				Cosigners:   cosignersConfig,
 				GRPCTimeout: "1500ms",
@@ -507,25 +516,25 @@ func configureAndStartSidecars(
 			ChainNodes: chainNodes,
 		}
 
-		cosigner := cosigner
+		cosign := cosign
 		i := i
 
-		// configure and start cosigner in parallel
+		// configure and start cosigners in parallel
 		eg.Go(func() error {
-			if err := writeConfigAndKeysThreshold(ctx, cosigner, config, eciesShards[i], ed25519Shards...); err != nil {
+			if err := writeConfigAndKeysThreshold(ctx, cosign, config, eciesShards[i], ed25519Shards...); err != nil {
 				return err
 			}
 
-			if err := cosigner.CreateContainer(ctx); err != nil {
+			if err := cosign.CreateContainer(ctx); err != nil {
 				return err
 			}
 
-			return cosigner.StartContainer(ctx)
+			return cosign.StartContainer(ctx)
 		})
 	}
 
 	require.NoError(t, eg.Wait())
 
-	// signal to pre-genesis that all cosigners have been started and chain start can proceed.
+	// signal to pre-genesis that all pcosigners have been started and chain start can proceed.
 	close(cosignersStarted)
 }
