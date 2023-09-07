@@ -268,7 +268,7 @@ func getLeader(ctx context.Context, cosigner *cosmos.SidecarProcess) (string, er
 	ctx, cancelFunc := context.WithTimeout(ctx, 10*time.Second)
 	defer cancelFunc()
 
-	grpcClient := proto.NewICosignerGRPCServerClient(conn)
+	grpcClient := proto.NewICosignerGRPCClient(conn)
 
 	res, err := grpcClient.GetLeader(ctx, &proto.CosignerGRPCGetLeaderRequest{})
 	if err != nil {

@@ -70,7 +70,7 @@ horcrux elect 2 # elect specific leader`,
 			ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancelFunc()
 
-			grpcClient := proto.NewICosignerGRPCServerClient(conn)
+			grpcClient := proto.NewICosignerGRPCClient(conn)
 			_, err = grpcClient.TransferLeadership(
 				ctx,
 				&proto.CosignerGRPCTransferLeadershipRequest{LeaderID: leaderID},
@@ -167,7 +167,7 @@ func getLeaderCmd() *cobra.Command {
 			ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancelFunc()
 
-			grpcClient := proto.NewICosignerGRPCServerClient(conn)
+			grpcClient := proto.NewICosignerGRPCClient(conn)
 
 			res, err := grpcClient.GetLeader(ctx, &proto.CosignerGRPCGetLeaderRequest{})
 			if err != nil {

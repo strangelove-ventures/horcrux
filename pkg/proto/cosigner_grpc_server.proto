@@ -3,9 +3,8 @@ syntax = "proto3";
 option go_package = "github.com/strangelove-ventures/horcrux/pkg/proto";
 
 package proto;
-// TODO: Rename it as GPRCserver. It makes more sense since we are using it for all connections. 
 // CosignerGRPC handles all the services (the server)
-service ICosignerGRPCServer {
+service ICosignerGRPC {
 	rpc SignBlock (CosignerGRPCSignBlockRequest) returns (CosignerGRPCSignBlockResponse) {}
 	rpc SetNoncesAndSign (CosignerGRPCSetNoncesAndSignRequest) returns (CosignerGRPCSetNoncesAndSignResponse) {}
   rpc GetNonces (CosignerGRPCGetNoncesRequest) returns (CosignerGRPCGetNoncesResponse) {}

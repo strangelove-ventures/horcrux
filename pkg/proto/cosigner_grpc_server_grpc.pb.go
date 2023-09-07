@@ -18,10 +18,10 @@ import (
 // Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
-// ICosignerGRPCServerClient is the client API for ICosignerGRPCServer service.
+// ICosignerGRPCClient is the client API for ICosignerGRPC service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type ICosignerGRPCServerClient interface {
+type ICosignerGRPCClient interface {
 	SignBlock(ctx context.Context, in *CosignerGRPCSignBlockRequest, opts ...grpc.CallOption) (*CosignerGRPCSignBlockResponse, error)
 	SetNoncesAndSign(ctx context.Context, in *CosignerGRPCSetNoncesAndSignRequest, opts ...grpc.CallOption) (*CosignerGRPCSetNoncesAndSignResponse, error)
 	GetNonces(ctx context.Context, in *CosignerGRPCGetNoncesRequest, opts ...grpc.CallOption) (*CosignerGRPCGetNoncesResponse, error)
@@ -29,219 +29,219 @@ type ICosignerGRPCServerClient interface {
 	GetLeader(ctx context.Context, in *CosignerGRPCGetLeaderRequest, opts ...grpc.CallOption) (*CosignerGRPCGetLeaderResponse, error)
 }
 
-type iCosignerGRPCServerClient struct {
+type iCosignerGRPCClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewICosignerGRPCServerClient(cc grpc.ClientConnInterface) ICosignerGRPCServerClient {
-	return &iCosignerGRPCServerClient{cc}
+func NewICosignerGRPCClient(cc grpc.ClientConnInterface) ICosignerGRPCClient {
+	return &iCosignerGRPCClient{cc}
 }
 
-func (c *iCosignerGRPCServerClient) SignBlock(ctx context.Context, in *CosignerGRPCSignBlockRequest, opts ...grpc.CallOption) (*CosignerGRPCSignBlockResponse, error) {
+func (c *iCosignerGRPCClient) SignBlock(ctx context.Context, in *CosignerGRPCSignBlockRequest, opts ...grpc.CallOption) (*CosignerGRPCSignBlockResponse, error) {
 	out := new(CosignerGRPCSignBlockResponse)
-	err := c.cc.Invoke(ctx, "/proto.ICosignerGRPCServer/SignBlock", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/proto.ICosignerGRPC/SignBlock", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *iCosignerGRPCServerClient) SetNoncesAndSign(ctx context.Context, in *CosignerGRPCSetNoncesAndSignRequest, opts ...grpc.CallOption) (*CosignerGRPCSetNoncesAndSignResponse, error) {
+func (c *iCosignerGRPCClient) SetNoncesAndSign(ctx context.Context, in *CosignerGRPCSetNoncesAndSignRequest, opts ...grpc.CallOption) (*CosignerGRPCSetNoncesAndSignResponse, error) {
 	out := new(CosignerGRPCSetNoncesAndSignResponse)
-	err := c.cc.Invoke(ctx, "/proto.ICosignerGRPCServer/SetNoncesAndSign", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/proto.ICosignerGRPC/SetNoncesAndSign", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *iCosignerGRPCServerClient) GetNonces(ctx context.Context, in *CosignerGRPCGetNoncesRequest, opts ...grpc.CallOption) (*CosignerGRPCGetNoncesResponse, error) {
+func (c *iCosignerGRPCClient) GetNonces(ctx context.Context, in *CosignerGRPCGetNoncesRequest, opts ...grpc.CallOption) (*CosignerGRPCGetNoncesResponse, error) {
 	out := new(CosignerGRPCGetNoncesResponse)
-	err := c.cc.Invoke(ctx, "/proto.ICosignerGRPCServer/GetNonces", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/proto.ICosignerGRPC/GetNonces", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *iCosignerGRPCServerClient) TransferLeadership(ctx context.Context, in *CosignerGRPCTransferLeadershipRequest, opts ...grpc.CallOption) (*CosignerGRPCTransferLeadershipResponse, error) {
+func (c *iCosignerGRPCClient) TransferLeadership(ctx context.Context, in *CosignerGRPCTransferLeadershipRequest, opts ...grpc.CallOption) (*CosignerGRPCTransferLeadershipResponse, error) {
 	out := new(CosignerGRPCTransferLeadershipResponse)
-	err := c.cc.Invoke(ctx, "/proto.ICosignerGRPCServer/TransferLeadership", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/proto.ICosignerGRPC/TransferLeadership", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *iCosignerGRPCServerClient) GetLeader(ctx context.Context, in *CosignerGRPCGetLeaderRequest, opts ...grpc.CallOption) (*CosignerGRPCGetLeaderResponse, error) {
+func (c *iCosignerGRPCClient) GetLeader(ctx context.Context, in *CosignerGRPCGetLeaderRequest, opts ...grpc.CallOption) (*CosignerGRPCGetLeaderResponse, error) {
 	out := new(CosignerGRPCGetLeaderResponse)
-	err := c.cc.Invoke(ctx, "/proto.ICosignerGRPCServer/GetLeader", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/proto.ICosignerGRPC/GetLeader", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// ICosignerGRPCServerServer is the server API for ICosignerGRPCServer service.
-// All implementations must embed UnimplementedICosignerGRPCServerServer
+// ICosignerGRPCServer is the server API for ICosignerGRPC service.
+// All implementations must embed UnimplementedICosignerGRPCServer
 // for forward compatibility
-type ICosignerGRPCServerServer interface {
+type ICosignerGRPCServer interface {
 	SignBlock(context.Context, *CosignerGRPCSignBlockRequest) (*CosignerGRPCSignBlockResponse, error)
 	SetNoncesAndSign(context.Context, *CosignerGRPCSetNoncesAndSignRequest) (*CosignerGRPCSetNoncesAndSignResponse, error)
 	GetNonces(context.Context, *CosignerGRPCGetNoncesRequest) (*CosignerGRPCGetNoncesResponse, error)
 	TransferLeadership(context.Context, *CosignerGRPCTransferLeadershipRequest) (*CosignerGRPCTransferLeadershipResponse, error)
 	GetLeader(context.Context, *CosignerGRPCGetLeaderRequest) (*CosignerGRPCGetLeaderResponse, error)
-	mustEmbedUnimplementedICosignerGRPCServerServer()
+	mustEmbedUnimplementedICosignerGRPCServer()
 }
 
-// UnimplementedICosignerGRPCServerServer must be embedded to have forward compatible implementations.
-type UnimplementedICosignerGRPCServerServer struct {
+// UnimplementedICosignerGRPCServer must be embedded to have forward compatible implementations.
+type UnimplementedICosignerGRPCServer struct {
 }
 
-func (UnimplementedICosignerGRPCServerServer) SignBlock(context.Context, *CosignerGRPCSignBlockRequest) (*CosignerGRPCSignBlockResponse, error) {
+func (UnimplementedICosignerGRPCServer) SignBlock(context.Context, *CosignerGRPCSignBlockRequest) (*CosignerGRPCSignBlockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SignBlock not implemented")
 }
-func (UnimplementedICosignerGRPCServerServer) SetNoncesAndSign(context.Context, *CosignerGRPCSetNoncesAndSignRequest) (*CosignerGRPCSetNoncesAndSignResponse, error) {
+func (UnimplementedICosignerGRPCServer) SetNoncesAndSign(context.Context, *CosignerGRPCSetNoncesAndSignRequest) (*CosignerGRPCSetNoncesAndSignResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetNoncesAndSign not implemented")
 }
-func (UnimplementedICosignerGRPCServerServer) GetNonces(context.Context, *CosignerGRPCGetNoncesRequest) (*CosignerGRPCGetNoncesResponse, error) {
+func (UnimplementedICosignerGRPCServer) GetNonces(context.Context, *CosignerGRPCGetNoncesRequest) (*CosignerGRPCGetNoncesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetNonces not implemented")
 }
-func (UnimplementedICosignerGRPCServerServer) TransferLeadership(context.Context, *CosignerGRPCTransferLeadershipRequest) (*CosignerGRPCTransferLeadershipResponse, error) {
+func (UnimplementedICosignerGRPCServer) TransferLeadership(context.Context, *CosignerGRPCTransferLeadershipRequest) (*CosignerGRPCTransferLeadershipResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method TransferLeadership not implemented")
 }
-func (UnimplementedICosignerGRPCServerServer) GetLeader(context.Context, *CosignerGRPCGetLeaderRequest) (*CosignerGRPCGetLeaderResponse, error) {
+func (UnimplementedICosignerGRPCServer) GetLeader(context.Context, *CosignerGRPCGetLeaderRequest) (*CosignerGRPCGetLeaderResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetLeader not implemented")
 }
-func (UnimplementedICosignerGRPCServerServer) mustEmbedUnimplementedICosignerGRPCServerServer() {}
+func (UnimplementedICosignerGRPCServer) mustEmbedUnimplementedICosignerGRPCServer() {}
 
-// UnsafeICosignerGRPCServerServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to ICosignerGRPCServerServer will
+// UnsafeICosignerGRPCServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ICosignerGRPCServer will
 // result in compilation errors.
-type UnsafeICosignerGRPCServerServer interface {
-	mustEmbedUnimplementedICosignerGRPCServerServer()
+type UnsafeICosignerGRPCServer interface {
+	mustEmbedUnimplementedICosignerGRPCServer()
 }
 
-func RegisterICosignerGRPCServerServer(s grpc.ServiceRegistrar, srv ICosignerGRPCServerServer) {
-	s.RegisterService(&ICosignerGRPCServer_ServiceDesc, srv)
+func RegisterICosignerGRPCServer(s grpc.ServiceRegistrar, srv ICosignerGRPCServer) {
+	s.RegisterService(&ICosignerGRPC_ServiceDesc, srv)
 }
 
-func _ICosignerGRPCServer_SignBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ICosignerGRPC_SignBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CosignerGRPCSignBlockRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ICosignerGRPCServerServer).SignBlock(ctx, in)
+		return srv.(ICosignerGRPCServer).SignBlock(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/proto.ICosignerGRPCServer/SignBlock",
+		FullMethod: "/proto.ICosignerGRPC/SignBlock",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ICosignerGRPCServerServer).SignBlock(ctx, req.(*CosignerGRPCSignBlockRequest))
+		return srv.(ICosignerGRPCServer).SignBlock(ctx, req.(*CosignerGRPCSignBlockRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ICosignerGRPCServer_SetNoncesAndSign_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ICosignerGRPC_SetNoncesAndSign_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CosignerGRPCSetNoncesAndSignRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ICosignerGRPCServerServer).SetNoncesAndSign(ctx, in)
+		return srv.(ICosignerGRPCServer).SetNoncesAndSign(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/proto.ICosignerGRPCServer/SetNoncesAndSign",
+		FullMethod: "/proto.ICosignerGRPC/SetNoncesAndSign",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ICosignerGRPCServerServer).SetNoncesAndSign(ctx, req.(*CosignerGRPCSetNoncesAndSignRequest))
+		return srv.(ICosignerGRPCServer).SetNoncesAndSign(ctx, req.(*CosignerGRPCSetNoncesAndSignRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ICosignerGRPCServer_GetNonces_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ICosignerGRPC_GetNonces_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CosignerGRPCGetNoncesRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ICosignerGRPCServerServer).GetNonces(ctx, in)
+		return srv.(ICosignerGRPCServer).GetNonces(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/proto.ICosignerGRPCServer/GetNonces",
+		FullMethod: "/proto.ICosignerGRPC/GetNonces",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ICosignerGRPCServerServer).GetNonces(ctx, req.(*CosignerGRPCGetNoncesRequest))
+		return srv.(ICosignerGRPCServer).GetNonces(ctx, req.(*CosignerGRPCGetNoncesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ICosignerGRPCServer_TransferLeadership_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ICosignerGRPC_TransferLeadership_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CosignerGRPCTransferLeadershipRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ICosignerGRPCServerServer).TransferLeadership(ctx, in)
+		return srv.(ICosignerGRPCServer).TransferLeadership(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/proto.ICosignerGRPCServer/TransferLeadership",
+		FullMethod: "/proto.ICosignerGRPC/TransferLeadership",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ICosignerGRPCServerServer).TransferLeadership(ctx, req.(*CosignerGRPCTransferLeadershipRequest))
+		return srv.(ICosignerGRPCServer).TransferLeadership(ctx, req.(*CosignerGRPCTransferLeadershipRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ICosignerGRPCServer_GetLeader_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ICosignerGRPC_GetLeader_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CosignerGRPCGetLeaderRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ICosignerGRPCServerServer).GetLeader(ctx, in)
+		return srv.(ICosignerGRPCServer).GetLeader(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/proto.ICosignerGRPCServer/GetLeader",
+		FullMethod: "/proto.ICosignerGRPC/GetLeader",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ICosignerGRPCServerServer).GetLeader(ctx, req.(*CosignerGRPCGetLeaderRequest))
+		return srv.(ICosignerGRPCServer).GetLeader(ctx, req.(*CosignerGRPCGetLeaderRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// ICosignerGRPCServer_ServiceDesc is the grpc.ServiceDesc for ICosignerGRPCServer service.
+// ICosignerGRPC_ServiceDesc is the grpc.ServiceDesc for ICosignerGRPC service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var ICosignerGRPCServer_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "proto.ICosignerGRPCServer",
-	HandlerType: (*ICosignerGRPCServerServer)(nil),
+var ICosignerGRPC_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "proto.ICosignerGRPC",
+	HandlerType: (*ICosignerGRPCServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "SignBlock",
-			Handler:    _ICosignerGRPCServer_SignBlock_Handler,
+			Handler:    _ICosignerGRPC_SignBlock_Handler,
 		},
 		{
 			MethodName: "SetNoncesAndSign",
-			Handler:    _ICosignerGRPCServer_SetNoncesAndSign_Handler,
+			Handler:    _ICosignerGRPC_SetNoncesAndSign_Handler,
 		},
 		{
 			MethodName: "GetNonces",
-			Handler:    _ICosignerGRPCServer_GetNonces_Handler,
+			Handler:    _ICosignerGRPC_GetNonces_Handler,
 		},
 		{
 			MethodName: "TransferLeadership",
-			Handler:    _ICosignerGRPCServer_TransferLeadership_Handler,
+			Handler:    _ICosignerGRPC_TransferLeadership_Handler,
 		},
 		{
 			MethodName: "GetLeader",
-			Handler:    _ICosignerGRPCServer_GetLeader_Handler,
+			Handler:    _ICosignerGRPC_GetLeader_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
