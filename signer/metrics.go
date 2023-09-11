@@ -74,48 +74,79 @@ var (
 	metricsTimeKeeper       = newMetricsTimer()
 
 	// Prometheus Metrics
-	totalPubKeyRequests = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "signer_total_pubkey_requests",
-		Help: "Total times public key requested (High count may indicate validator restarts)",
-	})
-	lastPrecommitHeight = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "signer_last_precommit_height",
-		Help: "Last Height Precommit Signed",
-	})
-	lastPrevoteHeight = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "signer_last_prevote_height",
-		Help: "Last Height Prevote Signed",
-	})
+	totalPubKeyRequests = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "signer_total_pubkey_requests",
+			Help: "Total times public key requested (High count may indicate validator restarts)",
+		},
+		[]string{"chain_id"},
+	)
+	lastPrecommitHeight = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "signer_last_precommit_height",
+			Help: "Last Height Precommit Signed",
+		},
+		[]string{"chain_id"},
+	)
 
-	lastProposalHeight = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "signer_last_proposal_height",
-		Help: "Last Height Proposal Signed",
-	})
-	lastPrecommitRound = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "signer_last_precommit_round",
-		Help: "Last Round Precommit Signed",
-	})
-	lastPrevoteRound = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "signer_last_prevote_round",
-		Help: "Last Round Prevote Signed",
-	})
-	lastProposalRound = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "signer_last_proposal_round",
-		Help: "Last Round Proposal Signed",
-	})
+	lastPrevoteHeight = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "signer_last_prevote_height",
+			Help: "Last Height Prevote Signed",
+		},
+		[]string{"chain_id"},
+	)
 
-	totalPrecommitsSigned = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "signer_total_precommits_signed",
-		Help: "Total Precommit Signed",
-	})
-	totalPrevotesSigned = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "signer_total_prevotes_signed",
-		Help: "Total Prevote Signed",
-	})
-	totalProposalsSigned = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "signer_total_proposals_signed",
-		Help: "Total Proposal Signed",
-	})
+	lastProposalHeight = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "signer_last_proposal_height",
+			Help: "Last Height Proposal Signed",
+		},
+		[]string{"chain_id"},
+	)
+	lastPrecommitRound = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "signer_last_precommit_round",
+			Help: "Last Round Precommit Signed",
+		},
+		[]string{"chain_id"},
+	)
+	lastPrevoteRound = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "signer_last_prevote_round",
+			Help: "Last Round Prevote Signed",
+		},
+		[]string{"chain_id"},
+	)
+	lastProposalRound = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "signer_last_proposal_round",
+			Help: "Last Round Proposal Signed",
+		},
+		[]string{"chain_id"},
+	)
+
+	totalPrecommitsSigned = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "signer_total_precommits_signed",
+			Help: "Total Precommit Signed",
+		},
+		[]string{"chain_id"},
+	)
+	totalPrevotesSigned = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "signer_total_prevotes_signed",
+			Help: "Total Prevote Signed",
+		},
+		[]string{"chain_id"},
+	)
+	totalProposalsSigned = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "signer_total_proposals_signed",
+			Help: "Total Proposal Signed",
+		},
+		[]string{"chain_id"},
+	)
 
 	secondsSinceLastPrecommit = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "signer_seconds_since_last_precommit",
@@ -140,22 +171,30 @@ var (
 			"(Should not increase beyond block time; If high, may indicate raft joining issue for CoSigner) ",
 	})
 
-	missedPrecommits = promauto.NewGauge(prometheus.GaugeOpts{
+	missedPrecommits = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "signer_missed_precommits",
 		Help: "Consecutive Precommit Missed",
-	})
-	missedPrevotes = promauto.NewGauge(prometheus.GaugeOpts{
+	},
+		[]string{"chain_id"},
+	)
+	missedPrevotes = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "signer_missed_prevotes",
 		Help: "Consecutive Prevote Missed",
-	})
-	totalMissedPrecommits = promauto.NewCounter(prometheus.CounterOpts{
+	},
+		[]string{"chain_id"},
+	)
+	totalMissedPrecommits = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "signer_total_missed_precommits",
 		Help: "Total Precommit Missed",
-	})
-	totalMissedPrevotes = promauto.NewCounter(prometheus.CounterOpts{
+	},
+		[]string{"chain_id"},
+	)
+	totalMissedPrevotes = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "signer_total_missed_prevotes",
 		Help: "Total Prevote Missed",
-	})
+	},
+		[]string{"chain_id"},
+	)
 
 	missedNonces = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -172,23 +211,31 @@ var (
 		[]string{"peerid"},
 	)
 
-	sentryConnectTries = promauto.NewGauge(prometheus.GaugeOpts{
+	sentryConnectTries = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "signer_sentry_connect_tries",
 		Help: "Consecutive Number of times sentry TCP connect has been tried (High count may indicate validator restarts)",
-	})
-	totalSentryConnectTries = promauto.NewCounter(prometheus.CounterOpts{
+	},
+		[]string{"node"},
+	)
+	totalSentryConnectTries = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "signer_total_sentry_connect_tries",
 		Help: "Total Number of times sentry TCP connect has been tried (High count may indicate validator restarts)",
-	})
+	},
+		[]string{"node"},
+	)
 
-	beyondBlockErrors = promauto.NewCounter(prometheus.CounterOpts{
+	beyondBlockErrors = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "signer_total_beyond_block_errors",
 		Help: "Total Times Signing Started but duplicate height/round request arrives",
-	})
-	failedSignVote = promauto.NewCounter(prometheus.CounterOpts{
+	},
+		[]string{"chain_id"},
+	)
+	failedSignVote = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "signer_total_failed_sign_vote",
 		Help: "Total Times Signer Failed to sign block - Unstarted and Unexepcted Height",
-	})
+	},
+		[]string{"chain_id"},
+	)
 
 	totalRaftLeader = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "signer_total_raft_leader",
