@@ -171,28 +171,32 @@ var (
 			"(Should not increase beyond block time; If high, may indicate raft joining issue for CoSigner) ",
 	})
 
-	missedPrecommits = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "signer_missed_precommits",
-		Help: "Consecutive Precommit Missed",
-	},
+	missedPrecommits = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "signer_missed_precommits",
+			Help: "Consecutive Precommit Missed",
+		},
 		[]string{"chain_id"},
 	)
-	missedPrevotes = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "signer_missed_prevotes",
-		Help: "Consecutive Prevote Missed",
-	},
+	missedPrevotes = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "signer_missed_prevotes",
+			Help: "Consecutive Prevote Missed",
+		},
 		[]string{"chain_id"},
 	)
-	totalMissedPrecommits = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "signer_total_missed_precommits",
-		Help: "Total Precommit Missed",
-	},
+	totalMissedPrecommits = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "signer_total_missed_precommits",
+			Help: "Total Precommit Missed",
+		},
 		[]string{"chain_id"},
 	)
-	totalMissedPrevotes = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "signer_total_missed_prevotes",
-		Help: "Total Prevote Missed",
-	},
+	totalMissedPrevotes = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "signer_total_missed_prevotes",
+			Help: "Total Prevote Missed",
+		},
 		[]string{"chain_id"},
 	)
 
@@ -211,29 +215,33 @@ var (
 		[]string{"peerid"},
 	)
 
-	sentryConnectTries = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "signer_sentry_connect_tries",
-		Help: "Consecutive Number of times sentry TCP connect has been tried (High count may indicate validator restarts)",
-	},
+	sentryConnectTries = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "signer_sentry_connect_tries",
+			Help: "Consecutive Number of times sentry TCP connect has been tried (High count may indicate validator restarts)",
+		},
 		[]string{"node"},
 	)
-	totalSentryConnectTries = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "signer_total_sentry_connect_tries",
-		Help: "Total Number of times sentry TCP connect has been tried (High count may indicate validator restarts)",
-	},
+	totalSentryConnectTries = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "signer_total_sentry_connect_tries",
+			Help: "Total Number of times sentry TCP connect has been tried (High count may indicate validator restarts)",
+		},
 		[]string{"node"},
 	)
 
-	beyondBlockErrors = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "signer_total_beyond_block_errors",
-		Help: "Total Times Signing Started but duplicate height/round request arrives",
-	},
+	beyondBlockErrors = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "signer_total_beyond_block_errors",
+			Help: "Total Times Signing Started but duplicate height/round request arrives",
+		},
 		[]string{"chain_id"},
 	)
-	failedSignVote = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "signer_total_failed_sign_vote",
-		Help: "Total Times Signer Failed to sign block - Unstarted and Unexepcted Height",
-	},
+	failedSignVote = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "signer_total_failed_sign_vote",
+			Help: "Total Times Signer Failed to sign block - Unstarted and Unexepcted Height",
+		},
 		[]string{"chain_id"},
 	)
 
