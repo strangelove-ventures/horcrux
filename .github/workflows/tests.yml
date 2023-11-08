@@ -26,10 +26,6 @@ jobs:
       - name: checkout horcrux
         uses: actions/checkout@v3
 
-      # make sure proto files are up to date
-      - name: generate fresh signer proto .go files
-        run: make proto-gen
-
       # run tests
       - name: run horcrux tests
         run: make test
@@ -58,10 +54,6 @@ jobs:
       # checkout horcrux
       - name: checkout horcrux
         uses: actions/checkout@v3
-
-      # make sure proto files are up to date
-      - name: generate fresh signer proto .go files
-        run: make proto-gen
 
       # run test matrix
       - name: run test
