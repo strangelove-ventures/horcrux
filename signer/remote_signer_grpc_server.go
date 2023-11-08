@@ -2,15 +2,12 @@ package signer
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"time"
 
-	cometcryptoencoding "github.com/cometbft/cometbft/crypto/encoding"
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	cometservice "github.com/cometbft/cometbft/libs/service"
-	cometprotoprivval "github.com/cometbft/cometbft/proto/tendermint/privval"
-	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
+
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -36,8 +33,9 @@ func NewRemoteSignerGRPCServer(
 	listenAddr string,
 ) *RemoteSignerGRPCServer {
 	return &RemoteSignerGRPCServer{
-		validator: validator,
-		logger:    logger,
+		validator:  validator,
+		logger:     logger,
+		listenAddr: listenAddr,
 	}
 }
 
@@ -57,104 +55,97 @@ func (s *RemoteSignerGRPCServer) OnStop() {
 	s.server.GracefulStop()
 }
 
-func (s *RemoteSignerGRPCServer) PubKey(_ context.Context, req *cometprotoprivval.PubKeyRequest) (*cometprotoprivval.PubKeyResponse, error) {
+func (s *RemoteSignerGRPCServer) PubKey(_ context.Context, req *proto.PubKeyRequest) (*proto.PubKeyResponse, error) {
 	totalPubKeyRequests.Inc()
-	res := new(cometprotoprivval.PubKeyResponse)
 
-	chainID := req.ChainId
-
-	pubKey, err := s.validator.GetPubKey(chainID)
+	pubKey, err := s.validator.GetPubKey(req.ChainId)
 	if err != nil {
 		s.logger.Error(
 			"Failed to get Pub Key",
-			"chain_id", chainID,
+			"chain_id", req.ChainId,
 			"error", err,
 		)
-		res.Error = getRemoteSignerError(err)
-		return res, nil
+		return nil, err
 	}
-	pk, err := cometcryptoencoding.PubKeyToProto(pubKey)
-	if err != nil {
-		s.logger.Error(
-			"Failed to encode public key",
-			"chain_id", chainID,
-			"error", err,
-		)
-		res.Error = getRemoteSignerError(err)
-		return res, nil
-	}
-	res.PubKey = pk
-	return res, nil
+
+	return &proto.PubKeyResponse{
+		PubKey: pubKey,
+	}, nil
 }
 
-func (s *RemoteSignerGRPCServer) SignVote(_ context.Context, req *cometprotoprivval.SignVoteRequest) (*cometprotoprivval.SignedVoteResponse, error) {
-	res := new(cometprotoprivval.SignedVoteResponse)
+func (s *RemoteSignerGRPCServer) Sign(
+	_ context.Context,
+	req *proto.SignBlockRequest,
+) (*proto.SignBlockResponse, error) {
+	chainID, block := req.ChainID, BlockFromProto(req.Block)
 
-	chainID := req.ChainId
-	vote := req.Vote
+	signature, timestamp, err := signAndTrack(s.logger, s.validator, chainID, block)
+	if err != nil {
+		return nil, err
+	}
 
-	if err := s.validator.SignVote(chainID, vote); err != nil {
+	return &proto.SignBlockResponse{
+		Signature: signature,
+		Timestamp: timestamp.UnixNano(),
+	}, nil
+}
+
+func signAndTrack(
+	logger cometlog.Logger,
+	validator PrivValidator,
+	chainID string,
+	block Block,
+) ([]byte, time.Time, error) {
+	signature, timestamp, err := validator.Sign(chainID, block)
+	if err != nil {
 		switch typedErr := err.(type) {
 		case *BeyondBlockError:
-			s.logger.Debug(
-				"Rejecting sign vote request",
+			logger.Debug(
+				"Rejecting sign request",
+				"type", signType(block.Step),
 				"chain_id", chainID,
-				"height", vote.Height,
-				"round", vote.Round,
-				"type", vote.Type,
-				"validator", fmt.Sprintf("%X", vote.ValidatorAddress),
+				"height", block.Height,
+				"round", block.Round,
 				"reason", typedErr.msg,
 			)
 			beyondBlockErrors.Inc()
 		default:
-			s.logger.Error(
-				"Failed to sign vote",
+			logger.Error(
+				"Failed to sign",
+				"type", signType(block.Step),
 				"chain_id", chainID,
-				"height", vote.Height,
-				"round", vote.Round,
-				"type", vote.Type,
-				"validator", fmt.Sprintf("%X", vote.ValidatorAddress),
+				"height", block.Height,
+				"round", block.Round,
 				"error", err,
 			)
 			failedSignVote.Inc()
 		}
-		res.Error = getRemoteSignerError(err)
-		return res, nil
+		return nil, block.Timestamp, err
 	}
+
 	// Show signatures provided to each node have the same signature and timestamps
 	sigLen := 6
-	if len(vote.Signature) < sigLen {
-		sigLen = len(vote.Signature)
+	if len(signature) < sigLen {
+		sigLen = len(signature)
 	}
-	s.logger.Info(
-		"Signed vote",
+	logger.Info(
+		"Signed",
+		"type", signType(block.Step),
 		"chain_id", chainID,
-		"height", vote.Height,
-		"round", vote.Round,
-		"type", vote.Type,
-		"sig", vote.Signature[:sigLen],
-		"ts", vote.Timestamp.Unix(),
+		"height", block.Height,
+		"round", block.Round,
+		"sig", signature[:sigLen],
+		"ts", block.Timestamp,
 	)
 
-	if vote.Type == cometproto.PrecommitType {
-		stepSize := vote.Height - previousPrecommitHeight
-		if previousPrecommitHeight != 0 && stepSize > 1 {
-			missedPrecommits.Add(float64(stepSize))
-			totalMissedPrecommits.Add(float64(stepSize))
-		} else {
-			missedPrecommits.Set(0)
-		}
-		previousPrecommitHeight = vote.Height // remember last PrecommitHeight
-
-		metricsTimeKeeper.SetPreviousPrecommit(time.Now())
-
-		lastPrecommitHeight.Set(float64(vote.Height))
-		lastPrecommitRound.Set(float64(vote.Round))
-		totalPrecommitsSigned.Inc()
-	}
-	if vote.Type == cometproto.PrevoteType {
+	switch block.Step {
+	case stepPropose:
+		lastProposalHeight.Set(float64(block.Height))
+		lastProposalRound.Set(float64(block.Round))
+		totalProposalsSigned.Inc()
+	case stepPrevote:
 		// Determine number of heights since the last Prevote
-		stepSize := vote.Height - previousPrevoteHeight
+		stepSize := block.Height - previousPrevoteHeight
 		if previousPrevoteHeight != 0 && stepSize > 1 {
 			missedPrevotes.Add(float64(stepSize))
 			totalMissedPrevotes.Add(float64(stepSize))
@@ -162,72 +153,29 @@ func (s *RemoteSignerGRPCServer) SignVote(_ context.Context, req *cometprotopriv
 			missedPrevotes.Set(0)
 		}
 
-		previousPrevoteHeight = vote.Height // remember last PrevoteHeight
+		previousPrevoteHeight = block.Height // remember last PrevoteHeight
 
 		metricsTimeKeeper.SetPreviousPrevote(time.Now())
 
-		lastPrevoteHeight.Set(float64(vote.Height))
-		lastPrevoteRound.Set(float64(vote.Round))
+		lastPrevoteHeight.Set(float64(block.Height))
+		lastPrevoteRound.Set(float64(block.Round))
 		totalPrevotesSigned.Inc()
-	}
-
-	res.Vote = *vote
-	return res, nil
-}
-
-func (s *RemoteSignerGRPCServer) SignProposal(_ context.Context, req *cometprotoprivval.SignProposalRequest) (*cometprotoprivval.SignedProposalResponse, error) {
-	res := new(cometprotoprivval.SignedProposalResponse)
-
-	chainID := req.ChainId
-	proposal := req.Proposal
-
-	if err := s.validator.SignProposal(chainID, proposal); err != nil {
-		switch typedErr := err.(type) {
-		case *BeyondBlockError:
-			s.logger.Debug(
-				"Rejecting proposal sign request",
-				"chain_id", chainID,
-				"height", proposal.Height,
-				"round", proposal.Round,
-				"type", proposal.Type,
-				"reason", typedErr.msg,
-			)
-			beyondBlockErrors.Inc()
-		default:
-			s.logger.Error(
-				"Failed to sign proposal",
-				"chain_id", chainID,
-				"height", proposal.Height,
-				"round", proposal.Round,
-				"type", proposal.Type,
-				"error", err,
-			)
+	case stepPrecommit:
+		stepSize := block.Height - previousPrecommitHeight
+		if previousPrecommitHeight != 0 && stepSize > 1 {
+			missedPrecommits.Add(float64(stepSize))
+			totalMissedPrecommits.Add(float64(stepSize))
+		} else {
+			missedPrecommits.Set(0)
 		}
-		res.Error = getRemoteSignerError(err)
-		return res, nil
-	}
-	// Show signatures provided to each node have the same signature and timestamps
-	sigLen := 6
-	if len(proposal.Signature) < sigLen {
-		sigLen = len(proposal.Signature)
-	}
-	s.logger.Info(
-		"Signed proposal",
-		"chain_id", chainID,
-		"height", proposal.Height,
-		"round", proposal.Round,
-		"type", proposal.Type,
-		"sig", proposal.Signature[:sigLen],
-		"ts", proposal.Timestamp.Unix(),
-	)
-	lastProposalHeight.Set(float64(proposal.Height))
-	lastProposalRound.Set(float64(proposal.Round))
-	totalProposalsSigned.Inc()
+		previousPrecommitHeight = block.Height // remember last PrecommitHeight
 
-	res.Proposal = *proposal
-	return res, nil
-}
+		metricsTimeKeeper.SetPreviousPrecommit(time.Now())
 
-func (s *RemoteSignerGRPCServer) Ping(context.Context, *cometprotoprivval.PingRequest) (*cometprotoprivval.PingResponse, error) {
-	return new(cometprotoprivval.PingResponse), nil
+		lastPrecommitHeight.Set(float64(block.Height))
+		lastPrecommitRound.Set(float64(block.Round))
+		totalPrecommitsSigned.Inc()
+	}
+
+	return signature, timestamp, nil
 }

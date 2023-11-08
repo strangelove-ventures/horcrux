@@ -1,0 +1,19 @@
+syntax = "proto3";
+package strangelove.horcrux;
+
+import "strangelove/horcrux/cosigner.proto";
+
+option go_package = "github.com/strangelove-ventures/horcrux/signer/proto";
+
+service RemoteSigner {
+	rpc PubKey (PubKeyRequest) returns (PubKeyResponse) {}
+	rpc Sign(strangelove.horcrux.SignBlockRequest) returns (strangelove.horcrux.SignBlockResponse) {}
+}
+
+message PubKeyRequest {
+	string chain_id = 1;
+}
+
+message PubKeyResponse {
+	bytes pub_key = 1;
+}

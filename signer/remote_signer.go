@@ -6,7 +6,6 @@ import (
 	"net"
 	"time"
 
-	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	cometcryptoencoding "github.com/cometbft/cometbft/crypto/encoding"
 	cometlog "github.com/cometbft/cometbft/libs/log"
@@ -23,9 +22,8 @@ const connRetrySec = 2
 // PrivValidator is a wrapper for tendermint PrivValidator,
 // with additional Stop method for safe shutdown.
 type PrivValidator interface {
-	SignVote(chainID string, vote *cometproto.Vote) error
-	SignProposal(chainID string, proposal *cometproto.Proposal) error
-	GetPubKey(chainID string) (cometcrypto.PubKey, error)
+	Sign(chainID string, block Block) ([]byte, time.Time, error)
+	GetPubKey(chainID string) ([]byte, error)
 	Stop()
 }
 
@@ -188,88 +186,14 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *cometp
 		Error: nil,
 	}}
 
-	if err := rs.privVal.SignVote(chainID, vote); err != nil {
-		switch typedErr := err.(type) {
-		case *BeyondBlockError:
-			rs.Logger.Debug(
-				"Rejecting sign vote request",
-				"chain_id", chainID,
-				"height", vote.Height,
-				"round", vote.Round,
-				"type", vote.Type,
-				"node", rs.address,
-				"validator", fmt.Sprintf("%X", vote.ValidatorAddress),
-				"reason", typedErr.msg,
-			)
-			beyondBlockErrors.Inc()
-		default:
-			rs.Logger.Error(
-				"Failed to sign vote",
-				"chain_id", chainID,
-				"height", vote.Height,
-				"round", vote.Round,
-				"type", vote.Type,
-				"node", rs.address,
-				"validator", fmt.Sprintf("%X", vote.ValidatorAddress),
-				"error", err,
-			)
-			failedSignVote.Inc()
-		}
+	signature, timestamp, err := signAndTrack(rs.Logger, rs.privVal, chainID, VoteToBlock(chainID, vote))
+	if err != nil {
 		msgSum.SignedVoteResponse.Error = getRemoteSignerError(err)
 		return cometprotoprivval.Message{Sum: msgSum}
 	}
-	// Show signatures provided to each node have the same signature and timestamps
-	sigLen := 6
-	if len(vote.Signature) < sigLen {
-		sigLen = len(vote.Signature)
-	}
-	rs.Logger.Info(
-		"Signed vote",
-		"chain_id", chainID,
-		"height", vote.Height,
-		"round", vote.Round,
-		"type", vote.Type,
-		"sig", vote.Signature[:sigLen],
-		"ts", vote.Timestamp.Unix(),
-		"node", rs.address,
-	)
 
-	if vote.Type == cometproto.PrecommitType {
-		stepSize := vote.Height - previousPrecommitHeight
-		if previousPrecommitHeight != 0 && stepSize > 1 {
-			missedPrecommits.Add(float64(stepSize))
-			totalMissedPrecommits.Add(float64(stepSize))
-		} else {
-			missedPrecommits.Set(0)
-		}
-		previousPrecommitHeight = vote.Height // remember last PrecommitHeight
-
-		metricsTimeKeeper.SetPreviousPrecommit(time.Now())
-
-		lastPrecommitHeight.Set(float64(vote.Height))
-		lastPrecommitRound.Set(float64(vote.Round))
-		totalPrecommitsSigned.Inc()
-	}
-	if vote.Type == cometproto.PrevoteType {
-		// Determine number of heights since the last Prevote
-		stepSize := vote.Height - previousPrevoteHeight
-		if previousPrevoteHeight != 0 && stepSize > 1 {
-			missedPrevotes.Add(float64(stepSize))
-			totalMissedPrevotes.Add(float64(stepSize))
-		} else {
-			missedPrevotes.Set(0)
-		}
-
-		previousPrevoteHeight = vote.Height // remember last PrevoteHeight
-
-		metricsTimeKeeper.SetPreviousPrevote(time.Now())
-
-		lastPrevoteHeight.Set(float64(vote.Height))
-		lastPrevoteRound.Set(float64(vote.Round))
-		totalPrevotesSigned.Inc()
-	}
-
-	msgSum.SignedVoteResponse.Vote = *vote
+	msgSum.SignedVoteResponse.Vote.Timestamp = timestamp
+	msgSum.SignedVoteResponse.Vote.Signature = signature
 	return cometprotoprivval.Message{Sum: msgSum}
 }
 
@@ -281,54 +205,17 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(
 		SignedProposalResponse: &cometprotoprivval.SignedProposalResponse{
 			Proposal: cometproto.Proposal{},
 			Error:    nil,
-		}}
+		},
+	}
 
-	if err := rs.privVal.SignProposal(chainID, proposal); err != nil {
-		switch typedErr := err.(type) {
-		case *BeyondBlockError:
-			rs.Logger.Debug(
-				"Rejecting proposal sign request",
-				"chain_id", chainID,
-				"height", proposal.Height,
-				"round", proposal.Round,
-				"type", proposal.Type,
-				"node", rs.address,
-				"reason", typedErr.msg,
-			)
-			beyondBlockErrors.Inc()
-		default:
-			rs.Logger.Error(
-				"Failed to sign proposal",
-				"chain_id", chainID,
-				"height", proposal.Height,
-				"round", proposal.Round,
-				"type", proposal.Type,
-				"node", rs.address,
-				"error", err,
-			)
-		}
+	signature, timestamp, err := signAndTrack(rs.Logger, rs.privVal, chainID, ProposalToBlock(chainID, proposal))
+	if err != nil {
 		msgSum.SignedProposalResponse.Error = getRemoteSignerError(err)
 		return cometprotoprivval.Message{Sum: msgSum}
 	}
-	// Show signatures provided to each node have the same signature and timestamps
-	sigLen := 6
-	if len(proposal.Signature) < sigLen {
-		sigLen = len(proposal.Signature)
-	}
-	rs.Logger.Info(
-		"Signed proposal",
-		"chain_id", chainID,
-		"height", proposal.Height,
-		"round", proposal.Round,
-		"type", proposal.Type,
-		"sig", proposal.Signature[:sigLen],
-		"ts", proposal.Timestamp.Unix(),
-		"node", rs.address,
-	)
-	lastProposalHeight.Set(float64(proposal.Height))
-	lastProposalRound.Set(float64(proposal.Round))
-	totalProposalsSigned.Inc()
-	msgSum.SignedProposalResponse.Proposal = *proposal
+
+	msgSum.SignedProposalResponse.Proposal.Timestamp = timestamp
+	msgSum.SignedProposalResponse.Proposal.Signature = signature
 	return cometprotoprivval.Message{Sum: msgSum}
 }
 
@@ -350,7 +237,7 @@ func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) cometprotopriv
 		msgSum.PubKeyResponse.Error = getRemoteSignerError(err)
 		return cometprotoprivval.Message{Sum: msgSum}
 	}
-	pk, err := cometcryptoencoding.PubKeyToProto(pubKey)
+	pk, err := cometcryptoencoding.PubKeyToProto(cometcryptoed25519.PubKey(pubKey))
 	if err != nil {
 		rs.Logger.Error(
 			"Failed to get Pub Key",

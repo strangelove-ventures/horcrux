@@ -8,11 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cometbft/cometbft/crypto"
 	"github.com/cometbft/cometbft/libs/log"
-	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	cometrpcjsontypes "github.com/cometbft/cometbft/rpc/jsonrpc/types"
-	comet "github.com/cometbft/cometbft/types"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 )
 
@@ -228,46 +225,18 @@ func (pv *ThresholdValidator) waitForSignStatesToFlushToDisk() {
 
 // GetPubKey returns the public key of the validator.
 // Implements PrivValidator.
-func (pv *ThresholdValidator) GetPubKey(chainID string) (crypto.PubKey, error) {
-	return pv.myCosigner.GetPubKey(chainID)
+func (pv *ThresholdValidator) GetPubKey(chainID string) ([]byte, error) {
+	pubKey, err := pv.myCosigner.GetPubKey(chainID)
+	if err != nil {
+		return nil, err
+	}
+	return pubKey.Bytes(), nil
 }
 
 // SignVote signs a canonical representation of the vote, along with the
 // chainID. Implements PrivValidator.
-func (pv *ThresholdValidator) SignVote(chainID string, vote *cometproto.Vote) error {
-	block := &Block{
-		Height:    vote.Height,
-		Round:     int64(vote.Round),
-		Step:      VoteToStep(vote),
-		Timestamp: vote.Timestamp,
-		SignBytes: comet.VoteSignBytes(chainID, vote),
-	}
-
-	sig, stamp, err := pv.SignBlock(chainID, block)
-
-	vote.Signature = sig
-	vote.Timestamp = stamp
-
-	return err
-}
-
-// SignProposal signs a canonical representation of the proposal, along with
-// the chainID. Implements PrivValidator.
-func (pv *ThresholdValidator) SignProposal(chainID string, proposal *cometproto.Proposal) error {
-	block := &Block{
-		Height:    proposal.Height,
-		Round:     int64(proposal.Round),
-		Step:      ProposalToStep(proposal),
-		Timestamp: proposal.Timestamp,
-		SignBytes: comet.ProposalSignBytes(chainID, proposal),
-	}
-
-	sig, stamp, err := pv.SignBlock(chainID, block)
-
-	proposal.Signature = sig
-	proposal.Timestamp = stamp
-
-	return err
+func (pv *ThresholdValidator) Sign(chainID string, block Block) ([]byte, time.Time, error) {
+	return pv.SignBlock(chainID, block)
 }
 
 type Block struct {
@@ -302,6 +271,16 @@ func (block Block) toProto() *proto.Block {
 		Step:      int32(block.Step),
 		SignBytes: block.SignBytes,
 		Timestamp: block.Timestamp.UnixNano(),
+	}
+}
+
+func BlockFromProto(block *proto.Block) Block {
+	return Block{
+		Height:    block.Height,
+		Round:     block.Round,
+		Step:      int8(block.Step),
+		SignBytes: block.SignBytes,
+		Timestamp: time.Unix(0, block.Timestamp),
 	}
 }
 
@@ -559,7 +538,7 @@ func (pv *ThresholdValidator) compareBlockSignatureAgainstHRS(
 	return newStillWaitingForBlockError(chainID, blockHRS)
 }
 
-func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, time.Time, error) {
+func (pv *ThresholdValidator) SignBlock(chainID string, block Block) ([]byte, time.Time, error) {
 	height, round, step, stamp, signBytes := block.Height, block.Round, block.Step, block.Timestamp, block.SignBytes
 
 	if err := pv.LoadSignStateIfNecessary(chainID); err != nil {
@@ -580,7 +559,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 		totalNotRaftLeader.Inc()
 		signRes, err := pv.leader.SignBlock(CosignerSignBlockRequest{
 			ChainID: chainID,
-			Block:   block,
+			Block:   &block,
 		})
 		if err != nil {
 			if _, ok := err.(*cometrpcjsontypes.RPCError); ok {
@@ -612,7 +591,7 @@ func (pv *ThresholdValidator) SignBlock(chainID string, block *Block) ([]byte, t
 	}
 
 	// Keep track of the last block that we began the signing process for. Only allow one attempt per block
-	existingSignature, existingTimestamp, err := pv.SaveLastSignedStateInitiated(chainID, block)
+	existingSignature, existingTimestamp, err := pv.SaveLastSignedStateInitiated(chainID, &block)
 	if err != nil {
 		return nil, stamp, err
 	}

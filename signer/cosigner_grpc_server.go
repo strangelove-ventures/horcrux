@@ -3,7 +3,6 @@ package signer
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/hashicorp/raft"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
@@ -34,14 +33,7 @@ func (rpc *CosignerGRPCServer) SignBlock(
 	_ context.Context,
 	req *proto.SignBlockRequest,
 ) (*proto.SignBlockResponse, error) {
-	block := &Block{
-		Height:    req.Block.GetHeight(),
-		Round:     req.Block.GetRound(),
-		Step:      int8(req.Block.GetStep()),
-		SignBytes: req.Block.GetSignBytes(),
-		Timestamp: time.Unix(0, req.Block.GetTimestamp()),
-	}
-	res, _, err := rpc.thresholdValidator.SignBlock(req.ChainID, block)
+	res, _, err := rpc.thresholdValidator.SignBlock(req.ChainID, BlockFromProto(req.Block))
 	if err != nil {
 		return nil, err
 	}

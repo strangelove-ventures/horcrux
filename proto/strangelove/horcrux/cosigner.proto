@@ -26,6 +26,7 @@ message SignBlockRequest {
 
 message SignBlockResponse {
 	bytes signature = 1;
+	int64 timestamp = 2;
 }
 
 message Nonce {
@@ -66,12 +67,12 @@ message GetNoncesResponse {
 }
 
 message TransferLeadershipRequest {
-  string leaderID = 1;
+ 	string leaderID = 1;
 }
 
 message TransferLeadershipResponse {
-  string leaderID = 1;
-  string leaderAddress = 2;
+	string leaderID = 1;
+	string leaderAddress = 2;
 }
 
 message GetLeaderRequest {}
