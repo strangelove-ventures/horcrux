@@ -17,10 +17,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Install and setup go
-      - name: Set up Go 1.19
+      - name: Set up Go 1.21
         uses: actions/setup-go@v4
         with:
-          go-version: '^1.19'
+          go-version: '^1.21.4'
 
       # checkout horcrux
       - name: checkout horcrux
@@ -28,7 +28,7 @@ jobs:
 
       # make sure proto files are up to date
       - name: generate fresh signer proto .go files
-        run: make signer-proto
+        run: make proto-gen
 
       # run tests
       - name: run horcrux tests
@@ -50,10 +50,10 @@ jobs:
           - TestSingleSignerTwoSentries
     steps:
       # Install and setup go
-      - name: Set up Go 1.20
+      - name: Set up Go 1.21
         uses: actions/setup-go@v4
         with:
-          go-version: '^1.20.0'
+          go-version: '^1.21.4'
 
       # checkout horcrux
       - name: checkout horcrux
@@ -61,7 +61,7 @@ jobs:
 
       # make sure proto files are up to date
       - name: generate fresh signer proto .go files
-        run: make signer-proto
+        run: make proto-gen
 
       # run test matrix
       - name: run test

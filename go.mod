@@ -1,6 +1,6 @@
 module github.com/strangelove-ventures/horcrux
 
-go 1.19
+go 1.21
 
 require (
 	github.com/Jille/raft-grpc-leader-rpc v1.1.0
