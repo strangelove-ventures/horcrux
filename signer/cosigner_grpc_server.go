@@ -9,31 +9,31 @@ import (
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 )
 
-var _ proto.CosignerGRPCServer = &GRPCServer{}
+var _ proto.CosignerServer = &CosignerGRPCServer{}
 
-type GRPCServer struct {
+type CosignerGRPCServer struct {
 	cosigner           *LocalCosigner
 	thresholdValidator *ThresholdValidator
 	raftStore          *RaftStore
-	proto.UnimplementedCosignerGRPCServer
+	proto.UnimplementedCosignerServer
 }
 
-func NewGRPCServer(
+func NewCosignerGRPCServer(
 	cosigner *LocalCosigner,
 	thresholdValidator *ThresholdValidator,
 	raftStore *RaftStore,
-) *GRPCServer {
-	return &GRPCServer{
+) *CosignerGRPCServer {
+	return &CosignerGRPCServer{
 		cosigner:           cosigner,
 		thresholdValidator: thresholdValidator,
 		raftStore:          raftStore,
 	}
 }
 
-func (rpc *GRPCServer) SignBlock(
+func (rpc *CosignerGRPCServer) SignBlock(
 	_ context.Context,
-	req *proto.CosignerGRPCSignBlockRequest,
-) (*proto.CosignerGRPCSignBlockResponse, error) {
+	req *proto.SignBlockRequest,
+) (*proto.SignBlockResponse, error) {
 	block := &Block{
 		Height:    req.Block.GetHeight(),
 		Round:     req.Block.GetRound(),
@@ -45,15 +45,15 @@ func (rpc *GRPCServer) SignBlock(
 	if err != nil {
 		return nil, err
 	}
-	return &proto.CosignerGRPCSignBlockResponse{
+	return &proto.SignBlockResponse{
 		Signature: res,
 	}, nil
 }
 
-func (rpc *GRPCServer) SetNoncesAndSign(
+func (rpc *CosignerGRPCServer) SetNoncesAndSign(
 	_ context.Context,
-	req *proto.CosignerGRPCSetNoncesAndSignRequest,
-) (*proto.CosignerGRPCSetNoncesAndSignResponse, error) {
+	req *proto.SetNoncesAndSignRequest,
+) (*proto.SetNoncesAndSignResponse, error) {
 	res, err := rpc.cosigner.SetNoncesAndSign(CosignerSetNoncesAndSignRequest{
 		ChainID:   req.ChainID,
 		Nonces:    CosignerNoncesFromProto(req.GetNonces()),
@@ -78,17 +78,17 @@ func (rpc *GRPCServer) SetNoncesAndSign(
 		"round", req.Hrst.Round,
 		"step", req.Hrst.Step,
 	)
-	return &proto.CosignerGRPCSetNoncesAndSignResponse{
+	return &proto.SetNoncesAndSignResponse{
 		NoncePublic: res.NoncePublic,
 		Timestamp:   res.Timestamp.UnixNano(),
 		Signature:   res.Signature,
 	}, nil
 }
 
-func (rpc *GRPCServer) GetNonces(
+func (rpc *CosignerGRPCServer) GetNonces(
 	_ context.Context,
-	req *proto.CosignerGRPCGetNoncesRequest,
-) (*proto.CosignerGRPCGetNoncesResponse, error) {
+	req *proto.GetNoncesRequest,
+) (*proto.GetNoncesResponse, error) {
 	res, err := rpc.cosigner.GetNonces(
 		req.ChainID,
 		HRSTKeyFromProto(req.GetHrst()),
@@ -96,17 +96,17 @@ func (rpc *GRPCServer) GetNonces(
 	if err != nil {
 		return nil, err
 	}
-	return &proto.CosignerGRPCGetNoncesResponse{
+	return &proto.GetNoncesResponse{
 		Nonces: CosignerNonces(res.Nonces).toProto(),
 	}, nil
 }
 
-func (rpc *GRPCServer) TransferLeadership(
+func (rpc *CosignerGRPCServer) TransferLeadership(
 	_ context.Context,
-	req *proto.CosignerGRPCTransferLeadershipRequest,
-) (*proto.CosignerGRPCTransferLeadershipResponse, error) {
+	req *proto.TransferLeadershipRequest,
+) (*proto.TransferLeadershipResponse, error) {
 	if rpc.raftStore.raft.State() != raft.Leader {
-		return &proto.CosignerGRPCTransferLeadershipResponse{}, nil
+		return &proto.TransferLeadershipResponse{}, nil
 	}
 	leaderID := req.GetLeaderID()
 	if leaderID != "" {
@@ -116,19 +116,19 @@ func (rpc *GRPCServer) TransferLeadership(
 				raftAddress := p2pURLToRaftAddress(c.GetAddress())
 				fmt.Printf("Transferring leadership to ID: %s - Address: %s\n", shardID, raftAddress)
 				rpc.raftStore.raft.LeadershipTransferToServer(raft.ServerID(shardID), raft.ServerAddress(raftAddress))
-				return &proto.CosignerGRPCTransferLeadershipResponse{LeaderID: shardID, LeaderAddress: raftAddress}, nil
+				return &proto.TransferLeadershipResponse{LeaderID: shardID, LeaderAddress: raftAddress}, nil
 			}
 		}
 	}
 	fmt.Printf("Transferring leadership to next candidate\n")
 	rpc.raftStore.raft.LeadershipTransfer()
-	return &proto.CosignerGRPCTransferLeadershipResponse{}, nil
+	return &proto.TransferLeadershipResponse{}, nil
 }
 
-func (rpc *GRPCServer) GetLeader(
+func (rpc *CosignerGRPCServer) GetLeader(
 	context.Context,
-	*proto.CosignerGRPCGetLeaderRequest,
-) (*proto.CosignerGRPCGetLeaderResponse, error) {
+	*proto.GetLeaderRequest,
+) (*proto.GetLeaderResponse, error) {
 	leader := rpc.raftStore.GetLeader()
-	return &proto.CosignerGRPCGetLeaderResponse{Leader: string(leader)}, nil
+	return &proto.GetLeaderResponse{Leader: string(leader)}, nil
 }

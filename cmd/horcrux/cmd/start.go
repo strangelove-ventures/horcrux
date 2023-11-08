@@ -61,6 +61,10 @@ func startCmd() *cobra.Command {
 				panic(fmt.Errorf("unexpected sign mode: %s", config.Config.SignMode))
 			}
 
+			if config.Config.GRPCAddr != "" {
+				services = append(services, signer.NewRemoteSignerGRPCServer(logger, val, config.Config.GRPCAddr))
+			}
+
 			go EnableDebugAndMetrics(cmd.Context(), out)
 
 			services, err = signer.StartRemoteSigners(services, logger, val, config.Config.Nodes())
