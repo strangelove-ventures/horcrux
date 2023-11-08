@@ -77,7 +77,7 @@ func (s *RaftStore) SignBlock(req CosignerSignBlockRequest) (*CosignerSignBlockR
 	defer cancelFunc()
 	res, err := client.SignBlock(context, &proto.SignBlockRequest{
 		ChainID: req.ChainID,
-		Block:   req.Block.toProto(),
+		Block:   req.Block.ToProto(),
 	})
 	if err != nil {
 		return nil, err

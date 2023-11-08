@@ -264,7 +264,7 @@ func (block Block) HRSTKey() HRSTKey {
 	}
 }
 
-func (block Block) toProto() *proto.Block {
+func (block Block) ToProto() *proto.Block {
 	return &proto.Block{
 		Height:    block.Height,
 		Round:     block.Round,
