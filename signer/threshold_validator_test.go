@@ -367,8 +367,25 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 		require.NoError(t, err)
 	}
 
+	electChan := make(chan struct{})
+	var done bool
+	var mu sync.Mutex
+	isDone := func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return done
+	}
+	setDone := func() {
+		mu.Lock()
+		defer mu.Unlock()
+		done = true
+	}
+
 	go func() {
 		for i := 0; true; i++ {
+			if isDone() {
+				break
+			}
 			// simulate leader election
 			for _, l := range leaders {
 				l.SetLeader(nil)
@@ -387,6 +404,7 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 			// time with new leader
 			time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond) //nolint:gosec
 		}
+		electChan <- struct{}{}
 	}()
 
 	// sign 20 blocks (proposal, prevote, precommit)
@@ -503,8 +521,12 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 		}
 
 		wg.Wait()
+
 		require.True(t, success) // at least one should succeed so that the block is not missed.
 	}
+
+	setDone()
+	<-electChan
 }
 
 func TestThresholdValidatorLeaderElection2of3(t *testing.T) {
