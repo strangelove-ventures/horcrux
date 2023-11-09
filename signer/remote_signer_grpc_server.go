@@ -32,11 +32,13 @@ func NewRemoteSignerGRPCServer(
 	validator PrivValidator,
 	listenAddr string,
 ) *RemoteSignerGRPCServer {
-	return &RemoteSignerGRPCServer{
+	s := &RemoteSignerGRPCServer{
 		validator:  validator,
 		logger:     logger,
 		listenAddr: listenAddr,
 	}
+	s.BaseService = *cometservice.NewBaseService(logger, "RemoteSignerGRPCServer", s)
+	return s
 }
 
 func (s *RemoteSignerGRPCServer) OnStart() error {

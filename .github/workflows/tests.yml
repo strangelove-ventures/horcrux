@@ -44,6 +44,7 @@ jobs:
           - Test2Of3SignerThreeSentriesUniqueConnection
           - TestUpgradeValidatorToHorcrux
           - TestSingleSignerTwoSentries
+          - TestHorcruxProxyGRPC
     steps:
       # Install and setup go
       - name: Set up Go 1.21

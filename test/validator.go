@@ -33,6 +33,9 @@ const (
 	signerPort       = "2222"
 	signerPortDocker = signerPort + "/tcp"
 
+	grpcPort       = "5555"
+	grpcPortDocker = grpcPort + "/tcp"
+
 	debugPort       = "8453"
 	debugPortDocker = debugPort + "/tcp"
 
@@ -40,6 +43,9 @@ const (
 	binary             = "horcrux"
 	signerImageUidGid  = "2345:2345"
 	signerImageHomeDir = "/home/horcrux"
+
+	horcruxProxyRegistry = "ghcr.io/strangelove-ventures/horcrux-proxy"
+	horcruxProxyTag      = "andrew-horcrux_remote_signer_grpc"
 )
 
 // chainWrapper holds the initial configuration for a chain to start from genesis.
@@ -137,7 +143,22 @@ func horcruxSidecar(ctx context.Context, node *cosmos.ChainNode, name string, cl
 	if err := node.NewSidecarProcess(
 		ctx, false, name, client, network,
 		ibc.DockerImage{Repository: signerImage, Version: "latest", UidGid: signerImageUidGid},
-		signerImageHomeDir, []string{signerPortDocker, debugPortDocker}, startCmd,
+		signerImageHomeDir, []string{signerPortDocker, grpcPortDocker, debugPortDocker}, startCmd,
+	); err != nil {
+		return nil, err
+	}
+
+	return node.Sidecars[len(node.Sidecars)-1], nil
+}
+
+// horcruxSidecar creates a horcrux sidecar process that will start when the chain starts.
+func horcruxProxySidecar(ctx context.Context, node *cosmos.ChainNode, name string, client *client.Client, network string, startupFlags ...string) (*cosmos.SidecarProcess, error) {
+	startCmd := []string{"horcrux-proxy", "start"}
+	startCmd = append(startCmd, startupFlags...)
+	if err := node.NewSidecarProcess(
+		ctx, false, name, client, network,
+		ibc.DockerImage{Repository: horcruxProxyRegistry, Version: horcruxProxyTag, UidGid: "100:1000"},
+		signerImageHomeDir, nil, startCmd,
 	); err != nil {
 		return nil, err
 	}

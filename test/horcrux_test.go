@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/cometbft/cometbft/crypto"
+	dockertypes "github.com/docker/docker/api/types"
 	"github.com/strangelove-ventures/horcrux/signer"
 	interchaintest "github.com/strangelove-ventures/interchaintest/v7"
 	"github.com/strangelove-ventures/interchaintest/v7/chain/cosmos"
@@ -356,7 +357,7 @@ func TestMultipleChainHorcrux(t *testing.T) {
 		}
 	}
 
-	cosignerSidecars := make(cosmos.SidecarProcesses, totalSigners)
+	cosignerSidecars := make(horcruxSidecars, totalSigners)
 
 	eciesShards, err := signer.CreateCosignerECIESShards(totalSigners)
 	require.NoError(t, err)
@@ -398,7 +399,9 @@ func TestMultipleChainHorcrux(t *testing.T) {
 							return err
 						}
 
-						cosignerSidecars[j] = cosigner
+						cosignerSidecars[j] = horcruxSidecarProcess{
+							cosigner: cosigner,
+						}
 					}
 				}
 
@@ -448,11 +451,18 @@ type cosignerChainConfig struct {
 	sentries []cosmos.ChainNodes
 }
 
+type horcruxSidecarProcess struct {
+	cosigner *cosmos.SidecarProcess
+	proxy    *cosmos.SidecarProcess
+}
+
+type horcruxSidecars []horcruxSidecarProcess
+
 func configureAndStartSidecars(
 	ctx context.Context,
 	t *testing.T,
 	eciesShards []signer.CosignerECIESKey,
-	cosignerSidecars cosmos.SidecarProcesses,
+	sidecars horcruxSidecars,
 	threshold int,
 	wg *sync.WaitGroup,
 	cosignersStarted chan struct{},
@@ -461,19 +471,19 @@ func configureAndStartSidecars(
 	// wait for pre-genesis to finish from all chains
 	wg.Wait()
 
-	totalSigners := len(cosignerSidecars)
+	totalSigners := len(sidecars)
 
 	cosignersConfig := make(signer.CosignersConfig, totalSigners)
-	for i, cosigner := range cosignerSidecars {
+	for i, s := range sidecars {
 		cosignersConfig[i] = signer.CosignerConfig{
 			ShardID: i + 1,
-			P2PAddr: fmt.Sprintf("tcp://%s:%s", cosigner.HostName(), signerPort),
+			P2PAddr: fmt.Sprintf("tcp://%s:%s", s.cosigner.HostName(), signerPort),
 		}
 	}
 
 	var eg errgroup.Group
 
-	for i, cosigner := range cosignerSidecars {
+	for i, s := range sidecars {
 		numSentries := 0
 		for _, chainConfig := range chainConfigs {
 			numSentries += len(chainConfig.sentries[i])
@@ -484,16 +494,23 @@ func configureAndStartSidecars(
 		ed25519Shards := make([]chainEd25519Shard, len(chainConfigs))
 
 		for j, chainConfig := range chainConfigs {
-			for _, sentry := range chainConfig.sentries[i] {
-				chainNodes = append(chainNodes, signer.ChainNode{
-					PrivValAddr: fmt.Sprintf("tcp://%s:1234", sentry.HostName()),
-				})
+			if s.proxy == nil {
+				for _, sentry := range chainConfig.sentries[i] {
+					chainNodes = append(chainNodes, signer.ChainNode{
+						PrivValAddr: fmt.Sprintf("tcp://%s:1234", sentry.HostName()),
+					})
+				}
 			}
 
 			ed25519Shards[j] = chainEd25519Shard{
 				chainID: chainConfig.chainID,
 				key:     chainConfig.shards[i],
 			}
+		}
+
+		var grpcAddr string
+		if s.proxy != nil {
+			grpcAddr = ":5555"
 		}
 
 		config := signer.Config{
@@ -505,10 +522,22 @@ func configureAndStartSidecars(
 				RaftTimeout: "1500ms",
 			},
 			ChainNodes: chainNodes,
+			GRPCAddr:   grpcAddr,
 		}
 
-		cosigner := cosigner
+		cosigner := s.cosigner
+		proxy := s.proxy
 		i := i
+
+		if proxy != nil {
+			eg.Go(func() error {
+				if err := proxy.CreateContainer(ctx); err != nil {
+					return err
+				}
+
+				return proxy.StartContainer(ctx)
+			})
+		}
 
 		// configure and start cosigner in parallel
 		eg.Go(func() error {
@@ -528,4 +557,146 @@ func configureAndStartSidecars(
 
 	// signal to pre-genesis that all cosigners have been started and chain start can proceed.
 	close(cosignersStarted)
+}
+
+func TestHorcruxProxyGRPC(t *testing.T) {
+	ctx := context.Background()
+	client, network := interchaintest.DockerSetup(t)
+	logger := zaptest.NewLogger(t)
+
+	_, err := client.ImagePull(
+		ctx,
+		horcruxProxyRegistry+":"+horcruxProxyTag,
+		dockertypes.ImagePullOptions{},
+	)
+	require.NoError(t, err)
+
+	const (
+		totalChains          = 2
+		validatorsPerChain   = 2
+		sentriesPerValidator = 3
+		totalSigners         = 3
+		threshold            = 2
+		sentriesPerSigner    = 1
+	)
+
+	chainWrappers := make([]*chainWrapper, totalChains)
+	pubKeys := make([]crypto.PubKey, totalChains)
+	chainConfigs := make([]*cosignerChainConfig, totalChains)
+	preGenesises := make([]func(*chainWrapper) func(ibc.ChainConfig) error, totalChains)
+
+	for i := 0; i < totalChains; i++ {
+		chainConfigs[i] = &cosignerChainConfig{
+			sentries: make([]cosmos.ChainNodes, sentriesPerSigner),
+			shards:   make([]signer.CosignerEd25519Key, totalSigners),
+		}
+	}
+
+	cosignerSidecars := make(horcruxSidecars, totalSigners)
+
+	eciesShards, err := signer.CreateCosignerECIESShards(totalSigners)
+	require.NoError(t, err)
+
+	var wg sync.WaitGroup
+	wg.Add(totalChains)
+
+	cosignersStarted := make(chan struct{}, 1)
+
+	for i, chainConfig := range chainConfigs {
+		i := i
+		chainConfig := chainConfig
+		preGenesises[i] = func(cw *chainWrapper) func(ibc.ChainConfig) error {
+			return func(cc ibc.ChainConfig) error {
+
+				firstSentry := cw.chain.Validators[0]
+				sentries := append(cosmos.ChainNodes{firstSentry}, cw.chain.FullNodes...)
+
+				sentriesForCosigner := getSentriesForCosignerConnection(sentries, totalSigners, sentriesPerSigner)
+				chainConfig.sentries = sentriesForCosigner
+
+				chainConfig.chainID = cw.chain.Config().ChainID
+
+				ed25519Shards, pvPubKey, err := getShardedPrivvalKey(ctx, firstSentry, threshold, uint8(totalSigners))
+				if err != nil {
+					wg.Done()
+					return err
+				}
+
+				chainConfig.shards = ed25519Shards
+
+				pubKeys[i] = pvPubKey
+
+				if i == 0 {
+					for j := 0; j < totalSigners; j++ {
+						var h horcruxSidecarProcess
+						cosigner, err := horcruxSidecar(ctx, firstSentry, fmt.Sprintf("cosigner-%d", j+1), client, network)
+						if err != nil {
+							wg.Done()
+							return err
+						}
+
+						h.cosigner = cosigner
+
+						startArgs := []string{
+							"-g", fmt.Sprintf("%s:%s", cosigner.HostName(), grpcPort),
+							"-o=false",
+						}
+
+						for _, chainConfig := range chainConfigs {
+							for _, sentry := range chainConfig.sentries[j] {
+								startArgs = append(startArgs, "-s", fmt.Sprintf("tcp://%s:1234", sentry.HostName()))
+							}
+						}
+
+						proxy, err := horcruxProxySidecar(ctx, firstSentry, fmt.Sprintf("proxy-%d", j+1), client, network, startArgs...)
+						if err != nil {
+							wg.Done()
+							return err
+						}
+
+						cosignerSidecars[j] = horcruxSidecarProcess{
+							cosigner: cosigner,
+							proxy:    proxy,
+						}
+					}
+				}
+
+				if err := enablePrivvalListener(ctx, logger, sentries, client); err != nil {
+					wg.Done()
+					return err
+				}
+
+				wg.Done()
+
+				// wait for all cosigners to be started before continuing to start the chain.
+				<-cosignersStarted
+
+				return nil
+			}
+		}
+	}
+
+	go configureAndStartSidecars(ctx, t, eciesShards, cosignerSidecars, threshold, &wg, cosignersStarted, chainConfigs...)
+
+	for i := 0; i < totalChains; i++ {
+		chainWrappers[i] = &chainWrapper{
+			totalValidators: validatorsPerChain,
+			totalSentries:   sentriesPerValidator - 1,
+			modifyGenesis:   modifyGenesisStrictUptime,
+			preGenesis:      preGenesises[i],
+		}
+	}
+
+	startChains(ctx, t, logger, client, network, chainWrappers...)
+
+	chains := make([]testutil.ChainHeighter, totalChains)
+	for i, cw := range chainWrappers {
+		chains[i] = cw.chain
+	}
+
+	testutil.WaitForBlocks(ctx, 20, chains...)
+
+	for i, p := range pubKeys {
+		requireHealthyValidator(t, chainWrappers[i].chain.Validators[0], p.Address())
+	}
 }
