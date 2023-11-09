@@ -360,8 +360,17 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 		require.NoError(t, err)
 	}
 
+	quit := make(chan bool)
+	done := make(chan bool)
+
 	go func() {
 		for i := 0; true; i++ {
+			select {
+			case <-quit:
+				done <- true
+				return
+			default:
+			}
 			// simulate leader election
 			for _, l := range leaders {
 				l.SetLeader(nil)
@@ -493,8 +502,12 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 		}
 
 		wg.Wait()
+
 		require.True(t, success) // at least one should succeed so that the block is not missed.
 	}
+
+	quit <- true
+	<-done
 }
 
 func TestThresholdValidatorLeaderElection2of3(t *testing.T) {
