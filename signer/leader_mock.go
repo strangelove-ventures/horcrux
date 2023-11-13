@@ -43,7 +43,7 @@ func (m *MockLeader) SignBlock(req CosignerSignBlockRequest) (*CosignerSignBlock
 		return nil, errors.New("timed out waiting for leader election to complete")
 	}
 
-	block := &Block{
+	block := Block{
 		Height:    req.Block.Height,
 		Round:     req.Block.Round,
 		Step:      req.Block.Step,

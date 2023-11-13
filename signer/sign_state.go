@@ -13,6 +13,7 @@ import (
 	"github.com/cometbft/cometbft/libs/protoio"
 	"github.com/cometbft/cometbft/libs/tempfile"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	comet "github.com/cometbft/cometbft/types"
 	"github.com/gogo/protobuf/proto"
 	"github.com/strangelove-ventures/horcrux/signer/cond"
 )
@@ -23,6 +24,19 @@ const (
 	stepPrecommit int8 = 3
 	blocksToCache      = 3
 )
+
+func signType(step int8) string {
+	switch step {
+	case stepPropose:
+		return "proposal"
+	case stepPrevote:
+		return "prevote"
+	case stepPrecommit:
+		return "precommit"
+	default:
+		return "unknown"
+	}
+}
 
 func CanonicalVoteToStep(vote *cometproto.CanonicalVote) int8 {
 	switch vote.Type {
@@ -46,8 +60,41 @@ func VoteToStep(vote *cometproto.Vote) int8 {
 	}
 }
 
+func VoteToBlock(chainID string, vote *cometproto.Vote) Block {
+	return Block{
+		Height:    vote.Height,
+		Round:     int64(vote.Round),
+		Step:      VoteToStep(vote),
+		SignBytes: comet.VoteSignBytes(chainID, vote),
+		Timestamp: vote.Timestamp,
+	}
+}
+
 func ProposalToStep(_ *cometproto.Proposal) int8 {
 	return stepPropose
+}
+
+func ProposalToBlock(chainID string, proposal *cometproto.Proposal) Block {
+	return Block{
+		Height:    proposal.Height,
+		Round:     int64(proposal.Round),
+		Step:      ProposalToStep(proposal),
+		SignBytes: comet.ProposalSignBytes(chainID, proposal),
+		Timestamp: proposal.Timestamp,
+	}
+}
+
+func StepToType(step int8) cometproto.SignedMsgType {
+	switch step {
+	case stepPropose:
+		return cometproto.ProposalType
+	case stepPrevote:
+		return cometproto.PrevoteType
+	case stepPrecommit:
+		return cometproto.PrecommitType
+	default:
+		panic("Unknown step")
+	}
 }
 
 // SignState stores signing information for high level watermark management.

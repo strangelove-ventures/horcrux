@@ -21,6 +21,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 	"golang.org/x/sync/errgroup"
+	"gopkg.in/yaml.v3"
 )
 
 // testChainSingleNodeAndHorcruxThreshold tests a single chain with a single horcrux (threshold mode) validator and single node validators for the rest of the validators.
@@ -275,9 +276,9 @@ func writeConfigAndKeysThreshold(
 	eciesKey signer.CosignerECIESKey,
 	ed25519Shards ...chainEd25519Shard,
 ) error {
-	configBz, err := json.Marshal(config)
+	configBz, err := yaml.Marshal(config)
 	if err != nil {
-		return fmt.Errorf("failed to marshal config to json: %w", err)
+		return fmt.Errorf("failed to marshal config to yaml: %w", err)
 	}
 
 	if err := cosigner.WriteFile(ctx, configBz, ".horcrux/config.yaml"); err != nil {

@@ -60,7 +60,7 @@ func (cosigner *RemoteCosigner) VerifySignature(_ string, _, _ []byte) bool {
 	return false
 }
 
-func (cosigner *RemoteCosigner) getGRPCClient() (proto.CosignerGRPCClient, *grpc.ClientConn, error) {
+func (cosigner *RemoteCosigner) getGRPCClient() (proto.CosignerClient, *grpc.ClientConn, error) {
 	var grpcAddress string
 	url, err := url.Parse(cosigner.address)
 	if err != nil {
@@ -72,7 +72,7 @@ func (cosigner *RemoteCosigner) getGRPCClient() (proto.CosignerGRPCClient, *grpc
 	if err != nil {
 		return nil, nil, err
 	}
-	return proto.NewCosignerGRPCClient(conn), conn, nil
+	return proto.NewCosignerClient(conn), conn, nil
 }
 
 // Implements the cosigner interface
@@ -87,7 +87,7 @@ func (cosigner *RemoteCosigner) GetNonces(
 	defer conn.Close()
 	context, cancelFunc := getContext()
 	defer cancelFunc()
-	res, err := client.GetNonces(context, &proto.CosignerGRPCGetNoncesRequest{
+	res, err := client.GetNonces(context, &proto.GetNoncesRequest{
 		ChainID: chainID,
 		Hrst:    req.toProto(),
 	})
@@ -109,7 +109,7 @@ func (cosigner *RemoteCosigner) SetNoncesAndSign(
 	defer conn.Close()
 	context, cancelFunc := getContext()
 	defer cancelFunc()
-	res, err := client.SetNoncesAndSign(context, &proto.CosignerGRPCSetNoncesAndSignRequest{
+	res, err := client.SetNoncesAndSign(context, &proto.SetNoncesAndSignRequest{
 		ChainID:   req.ChainID,
 		Nonces:    CosignerNonces(req.Nonces).toProto(),
 		Hrst:      req.HRST.toProto(),
