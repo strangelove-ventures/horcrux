@@ -602,6 +602,9 @@ func TestHorcruxProxyGRPC(t *testing.T) {
 
 	cosignersStarted := make(chan struct{}, 1)
 
+	var configWg sync.WaitGroup
+	configWg.Add(totalChains)
+
 	for i, chainConfig := range chainConfigs {
 		i := i
 		chainConfig := chainConfig
@@ -613,6 +616,8 @@ func TestHorcruxProxyGRPC(t *testing.T) {
 
 				sentriesForCosigner := getSentriesForCosignerConnection(sentries, totalSigners, sentriesPerSigner)
 				chainConfig.sentries = sentriesForCosigner
+
+				configWg.Done()
 
 				chainConfig.chainID = cw.chain.Config().ChainID
 
@@ -627,6 +632,7 @@ func TestHorcruxProxyGRPC(t *testing.T) {
 				pubKeys[i] = pvPubKey
 
 				if i == 0 {
+					configWg.Wait()
 					for j := 0; j < totalSigners; j++ {
 						var h horcruxSidecarProcess
 						cosigner, err := horcruxSidecar(ctx, firstSentry, fmt.Sprintf("cosigner-%d", j+1), client, network)
