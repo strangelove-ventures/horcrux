@@ -22,8 +22,8 @@ const connRetrySec = 2
 // PrivValidator is a wrapper for tendermint PrivValidator,
 // with additional Stop method for safe shutdown.
 type PrivValidator interface {
-	Sign(chainID string, block Block) ([]byte, time.Time, error)
-	GetPubKey(chainID string) ([]byte, error)
+	Sign(ctx context.Context, chainID string, block Block) ([]byte, time.Time, error)
+	GetPubKey(ctx context.Context, chainID string) ([]byte, error)
 	Stop()
 }
 
@@ -186,7 +186,7 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *cometp
 		Error: nil,
 	}}
 
-	signature, timestamp, err := signAndTrack(rs.Logger, rs.privVal, chainID, VoteToBlock(chainID, vote))
+	signature, timestamp, err := signAndTrack(context.TODO(), rs.Logger, rs.privVal, chainID, VoteToBlock(chainID, vote))
 	if err != nil {
 		msgSum.SignedVoteResponse.Error = getRemoteSignerError(err)
 		return cometprotoprivval.Message{Sum: msgSum}
@@ -208,7 +208,7 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(
 		},
 	}
 
-	signature, timestamp, err := signAndTrack(rs.Logger, rs.privVal, chainID, ProposalToBlock(chainID, proposal))
+	signature, timestamp, err := signAndTrack(context.TODO(), rs.Logger, rs.privVal, chainID, ProposalToBlock(chainID, proposal))
 	if err != nil {
 		msgSum.SignedProposalResponse.Error = getRemoteSignerError(err)
 		return cometprotoprivval.Message{Sum: msgSum}
@@ -226,7 +226,7 @@ func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) cometprotopriv
 		Error:  nil,
 	}}
 
-	pubKey, err := rs.privVal.GetPubKey(chainID)
+	pubKey, err := rs.privVal.GetPubKey(context.TODO(), chainID)
 	if err != nil {
 		rs.Logger.Error(
 			"Failed to get Pub Key",

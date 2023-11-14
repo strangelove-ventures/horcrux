@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/raft"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 )
@@ -30,10 +31,10 @@ func NewCosignerGRPCServer(
 }
 
 func (rpc *CosignerGRPCServer) SignBlock(
-	_ context.Context,
+	ctx context.Context,
 	req *proto.SignBlockRequest,
 ) (*proto.SignBlockResponse, error) {
-	res, _, err := rpc.thresholdValidator.SignBlock(req.ChainID, BlockFromProto(req.Block))
+	res, _, err := rpc.thresholdValidator.Sign(ctx, req.ChainID, BlockFromProto(req.Block))
 	if err != nil {
 		return nil, err
 	}
@@ -43,12 +44,15 @@ func (rpc *CosignerGRPCServer) SignBlock(
 }
 
 func (rpc *CosignerGRPCServer) SetNoncesAndSign(
-	_ context.Context,
+	ctx context.Context,
 	req *proto.SetNoncesAndSignRequest,
 ) (*proto.SetNoncesAndSignResponse, error) {
-	res, err := rpc.cosigner.SetNoncesAndSign(CosignerSetNoncesAndSignRequest{
-		ChainID:   req.ChainID,
-		Nonces:    CosignerNoncesFromProto(req.GetNonces()),
+	res, err := rpc.cosigner.SetNoncesAndSign(ctx, CosignerSetNoncesAndSignRequest{
+		ChainID: req.ChainID,
+		Nonces: &CosignerUUIDNonces{
+			UUID:   uuid.UUID(req.Uuid),
+			Nonces: CosignerNoncesFromProto(req.GetNonces()),
+		},
 		HRST:      HRSTKeyFromProto(req.GetHrst()),
 		SignBytes: req.GetSignBytes(),
 	})
@@ -78,18 +82,23 @@ func (rpc *CosignerGRPCServer) SetNoncesAndSign(
 }
 
 func (rpc *CosignerGRPCServer) GetNonces(
-	_ context.Context,
+	ctx context.Context,
 	req *proto.GetNoncesRequest,
 ) (*proto.GetNoncesResponse, error) {
+	uuids := make([]uuid.UUID, len(req.Uuids))
+	for i, uuidBytes := range req.Uuids {
+		uuids[i] = uuid.UUID(uuidBytes[:])
+	}
 	res, err := rpc.cosigner.GetNonces(
-		req.ChainID,
-		HRSTKeyFromProto(req.GetHrst()),
+		ctx,
+		uuids,
 	)
 	if err != nil {
 		return nil, err
 	}
+
 	return &proto.GetNoncesResponse{
-		Nonces: CosignerNonces(res.Nonces).toProto(),
+		Nonces: res.toProto(),
 	}, nil
 }
 

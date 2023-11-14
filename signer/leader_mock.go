@@ -1,6 +1,7 @@
 package signer
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"time"
@@ -50,7 +51,7 @@ func (m *MockLeader) SignBlock(req CosignerSignBlockRequest) (*CosignerSignBlock
 		SignBytes: req.Block.SignBytes,
 		Timestamp: req.Block.Timestamp,
 	}
-	res, _, err := l.SignBlock(req.ChainID, block)
+	res, _, err := l.Sign(context.TODO(), req.ChainID, block)
 	if err != nil {
 		return nil, err
 	}

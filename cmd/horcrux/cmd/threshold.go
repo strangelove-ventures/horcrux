@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 const maxWaitForSameBlockAttempts = 3
 
 func NewThresholdValidator(
+	ctx context.Context,
 	logger cometlog.Logger,
 ) ([]cometservice.Service, *signer.ThresholdValidator, error) {
 	if err := config.Config.ValidateThresholdModeConfig(); err != nil {
@@ -91,6 +93,10 @@ func NewThresholdValidator(
 	)
 
 	raftStore.SetThresholdValidator(val)
+
+	if err := val.Start(ctx); err != nil {
+		return nil, nil, fmt.Errorf("failed to start threshold validator: %w", err)
+	}
 
 	return services, val, nil
 }

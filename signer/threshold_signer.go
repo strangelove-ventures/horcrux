@@ -5,9 +5,6 @@ type ThresholdSigner interface {
 	// PubKey returns the public key bytes for the combination of all cosigners.
 	PubKey() []byte
 
-	// GenerateNonces deals nonces for all cosigners.
-	GenerateNonces() (Nonces, error)
-
 	// Sign signs a byte payload with the provided nonces.
 	Sign(nonces []Nonce, payload []byte) ([]byte, error)
 

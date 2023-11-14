@@ -1,9 +1,11 @@
 package signer
 
 import (
+	"context"
 	"time"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
+	"github.com/google/uuid"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 )
 
@@ -23,10 +25,10 @@ type Cosigner interface {
 	VerifySignature(chainID string, payload, signature []byte) bool
 
 	// Get nonces for all cosigner shards
-	GetNonces(chainID string, hrst HRSTKey) (*CosignerNoncesResponse, error)
+	GetNonces(ctx context.Context, uuids []uuid.UUID) (CosignerUUIDNoncesMultiple, error)
 
 	// Sign the requested bytes
-	SetNoncesAndSign(req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error)
+	SetNoncesAndSign(ctx context.Context, req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error)
 }
 
 // CosignerSignRequest is sent to a co-signer to obtain their signature for the SignBytes
@@ -34,6 +36,7 @@ type Cosigner interface {
 type CosignerSignRequest struct {
 	ChainID   string
 	SignBytes []byte
+	UUID      uuid.UUID
 }
 
 type CosignerSignResponse struct {
@@ -87,18 +90,6 @@ func CosignerNoncesFromProto(secretParts []*proto.Nonce) []CosignerNonce {
 	return out
 }
 
-type CosignerSetNonceRequest struct {
-	ChainID   string
-	SourceID  int
-	PubKey    []byte
-	Share     []byte
-	Signature []byte
-	Height    int64
-	Round     int64
-	Step      int8
-	Timestamp time.Time
-}
-
 type CosignerSignBlockRequest struct {
 	ChainID string
 	Block   *Block
@@ -107,14 +98,48 @@ type CosignerSignBlockRequest struct {
 type CosignerSignBlockResponse struct {
 	Signature []byte
 }
+type CosignerUUIDNonces struct {
+	UUID   uuid.UUID
+	Nonces CosignerNonces
+}
 
-type CosignerNoncesResponse struct {
-	Nonces []CosignerNonce
+func (c *CosignerUUIDNonces) For(id int) *CosignerUUIDNonces {
+	res := &CosignerUUIDNonces{UUID: c.UUID}
+	for _, nonce := range c.Nonces {
+		if nonce.DestinationID == id {
+			res.Nonces = append(res.Nonces, nonce)
+		}
+	}
+	return res
+}
+
+type CosignerUUIDNoncesMultiple []*CosignerUUIDNonces
+
+func (n *CosignerUUIDNonces) toProto() *proto.UUIDNonce {
+	out := &proto.UUIDNonce{
+		Uuid:   n.UUID[:],
+		Nonces: make([]*proto.Nonce, len(n.Nonces)),
+	}
+	for i, nonce := range n.Nonces {
+		out.Nonces[i] = nonce.toProto()
+	}
+	return out
+}
+
+func (n CosignerUUIDNoncesMultiple) toProto() []*proto.UUIDNonce {
+	out := make([]*proto.UUIDNonce, len(n))
+	for i, nonces := range n {
+		out[i] = &proto.UUIDNonce{
+			Uuid:   nonces.UUID[:],
+			Nonces: nonces.Nonces.toProto(),
+		}
+	}
+	return out
 }
 
 type CosignerSetNoncesAndSignRequest struct {
 	ChainID   string
-	Nonces    []CosignerNonce
+	Nonces    *CosignerUUIDNonces
 	HRST      HRSTKey
 	SignBytes []byte
 }

@@ -7,10 +7,13 @@ import (
 	"time"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
+	"github.com/google/uuid"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
+
+var _ Cosigner = &RemoteCosigner{}
 
 // RemoteCosigner uses CosignerGRPC to request signing from a remote cosigner
 type RemoteCosigner struct {
@@ -77,41 +80,49 @@ func (cosigner *RemoteCosigner) getGRPCClient() (proto.CosignerClient, *grpc.Cli
 
 // Implements the cosigner interface
 func (cosigner *RemoteCosigner) GetNonces(
-	chainID string,
-	req HRSTKey,
-) (*CosignerNoncesResponse, error) {
+	ctx context.Context,
+	uuids []uuid.UUID,
+) (CosignerUUIDNoncesMultiple, error) {
 	client, conn, err := cosigner.getGRPCClient()
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
-	context, cancelFunc := getContext()
-	defer cancelFunc()
-	res, err := client.GetNonces(context, &proto.GetNoncesRequest{
-		ChainID: chainID,
-		Hrst:    req.toProto(),
+	us := make([][]byte, len(uuids))
+	for i, u := range uuids {
+		us[i] = make([]byte, 16)
+		copy(us[i], u[:])
+	}
+	res, err := client.GetNonces(ctx, &proto.GetNoncesRequest{
+		Uuids: us,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &CosignerNoncesResponse{
-		Nonces: CosignerNoncesFromProto(res.GetNonces()),
-	}, nil
+	out := make(CosignerUUIDNoncesMultiple, len(res.Nonces))
+	for i, nonces := range res.Nonces {
+		out[i] = &CosignerUUIDNonces{
+			UUID:   uuid.UUID(nonces.Uuid),
+			Nonces: CosignerNoncesFromProto(nonces.Nonces),
+		}
+	}
+	return out, nil
 }
 
 // Implements the cosigner interface
 func (cosigner *RemoteCosigner) SetNoncesAndSign(
+	ctx context.Context,
 	req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error) {
 	client, conn, err := cosigner.getGRPCClient()
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
-	context, cancelFunc := getContext()
-	defer cancelFunc()
-	res, err := client.SetNoncesAndSign(context, &proto.SetNoncesAndSignRequest{
+
+	res, err := client.SetNoncesAndSign(ctx, &proto.SetNoncesAndSignRequest{
+		Uuid:      req.Nonces.UUID[:],
 		ChainID:   req.ChainID,
-		Nonces:    CosignerNonces(req.Nonces).toProto(),
+		Nonces:    CosignerNonces(req.Nonces.Nonces).toProto(),
 		Hrst:      req.HRST.toProto(),
 		SignBytes: req.SignBytes,
 	})

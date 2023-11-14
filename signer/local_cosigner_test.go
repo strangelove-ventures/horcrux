@@ -1,6 +1,7 @@
 package signer
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	comet "github.com/cometbft/cometbft/types"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
@@ -112,6 +114,8 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 		},
 	}
 
+	ctx := context.Background()
+
 	tmpDir := t.TempDir()
 
 	thresholdCosigners := make([]*LocalCosigner, threshold)
@@ -125,6 +129,9 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 		Step:      2,
 		Timestamp: now.UnixNano(),
 	}
+
+	u, err := uuid.NewRandom()
+	require.NoError(t, err)
 
 	for i := 0; i < int(total); i++ {
 		id := i + 1
@@ -169,10 +176,10 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 		if i < int(threshold) {
 			thresholdCosigners[i] = cosigner
 
-			nonce, err := cosigner.GetNonces(testChainID, hrst)
+			res, err := cosigner.GetNonces(ctx, []uuid.UUID{u})
 			require.NoError(t, err)
 
-			nonces[i] = nonce.Nonces
+			nonces[i] = res[0].Nonces
 		}
 	}
 
@@ -202,9 +209,12 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 			}
 		}
 
-		sigRes, err := cosigner.SetNoncesAndSign(CosignerSetNoncesAndSignRequest{
+		sigRes, err := cosigner.SetNoncesAndSign(ctx, CosignerSetNoncesAndSignRequest{
+			Nonces: &CosignerUUIDNonces{
+				UUID:   u,
+				Nonces: cosignerNonces,
+			},
 			ChainID:   testChainID,
-			Nonces:    cosignerNonces,
 			HRST:      hrst,
 			SignBytes: signBytes,
 		})

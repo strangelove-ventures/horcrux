@@ -9,6 +9,7 @@ service Cosigner {
 	rpc GetNonces (GetNoncesRequest) returns (GetNoncesResponse) {}
 	rpc TransferLeadership (TransferLeadershipRequest) returns (TransferLeadershipResponse) {}
 	rpc GetLeader (GetLeaderRequest) returns (GetLeaderResponse) {}
+	rpc Ping(PingRequest) returns (PingResponse) {}
 }
 
 message Block {
@@ -37,6 +38,11 @@ message Nonce {
 	bytes signature = 5;
 }
 
+message UUIDNonce {
+	bytes uuid = 1;
+	repeated Nonce nonces = 2;
+}
+
 message HRST {
 	int64 height = 1;
 	int64 round = 2;
@@ -45,10 +51,11 @@ message HRST {
 }
 
 message SetNoncesAndSignRequest {
-	repeated Nonce nonces = 1;
-	HRST hrst = 2;
-	bytes signBytes = 3;
-	string chainID = 4;
+	bytes uuid = 1;
+	repeated Nonce nonces = 2;
+	HRST hrst = 3;
+	bytes signBytes = 4;
+	string chainID = 5;
 }
 
 message SetNoncesAndSignResponse {
@@ -58,12 +65,11 @@ message SetNoncesAndSignResponse {
 }
 
 message GetNoncesRequest {
-	HRST hrst = 1;
-	string chainID = 2;
+	repeated bytes uuids = 1;
 }
 
 message GetNoncesResponse {
-	repeated Nonce nonces = 1;
+	repeated UUIDNonce nonces = 1;
 }
 
 message TransferLeadershipRequest {
@@ -80,3 +86,6 @@ message GetLeaderRequest {}
 message GetLeaderResponse {
 	string leader = 1;
 }
+
+message PingRequest {}
+message PingResponse {}

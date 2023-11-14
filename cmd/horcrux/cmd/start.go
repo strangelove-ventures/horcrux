@@ -48,7 +48,7 @@ func startCmd() *cobra.Command {
 
 			switch config.Config.SignMode {
 			case signer.SignModeThreshold:
-				services, val, err = NewThresholdValidator(logger)
+				services, val, err = NewThresholdValidator(cmd.Context(), logger)
 				if err != nil {
 					return err
 				}
