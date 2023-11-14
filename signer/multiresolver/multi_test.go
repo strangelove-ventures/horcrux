@@ -39,7 +39,7 @@ func createListener(nodeID string, homedir string) (string, func(), error) {
 	}
 
 	grpcServer := grpc.NewServer()
-	proto.RegisterCosignerGRPCServer(grpcServer, signer.NewGRPCServer(nil, nil, s))
+	proto.RegisterCosignerServer(grpcServer, signer.NewCosignerGRPCServer(nil, nil, s))
 	transportManager.Register(grpcServer)
 
 	go func() {
@@ -90,8 +90,8 @@ func TestMultiResolver(t *testing.T) {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancelFunc()
 
-	grpcClient := proto.NewCosignerGRPCClient(connDNS)
-	_, err = grpcClient.GetLeader(ctx, &proto.CosignerGRPCGetLeaderRequest{})
+	grpcClient := proto.NewCosignerClient(connDNS)
+	_, err = grpcClient.GetLeader(ctx, &proto.GetLeaderRequest{})
 	require.NoError(t, err)
 
 	connIP, err := grpc.Dial(targetIP,
@@ -103,7 +103,7 @@ func TestMultiResolver(t *testing.T) {
 	require.NoError(t, err)
 	defer connIP.Close()
 
-	grpcClient = proto.NewCosignerGRPCClient(connIP)
-	_, err = grpcClient.GetLeader(ctx, &proto.CosignerGRPCGetLeaderRequest{})
+	grpcClient = proto.NewCosignerClient(connIP)
+	_, err = grpcClient.GetLeader(ctx, &proto.GetLeaderRequest{})
 	require.NoError(t, err)
 }

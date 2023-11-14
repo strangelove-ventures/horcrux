@@ -13,7 +13,6 @@ import (
 	cometrand "github.com/cometbft/cometbft/libs/rand"
 	cometprivval "github.com/cometbft/cometbft/privval"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	comet "github.com/cometbft/cometbft/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -53,22 +52,17 @@ func TestSingleSignerValidator(t *testing.T) {
 		Type:   cometproto.ProposalType,
 	}
 
-	signBytes := comet.ProposalSignBytes(testChainID, &proposal)
+	block := ProposalToBlock(testChainID, &proposal)
 
-	err = validator.SignProposal(testChainID, &proposal)
+	signature, _, err := validator.Sign(testChainID, block)
 	require.NoError(t, err)
 
-	require.True(t, privateKey.PubKey().VerifySignature(signBytes, proposal.Signature))
+	require.True(t, privateKey.PubKey().VerifySignature(block.SignBytes, signature))
 
-	proposal = cometproto.Proposal{
-		Height:    1,
-		Round:     20,
-		Type:      cometproto.ProposalType,
-		Timestamp: time.Now(),
-	}
+	proposal.Timestamp = time.Now()
 
 	// should be able to sign same proposal with only differing timestamp
-	err = validator.SignProposal(testChainID, &proposal)
+	_, _, err = validator.Sign(testChainID, ProposalToBlock(testChainID, &proposal))
 	require.NoError(t, err)
 
 	// construct different block ID for proposal at same height as highest signed
@@ -84,36 +78,28 @@ func TestSingleSignerValidator(t *testing.T) {
 	}
 
 	// should not be able to sign same proposal at same height as highest signed with different BlockID
-	err = validator.SignProposal(testChainID, &proposal)
+	_, _, err = validator.Sign(testChainID, ProposalToBlock(testChainID, &proposal))
 	require.Error(t, err, "double sign!")
 
-	proposal = cometproto.Proposal{
-		Height: 1,
-		Round:  19,
-		Type:   cometproto.ProposalType,
-	}
+	proposal.Round = 19
 
 	// should not be able to sign lower than highest signed
-	err = validator.SignProposal(testChainID, &proposal)
+	_, _, err = validator.Sign(testChainID, ProposalToBlock(testChainID, &proposal))
 	require.Error(t, err, "double sign!")
 
 	// lower LSS should sign for different chain ID
-	err = validator.SignProposal("different", &proposal)
+	_, _, err = validator.Sign("different", ProposalToBlock("different", &proposal))
 	require.NoError(t, err)
 
 	// reinitialize validator to make sure new runtime will not allow double sign
 	validator = NewSingleSignerValidator(runtimeConfig)
 
-	err = validator.SignProposal(testChainID, &proposal)
+	_, _, err = validator.Sign(testChainID, ProposalToBlock(testChainID, &proposal))
 	require.Error(t, err, "double sign!")
 
-	proposal = cometproto.Proposal{
-		Height: 1,
-		Round:  21,
-		Type:   cometproto.ProposalType,
-	}
+	proposal.Round = 21
 
 	// signing higher block now should succeed
-	err = validator.SignProposal(testChainID, &proposal)
+	_, _, err = validator.Sign(testChainID, ProposalToBlock(testChainID, &proposal))
 	require.NoError(t, err)
 }

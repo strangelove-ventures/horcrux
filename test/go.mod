@@ -1,6 +1,6 @@
 module github.com/strangelove-ventures/horcrux/test
 
-go 1.19
+go 1.21
 
 require (
 	github.com/cometbft/cometbft v0.37.2
@@ -14,6 +14,7 @@ require (
 	go.uber.org/zap v1.24.0
 	golang.org/x/sync v0.3.0
 	google.golang.org/grpc v1.56.1
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -232,7 +233,6 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.1.7 // indirect
 	lukechampine.com/uint128 v1.2.0 // indirect
 	modernc.org/cc/v3 v3.40.0 // indirect

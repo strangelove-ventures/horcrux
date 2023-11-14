@@ -34,6 +34,7 @@ type Config struct {
 	ThresholdModeConfig *ThresholdModeConfig `yaml:"thresholdMode,omitempty"`
 	ChainNodes          ChainNodes           `yaml:"chainNodes"`
 	DebugAddr           string               `yaml:"debugAddr"`
+	GRPCAddr            string               `yaml:"grpcAddr"`
 }
 
 func (c *Config) Nodes() (out []string) {
@@ -52,12 +53,6 @@ func (c *Config) MustMarshalYaml() []byte {
 }
 
 func (c *Config) ValidateSingleSignerConfig() error {
-	if len(c.ChainNodes) == 0 {
-		return fmt.Errorf("need to have chainNodes configured for priv-val connection")
-	}
-	if err := c.ChainNodes.Validate(); err != nil {
-		return err
-	}
 	return c.ChainNodes.Validate()
 }
 
@@ -329,6 +324,9 @@ func (cn ChainNode) Validate() error {
 type ChainNodes []ChainNode
 
 func (cns ChainNodes) Validate() error {
+	if cns == nil {
+		return nil
+	}
 	for _, cn := range cns {
 		if err := cn.Validate(); err != nil {
 			return err

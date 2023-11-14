@@ -28,7 +28,7 @@ func startCmd() *cobra.Command {
 				return fmt.Errorf("this is a legacy config. run `horcrux config migrate` to migrate to the latest format")
 			}
 
-			logger := cometlog.NewTMLogger(cometlog.NewSyncWriter(out)).With("module", "validator")
+			logger := cometlog.NewTMLogger(cometlog.NewSyncWriter(out))
 
 			// create all directories up to the state directory
 			if err = os.MkdirAll(config.StateDir, 0700); err != nil {
@@ -59,6 +59,15 @@ func startCmd() *cobra.Command {
 				}
 			default:
 				panic(fmt.Errorf("unexpected sign mode: %s", config.Config.SignMode))
+			}
+
+			if config.Config.GRPCAddr != "" {
+				grpcServer := signer.NewRemoteSignerGRPCServer(logger, val, config.Config.GRPCAddr)
+				services = append(services, grpcServer)
+
+				if err := grpcServer.Start(); err != nil {
+					return fmt.Errorf("failed to start grpc server: %w", err)
+				}
 			}
 
 			go EnableDebugAndMetrics(cmd.Context(), out)

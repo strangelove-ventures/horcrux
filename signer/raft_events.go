@@ -47,7 +47,7 @@ func (f *fsm) handleLSSEvent(value string) {
 	_ = f.cosigner.SaveLastSignedState(lss.ChainID, lss.SignStateConsensus)
 }
 
-func (s *RaftStore) getLeaderGRPCClient() (proto.CosignerGRPCClient, *grpc.ClientConn, error) {
+func (s *RaftStore) getLeaderGRPCClient() (proto.CosignerClient, *grpc.ClientConn, error) {
 	var leader string
 	for i := 0; i < 30; i++ {
 		leader = string(s.GetLeader())
@@ -64,7 +64,7 @@ func (s *RaftStore) getLeaderGRPCClient() (proto.CosignerGRPCClient, *grpc.Clien
 	if err != nil {
 		return nil, nil, err
 	}
-	return proto.NewCosignerGRPCClient(conn), conn, nil
+	return proto.NewCosignerClient(conn), conn, nil
 }
 
 func (s *RaftStore) SignBlock(req CosignerSignBlockRequest) (*CosignerSignBlockResponse, error) {
@@ -75,9 +75,9 @@ func (s *RaftStore) SignBlock(req CosignerSignBlockRequest) (*CosignerSignBlockR
 	defer conn.Close()
 	context, cancelFunc := getContext()
 	defer cancelFunc()
-	res, err := client.SignBlock(context, &proto.CosignerGRPCSignBlockRequest{
+	res, err := client.SignBlock(context, &proto.SignBlockRequest{
 		ChainID: req.ChainID,
-		Block:   req.Block.toProto(),
+		Block:   req.Block.ToProto(),
 	})
 	if err != nil {
 		return nil, err

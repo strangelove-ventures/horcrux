@@ -49,13 +49,6 @@ func TestValidateSingleSignerConfig(t *testing.T) {
 			expectErr: nil,
 		},
 		{
-			name: "no nodes configured",
-			config: signer.Config{
-				ChainNodes: nil,
-			},
-			expectErr: fmt.Errorf("need to have chainNodes configured for priv-val connection"),
-		},
-		{
 			name: "invalid node address",
 			config: signer.Config{
 				ChainNodes: []signer.ChainNode{
@@ -285,32 +278,6 @@ func TestValidateThresholdModeConfig(t *testing.T) {
 			expectErr: fmt.Errorf("invalid grpcTimeout: %w", fmt.Errorf("time: missing unit in duration \"1000\"")),
 		},
 		{
-			name: "no nodes configured",
-			config: signer.Config{
-				ThresholdModeConfig: &signer.ThresholdModeConfig{
-					Threshold:   2,
-					RaftTimeout: "1000ms",
-					GRPCTimeout: "1000ms",
-					Cosigners: signer.CosignersConfig{
-						{
-							ShardID: 1,
-							P2PAddr: "tcp://127.0.0.1:2222",
-						},
-						{
-							ShardID: 2,
-							P2PAddr: "tcp://127.0.0.1:2223",
-						},
-						{
-							ShardID: 3,
-							P2PAddr: "tcp://127.0.0.1:2224",
-						},
-					},
-				},
-				ChainNodes: nil,
-			},
-			expectErr: fmt.Errorf("need to have chainNodes configured for priv-val connection"),
-		},
-		{
 			name: "invalid node address",
 			config: signer.Config{
 				ThresholdModeConfig: &signer.ThresholdModeConfig{
@@ -436,6 +403,7 @@ chainNodes:
 - privValAddr: tcp://127.0.0.1:2345
 - privValAddr: tcp://127.0.0.1:3456
 debugAddr: ""
+grpcAddr: ""
 `, string(configYamlBz))
 }
 

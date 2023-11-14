@@ -18,6 +18,7 @@ const (
 	flagGRPCTimeout = "grpc-timeout"
 	flagOverwrite   = "overwrite"
 	flagBare        = "bare"
+	flagGRPCAddress = "flagGRPCAddress"
 )
 
 func configCmd() *cobra.Command {
@@ -67,7 +68,8 @@ for threshold signer mode, --cosigner flags and --threshold flag are required.
 			if keyDirFlag != "" {
 				keyDir = &keyDirFlag
 			}
-			debugAddr, _ := cmdFlags.GetString("debug-addr")
+			debugAddr, _ := cmdFlags.GetString(flagDebugAddr)
+			grpcAddr, _ := cmdFlags.GetString(flagGRPCAddress)
 			if signMode == string(signer.SignModeThreshold) {
 				// Threshold Mode Config
 				cosignersFlag, _ := cmdFlags.GetStringSlice(flagCosigner)
@@ -90,6 +92,7 @@ for threshold signer mode, --cosigner flags and --threshold flag are required.
 					},
 					ChainNodes: cn,
 					DebugAddr:  debugAddr,
+					GRPCAddr:   grpcAddr,
 				}
 
 				if !bare {
@@ -158,5 +161,6 @@ for threshold signer mode, --cosigner flags and --threshold flag are required.
 		false,
 		"allows initialization without providing any flags. If flags are provided, will not perform final validation",
 	)
+	f.StringP(flagGRPCAddress, "g", "", "GRPC address if listener should be enabled")
 	return cmd
 }
