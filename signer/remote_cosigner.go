@@ -122,7 +122,7 @@ func (cosigner *RemoteCosigner) SetNoncesAndSign(
 	res, err := client.SetNoncesAndSign(ctx, &proto.SetNoncesAndSignRequest{
 		Uuid:      req.Nonces.UUID[:],
 		ChainID:   req.ChainID,
-		Nonces:    CosignerNonces(req.Nonces.Nonces).toProto(),
+		Nonces:    req.Nonces.Nonces.toProto(),
 		Hrst:      req.HRST.toProto(),
 		SignBytes: req.SignBytes,
 	})

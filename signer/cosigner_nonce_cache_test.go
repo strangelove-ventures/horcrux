@@ -28,16 +28,19 @@ func TestNonceCacheDemand(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	nonceCache.LoadN(ctx, 10)
+
 	go nonceCache.Start(ctx)
 
 	for i := 0; i < 3000; i++ {
-		nonceCache.GetNonces(ctx, []Cosigner{cosigners[0], cosigners[1]})
+		_, err := nonceCache.GetNonces(ctx, []Cosigner{cosigners[0], cosigners[1]})
+		require.NoError(t, err)
 		time.Sleep(10 * time.Millisecond)
 		require.Greater(t, len(nonceCache.readyNonces), 0)
 	}
 
 	require.Greater(t, len(nonceCache.readyNonces), 0)
 
-	target := int(nonceCache.noncesPerMinute * .01)
+	target := int(nonceCache.noncesPerMinute*.01) + 10
 	require.LessOrEqual(t, len(nonceCache.readyNonces), target)
 }

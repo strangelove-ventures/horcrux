@@ -67,6 +67,12 @@ func NewThresholdValidator(
 	peerCosigners []Cosigner,
 	leader Leader,
 ) *ThresholdValidator {
+	nc := NewCosignerNonceCache(
+		logger,
+		append(peerCosigners, myCosigner),
+		leader, defaultGetNoncesInterval,
+		defaultGetNoncesTimeout,
+	)
 	return &ThresholdValidator{
 		logger:                      logger,
 		config:                      config,
@@ -77,7 +83,7 @@ func NewThresholdValidator(
 		peerCosigners:               peerCosigners,
 		leader:                      leader,
 		cosignerHealth:              NewCosignerHealth(peerCosigners, leader),
-		nonceCache:                  NewCosignerNonceCache(logger, append(peerCosigners, myCosigner), leader, defaultGetNoncesInterval, defaultGetNoncesTimeout),
+		nonceCache:                  nc,
 	}
 }
 
@@ -505,15 +511,29 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 	numPeers := len(pv.peerCosigners)
 	total := uint8(numPeers + 1)
 
-	fastestPeers := pv.cosignerHealth.GetFastest(pv.threshold - 1)
-	cosignersForThisBlock := append(fastestPeers, pv.myCosigner)
+	peerStartTime := time.Now()
+
+	cosignersForThisBlock := pv.cosignerHealth.GetFastest(pv.threshold - 1)
+	cosignersForThisBlock = append(cosignersForThisBlock, pv.myCosigner)
 	nonceCtx, nonceCancel := context.WithTimeout(ctx, pv.grpcTimeout)
 	defer nonceCancel()
 	nonces, err := pv.nonceCache.GetNonces(nonceCtx, cosignersForThisBlock)
 	if err != nil {
 		pv.notifyBlockSignError(chainID, block.HRSKey())
+
+		for _, peer := range pv.peerCosigners {
+			missedNonces.WithLabelValues(peer.GetAddress()).Add(float64(1))
+			totalMissedNonces.WithLabelValues(peer.GetAddress()).Inc()
+		}
 		// Nonces are required, cannot proceed
 		return nil, stamp, fmt.Errorf("failed to get nonces: %w", err)
+	}
+
+	timedSignBlockThresholdLag.Observe(time.Since(timeStartSignBlock).Seconds())
+
+	for _, peer := range pv.peerCosigners {
+		missedNonces.WithLabelValues(peer.GetAddress()).Set(0)
+		timedCosignerNonceLag.WithLabelValues(peer.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
 	}
 
 	cosignersForThisBlockInt := make([]int, len(cosignersForThisBlock))
@@ -532,6 +552,8 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 			ctx, cancel := context.WithTimeout(ctx, pv.grpcTimeout)
 			defer cancel()
 
+			peerStartTime := time.Now()
+
 			// set peerNonces and sign in single rpc call.
 			sigRes, err := cosigner.SetNoncesAndSign(ctx, CosignerSetNoncesAndSignRequest{
 				ChainID:   chainID,
@@ -540,7 +562,16 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 				SignBytes: signBytes,
 			})
 			if err != nil {
+				pv.logger.Error(
+					"Cosigner failed to set nonces and sign",
+					"id", cosigner.GetID(),
+					"err", err.Error(),
+				)
 				return err
+			}
+
+			if cosigner != pv.myCosigner {
+				timedCosignerSignLag.WithLabelValues(cosigner.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
 			}
 			shareSignatures[cosigner.GetID()-1] = sigRes.Signature
 			return nil

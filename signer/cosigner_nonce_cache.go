@@ -74,9 +74,10 @@ func (cnc *CosignerNonceCache) reconcile(ctx context.Context) {
 	}()
 
 	// calculate how many nonces we need to load to keep up with demand
-	// load 120% the number of nonces we need to keep up with demand
+	// load 120% the number of nonces we need to keep up with demand,
+	// plus 10 for padding
 
-	target := int((cnc.noncesPerMinute / 60) * cnc.getNoncesInterval.Seconds() * 1.2)
+	target := int((cnc.noncesPerMinute/60)*cnc.getNoncesInterval.Seconds()*1.2) + 10
 	additional := target - remainingNonces
 	if additional < 0 {
 		// we're ahead of demand, don't load any more

@@ -103,9 +103,9 @@ type CosignerUUIDNonces struct {
 	Nonces CosignerNonces
 }
 
-func (c *CosignerUUIDNonces) For(id int) *CosignerUUIDNonces {
-	res := &CosignerUUIDNonces{UUID: c.UUID}
-	for _, nonce := range c.Nonces {
+func (n *CosignerUUIDNonces) For(id int) *CosignerUUIDNonces {
+	res := &CosignerUUIDNonces{UUID: n.UUID}
+	for _, nonce := range n.Nonces {
 		if nonce.DestinationID == id {
 			res.Nonces = append(res.Nonces, nonce)
 		}
@@ -114,17 +114,6 @@ func (c *CosignerUUIDNonces) For(id int) *CosignerUUIDNonces {
 }
 
 type CosignerUUIDNoncesMultiple []*CosignerUUIDNonces
-
-func (n *CosignerUUIDNonces) toProto() *proto.UUIDNonce {
-	out := &proto.UUIDNonce{
-		Uuid:   n.UUID[:],
-		Nonces: make([]*proto.Nonce, len(n.Nonces)),
-	}
-	for i, nonce := range n.Nonces {
-		out.Nonces[i] = nonce.toProto()
-	}
-	return out
-}
 
 func (n CosignerUUIDNoncesMultiple) toProto() []*proto.UUIDNonce {
 	out := make([]*proto.UUIDNonce, len(n))

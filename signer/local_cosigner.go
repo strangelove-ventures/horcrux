@@ -203,7 +203,11 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		return res, nil
 	}
 
-	nonces, err := cosigner.combinedNonces(cosigner.GetID(), uint8(cosigner.config.Config.ThresholdModeConfig.Threshold), req.UUID)
+	nonces, err := cosigner.combinedNonces(
+		cosigner.GetID(),
+		uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
+		req.UUID,
+	)
 	if err != nil {
 		return res, err
 	}
@@ -239,7 +243,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	return res, nil
 }
 
-func (cosigner *LocalCosigner) generateNonces(uuid uuid.UUID) ([]Nonces, error) {
+func (cosigner *LocalCosigner) generateNonces() ([]Nonces, error) {
 	total := len(cosigner.config.Config.ThresholdModeConfig.Cosigners)
 	meta := make([]Nonces, total)
 
@@ -360,7 +364,7 @@ func (cosigner *LocalCosigner) generateNoncesIfNecessary(uuid uuid.UUID) ([]Nonc
 		return nonces, nil
 	}
 
-	newNonces, err := cosigner.generateNonces(uuid)
+	newNonces, err := cosigner.generateNonces()
 	if err != nil {
 		return nil, err
 	}

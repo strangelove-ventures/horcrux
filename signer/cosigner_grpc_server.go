@@ -87,7 +87,7 @@ func (rpc *CosignerGRPCServer) GetNonces(
 ) (*proto.GetNoncesResponse, error) {
 	uuids := make([]uuid.UUID, len(req.Uuids))
 	for i, uuidBytes := range req.Uuids {
-		uuids[i] = uuid.UUID(uuidBytes[:])
+		uuids[i] = uuid.UUID(uuidBytes)
 	}
 	res, err := rpc.cosigner.GetNonces(
 		ctx,
