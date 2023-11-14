@@ -48,8 +48,14 @@ func (ch *CosignerHealth) Start(ctx context.Context) {
 	}
 }
 
+func (ch *CosignerHealth) MarkUnhealthy(cosigner Cosigner) {
+	ch.mu.Lock()
+	defer ch.mu.Unlock()
+	ch.rtt[cosigner.GetID()] = -1
+}
+
 func (ch *CosignerHealth) updateRTT(ctx context.Context, cosigner Cosigner) {
-	var rtt int64
+	rtt := int64(-1)
 	defer func() {
 		ch.mu.Lock()
 		defer ch.mu.Unlock()
@@ -62,14 +68,12 @@ func (ch *CosignerHealth) updateRTT(ctx context.Context, cosigner Cosigner) {
 	}
 	client := proto.NewCosignerClient(conn)
 	_, err = client.Ping(ctx, &proto.PingRequest{})
-	if err != nil {
-		rtt = -1
-	} else {
+	if err == nil {
 		rtt = time.Since(start).Nanoseconds()
 	}
 }
 
-func (ch *CosignerHealth) GetFastest(n int) []Cosigner {
+func (ch *CosignerHealth) GetFastest() []Cosigner {
 	ch.mu.RLock()
 	defer ch.mu.RUnlock()
 
@@ -88,5 +92,5 @@ func (ch *CosignerHealth) GetFastest(n int) []Cosigner {
 		return rtt1 < rtt2
 	})
 
-	return fastest[:n]
+	return fastest
 }

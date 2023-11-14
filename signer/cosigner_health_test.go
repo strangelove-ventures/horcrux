@@ -21,9 +21,8 @@ func TestCosignerHealth(t *testing.T) {
 		5: 300,
 	}
 
-	fastest := ch.GetFastest(2)
+	fastest := ch.GetFastest()
 
-	require.Len(t, fastest, 2)
 	require.Equal(t, 4, fastest[0].GetID())
 	require.Equal(t, 2, fastest[1].GetID())
 }

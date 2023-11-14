@@ -513,7 +513,8 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 
 	peerStartTime := time.Now()
 
-	cosignersForThisBlock := pv.cosignerHealth.GetFastest(pv.threshold - 1)
+	cosignersOrderedByFastest := pv.cosignerHealth.GetFastest()
+	cosignersForThisBlock := cosignersOrderedByFastest[:pv.threshold-1]
 	cosignersForThisBlock = append(cosignersForThisBlock, pv.myCosigner)
 	nonceCtx, nonceCancel := context.WithTimeout(ctx, pv.grpcTimeout)
 	defer nonceCancel()
@@ -527,6 +528,19 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 		}
 		// Nonces are required, cannot proceed
 		return nil, stamp, fmt.Errorf("failed to get nonces: %w", err)
+	}
+
+	nextFastestCosignerIndex := pv.threshold
+	var nextFastestCosignerIndexMu sync.Mutex
+	getNextFastestCosigner := func() Cosigner {
+		nextFastestCosignerIndexMu.Lock()
+		defer nextFastestCosignerIndexMu.Unlock()
+		if nextFastestCosignerIndex >= numPeers {
+			return nil
+		}
+		cosigner := cosignersOrderedByFastest[nextFastestCosignerIndex]
+		nextFastestCosignerIndex++
+		return cosigner
 	}
 
 	timedSignBlockThresholdLag.Observe(time.Since(timeStartSignBlock).Seconds())
@@ -549,32 +563,38 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 	for _, cosigner := range cosignersForThisBlock {
 		cosigner := cosigner
 		eg.Go(func() error {
-			ctx, cancel := context.WithTimeout(ctx, pv.grpcTimeout)
-			defer cancel()
+			for cosigner != nil {
+				ctx, cancel := context.WithTimeout(ctx, pv.grpcTimeout)
+				defer cancel()
 
-			peerStartTime := time.Now()
+				peerStartTime := time.Now()
 
-			// set peerNonces and sign in single rpc call.
-			sigRes, err := cosigner.SetNoncesAndSign(ctx, CosignerSetNoncesAndSignRequest{
-				ChainID:   chainID,
-				Nonces:    nonces.For(cosigner.GetID()),
-				HRST:      hrst,
-				SignBytes: signBytes,
-			})
-			if err != nil {
-				pv.logger.Error(
-					"Cosigner failed to set nonces and sign",
-					"id", cosigner.GetID(),
-					"err", err.Error(),
-				)
-				return err
+				// set peerNonces and sign in single rpc call.
+				sigRes, err := cosigner.SetNoncesAndSign(ctx, CosignerSetNoncesAndSignRequest{
+					ChainID:   chainID,
+					Nonces:    nonces.For(cosigner.GetID()),
+					HRST:      hrst,
+					SignBytes: signBytes,
+				})
+				if err != nil {
+					pv.logger.Error(
+						"Cosigner failed to set nonces and sign",
+						"id", cosigner.GetID(),
+						"err", err.Error(),
+					)
+					pv.cosignerHealth.MarkUnhealthy(cosigner)
+					cosigner = getNextFastestCosigner()
+					continue
+				}
+
+				if cosigner != pv.myCosigner {
+					timedCosignerSignLag.WithLabelValues(cosigner.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
+				}
+				shareSignatures[cosigner.GetID()-1] = sigRes.Signature
+
+				return nil
 			}
-
-			if cosigner != pv.myCosigner {
-				timedCosignerSignLag.WithLabelValues(cosigner.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
-			}
-			shareSignatures[cosigner.GetID()-1] = sigRes.Signature
-			return nil
+			return fmt.Errorf("no cosigners available to sign")
 		})
 	}
 
@@ -599,11 +619,14 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 			continue
 		}
 
+		sig := make([]byte, len(shareSig))
+		copy(sig, shareSig)
+
 		// we are ok to use the share signatures - complete boolean
 		// prevents future concurrent access
 		shareSigs = append(shareSigs, PartialSignature{
 			ID:        idx + 1,
-			Signature: shareSig,
+			Signature: sig,
 		})
 	}
 
