@@ -34,7 +34,7 @@ func TestNonceCacheDemand(t *testing.T) {
 	go nonceCache.Start(ctx)
 
 	for i := 0; i < 3000; i++ {
-		n, err := nonceCache.GetNonces(ctx, []Cosigner{cosigners[0], cosigners[1]})
+		n, err := nonceCache.GetNonces([]Cosigner{cosigners[0], cosigners[1]})
 		require.NoError(t, err)
 		nonceCache.ClearNonce(n.UUID)
 		time.Sleep(10 * time.Millisecond)

@@ -230,7 +230,7 @@ func (cnc *CosignerNonceCache) Start(ctx context.Context) {
 	}
 }
 
-func (cnc *CosignerNonceCache) GetNonces(ctx context.Context, fastestPeers []Cosigner) (*CosignerUUIDNonces, error) {
+func (cnc *CosignerNonceCache) GetNonces(fastestPeers []Cosigner) (*CosignerUUIDNonces, error) {
 	cnc.cache.mu.RLock()
 	defer cnc.cache.mu.RUnlock()
 CheckNoncesLoop:
@@ -259,9 +259,9 @@ CheckNoncesLoop:
 	}
 
 	// no nonces found
-	var cosignerInts []int
-	for _, p := range fastestPeers {
-		cosignerInts = append(cosignerInts, p.GetID())
+	cosignerInts := make([]int, len(fastestPeers))
+	for i, p := range fastestPeers {
+		cosignerInts[i] = p.GetID()
 	}
 	return nil, fmt.Errorf("no nonces found involving cosigners %+v", cosignerInts)
 }

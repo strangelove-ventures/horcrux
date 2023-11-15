@@ -559,10 +559,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 	cosignersForThisBlock[0] = pv.myCosigner
 	copy(cosignersForThisBlock[1:], cosignersOrderedByFastest[:pv.threshold-1])
 
-	nonceCtx, nonceCancel := context.WithTimeout(ctx, pv.grpcTimeout)
-	defer nonceCancel()
-
-	nonces, err := pv.nonceCache.GetNonces(nonceCtx, cosignersForThisBlock)
+	nonces, err := pv.nonceCache.GetNonces(cosignersForThisBlock)
 	if err != nil {
 		pv.notifyBlockSignError(chainID, block.HRSKey(), signBytes)
 
