@@ -486,9 +486,12 @@ func (pv *ThresholdValidator) getNoncesFallback(
 	}
 
 	var thresholdNonces CosignerNonces
-	var thresholdCosigners []Cosigner
+	thresholdCosigners := make([]Cosigner, len(nonces))
+	i := 0
 	for c, n := range nonces {
-		thresholdCosigners = append(thresholdCosigners, c)
+		thresholdCosigners[i] = c
+		i++
+
 		thresholdNonces = append(thresholdNonces, n...)
 	}
 
