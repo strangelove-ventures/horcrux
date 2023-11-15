@@ -69,16 +69,16 @@ horcrux elect 2 # elect specific leader`,
 			ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancelFunc()
 
-			grpcClient := proto.NewCosignerGRPCClient(conn)
+			grpcClient := proto.NewCosignerClient(conn)
 			_, err = grpcClient.TransferLeadership(
 				ctx,
-				&proto.CosignerGRPCTransferLeadershipRequest{LeaderID: leaderID},
+				&proto.TransferLeadershipRequest{LeaderID: leaderID},
 			)
 			if err != nil {
 				return err
 			}
 
-			res, err := grpcClient.GetLeader(ctx, &proto.CosignerGRPCGetLeaderRequest{})
+			res, err := grpcClient.GetLeader(ctx, &proto.GetLeaderRequest{})
 			if err != nil {
 				return err
 			}
@@ -166,9 +166,9 @@ func getLeaderCmd() *cobra.Command {
 			ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancelFunc()
 
-			grpcClient := proto.NewCosignerGRPCClient(conn)
+			grpcClient := proto.NewCosignerClient(conn)
 
-			res, err := grpcClient.GetLeader(ctx, &proto.CosignerGRPCGetLeaderRequest{})
+			res, err := grpcClient.GetLeader(ctx, &proto.GetLeaderRequest{})
 			if err != nil {
 				return err
 			}

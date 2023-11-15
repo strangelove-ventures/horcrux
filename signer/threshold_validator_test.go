@@ -100,14 +100,14 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 		Type:   cometproto.ProposalType,
 	}
 
-	signBytes := comet.ProposalSignBytes(testChainID, &proposal)
+	block := ProposalToBlock(testChainID, &proposal)
 
-	err = validator.SignProposal(testChainID, &proposal)
+	signature, _, err := validator.Sign(testChainID, block)
 	require.NoError(t, err)
 
-	require.True(t, pubKey.VerifySignature(signBytes, proposal.Signature))
+	require.True(t, pubKey.VerifySignature(block.SignBytes, signature))
 
-	firstSignature := proposal.Signature
+	firstSignature := signature
 
 	require.Len(t, firstSignature, 64)
 
@@ -118,8 +118,10 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 		Timestamp: time.Now(),
 	}
 
+	block = ProposalToBlock(testChainID, &proposal)
+
 	// should be able to sign same proposal with only differing timestamp
-	err = validator.SignProposal(testChainID, &proposal)
+	_, _, err = validator.Sign(testChainID, block)
 	require.NoError(t, err)
 
 	// construct different block ID for proposal at same height as highest signed
@@ -136,23 +138,19 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 	// different than single-signer mode, threshold mode will be successful for this,
 	// but it will return the same signature as before.
-	err = validator.SignProposal(testChainID, &proposal)
+	signature, _, err = validator.Sign(testChainID, ProposalToBlock(testChainID, &proposal))
 	require.NoError(t, err)
 
-	require.True(t, bytes.Equal(firstSignature, proposal.Signature))
+	require.True(t, bytes.Equal(firstSignature, signature))
 
-	proposal = cometproto.Proposal{
-		Height: 1,
-		Round:  19,
-		Type:   cometproto.ProposalType,
-	}
+	proposal.Round = 19
 
 	// should not be able to sign lower than highest signed
-	err = validator.SignProposal(testChainID, &proposal)
+	_, _, err = validator.Sign(testChainID, ProposalToBlock(testChainID, &proposal))
 	require.Error(t, err, "double sign!")
 
 	// lower LSS should sign for different chain ID
-	err = validator.SignProposal(testChainID2, &proposal)
+	_, _, err = validator.Sign(testChainID2, ProposalToBlock(testChainID2, &proposal))
 	require.NoError(t, err)
 
 	// reinitialize validator to make sure new runtime will not allow double sign
@@ -168,7 +166,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	)
 	defer newValidator.Stop()
 
-	err = newValidator.SignProposal(testChainID, &proposal)
+	_, _, err = newValidator.Sign(testChainID, ProposalToBlock(testChainID, &proposal))
 	require.Error(t, err, "double sign!")
 
 	proposal = cometproto.Proposal{
@@ -187,13 +185,16 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	var eg errgroup.Group
 
 	eg.Go(func() error {
-		return newValidator.SignProposal(testChainID, &proposal)
+		_, _, err := newValidator.Sign(testChainID, ProposalToBlock(testChainID, &proposal))
+		return err
 	})
 	eg.Go(func() error {
-		return newValidator.SignProposal(testChainID, &proposalClone)
+		_, _, err := newValidator.Sign(testChainID, ProposalToBlock(testChainID, &proposalClone))
+		return err
 	})
 	eg.Go(func() error {
-		return newValidator.SignProposal(testChainID, &proposalClone2)
+		_, _, err := newValidator.Sign(testChainID, ProposalToBlock(testChainID, &proposalClone2))
+		return err
 	})
 	// signing higher block now should succeed
 	err = eg.Wait()
@@ -215,13 +216,16 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 		prevoteClone2.Timestamp = prevote.Timestamp.Add(4 * time.Millisecond)
 
 		eg.Go(func() error {
-			return newValidator.SignVote(testChainID, &prevote)
+			_, _, err := newValidator.Sign(testChainID, VoteToBlock(testChainID, &prevote))
+			return err
 		})
 		eg.Go(func() error {
-			return newValidator.SignVote(testChainID, &prevoteClone)
+			_, _, err := newValidator.Sign(testChainID, VoteToBlock(testChainID, &prevoteClone))
+			return err
 		})
 		eg.Go(func() error {
-			return newValidator.SignVote(testChainID, &prevoteClone2)
+			_, _, err := newValidator.Sign(testChainID, VoteToBlock(testChainID, &prevoteClone2))
+			return err
 		})
 
 		err = eg.Wait()
@@ -241,13 +245,16 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 		precommitClone2.Timestamp = precommit.Timestamp.Add(4 * time.Millisecond)
 
 		eg.Go(func() error {
-			return newValidator.SignVote(testChainID, &precommit)
+			_, _, err := newValidator.Sign(testChainID, VoteToBlock(testChainID, &precommit))
+			return err
 		})
 		eg.Go(func() error {
-			return newValidator.SignVote(testChainID, &precommitClone)
+			_, _, err := newValidator.Sign(testChainID, VoteToBlock(testChainID, &precommitClone))
+			return err
 		})
 		eg.Go(func() error {
-			return newValidator.SignVote(testChainID, &precommitClone2)
+			_, _, err := newValidator.Sign(testChainID, VoteToBlock(testChainID, &precommitClone2))
+			return err
 		})
 
 		err = eg.Wait()
@@ -360,8 +367,17 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 		require.NoError(t, err)
 	}
 
+	quit := make(chan bool)
+	done := make(chan bool)
+
 	go func() {
 		for i := 0; true; i++ {
+			select {
+			case <-quit:
+				done <- true
+				return
+			default:
+			}
 			// simulate leader election
 			for _, l := range leaders {
 				l.SetLeader(nil)
@@ -402,14 +418,15 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 					Type:   cometproto.ProposalType,
 				}
 
-				if err := tv.SignProposal(testChainID, &proposal); err != nil {
+				signature, _, err := tv.Sign(testChainID, ProposalToBlock(testChainID, &proposal))
+				if err != nil {
 					t.Log("Proposal sign failed", "error", err)
 					return
 				}
 
 				signBytes := comet.ProposalSignBytes(testChainID, &proposal)
 
-				if !pubKey.VerifySignature(signBytes, proposal.Signature) {
+				if !pubKey.VerifySignature(signBytes, signature) {
 					t.Log("Proposal signature verification failed")
 					return
 				}
@@ -438,14 +455,15 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 					Type:   cometproto.PrevoteType,
 				}
 
-				if err := tv.SignVote(testChainID, &preVote); err != nil {
+				signature, _, err := tv.Sign(testChainID, VoteToBlock(testChainID, &preVote))
+				if err != nil {
 					t.Log("PreVote sign failed", "error", err)
 					return
 				}
 
 				signBytes := comet.VoteSignBytes(testChainID, &preVote)
 
-				if !pubKey.VerifySignature(signBytes, preVote.Signature) {
+				if !pubKey.VerifySignature(signBytes, signature) {
 					t.Log("PreVote signature verification failed")
 					return
 				}
@@ -474,14 +492,15 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 					Type:   cometproto.PrecommitType,
 				}
 
-				if err := tv.SignVote(testChainID, &preCommit); err != nil {
+				signature, _, err := tv.Sign(testChainID, VoteToBlock(testChainID, &preCommit))
+				if err != nil {
 					t.Log("PreCommit sign failed", "error", err)
 					return
 				}
 
 				signBytes := comet.VoteSignBytes(testChainID, &preCommit)
 
-				if !pubKey.VerifySignature(signBytes, preCommit.Signature) {
+				if !pubKey.VerifySignature(signBytes, signature) {
 					t.Log("PreCommit signature verification failed")
 					return
 				}
@@ -493,8 +512,12 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 		}
 
 		wg.Wait()
+
 		require.True(t, success) // at least one should succeed so that the block is not missed.
 	}
+
+	quit <- true
+	<-done
 }
 
 func TestThresholdValidatorLeaderElection2of3(t *testing.T) {
