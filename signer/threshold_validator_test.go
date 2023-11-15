@@ -438,6 +438,8 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 		for _, tv := range thresholdValidators {
 			tv := tv
 
+			tv.nonceCache.LoadN(ctx, 1)
+
 			go func() {
 				defer wg.Done()
 				// stagger signing requests with random sleep
@@ -478,6 +480,8 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 		for _, tv := range thresholdValidators {
 			tv := tv
 
+			tv.nonceCache.LoadN(ctx, 1)
+
 			go func() {
 				defer wg.Done()
 				// stagger signing requests with random sleep
@@ -517,6 +521,8 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 		success = false
 		for _, tv := range thresholdValidators {
 			tv := tv
+
+			tv.nonceCache.LoadN(ctx, 1)
 
 			go func() {
 				defer wg.Done()
