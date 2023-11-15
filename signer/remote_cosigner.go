@@ -39,10 +39,6 @@ func NewRemoteCosigner(id int, address string) (*RemoteCosigner, error) {
 	return cosigner, nil
 }
 
-const (
-	rpcTimeout = 4 * time.Second
-)
-
 // GetID returns the ID of the remote cosigner
 // Implements the cosigner interface
 func (cosigner *RemoteCosigner) GetID() int {

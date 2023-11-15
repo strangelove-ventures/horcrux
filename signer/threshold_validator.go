@@ -545,7 +545,11 @@ func (pv *ThresholdValidator) waitForPeerNonces(
 	mu.Unlock()
 }
 
-func (pv *ThresholdValidator) proxyIfNecessary(ctx context.Context, chainID string, block Block) (bool, []byte, time.Time, error) {
+func (pv *ThresholdValidator) proxyIfNecessary(
+	ctx context.Context,
+	chainID string,
+	block Block,
+) (bool, []byte, time.Time, error) {
 	height, round, step, stamp := block.Height, block.Round, block.Step, block.Timestamp
 
 	if pv.leader.IsLeader() {
