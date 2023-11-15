@@ -84,7 +84,7 @@ message TransferLeadershipResponse {
 message GetLeaderRequest {}
 
 message GetLeaderResponse {
-	string leader = 1;
+	int32 leader = 1;
 }
 
 message PingRequest {}

@@ -19,25 +19,29 @@ var _ Cosigner = &RemoteCosigner{}
 type RemoteCosigner struct {
 	id      int
 	address string
+
+	client proto.CosignerClient
 }
 
 // NewRemoteCosigner returns a newly initialized RemoteCosigner
-func NewRemoteCosigner(id int, address string) *RemoteCosigner {
+func NewRemoteCosigner(id int, address string) (*RemoteCosigner, error) {
+	client, err := getGRPCClient(address)
+	if err != nil {
+		return nil, err
+	}
 
 	cosigner := &RemoteCosigner{
 		id:      id,
 		address: address,
+		client:  client,
 	}
-	return cosigner
+
+	return cosigner, nil
 }
 
 const (
 	rpcTimeout = 4 * time.Second
 )
-
-func getContext() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), rpcTimeout)
-}
 
 // GetID returns the ID of the remote cosigner
 // Implements the cosigner interface
@@ -63,19 +67,19 @@ func (cosigner *RemoteCosigner) VerifySignature(_ string, _, _ []byte) bool {
 	return false
 }
 
-func (cosigner *RemoteCosigner) getGRPCClient() (proto.CosignerClient, *grpc.ClientConn, error) {
+func getGRPCClient(address string) (proto.CosignerClient, error) {
 	var grpcAddress string
-	url, err := url.Parse(cosigner.address)
+	url, err := url.Parse(address)
 	if err != nil {
-		grpcAddress = cosigner.address
+		grpcAddress = address
 	} else {
 		grpcAddress = url.Host
 	}
 	conn, err := grpc.Dial(grpcAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return proto.NewCosignerClient(conn), conn, nil
+	return proto.NewCosignerClient(conn), nil
 }
 
 // Implements the cosigner interface
@@ -83,17 +87,12 @@ func (cosigner *RemoteCosigner) GetNonces(
 	ctx context.Context,
 	uuids []uuid.UUID,
 ) (CosignerUUIDNoncesMultiple, error) {
-	client, conn, err := cosigner.getGRPCClient()
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
 	us := make([][]byte, len(uuids))
 	for i, u := range uuids {
 		us[i] = make([]byte, 16)
 		copy(us[i], u[:])
 	}
-	res, err := client.GetNonces(ctx, &proto.GetNoncesRequest{
+	res, err := cosigner.client.GetNonces(ctx, &proto.GetNoncesRequest{
 		Uuids: us,
 	})
 	if err != nil {
@@ -113,13 +112,7 @@ func (cosigner *RemoteCosigner) GetNonces(
 func (cosigner *RemoteCosigner) SetNoncesAndSign(
 	ctx context.Context,
 	req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error) {
-	client, conn, err := cosigner.getGRPCClient()
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
-
-	res, err := client.SetNoncesAndSign(ctx, &proto.SetNoncesAndSignRequest{
+	res, err := cosigner.client.SetNoncesAndSign(ctx, &proto.SetNoncesAndSignRequest{
 		Uuid:      req.Nonces.UUID[:],
 		ChainID:   req.ChainID,
 		Nonces:    req.Nonces.Nonces.toProto(),
@@ -133,5 +126,21 @@ func (cosigner *RemoteCosigner) SetNoncesAndSign(
 		NoncePublic: res.GetNoncePublic(),
 		Timestamp:   time.Unix(0, res.GetTimestamp()),
 		Signature:   res.GetSignature(),
+	}, nil
+}
+
+func (cosigner *RemoteCosigner) Sign(
+	ctx context.Context,
+	req CosignerSignBlockRequest,
+) (*CosignerSignBlockResponse, error) {
+	res, err := cosigner.client.SignBlock(ctx, &proto.SignBlockRequest{
+		ChainID: req.ChainID,
+		Block:   req.Block.ToProto(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &CosignerSignBlockResponse{
+		Signature: res.GetSignature(),
 	}, nil
 }

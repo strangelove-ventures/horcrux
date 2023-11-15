@@ -41,9 +41,13 @@ func NewThresholdValidator(
 
 	for _, c := range thresholdCfg.Cosigners {
 		if c.ShardID != security.GetID() {
+			rc, err := signer.NewRemoteCosigner(c.ShardID, c.P2PAddr)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to initialize remote cosigner: %w", err)
+			}
 			remoteCosigners = append(
 				remoteCosigners,
-				signer.NewRemoteCosigner(c.ShardID, c.P2PAddr),
+				rc,
 			)
 		} else {
 			p2pListen = c.P2PAddr

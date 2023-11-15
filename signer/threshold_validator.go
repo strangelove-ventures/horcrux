@@ -32,7 +32,7 @@ type ThresholdValidator struct {
 	myCosigner *LocalCosigner
 
 	// peer cosigners
-	peerCosigners []Cosigner
+	peerCosigners Cosigners
 
 	leader Leader
 
@@ -545,6 +545,59 @@ func (pv *ThresholdValidator) waitForPeerNonces(
 	mu.Unlock()
 }
 
+func (pv *ThresholdValidator) proxyIfNecessary(ctx context.Context, chainID string, block Block) (bool, []byte, time.Time, error) {
+	height, round, step, stamp := block.Height, block.Round, block.Step, block.Timestamp
+
+	if pv.leader.IsLeader() {
+		return false, nil, time.Time{}, nil
+	}
+
+	leader := pv.leader.GetLeader()
+
+	// TODO is there a better way than to poll during leader election?
+	for i := 0; i < 500 && leader == -1; i++ {
+		time.Sleep(10 * time.Millisecond)
+		leader = pv.leader.GetLeader()
+	}
+
+	if leader == -1 {
+		return true, nil, stamp, fmt.Errorf("timed out waiting for raft leader")
+	}
+
+	if leader == pv.myCosigner.GetID() {
+		return false, nil, time.Time{}, nil
+	}
+
+	pv.logger.Debug("I am not the leader. Proxying request to the leader",
+		"chain_id", chainID,
+		"height", height,
+		"round", round,
+		"step", step,
+	)
+	totalNotRaftLeader.Inc()
+
+	cosignerLeader := pv.peerCosigners.GetByID(leader)
+	if cosignerLeader == nil {
+		return true, nil, stamp, fmt.Errorf("failed to find cosigner with id %d", leader)
+	}
+
+	signRes, err := cosignerLeader.(*RemoteCosigner).Sign(ctx, CosignerSignBlockRequest{
+		ChainID: chainID,
+		Block:   &block,
+	})
+	if err != nil {
+		if _, ok := err.(*cometrpcjsontypes.RPCError); ok {
+			rpcErrUnwrapped := err.(*cometrpcjsontypes.RPCError).Data
+			// Need to return BeyondBlockError after proxy since the error type will be lost over RPC
+			if len(rpcErrUnwrapped) > 33 && rpcErrUnwrapped[:33] == "Progress already started on block" {
+				return true, nil, stamp, &BeyondBlockError{msg: rpcErrUnwrapped}
+			}
+		}
+		return true, nil, stamp, err
+	}
+	return true, signRes.Signature, stamp, nil
+}
+
 func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Block) ([]byte, time.Time, error) {
 	height, round, step, stamp, signBytes := block.Height, block.Round, block.Step, block.Timestamp, block.SignBytes
 
@@ -554,29 +607,9 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 
 	// Only the leader can execute this function. Followers can handle the requests,
 	// but they just need to proxy the request to the raft leader
-	if !pv.leader.IsLeader() {
-		pv.logger.Debug("I am not the leader. Proxying request to the leader",
-			"chain_id", chainID,
-			"height", height,
-			"round", round,
-			"step", step,
-		)
-		totalNotRaftLeader.Inc()
-		signRes, err := pv.leader.SignBlock(CosignerSignBlockRequest{
-			ChainID: chainID,
-			Block:   &block,
-		})
-		if err != nil {
-			if _, ok := err.(*cometrpcjsontypes.RPCError); ok {
-				rpcErrUnwrapped := err.(*cometrpcjsontypes.RPCError).Data
-				// Need to return BeyondBlockError after proxy since the error type will be lost over RPC
-				if len(rpcErrUnwrapped) > 33 && rpcErrUnwrapped[:33] == "Progress already started on block" {
-					return nil, stamp, &BeyondBlockError{msg: rpcErrUnwrapped}
-				}
-			}
-			return nil, stamp, err
-		}
-		return signRes.Signature, stamp, nil
+	isProxied, proxySig, proxyStamp, err := pv.proxyIfNecessary(ctx, chainID, block)
+	if isProxied {
+		return proxySig, proxyStamp, err
 	}
 
 	totalRaftLeader.Inc()
@@ -798,6 +831,15 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 	timeSignBlock := time.Since(timeStartSignBlock)
 	timeSignBlockSec := timeSignBlock.Seconds()
 	timedSignBlockLag.Observe(timeSignBlockSec)
+
+	pv.logger.Info(
+		"Signed",
+		"chain_id", chainID,
+		"height", height,
+		"round", round,
+		"type", signType(step),
+		"duration_ms", timeSignBlock.Round(time.Millisecond),
+	)
 
 	return signature, stamp, nil
 }

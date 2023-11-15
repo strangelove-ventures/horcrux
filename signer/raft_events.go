@@ -2,12 +2,6 @@ package signer
 
 import (
 	"encoding/json"
-	"errors"
-	"time"
-
-	"github.com/strangelove-ventures/horcrux/signer/proto"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 const (
@@ -45,44 +39,4 @@ func (f *fsm) handleLSSEvent(value string) {
 	}
 	_ = f.thresholdValidator.SaveLastSignedState(lss.ChainID, lss.SignStateConsensus)
 	_ = f.cosigner.SaveLastSignedState(lss.ChainID, lss.SignStateConsensus)
-}
-
-func (s *RaftStore) getLeaderGRPCClient() (proto.CosignerClient, *grpc.ClientConn, error) {
-	var leader string
-	for i := 0; i < 30; i++ {
-		leader = string(s.GetLeader())
-		if leader != "" {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-	if leader == "" {
-		totalRaftLeaderElectiontimeout.Inc()
-		return nil, nil, errors.New("timed out waiting for leader election to complete")
-	}
-	conn, err := grpc.Dial(leader, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return nil, nil, err
-	}
-	return proto.NewCosignerClient(conn), conn, nil
-}
-
-func (s *RaftStore) SignBlock(req CosignerSignBlockRequest) (*CosignerSignBlockResponse, error) {
-	client, conn, err := s.getLeaderGRPCClient()
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
-	context, cancelFunc := getContext()
-	defer cancelFunc()
-	res, err := client.SignBlock(context, &proto.SignBlockRequest{
-		ChainID: req.ChainID,
-		Block:   req.Block.ToProto(),
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &CosignerSignBlockResponse{
-		Signature: res.GetSignature(),
-	}, nil
 }

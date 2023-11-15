@@ -31,6 +31,17 @@ type Cosigner interface {
 	SetNoncesAndSign(ctx context.Context, req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error)
 }
 
+type Cosigners []Cosigner
+
+func (cosigners Cosigners) GetByID(id int) Cosigner {
+	for _, cosigner := range cosigners {
+		if cosigner.GetID() == id {
+			return cosigner
+		}
+	}
+	return nil
+}
+
 // CosignerSignRequest is sent to a co-signer to obtain their signature for the SignBytes
 // The SignBytes should be a serialized block
 type CosignerSignRequest struct {
