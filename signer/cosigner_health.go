@@ -2,15 +2,12 @@ package signer
 
 import (
 	"context"
-	"net/url"
 	"sort"
 	"sync"
 	"time"
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 const (
@@ -40,7 +37,9 @@ func (ch *CosignerHealth) Reconcile(ctx context.Context) {
 		var wg sync.WaitGroup
 		wg.Add(len(ch.cosigners))
 		for _, cosigner := range ch.cosigners {
-			go ch.updateRTT(ctx, cosigner, &wg)
+			if rc, ok := cosigner.(*RemoteCosigner); ok {
+				go ch.updateRTT(ctx, rc, &wg)
+			}
 		}
 		wg.Wait()
 	}
@@ -65,7 +64,7 @@ func (ch *CosignerHealth) MarkUnhealthy(cosigner Cosigner) {
 	ch.rtt[cosigner.GetID()] = -1
 }
 
-func (ch *CosignerHealth) updateRTT(ctx context.Context, cosigner Cosigner, wg *sync.WaitGroup) {
+func (ch *CosignerHealth) updateRTT(ctx context.Context, cosigner *RemoteCosigner, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	rtt := int64(-1)
@@ -78,24 +77,7 @@ func (ch *CosignerHealth) updateRTT(ctx context.Context, cosigner Cosigner, wg *
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
 
-	var grpcAddress string
-	cosignerAddress := cosigner.GetAddress()
-	url, err := url.Parse(cosignerAddress)
-	if err != nil {
-		grpcAddress = cosignerAddress
-	} else {
-		grpcAddress = url.Host
-	}
-
-	conn, err := grpc.DialContext(ctx, grpcAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		ch.logger.Error("Failed to dial", "cosigner", cosigner.GetID(), "error", err)
-		return
-	}
-	defer conn.Close()
-
-	client := proto.NewCosignerClient(conn)
-	_, err = client.Ping(ctx, &proto.PingRequest{})
+	_, err := cosigner.client.Ping(ctx, &proto.PingRequest{})
 	if err != nil {
 		ch.logger.Error("Failed to ping", "cosigner", cosigner.GetID(), "error", err)
 		return

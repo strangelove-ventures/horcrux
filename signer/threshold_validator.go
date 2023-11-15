@@ -565,6 +565,7 @@ func (pv *ThresholdValidator) proxyIfNecessary(
 	}
 
 	if leader == -1 {
+		totalRaftLeaderElectionTimeout.Inc()
 		return true, nil, stamp, fmt.Errorf("timed out waiting for raft leader")
 	}
 
