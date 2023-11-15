@@ -83,6 +83,14 @@ func startChains(
 			ChainConfig: ibc.ChainConfig{
 				ModifyGenesis: c.modifyGenesis,
 				PreGenesis:    preGenesis,
+				ConfigFileOverrides: map[string]any{
+					"config/config.toml": testutil.Toml{
+						"consensus": testutil.Toml{
+							"timeout_commit":  "1s",
+							"timeout_propose": "1s",
+						},
+					},
+				},
 			},
 		}
 	}

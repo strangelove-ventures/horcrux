@@ -23,6 +23,7 @@ func TestNonceCacheDemand(t *testing.T) {
 		&MockLeader{id: 1, leader: &ThresholdValidator{myCosigner: lcs[0]}},
 		500*time.Millisecond,
 		100*time.Millisecond,
+		2,
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -33,14 +34,17 @@ func TestNonceCacheDemand(t *testing.T) {
 	go nonceCache.Start(ctx)
 
 	for i := 0; i < 3000; i++ {
-		_, err := nonceCache.GetNonces(ctx, []Cosigner{cosigners[0], cosigners[1]})
+		n, err := nonceCache.GetNonces(ctx, []Cosigner{cosigners[0], cosigners[1]})
 		require.NoError(t, err)
+		nonceCache.ClearNonce(n.UUID)
 		time.Sleep(10 * time.Millisecond)
-		require.Greater(t, len(nonceCache.readyNonces), 0)
+		require.Greater(t, nonceCache.cache.Size(), 0)
 	}
 
-	require.Greater(t, len(nonceCache.readyNonces), 0)
+	size := nonceCache.cache.Size()
+
+	require.Greater(t, size, 0)
 
 	target := int(nonceCache.noncesPerMinute*.01) + 10
-	require.LessOrEqual(t, len(nonceCache.readyNonces), target)
+	require.LessOrEqual(t, size, target)
 }

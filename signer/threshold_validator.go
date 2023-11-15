@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -43,6 +44,9 @@ type ThresholdValidator struct {
 	cosignerHealth *CosignerHealth
 
 	nonceCache *CosignerNonceCache
+
+	lastWasLeader   bool
+	lastWasLeaderMu sync.Mutex
 }
 
 type ChainSignState struct {
@@ -67,11 +71,21 @@ func NewThresholdValidator(
 	peerCosigners []Cosigner,
 	leader Leader,
 ) *ThresholdValidator {
+	allCosigners := make([]Cosigner, len(peerCosigners)+1)
+	allCosigners[0] = myCosigner
+	copy(allCosigners[1:], peerCosigners)
+
+	for _, cosigner := range peerCosigners {
+		logger.Debug("Peer cosigner", "id", cosigner.GetID())
+	}
+
 	nc := NewCosignerNonceCache(
 		logger,
-		append(peerCosigners, myCosigner),
-		leader, defaultGetNoncesInterval,
+		allCosigners,
+		leader,
+		defaultGetNoncesInterval,
 		defaultGetNoncesTimeout,
+		uint8(threshold),
 	)
 	return &ThresholdValidator{
 		logger:                      logger,
@@ -82,7 +96,7 @@ func NewThresholdValidator(
 		myCosigner:                  myCosigner,
 		peerCosigners:               peerCosigners,
 		leader:                      leader,
-		cosignerHealth:              NewCosignerHealth(peerCosigners, leader),
+		cosignerHealth:              NewCosignerHealth(logger, peerCosigners, leader),
 		nonceCache:                  nc,
 	}
 }
@@ -222,7 +236,7 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, block
 
 // notifyBlockSignError will alert any waiting goroutines that an error
 // has occurred during signing and a retry can be attempted.
-func (pv *ThresholdValidator) notifyBlockSignError(chainID string, hrs HRSKey) {
+func (pv *ThresholdValidator) notifyBlockSignError(chainID string, hrs HRSKey, signBytes []byte) {
 	css := pv.mustLoadChainState(chainID)
 
 	css.lastSignState.mu.Lock()
@@ -231,6 +245,7 @@ func (pv *ThresholdValidator) notifyBlockSignError(chainID string, hrs HRSKey) {
 		Round:  hrs.Round,
 		Step:   hrs.Step,
 		// empty signature to indicate error
+		SignBytes: signBytes,
 	}
 	css.lastSignState.mu.Unlock()
 	css.lastSignState.cond.Broadcast()
@@ -446,6 +461,30 @@ func (pv *ThresholdValidator) compareBlockSignatureAgainstHRS(
 	return newStillWaitingForBlockError(chainID, blockHRS)
 }
 
+func (pv *ThresholdValidator) loadNoncesIfNewLeader(ctx context.Context) bool {
+	pv.lastWasLeaderMu.Lock()
+	lastWasLeader := pv.lastWasLeader
+	isLeader := pv.leader.IsLeader()
+	pv.lastWasLeader = isLeader
+	pv.lastWasLeaderMu.Unlock()
+
+	if isLeader && !lastWasLeader {
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			pv.nonceCache.ClearAllNonces()
+			pv.nonceCache.LoadN(ctx, 20)
+		}()
+		go func() {
+			defer wg.Done()
+			pv.cosignerHealth.Reconcile(ctx)
+		}()
+		wg.Wait()
+	}
+	return isLeader
+}
+
 func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Block) ([]byte, time.Time, error) {
 	height, round, step, stamp, signBytes := block.Height, block.Round, block.Step, block.Timestamp, block.SignBytes
 
@@ -455,9 +494,11 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 
 	timeStartSignBlock := time.Now()
 
+	isLeader := pv.loadNoncesIfNewLeader(ctx)
+
 	// Only the leader can execute this function. Followers can handle the requests,
 	// but they just need to proxy the request to the raft leader
-	if !pv.leader.IsLeader() {
+	if !isLeader {
 		pv.logger.Debug("I am not the leader. Proxying request to the leader",
 			"chain_id", chainID,
 			"height", height,
@@ -501,7 +542,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 	// Keep track of the last block that we began the signing process for. Only allow one attempt per block
 	existingSignature, existingTimestamp, err := pv.SaveLastSignedStateInitiated(chainID, &block)
 	if err != nil {
-		return nil, stamp, err
+		return nil, stamp, fmt.Errorf("error saving last sign state initiated: %w", err)
 	}
 	if existingSignature != nil {
 		pv.logger.Debug("Returning existing signature", "signature", fmt.Sprintf("%x", existingSignature))
@@ -514,13 +555,16 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 	peerStartTime := time.Now()
 
 	cosignersOrderedByFastest := pv.cosignerHealth.GetFastest()
-	cosignersForThisBlock := cosignersOrderedByFastest[:pv.threshold-1]
-	cosignersForThisBlock = append(cosignersForThisBlock, pv.myCosigner)
+	cosignersForThisBlock := make([]Cosigner, pv.threshold)
+	cosignersForThisBlock[0] = pv.myCosigner
+	copy(cosignersForThisBlock[1:], cosignersOrderedByFastest[:pv.threshold-1])
+
 	nonceCtx, nonceCancel := context.WithTimeout(ctx, pv.grpcTimeout)
 	defer nonceCancel()
+
 	nonces, err := pv.nonceCache.GetNonces(nonceCtx, cosignersForThisBlock)
 	if err != nil {
-		pv.notifyBlockSignError(chainID, block.HRSKey())
+		pv.notifyBlockSignError(chainID, block.HRSKey(), signBytes)
 
 		for _, peer := range pv.peerCosigners {
 			missedNonces.WithLabelValues(peer.GetAddress()).Add(float64(1))
@@ -530,12 +574,12 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 		return nil, stamp, fmt.Errorf("failed to get nonces: %w", err)
 	}
 
-	nextFastestCosignerIndex := pv.threshold
+	nextFastestCosignerIndex := pv.threshold - 1
 	var nextFastestCosignerIndexMu sync.Mutex
 	getNextFastestCosigner := func() Cosigner {
 		nextFastestCosignerIndexMu.Lock()
 		defer nextFastestCosignerIndexMu.Unlock()
-		if nextFastestCosignerIndex >= numPeers {
+		if nextFastestCosignerIndex >= len(cosignersOrderedByFastest) {
 			return nil
 		}
 		cosigner := cosignersOrderedByFastest[nextFastestCosignerIndex]
@@ -559,18 +603,20 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 	// destination for share signatures
 	shareSignatures := make([][]byte, total)
 
+	pv.nonceCache.ClearNonce(nonces.UUID)
+
 	var eg errgroup.Group
 	for _, cosigner := range cosignersForThisBlock {
 		cosigner := cosigner
 		eg.Go(func() error {
 			for cosigner != nil {
-				ctx, cancel := context.WithTimeout(ctx, pv.grpcTimeout)
+				signCtx, cancel := context.WithTimeout(ctx, pv.grpcTimeout)
 				defer cancel()
 
 				peerStartTime := time.Now()
 
 				// set peerNonces and sign in single rpc call.
-				sigRes, err := cosigner.SetNoncesAndSign(ctx, CosignerSetNoncesAndSignRequest{
+				sigRes, err := cosigner.SetNoncesAndSign(signCtx, CosignerSetNoncesAndSignRequest{
 					ChainID:   chainID,
 					Nonces:    nonces.For(cosigner.GetID()),
 					HRST:      hrst,
@@ -582,7 +628,19 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 						"id", cosigner.GetID(),
 						"err", err.Error(),
 					)
-					pv.cosignerHealth.MarkUnhealthy(cosigner)
+
+					if cosigner.GetID() == pv.myCosigner.GetID() {
+						return err
+					}
+
+					// TODO only do this if errors.Is(context.Cacnceled) or network errors
+					if !strings.Contains(err.Error(), "regression") {
+						pv.cosignerHealth.MarkUnhealthy(cosigner)
+						pv.nonceCache.ClearNonces(cosigner)
+					}
+
+					// this will only work if the next cosigner has the nonces we've already decided to use for this block
+					// otherwise the sign attempt will fail
 					cosigner = getNextFastestCosigner()
 					continue
 				}
@@ -599,18 +657,11 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 	}
 
 	if err := eg.Wait(); err != nil {
-		pv.notifyBlockSignError(chainID, block.HRSKey())
-		return nil, stamp, err
+		pv.notifyBlockSignError(chainID, block.HRSKey(), signBytes)
+		return nil, stamp, fmt.Errorf("error from cosigner(s): %s", err)
 	}
 
 	timedSignBlockCosignerLag.Observe(time.Since(timeStartSignBlock).Seconds())
-	pv.logger.Debug(
-		"Done waiting for cosigners, assembling signatures",
-		"chain_id", chainID,
-		"height", hrst.Height,
-		"round", hrst.Round,
-		"step", hrst.Step,
-	)
 
 	// collect all valid responses into array of partial signatures
 	shareSigs := make([]PartialSignature, 0, pv.threshold)
@@ -632,29 +683,22 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 
 	if len(shareSigs) < pv.threshold {
 		totalInsufficientCosigners.Inc()
-		pv.notifyBlockSignError(chainID, block.HRSKey())
+		pv.notifyBlockSignError(chainID, block.HRSKey(), signBytes)
 		return nil, stamp, errors.New("not enough co-signers")
 	}
 
 	// assemble into final signature
 	signature, err := pv.myCosigner.CombineSignatures(chainID, shareSigs)
 	if err != nil {
-		pv.notifyBlockSignError(chainID, block.HRSKey())
-		return nil, stamp, err
+		pv.notifyBlockSignError(chainID, block.HRSKey(), signBytes)
+		return nil, stamp, fmt.Errorf("error combining signatures: %w", err)
 	}
-
-	pv.logger.Debug(
-		"Assembled full signature",
-		"chain_id", chainID,
-		"height", hrst.Height,
-		"round", hrst.Round,
-		"step", hrst.Step,
-	)
 
 	// verify the combined signature before saving to watermark
 	if !pv.myCosigner.VerifySignature(chainID, signBytes, signature) {
 		totalInvalidSignature.Inc()
-		pv.notifyBlockSignError(chainID, block.HRSKey())
+
+		pv.notifyBlockSignError(chainID, block.HRSKey(), signBytes)
 		return nil, stamp, errors.New("combined signature is not valid")
 	}
 
@@ -677,19 +721,23 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 	css.lastSignStateMutex.Unlock()
 	if err != nil {
 		if _, isSameHRSError := err.(*SameHRSError); !isSameHRSError {
-			pv.notifyBlockSignError(chainID, block.HRSKey())
-			return nil, stamp, err
+
+			pv.notifyBlockSignError(chainID, block.HRSKey(), signBytes)
+			return nil, stamp, fmt.Errorf("error saving last sign state: %w", err)
 		}
 	}
 
 	// Emit last signed state to cluster
 	err = pv.leader.ShareSigned(newLss)
 	if err != nil {
+		// this is not required for double sign protection, so we don't need to return an error here.
+		// this is only an additional mechanism that will catch double signs earlier in the sign process.
 		pv.logger.Error("Error emitting LSS", err.Error())
 	}
 
-	timeSignBlock := time.Since(timeStartSignBlock).Seconds()
-	timedSignBlockLag.Observe(timeSignBlock)
+	timeSignBlock := time.Since(timeStartSignBlock)
+	timeSignBlockSec := timeSignBlock.Seconds()
+	timedSignBlockLag.Observe(timeSignBlockSec)
 
 	return signature, stamp, nil
 }

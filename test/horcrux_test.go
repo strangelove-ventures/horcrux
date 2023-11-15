@@ -154,6 +154,8 @@ func TestDownedSigners2of3(t *testing.T) {
 		ctx, t, totalValidators, totalSigners, threshold, totalSentries, sentriesPerSigner,
 	)
 
+	require.NoError(t, testutil.WaitForBlocks(ctx, 15, cw.chain))
+
 	ourValidator := cw.chain.Validators[0]
 	requireHealthyValidator(t, ourValidator, pubKey.Address())
 
@@ -165,7 +167,7 @@ func TestDownedSigners2of3(t *testing.T) {
 		require.NoError(t, cosigner.StopContainer(ctx))
 
 		t.Logf("{%s} -> Waiting for blocks after stopping cosigner {%s}", ourValidator.Name(), cosigner.Name())
-		require.NoError(t, testutil.WaitForBlocks(ctx, 5, cw.chain))
+		require.NoError(t, testutil.WaitForBlocks(ctx, 15, cw.chain))
 
 		requireHealthyValidator(t, ourValidator, pubKey.Address())
 
@@ -173,7 +175,7 @@ func TestDownedSigners2of3(t *testing.T) {
 		require.NoError(t, cosigner.StartContainer(ctx))
 
 		t.Logf("{%s} -> Waiting for blocks after restarting cosigner {%s}", ourValidator.Name(), cosigner.Name())
-		require.NoError(t, testutil.WaitForBlocks(ctx, 5, cw.chain))
+		require.NoError(t, testutil.WaitForBlocks(ctx, 15, cw.chain))
 
 		requireHealthyValidator(t, ourValidator, pubKey.Address())
 	}
@@ -194,6 +196,8 @@ func TestDownedSigners3of5(t *testing.T) {
 	cw, pubKey := startChainSingleNodeAndHorcruxThreshold(
 		ctx, t, totalValidators, totalSigners, threshold, totalSentries, sentriesPerSigner,
 	)
+
+	require.NoError(t, testutil.WaitForBlocks(ctx, 15, cw.chain))
 
 	ourValidator := cw.chain.Validators[0]
 	requireHealthyValidator(t, ourValidator, pubKey.Address())
@@ -221,13 +225,13 @@ func TestDownedSigners3of5(t *testing.T) {
 		}
 
 		t.Logf("{%s} -> Waiting for blocks after stopping cosigner {%s}", ourValidator.Name(), cosigner2.Name())
-		require.NoError(t, testutil.WaitForBlocks(ctx, 5, cw.chain))
+		require.NoError(t, testutil.WaitForBlocks(ctx, 15, cw.chain))
 
 		requireHealthyValidator(t, ourValidator, pubKey.Address())
 
 		t.Logf("{%s} -> Restarting cosigner...", cosigner1.Name())
 		require.NoError(t, cosigner1.StartContainer(ctx))
-		require.NoError(t, testutil.WaitForBlocks(ctx, 5, cw.chain))
+		require.NoError(t, testutil.WaitForBlocks(ctx, 15, cw.chain))
 
 		requireHealthyValidator(t, ourValidator, pubKey.Address())
 	}

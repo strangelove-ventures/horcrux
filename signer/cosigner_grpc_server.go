@@ -133,3 +133,7 @@ func (rpc *CosignerGRPCServer) GetLeader(
 	leader := rpc.raftStore.GetLeader()
 	return &proto.GetLeaderResponse{Leader: string(leader)}, nil
 }
+
+func (rpc *CosignerGRPCServer) Ping(context.Context, *proto.PingRequest) (*proto.PingResponse, error) {
+	return &proto.PingResponse{}, nil
+}

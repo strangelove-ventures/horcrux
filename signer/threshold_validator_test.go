@@ -94,7 +94,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 	ctx := context.Background()
 
-	validator.nonceCache.LoadN(ctx, 5)
+	validator.nonceCache.LoadN(ctx, 1)
 
 	err := validator.LoadSignStateIfNecessary(testChainID)
 	require.NoError(t, err)
@@ -125,6 +125,8 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 	block = ProposalToBlock(testChainID, &proposal)
 
+	validator.nonceCache.LoadN(ctx, 1)
+
 	// should be able to sign same proposal with only differing timestamp
 	_, _, err = validator.Sign(ctx, testChainID, block)
 	require.NoError(t, err)
@@ -141,6 +143,8 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 		BlockID: blockID,
 	}
 
+	validator.nonceCache.LoadN(ctx, 1)
+
 	// different than single-signer mode, threshold mode will be successful for this,
 	// but it will return the same signature as before.
 	signature, _, err = validator.Sign(ctx, testChainID, ProposalToBlock(testChainID, &proposal))
@@ -150,9 +154,13 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 	proposal.Round = 19
 
+	validator.nonceCache.LoadN(ctx, 1)
+
 	// should not be able to sign lower than highest signed
 	_, _, err = validator.Sign(ctx, testChainID, ProposalToBlock(testChainID, &proposal))
 	require.Error(t, err, "double sign!")
+
+	validator.nonceCache.LoadN(ctx, 1)
 
 	// lower LSS should sign for different chain ID
 	_, _, err = validator.Sign(ctx, testChainID2, ProposalToBlock(testChainID2, &proposal))
@@ -171,7 +179,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	)
 	defer newValidator.Stop()
 
-	newValidator.nonceCache.LoadN(ctx, 500)
+	newValidator.nonceCache.LoadN(ctx, 1)
 
 	_, _, err = newValidator.Sign(ctx, testChainID, ProposalToBlock(testChainID, &proposal))
 	require.Error(t, err, "double sign!")
@@ -191,6 +199,8 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 	var eg errgroup.Group
 
+	newValidator.nonceCache.LoadN(ctx, 3)
+
 	eg.Go(func() error {
 		_, _, err := newValidator.Sign(ctx, testChainID, ProposalToBlock(testChainID, &proposal))
 		return err
@@ -209,6 +219,8 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 	// Sign some votes from multiple sentries
 	for i := 2; i < 50; i++ {
+		newValidator.nonceCache.LoadN(ctx, 3)
+
 		prevote := cometproto.Vote{
 			Height:    int64(i),
 			Round:     0,
@@ -256,6 +268,8 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 		precommitClone2 := precommit
 		precommitClone2.Timestamp = precommit.Timestamp.Add(4 * time.Millisecond)
+
+		newValidator.nonceCache.LoadN(ctx, 3)
 
 		eg.Go(func() error {
 			_, _, err := newValidator.Sign(ctx, testChainID, VoteToBlock(testChainID, &precommit))
@@ -376,8 +390,6 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 			leader = tv
 			leaders[i].leader = tv
 		}
-
-		tv.nonceCache.LoadN(ctx, 100)
 
 		thresholdValidators = append(thresholdValidators, tv)
 		defer tv.Stop()

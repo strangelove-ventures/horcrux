@@ -2,20 +2,23 @@ package signer
 
 import (
 	"context"
+	"net/url"
 	"sort"
 	"sync"
 	"time"
 
+	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 const (
-	pingInterval = 5 * time.Second
+	pingInterval = 1 * time.Second
 )
 
 type CosignerHealth struct {
+	logger    cometlog.Logger
 	cosigners []Cosigner
 	rtt       map[int]int64
 	mu        sync.RWMutex
@@ -23,22 +26,30 @@ type CosignerHealth struct {
 	leader Leader
 }
 
-func NewCosignerHealth(cosigners []Cosigner, leader Leader) *CosignerHealth {
+func NewCosignerHealth(logger cometlog.Logger, cosigners []Cosigner, leader Leader) *CosignerHealth {
 	return &CosignerHealth{
+		logger:    logger,
 		cosigners: cosigners,
 		rtt:       make(map[int]int64),
 		leader:    leader,
 	}
 }
 
+func (ch *CosignerHealth) Reconcile(ctx context.Context) {
+	if ch.leader.IsLeader() {
+		var wg sync.WaitGroup
+		wg.Add(len(ch.cosigners))
+		for _, cosigner := range ch.cosigners {
+			go ch.updateRTT(ctx, cosigner, &wg)
+		}
+		wg.Wait()
+	}
+}
+
 func (ch *CosignerHealth) Start(ctx context.Context) {
 	ticker := time.NewTicker(pingInterval)
 	for {
-		if ch.leader.IsLeader() {
-			for _, cosigner := range ch.cosigners {
-				go ch.updateRTT(ctx, cosigner)
-			}
-		}
+		ch.Reconcile(ctx)
 		select {
 		case <-ctx.Done():
 			return
@@ -54,7 +65,9 @@ func (ch *CosignerHealth) MarkUnhealthy(cosigner Cosigner) {
 	ch.rtt[cosigner.GetID()] = -1
 }
 
-func (ch *CosignerHealth) updateRTT(ctx context.Context, cosigner Cosigner) {
+func (ch *CosignerHealth) updateRTT(ctx context.Context, cosigner Cosigner, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	rtt := int64(-1)
 	defer func() {
 		ch.mu.Lock()
@@ -62,15 +75,32 @@ func (ch *CosignerHealth) updateRTT(ctx context.Context, cosigner Cosigner) {
 		ch.rtt[cosigner.GetID()] = rtt
 	}()
 	start := time.Now()
-	conn, err := grpc.Dial(cosigner.GetAddress(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
+	defer cancel()
+
+	var grpcAddress string
+	cosignerAddress := cosigner.GetAddress()
+	url, err := url.Parse(cosignerAddress)
 	if err != nil {
+		grpcAddress = cosignerAddress
+	} else {
+		grpcAddress = url.Host
+	}
+
+	conn, err := grpc.DialContext(ctx, grpcAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		ch.logger.Error("Failed to dial", "cosigner", cosigner.GetID(), "error", err)
 		return
 	}
+	defer conn.Close()
+
 	client := proto.NewCosignerClient(conn)
 	_, err = client.Ping(ctx, &proto.PingRequest{})
-	if err == nil {
-		rtt = time.Since(start).Nanoseconds()
+	if err != nil {
+		ch.logger.Error("Failed to ping", "cosigner", cosigner.GetID(), "error", err)
+		return
 	}
+	rtt = time.Since(start).Nanoseconds()
 }
 
 func (ch *CosignerHealth) GetFastest() []Cosigner {
