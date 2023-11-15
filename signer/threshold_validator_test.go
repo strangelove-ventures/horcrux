@@ -79,7 +79,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	leader := &MockLeader{id: 1}
 
 	validator := NewThresholdValidator(
-		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)),
+		cometlog.NewNopLogger(),
 		cosigners[0].config,
 		int(threshold),
 		time.Second,
@@ -168,7 +168,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 	// reinitialize validator to make sure new runtime will not allow double sign
 	newValidator := NewThresholdValidator(
-		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)),
+		cometlog.NewNopLogger(),
 		cosigners[0].config,
 		int(threshold),
 		time.Second,
@@ -334,7 +334,7 @@ func getTestLocalCosigners(t *testing.T, threshold, total uint8) ([]*LocalCosign
 		}
 
 		cosigner := NewLocalCosigner(
-			cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)),
+			cometlog.NewNopLogger(),
 			cosignerConfig,
 			NewCosignerSecurityECIES(
 				CosignerECIESKey{
@@ -377,7 +377,7 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 		}
 		leaders[i] = &MockLeader{id: cosigner.GetID(), leader: leader}
 		tv := NewThresholdValidator(
-			cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)),
+			cometlog.NewNopLogger(),
 			cosigner.config,
 			int(threshold),
 			time.Second,
