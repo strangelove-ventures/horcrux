@@ -19,7 +19,7 @@ type CosignerNonceCache struct {
 
 	leader Leader
 
-	lastReconcileNonces int
+	lastReconcileNonces lastCount
 	lastReconcileTime   time.Time
 	noncesPerMinute     float64
 
@@ -29,6 +29,29 @@ type CosignerNonceCache struct {
 	threshold uint8
 
 	cache NonceCache
+}
+
+type lastCount struct {
+	count int
+	mu    sync.RWMutex
+}
+
+func (lc *lastCount) Set(n int) {
+	lc.mu.Lock()
+	defer lc.mu.Unlock()
+	lc.count = n
+}
+
+func (lc *lastCount) Inc() {
+	lc.mu.Lock()
+	defer lc.mu.Unlock()
+	lc.count++
+}
+
+func (lc *lastCount) Get() int {
+	lc.mu.RLock()
+	defer lc.mu.RUnlock()
+	return lc.count
 }
 
 type NonceCache struct {
@@ -110,12 +133,11 @@ func (cnc *CosignerNonceCache) reconcile(ctx context.Context) {
 	if !cnc.leader.IsLeader() {
 		return
 	}
-	cnc.logger.Debug("Reconciling nonces")
 	remainingNonces := cnc.cache.Size()
 	timeSinceLastReconcile := time.Since(cnc.lastReconcileTime)
 
 	// calculate nonces per minute
-	noncesPerMin := float64(cnc.lastReconcileNonces-remainingNonces) / timeSinceLastReconcile.Minutes()
+	noncesPerMin := float64(cnc.lastReconcileNonces.Get()-remainingNonces) / timeSinceLastReconcile.Minutes()
 	if noncesPerMin < 0 {
 		noncesPerMin = 0
 	}
@@ -129,7 +151,7 @@ func (cnc *CosignerNonceCache) reconcile(ctx context.Context) {
 	}
 
 	defer func() {
-		cnc.lastReconcileNonces = cnc.cache.Size()
+		cnc.lastReconcileNonces.Set(cnc.cache.Size())
 		cnc.lastReconcileTime = time.Now()
 	}()
 
@@ -139,7 +161,7 @@ func (cnc *CosignerNonceCache) reconcile(ctx context.Context) {
 
 	target := int((cnc.noncesPerMinute/60)*cnc.getNoncesInterval.Seconds()*1.2) + 10
 	additional := target - remainingNonces
-	if additional < 0 {
+	if additional <= 0 {
 		// we're ahead of demand, don't load any more
 		cnc.logger.Debug(
 			"Cosigner nonce cache ahead of demand",
@@ -147,7 +169,6 @@ func (cnc *CosignerNonceCache) reconcile(ctx context.Context) {
 			"remaining", remainingNonces,
 			"noncesPerMin", cnc.noncesPerMinute,
 		)
-
 		return
 	}
 
@@ -163,6 +184,9 @@ func (cnc *CosignerNonceCache) reconcile(ctx context.Context) {
 }
 
 func (cnc *CosignerNonceCache) LoadN(ctx context.Context, n int) {
+	if n == 0 {
+		return
+	}
 	uuids := cnc.getUuids(n)
 	nonces := make([]*CachedNonceSingle, len(cnc.cosigners))
 	var wg sync.WaitGroup
@@ -174,11 +198,21 @@ func (cnc *CosignerNonceCache) LoadN(ctx context.Context, n int) {
 			defer wg.Done()
 			ctx, cancel := context.WithTimeout(ctx, cnc.getNoncesTimeout)
 			defer cancel()
+
+			peerStartTime := time.Now()
 			n, err := p.GetNonces(ctx, uuids)
 			if err != nil {
+				// Significant missing shares may lead to signature failure
+				missedNonces.WithLabelValues(p.GetAddress()).Add(float64(1))
+				totalMissedNonces.WithLabelValues(p.GetAddress()).Inc()
+
 				cnc.logger.Error("Failed to get nonces from peer", "peer", p.GetID(), "error", err)
 				return
 			}
+
+			missedNonces.WithLabelValues(p.GetAddress()).Set(0)
+			timedCosignerNonceLag.WithLabelValues(p.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
+
 			nonces[i] = &CachedNonceSingle{
 				Cosigner: p,
 				Nonces:   n,
@@ -211,12 +245,7 @@ func (cnc *CosignerNonceCache) LoadN(ctx context.Context, n int) {
 }
 
 func (cnc *CosignerNonceCache) Start(ctx context.Context) {
-	// tiered startup to quickly bootstrap nonces for immediate signing
-	for i := 1; i < 10; i++ {
-		cnc.LoadN(ctx, i*20)
-	}
-
-	cnc.lastReconcileNonces = cnc.cache.Size()
+	cnc.lastReconcileNonces.Set(cnc.cache.Size())
 	cnc.lastReconcileTime = time.Now()
 
 	ticker := time.NewTicker(cnc.getNoncesInterval)
@@ -251,12 +280,19 @@ CheckNoncesLoop:
 			}
 		}
 
+		cnc.cache.mu.RUnlock()
+		cnc.clearNonce(u)
+		cnc.cache.mu.RLock()
+
 		// all peers found
 		return &CosignerUUIDNonces{
 			UUID:   u,
 			Nonces: nonces,
 		}, nil
 	}
+
+	// increment so it's taken into account in the nonce burn rate in the next reconciliation
+	cnc.lastReconcileNonces.Inc()
 
 	// no nonces found
 	cosignerInts := make([]int, len(fastestPeers))
@@ -266,7 +302,7 @@ CheckNoncesLoop:
 	return nil, fmt.Errorf("no nonces found involving cosigners %+v", cosignerInts)
 }
 
-func (cnc *CosignerNonceCache) ClearNonce(uuid uuid.UUID) {
+func (cnc *CosignerNonceCache) clearNonce(uuid uuid.UUID) {
 	cnc.cache.mu.Lock()
 	defer cnc.cache.mu.Unlock()
 	delete(cnc.cache.cache, uuid)

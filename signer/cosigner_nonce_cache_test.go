@@ -27,16 +27,14 @@ func TestNonceCacheDemand(t *testing.T) {
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
-	nonceCache.LoadN(ctx, 10)
+	nonceCache.LoadN(ctx, 1000)
 
 	go nonceCache.Start(ctx)
 
 	for i := 0; i < 3000; i++ {
-		n, err := nonceCache.GetNonces([]Cosigner{cosigners[0], cosigners[1]})
+		_, err := nonceCache.GetNonces([]Cosigner{cosigners[0], cosigners[1]})
 		require.NoError(t, err)
-		nonceCache.ClearNonce(n.UUID)
 		time.Sleep(10 * time.Millisecond)
 		require.Greater(t, nonceCache.cache.Size(), 0)
 	}
@@ -44,6 +42,8 @@ func TestNonceCacheDemand(t *testing.T) {
 	size := nonceCache.cache.Size()
 
 	require.Greater(t, size, 0)
+
+	cancel()
 
 	target := int(nonceCache.noncesPerMinute*.01) + 10
 	require.LessOrEqual(t, size, target)

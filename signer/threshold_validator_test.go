@@ -94,8 +94,6 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 	ctx := context.Background()
 
-	validator.nonceCache.LoadN(ctx, 1)
-
 	err := validator.LoadSignStateIfNecessary(testChainID)
 	require.NoError(t, err)
 
@@ -272,15 +270,21 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 		newValidator.nonceCache.LoadN(ctx, 3)
 
 		eg.Go(func() error {
+			start := time.Now()
+			t.Log("Sign time", "duration", time.Since(start))
 			_, _, err := newValidator.Sign(ctx, testChainID, VoteToBlock(testChainID, &precommit))
 			return err
 		})
 		eg.Go(func() error {
+			start := time.Now()
+			t.Log("Sign time", "duration", time.Since(start))
 			_, _, err := newValidator.Sign(ctx, testChainID, VoteToBlock(testChainID, &precommitClone))
 			return err
 		})
 		eg.Go(func() error {
+			start := time.Now()
 			_, _, err := newValidator.Sign(ctx, testChainID, VoteToBlock(testChainID, &precommitClone2))
+			t.Log("Sign time", "duration", time.Since(start))
 			return err
 		})
 

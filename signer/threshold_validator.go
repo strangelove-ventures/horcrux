@@ -12,6 +12,7 @@ import (
 
 	"github.com/cometbft/cometbft/libs/log"
 	cometrpcjsontypes "github.com/cometbft/cometbft/rpc/jsonrpc/types"
+	"github.com/google/uuid"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"golang.org/x/sync/errgroup"
 )
@@ -44,9 +45,6 @@ type ThresholdValidator struct {
 	cosignerHealth *CosignerHealth
 
 	nonceCache *CosignerNonceCache
-
-	lastWasLeader   bool
-	lastWasLeaderMu sync.Mutex
 }
 
 type ChainSignState struct {
@@ -461,28 +459,87 @@ func (pv *ThresholdValidator) compareBlockSignatureAgainstHRS(
 	return newStillWaitingForBlockError(chainID, blockHRS)
 }
 
-func (pv *ThresholdValidator) loadNoncesIfNewLeader(ctx context.Context) bool {
-	pv.lastWasLeaderMu.Lock()
-	lastWasLeader := pv.lastWasLeader
-	isLeader := pv.leader.IsLeader()
-	pv.lastWasLeader = isLeader
-	pv.lastWasLeaderMu.Unlock()
+func (pv *ThresholdValidator) getNoncesFallback(
+	ctx context.Context,
+) (*CosignerUUIDNonces, []Cosigner, error) {
+	nonces := make(map[Cosigner]CosignerNonces)
 
-	if isLeader && !lastWasLeader {
-		var wg sync.WaitGroup
-		wg.Add(2)
-		go func() {
-			defer wg.Done()
-			pv.nonceCache.ClearAllNonces()
-			pv.nonceCache.LoadN(ctx, 20)
-		}()
-		go func() {
-			defer wg.Done()
-			pv.cosignerHealth.Reconcile(ctx)
-		}()
-		wg.Wait()
+	var wg sync.WaitGroup
+	wg.Add(pv.threshold)
+
+	var mu sync.Mutex
+
+	u := uuid.New()
+
+	allCosigners := make([]Cosigner, len(pv.peerCosigners)+1)
+	allCosigners[0] = pv.myCosigner
+	copy(allCosigners[1:], pv.peerCosigners)
+
+	for _, c := range allCosigners {
+		go pv.waitForPeerNonces(ctx, u, c, &wg, nonces, &mu)
 	}
-	return isLeader
+
+	// Wait for threshold cosigners to be complete
+	// A Cosigner will either respond in time, or be cancelled with timeout
+	if waitUntilCompleteOrTimeout(&wg, pv.grpcTimeout) {
+		return nil, nil, errors.New("timed out waiting for ephemeral shares")
+	}
+
+	var thresholdNonces CosignerNonces
+	var thresholdCosigners []Cosigner
+	for c, n := range nonces {
+		thresholdCosigners = append(thresholdCosigners, c)
+		thresholdNonces = append(thresholdNonces, n...)
+	}
+
+	return &CosignerUUIDNonces{
+		UUID:   u,
+		Nonces: thresholdNonces,
+	}, thresholdCosigners, nil
+}
+
+func waitUntilCompleteOrTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
+	c := make(chan struct{})
+	go func() {
+		defer close(c)
+		wg.Wait()
+	}()
+	select {
+	case <-c:
+		return false // completed normally
+	case <-time.After(timeout):
+		return true // timed out
+	}
+}
+
+func (pv *ThresholdValidator) waitForPeerNonces(
+	ctx context.Context,
+	u uuid.UUID,
+	peer Cosigner,
+	wg *sync.WaitGroup,
+	nonces map[Cosigner]CosignerNonces,
+	mu sync.Locker,
+) {
+	peerStartTime := time.Now()
+	peerNonces, err := peer.GetNonces(ctx, []uuid.UUID{u})
+	if err != nil {
+		missedNonces.WithLabelValues(peer.GetAddress()).Add(float64(1))
+		totalMissedNonces.WithLabelValues(peer.GetAddress()).Inc()
+
+		pv.logger.Error("Error getting nonces", "cosigner", peer.GetID(), "err", err)
+		return
+	}
+
+	missedNonces.WithLabelValues(peer.GetAddress()).Set(0)
+	timedCosignerNonceLag.WithLabelValues(peer.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
+
+	// Check so that wg.Done is not called more than (threshold - 1) times which causes hardlock
+	mu.Lock()
+	if len(nonces) < pv.threshold {
+		nonces[peer] = peerNonces[0].Nonces
+		defer wg.Done()
+	}
+	mu.Unlock()
 }
 
 func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Block) ([]byte, time.Time, error) {
@@ -492,13 +549,9 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 		return nil, stamp, err
 	}
 
-	timeStartSignBlock := time.Now()
-
-	isLeader := pv.loadNoncesIfNewLeader(ctx)
-
 	// Only the leader can execute this function. Followers can handle the requests,
 	// but they just need to proxy the request to the raft leader
-	if !isLeader {
+	if !pv.leader.IsLeader() {
 		pv.logger.Debug("I am not the leader. Proxying request to the leader",
 			"chain_id", chainID,
 			"height", height,
@@ -532,6 +585,8 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 		"step", step,
 	)
 
+	timeStartSignBlock := time.Now()
+
 	hrst := HRSTKey{
 		Height:    height,
 		Round:     round,
@@ -560,15 +615,17 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 	copy(cosignersForThisBlock[1:], cosignersOrderedByFastest[:pv.threshold-1])
 
 	nonces, err := pv.nonceCache.GetNonces(cosignersForThisBlock)
-	if err != nil {
-		pv.notifyBlockSignError(chainID, block.HRSKey(), signBytes)
 
-		for _, peer := range pv.peerCosigners {
-			missedNonces.WithLabelValues(peer.GetAddress()).Add(float64(1))
-			totalMissedNonces.WithLabelValues(peer.GetAddress()).Inc()
+	var dontIterateFastestCosigners bool
+
+	if err != nil {
+		var fallbackErr error
+		nonces, cosignersForThisBlock, fallbackErr = pv.getNoncesFallback(ctx)
+		if fallbackErr != nil {
+			pv.notifyBlockSignError(chainID, block.HRSKey(), signBytes)
+			return nil, stamp, fmt.Errorf("failed to get nonces: %w", errors.Join(err, fallbackErr))
 		}
-		// Nonces are required, cannot proceed
-		return nil, stamp, fmt.Errorf("failed to get nonces: %w", err)
+		dontIterateFastestCosigners = true
 	}
 
 	nextFastestCosignerIndex := pv.threshold - 1
@@ -599,8 +656,6 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 
 	// destination for share signatures
 	shareSignatures := make([][]byte, total)
-
-	pv.nonceCache.ClearNonce(nonces.UUID)
 
 	var eg errgroup.Group
 	for _, cosigner := range cosignersForThisBlock {
@@ -634,6 +689,11 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 					if !strings.Contains(err.Error(), "regression") {
 						pv.cosignerHealth.MarkUnhealthy(cosigner)
 						pv.nonceCache.ClearNonces(cosigner)
+					}
+
+					if dontIterateFastestCosigners {
+						cosigner = nil
+						continue
 					}
 
 					// this will only work if the next cosigner has the nonces we've already decided to use for this block
