@@ -10,9 +10,11 @@ import (
 	"github.com/google/uuid"
 )
 
-const defaultGetNoncesInterval = 3 * time.Second
-const defaultGetNoncesTimeout = 4 * time.Second
-const cachePreSize = 10000
+const (
+	defaultGetNoncesInterval = 3 * time.Second
+	defaultGetNoncesTimeout  = 4 * time.Second
+	cachePreSize             = 10000
+)
 
 type CosignerNonceCache struct {
 	logger    cometlog.Logger
@@ -199,7 +201,7 @@ func (cnc *CosignerNonceCache) LoadN(ctx context.Context, n int) {
 	var wg sync.WaitGroup
 	wg.Add(len(cnc.cosigners))
 
-	expiration := time.Now().Add(cnc.getNoncesInterval)
+	expiration := time.Now().Add(nonceExpiration)
 
 	for i, p := range cnc.cosigners {
 		i := i

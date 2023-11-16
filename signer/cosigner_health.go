@@ -33,16 +33,17 @@ func NewCosignerHealth(logger cometlog.Logger, cosigners []Cosigner, leader Lead
 }
 
 func (ch *CosignerHealth) Reconcile(ctx context.Context) {
-	if ch.leader.IsLeader() {
-		var wg sync.WaitGroup
-		wg.Add(len(ch.cosigners))
-		for _, cosigner := range ch.cosigners {
-			if rc, ok := cosigner.(*RemoteCosigner); ok {
-				go ch.updateRTT(ctx, rc, &wg)
-			}
-		}
-		wg.Wait()
+	if !ch.leader.IsLeader() {
+		return
 	}
+	var wg sync.WaitGroup
+	wg.Add(len(ch.cosigners))
+	for _, cosigner := range ch.cosigners {
+		if rc, ok := cosigner.(*RemoteCosigner); ok {
+			go ch.updateRTT(ctx, rc, &wg)
+		}
+	}
+	wg.Wait()
 }
 
 func (ch *CosignerHealth) Start(ctx context.Context) {
