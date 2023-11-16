@@ -106,6 +106,8 @@ func (pv *ThresholdValidator) Start(ctx context.Context) error {
 
 	go pv.nonceCache.Start(ctx)
 
+	go pv.myCosigner.StartNoncePruner(ctx)
+
 	return nil
 }
 

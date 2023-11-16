@@ -28,7 +28,7 @@ func TestNonceCacheDemand(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	nonceCache.LoadN(ctx, 1000)
+	nonceCache.LoadN(ctx, 500)
 
 	go nonceCache.Start(ctx)
 

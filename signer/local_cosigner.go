@@ -16,6 +16,8 @@ import (
 
 var _ Cosigner = &LocalCosigner{}
 
+const nonceExpiration = 10 * time.Second
+
 // LocalCosigner responds to sign requests.
 // It maintains a high watermark to avoid double-signing.
 // Signing is thread safe.
@@ -27,7 +29,7 @@ type LocalCosigner struct {
 	address       string
 	pendingDiskWG sync.WaitGroup
 
-	nonces map[uuid.UUID][]Nonces
+	nonces map[uuid.UUID]*NoncesWithExpiration
 	// protects the nonces map
 	noncesMu sync.RWMutex
 }
@@ -43,7 +45,7 @@ func NewLocalCosigner(
 		config:   config,
 		security: security,
 		address:  address,
-		nonces:   make(map[uuid.UUID][]Nonces),
+		nonces:   make(map[uuid.UUID]*NoncesWithExpiration),
 	}
 }
 
@@ -53,6 +55,31 @@ type ChainState struct {
 	lastSignState *SignState
 	// signer generates nonces, combines nonces, signs, and verifies signatures.
 	signer ThresholdSigner
+}
+
+// StartNoncePruner periodically prunes nonces that have expired.
+func (cosigner *LocalCosigner) StartNoncePruner(ctx context.Context) {
+	ticker := time.NewTicker(nonceExpiration / 4)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			cosigner.pruneNonces()
+		}
+	}
+}
+
+// pruneNonces removes nonces that have expired.
+func (cosigner *LocalCosigner) pruneNonces() {
+	cosigner.noncesMu.Lock()
+	defer cosigner.noncesMu.Unlock()
+	now := time.Now()
+	for uuid, nonces := range cosigner.nonces {
+		if now.After(nonces.Expiration) {
+			delete(cosigner.nonces, uuid)
+		}
+	}
 }
 
 func (cosigner *LocalCosigner) combinedNonces(myID int, threshold uint8, uuid uuid.UUID) ([]Nonce, error) {
@@ -67,7 +94,7 @@ func (cosigner *LocalCosigner) combinedNonces(myID int, threshold uint8, uuid uu
 	combinedNonces := make([]Nonce, 0, threshold)
 
 	// calculate secret and public keys
-	for _, c := range nonces {
+	for _, c := range nonces.Nonces {
 		if len(c.Shares) == 0 || len(c.Shares[myID-1]) == 0 {
 			continue
 		}
@@ -289,6 +316,7 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 	return nil
 }
 
+// GetNonces returns the nonces for the given UUIDs, generating if necessary.
 func (cosigner *LocalCosigner) GetNonces(
 	_ context.Context,
 	uuids []uuid.UUID,
@@ -355,7 +383,7 @@ func (cosigner *LocalCosigner) GetNonces(
 	return res, nil
 }
 
-func (cosigner *LocalCosigner) generateNoncesIfNecessary(uuid uuid.UUID) ([]Nonces, error) {
+func (cosigner *LocalCosigner) generateNoncesIfNecessary(uuid uuid.UUID) (*NoncesWithExpiration, error) {
 	// protects the meta map
 	cosigner.noncesMu.Lock()
 	defer cosigner.noncesMu.Unlock()
@@ -369,8 +397,13 @@ func (cosigner *LocalCosigner) generateNoncesIfNecessary(uuid uuid.UUID) ([]Nonc
 		return nil, err
 	}
 
-	cosigner.nonces[uuid] = newNonces
-	return newNonces, nil
+	res := NoncesWithExpiration{
+		Nonces:     newNonces,
+		Expiration: time.Now().Add(nonceExpiration),
+	}
+
+	cosigner.nonces[uuid] = &res
+	return &res, nil
 }
 
 // Get the ephemeral secret part for an ephemeral share
@@ -388,7 +421,7 @@ func (cosigner *LocalCosigner) getNonce(
 		return zero, err
 	}
 
-	ourCosignerMeta := meta[id-1]
+	ourCosignerMeta := meta.Nonces[id-1]
 	nonce, err := cosigner.security.EncryptAndSign(peerID, ourCosignerMeta.PubKey, ourCosignerMeta.Shares[peerID-1])
 	if err != nil {
 		return zero, err
@@ -414,7 +447,7 @@ func (cosigner *LocalCosigner) setNonce(uuid uuid.UUID, nonce CosignerNonce) err
 	cosigner.noncesMu.Lock()
 	defer cosigner.noncesMu.Unlock()
 
-	nonces, ok := cosigner.nonces[uuid]
+	n, ok := cosigner.nonces[uuid]
 	// generate metadata placeholder
 	if !ok {
 		return fmt.Errorf(
@@ -424,11 +457,11 @@ func (cosigner *LocalCosigner) setNonce(uuid uuid.UUID, nonce CosignerNonce) err
 	}
 
 	// set slot
-	if nonces[nonce.SourceID-1].Shares == nil {
-		nonces[nonce.SourceID-1].Shares = make([][]byte, len(cosigner.config.Config.ThresholdModeConfig.Cosigners))
+	if n.Nonces[nonce.SourceID-1].Shares == nil {
+		n.Nonces[nonce.SourceID-1].Shares = make([][]byte, len(cosigner.config.Config.ThresholdModeConfig.Cosigners))
 	}
-	nonces[nonce.SourceID-1].Shares[cosigner.GetID()-1] = nonceShare
-	nonces[nonce.SourceID-1].PubKey = noncePub
+	n.Nonces[nonce.SourceID-1].Shares[cosigner.GetID()-1] = nonceShare
+	n.Nonces[nonce.SourceID-1].PubKey = noncePub
 
 	return nil
 }

@@ -12,6 +12,7 @@ import (
 
 const defaultGetNoncesInterval = 3 * time.Second
 const defaultGetNoncesTimeout = 4 * time.Second
+const cachePreSize = 10000
 
 type CosignerNonceCache struct {
 	logger    cometlog.Logger
@@ -61,7 +62,7 @@ type NonceCache struct {
 
 func NewNonceCache() NonceCache {
 	return NonceCache{
-		cache: make(map[uuid.UUID]*CachedNonce, 10000),
+		cache: make(map[uuid.UUID]*CachedNonce, cachePreSize),
 	}
 }
 
@@ -98,6 +99,9 @@ type CachedNonce struct {
 	// UUID identifying this collection of nonces
 	UUID uuid.UUID
 
+	// Expiration time of this nonce
+	Expiration time.Time
+
 	// Cached nonces, cosigners which have this nonce in their metadata, ready to sign
 	Nonces []CosignerNoncesRel
 }
@@ -130,6 +134,9 @@ func (cnc *CosignerNonceCache) getUuids(n int) []uuid.UUID {
 }
 
 func (cnc *CosignerNonceCache) reconcile(ctx context.Context) {
+	// prune expired nonces
+	cnc.pruneNonces()
+
 	if !cnc.leader.IsLeader() {
 		return
 	}
@@ -191,6 +198,9 @@ func (cnc *CosignerNonceCache) LoadN(ctx context.Context, n int) {
 	nonces := make([]*CachedNonceSingle, len(cnc.cosigners))
 	var wg sync.WaitGroup
 	wg.Add(len(cnc.cosigners))
+
+	expiration := time.Now().Add(cnc.getNoncesInterval)
+
 	for i, p := range cnc.cosigners {
 		i := i
 		p := p
@@ -223,7 +233,8 @@ func (cnc *CosignerNonceCache) LoadN(ctx context.Context, n int) {
 	added := 0
 	for i, u := range uuids {
 		nonce := CachedNonce{
-			UUID: u,
+			UUID:       u,
+			Expiration: expiration,
 		}
 		num := uint8(0)
 		for _, n := range nonces {
@@ -302,6 +313,16 @@ CheckNoncesLoop:
 	return nil, fmt.Errorf("no nonces found involving cosigners %+v", cosignerInts)
 }
 
+func (cnc *CosignerNonceCache) pruneNonces() {
+	cnc.cache.mu.Lock()
+	defer cnc.cache.mu.Unlock()
+	for u, cn := range cnc.cache.cache {
+		if time.Now().After(cn.Expiration) {
+			delete(cnc.cache.cache, u)
+		}
+	}
+}
+
 func (cnc *CosignerNonceCache) clearNonce(uuid uuid.UUID) {
 	cnc.cache.mu.Lock()
 	defer cnc.cache.mu.Unlock()
@@ -334,5 +355,5 @@ func (cnc *CosignerNonceCache) ClearNonces(cosigner Cosigner) {
 func (cnc *CosignerNonceCache) ClearAllNonces() {
 	cnc.cache.mu.Lock()
 	defer cnc.cache.mu.Unlock()
-	cnc.cache.cache = make(map[uuid.UUID]*CachedNonce, 10000)
+	cnc.cache.cache = make(map[uuid.UUID]*CachedNonce, cachePreSize)
 }
