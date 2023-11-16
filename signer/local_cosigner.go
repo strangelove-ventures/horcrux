@@ -16,7 +16,9 @@ import (
 
 var _ Cosigner = &LocalCosigner{}
 
-const nonceExpiration = 10 * time.Second
+// double the CosignerNonceCache expiration so that sign requests from the leader
+// never reference nonces which have expired here in the LocalCosigner.
+const nonceExpiration = 20 * time.Second
 
 // LocalCosigner responds to sign requests.
 // It maintains a high watermark to avoid double-signing.

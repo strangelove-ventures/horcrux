@@ -14,6 +14,7 @@ const (
 	defaultGetNoncesInterval = 3 * time.Second
 	defaultGetNoncesTimeout  = 4 * time.Second
 	cachePreSize             = 10000
+	nonceCacheExpiration     = 10 * time.Second // half of the local cosigner cache expiration
 )
 
 type CosignerNonceCache struct {
@@ -201,7 +202,7 @@ func (cnc *CosignerNonceCache) LoadN(ctx context.Context, n int) {
 	var wg sync.WaitGroup
 	wg.Add(len(cnc.cosigners))
 
-	expiration := time.Now().Add(nonceExpiration)
+	expiration := time.Now().Add(nonceCacheExpiration)
 
 	for i, p := range cnc.cosigners {
 		i := i
