@@ -289,6 +289,71 @@ func (signState *SignState) save(jsonBytes []byte) {
 	}
 }
 
+type HeightRegressionError struct {
+	regressed, last int64
+}
+
+func (e *HeightRegressionError) Error() string {
+	return fmt.Sprintf(
+		"height regression. Got %v, last height %v",
+		e.regressed, e.last,
+	)
+}
+
+func newHeightRegressionError(regressed, last int64) *HeightRegressionError {
+	return &HeightRegressionError{
+		regressed: regressed,
+		last:      last,
+	}
+}
+
+type RoundRegressionError struct {
+	height          int64
+	regressed, last int64
+}
+
+func (e *RoundRegressionError) Error() string {
+	return fmt.Sprintf(
+		"round regression at height %d. Got %d, last round %d",
+		e.height, e.regressed, e.last,
+	)
+}
+
+func newRoundRegressionError(height, regressed, last int64) *RoundRegressionError {
+	return &RoundRegressionError{
+		height:    height,
+		regressed: regressed,
+		last:      last,
+	}
+}
+
+type StepRegressionError struct {
+	height, round   int64
+	regressed, last int8
+}
+
+func (e *StepRegressionError) Error() string {
+	return fmt.Sprintf(
+		"step regression at height %d, round %d. Got %d, last step %d",
+		e.height, e.round, e.regressed, e.last,
+	)
+}
+
+func newStepRegressionError(height, round int64, regressed, last int8) *StepRegressionError {
+	return &StepRegressionError{
+		height:    height,
+		round:     round,
+		regressed: regressed,
+		last:      last,
+	}
+}
+
+type EmptySignBytesError struct{}
+
+func (e *EmptySignBytesError) Error() string {
+	return "no SignBytes found"
+}
+
 // CheckHRS checks the given height, round, step (HRS) against that of the
 // SignState. It returns an error if the arguments constitute a regression,
 // or if they match but the SignBytes are empty.
@@ -297,19 +362,17 @@ func (signState *SignState) save(jsonBytes []byte) {
 // It panics if the HRS matches the arguments, there's a SignBytes, but no Signature.
 func (signState *SignState) CheckHRS(hrst HRSTKey) (bool, error) {
 	if signState.Height > hrst.Height {
-		return false, fmt.Errorf("height regression. Got %v, last height %v", hrst.Height, signState.Height)
+		return false, newHeightRegressionError(hrst.Height, signState.Height)
 	}
 
 	if signState.Height == hrst.Height {
 		if signState.Round > hrst.Round {
-			return false, fmt.Errorf("round regression at height %v. Got %v, last round %v",
-				hrst.Height, hrst.Round, signState.Round)
+			return false, newRoundRegressionError(hrst.Height, hrst.Round, signState.Round)
 		}
 
 		if signState.Round == hrst.Round {
 			if signState.Step > hrst.Step {
-				return false, fmt.Errorf("step regression at height %v round %v. Got %v, last step %v",
-					hrst.Height, hrst.Round, hrst.Step, signState.Step)
+				return false, newStepRegressionError(hrst.Height, hrst.Round, hrst.Step, signState.Step)
 			} else if signState.Step == hrst.Step {
 				if signState.SignBytes != nil {
 					if signState.Signature == nil {
@@ -317,7 +380,7 @@ func (signState *SignState) CheckHRS(hrst HRSTKey) (bool, error) {
 					}
 					return true, nil
 				}
-				return false, errors.New("no SignBytes found")
+				return false, new(EmptySignBytesError)
 			}
 		}
 	}
@@ -447,16 +510,67 @@ func onlyDifferByTimestamp(step int8, signStateSignBytes, signBytes []byte) erro
 		return checkVoteOnlyDifferByTimestamp(signStateSignBytes, signBytes)
 	}
 
-	return fmt.Errorf("unexpected sign step: %d", step)
+	panic(fmt.Errorf("unexpected sign step: %d", step))
+}
+
+type UnmarshalError struct {
+	name     string
+	signType string
+	err      error
+}
+
+func (e *UnmarshalError) Error() string {
+	return fmt.Sprintf("%s cannot be unmarshalled into %s: %v", e.name, e.signType, e.err)
+}
+
+func newUnmarshalError(name, signType string, err error) *UnmarshalError {
+	return &UnmarshalError{
+		name:     name,
+		signType: signType,
+		err:      err,
+	}
+}
+
+type AlreadySignedVoteError struct {
+	nonFirst bool
+}
+
+func (e *AlreadySignedVoteError) Error() string {
+	if e.nonFirst {
+		return "already signed vote with non-nil BlockID. refusing to sign vote on nil BlockID"
+	}
+	return "already signed vote with nil BlockID. refusing to sign vote on non-nil BlockID"
+}
+
+func newAlreadySignedVoteError(nonFirst bool) *AlreadySignedVoteError {
+	return &AlreadySignedVoteError{
+		nonFirst: nonFirst,
+	}
+}
+
+type DiffBlockIDsError struct {
+	first  []byte
+	second []byte
+}
+
+func (e *DiffBlockIDsError) Error() string {
+	return fmt.Sprintf("differing block IDs - last Vote: %s, new Vote: %s", e.first, e.second)
+}
+
+func newDiffBlockIDsError(first, second []byte) *DiffBlockIDsError {
+	return &DiffBlockIDsError{
+		first:  first,
+		second: second,
+	}
 }
 
 func checkVoteOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) error {
 	var lastVote, newVote cometproto.CanonicalVote
 	if err := protoio.UnmarshalDelimited(lastSignBytes, &lastVote); err != nil {
-		return fmt.Errorf("lastSignBytes cannot be unmarshalled into vote: %v", err)
+		return newUnmarshalError("lastSignBytes", "vote", err)
 	}
 	if err := protoio.UnmarshalDelimited(newSignBytes, &newVote); err != nil {
-		return fmt.Errorf("signBytes cannot be unmarshalled into vote: %v", err)
+		return newUnmarshalError("newSignBytes", "vote", err)
 	}
 
 	// set the times to the same value and check equality
@@ -469,14 +583,13 @@ func checkVoteOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) error {
 	lastVoteBlockID := lastVote.GetBlockID()
 	newVoteBlockID := newVote.GetBlockID()
 	if newVoteBlockID == nil && lastVoteBlockID != nil {
-		return errors.New("already signed vote with non-nil BlockID. refusing to sign vote on nil BlockID")
+		return newAlreadySignedVoteError(true)
 	}
 	if newVoteBlockID != nil && lastVoteBlockID == nil {
-		return errors.New("already signed vote with nil BlockID. refusing to sign vote on non-nil BlockID")
+		return newAlreadySignedVoteError(false)
 	}
 	if !bytes.Equal(lastVoteBlockID.GetHash(), newVoteBlockID.GetHash()) {
-		return fmt.Errorf("differing block IDs - last Vote: %s, new Vote: %s",
-			lastVoteBlockID.GetHash(), newVoteBlockID.GetHash())
+		return newDiffBlockIDsError(lastVoteBlockID.GetHash(), newVoteBlockID.GetHash())
 	}
 	return newConflictingDataError(lastSignBytes, newSignBytes)
 }
@@ -484,10 +597,10 @@ func checkVoteOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) error {
 func checkProposalOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) error {
 	var lastProposal, newProposal cometproto.CanonicalProposal
 	if err := protoio.UnmarshalDelimited(lastSignBytes, &lastProposal); err != nil {
-		return fmt.Errorf("lastSignBytes cannot be unmarshalled into proposal: %v", err)
+		return newUnmarshalError("lastSignBytes", "proposal", err)
 	}
 	if err := protoio.UnmarshalDelimited(newSignBytes, &newProposal); err != nil {
-		return fmt.Errorf("signBytes cannot be unmarshalled into proposal: %v", err)
+		return newUnmarshalError("newSignBytes", "proposal", err)
 	}
 
 	// set the times to the same value and check equality

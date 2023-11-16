@@ -85,7 +85,7 @@ func (s *ThresholdSignerSoft) sumNonces(nonces []Nonce) (tsed25519.Scalar, tsed2
 	return nonceShare, noncePub, nil
 }
 
-func (s *ThresholdSignerSoft) GenerateNonces() (Nonces, error) {
+func GenerateNonces(threshold, total uint8) (Nonces, error) {
 	secret := make([]byte, 32)
 	if _, err := rand.Read(secret); err != nil {
 		return Nonces{}, err
@@ -93,13 +93,13 @@ func (s *ThresholdSignerSoft) GenerateNonces() (Nonces, error) {
 
 	nonces := Nonces{
 		PubKey: tsed25519.ScalarMultiplyBase(secret),
-		Shares: make([][]byte, s.total),
+		Shares: make([][]byte, total),
 	}
 
-	shares := tsed25519.DealShares(secret, s.threshold, s.total)
+	shares := tsed25519.DealShares(secret, threshold, total)
 
-	for i, s := range shares {
-		nonces.Shares[i] = s
+	for i, sh := range shares {
+		nonces.Shares[i] = sh
 	}
 
 	return nonces, nil

@@ -1,6 +1,7 @@
 package signer
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
@@ -35,7 +36,7 @@ func NewSingleSignerValidator(config *RuntimeConfig) *SingleSignerValidator {
 }
 
 // GetPubKey implements types.PrivValidator
-func (pv *SingleSignerValidator) GetPubKey(chainID string) ([]byte, error) {
+func (pv *SingleSignerValidator) GetPubKey(_ context.Context, chainID string) ([]byte, error) {
 	chainState, err := pv.loadChainStateIfNecessary(chainID)
 	if err != nil {
 		return nil, err
@@ -48,7 +49,7 @@ func (pv *SingleSignerValidator) GetPubKey(chainID string) ([]byte, error) {
 }
 
 // SignVote implements types.PrivValidator
-func (pv *SingleSignerValidator) Sign(chainID string, block Block) ([]byte, time.Time, error) {
+func (pv *SingleSignerValidator) Sign(_ context.Context, chainID string, block Block) ([]byte, time.Time, error) {
 	chainState, err := pv.loadChainStateIfNecessary(chainID)
 	if err != nil {
 		return nil, block.Timestamp, err

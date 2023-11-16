@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 const maxWaitForSameBlockAttempts = 3
 
 func NewThresholdValidator(
+	ctx context.Context,
 	logger cometlog.Logger,
 ) ([]cometservice.Service, *signer.ThresholdValidator, error) {
 	if err := config.Config.ValidateThresholdModeConfig(); err != nil {
@@ -39,9 +41,13 @@ func NewThresholdValidator(
 
 	for _, c := range thresholdCfg.Cosigners {
 		if c.ShardID != security.GetID() {
+			rc, err := signer.NewRemoteCosigner(c.ShardID, c.P2PAddr)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to initialize remote cosigner: %w", err)
+			}
 			remoteCosigners = append(
 				remoteCosigners,
-				signer.NewRemoteCosigner(c.ShardID, c.P2PAddr),
+				rc,
 			)
 		} else {
 			p2pListen = c.P2PAddr
@@ -91,6 +97,10 @@ func NewThresholdValidator(
 	)
 
 	raftStore.SetThresholdValidator(val)
+
+	if err := val.Start(ctx); err != nil {
+		return nil, nil, fmt.Errorf("failed to start threshold validator: %w", err)
+	}
 
 	return services, val, nil
 }

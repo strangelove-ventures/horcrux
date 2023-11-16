@@ -198,11 +198,10 @@ var (
 		Name: "signer_total_raft_not_leader",
 		Help: "Total Times Signer is NOT Raft Leader (Proxy signing to Raft Leader)",
 	})
-	totalRaftLeaderElectiontimeout = promauto.NewCounter(prometheus.CounterOpts{
+	totalRaftLeaderElectionTimeout = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "signer_total_raft_leader_election_timeout",
 		Help: "Total Times Raft Leader Failed Election (Lacking Peers)",
 	})
-
 	totalInvalidSignature = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "signer_error_total_invalid_signatures",
 		Help: "Total Times Combined Signature is Invalid",

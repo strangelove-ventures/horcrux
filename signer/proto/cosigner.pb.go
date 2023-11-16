@@ -283,6 +283,58 @@ func (m *Nonce) GetSignature() []byte {
 	return nil
 }
 
+type UUIDNonce struct {
+	Uuid   []byte   `protobuf:"bytes,1,opt,name=uuid,proto3" json:"uuid,omitempty"`
+	Nonces []*Nonce `protobuf:"bytes,2,rep,name=nonces,proto3" json:"nonces,omitempty"`
+}
+
+func (m *UUIDNonce) Reset()         { *m = UUIDNonce{} }
+func (m *UUIDNonce) String() string { return proto.CompactTextString(m) }
+func (*UUIDNonce) ProtoMessage()    {}
+func (*UUIDNonce) Descriptor() ([]byte, []int) {
+	return fileDescriptor_b7a1f695b94b848a, []int{4}
+}
+func (m *UUIDNonce) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *UUIDNonce) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_UUIDNonce.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *UUIDNonce) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_UUIDNonce.Merge(m, src)
+}
+func (m *UUIDNonce) XXX_Size() int {
+	return m.Size()
+}
+func (m *UUIDNonce) XXX_DiscardUnknown() {
+	xxx_messageInfo_UUIDNonce.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_UUIDNonce proto.InternalMessageInfo
+
+func (m *UUIDNonce) GetUuid() []byte {
+	if m != nil {
+		return m.Uuid
+	}
+	return nil
+}
+
+func (m *UUIDNonce) GetNonces() []*Nonce {
+	if m != nil {
+		return m.Nonces
+	}
+	return nil
+}
+
 type HRST struct {
 	Height    int64 `protobuf:"varint,1,opt,name=height,proto3" json:"height,omitempty"`
 	Round     int64 `protobuf:"varint,2,opt,name=round,proto3" json:"round,omitempty"`
@@ -294,7 +346,7 @@ func (m *HRST) Reset()         { *m = HRST{} }
 func (m *HRST) String() string { return proto.CompactTextString(m) }
 func (*HRST) ProtoMessage()    {}
 func (*HRST) Descriptor() ([]byte, []int) {
-	return fileDescriptor_b7a1f695b94b848a, []int{4}
+	return fileDescriptor_b7a1f695b94b848a, []int{5}
 }
 func (m *HRST) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -352,17 +404,18 @@ func (m *HRST) GetTimestamp() int64 {
 }
 
 type SetNoncesAndSignRequest struct {
-	Nonces    []*Nonce `protobuf:"bytes,1,rep,name=nonces,proto3" json:"nonces,omitempty"`
-	Hrst      *HRST    `protobuf:"bytes,2,opt,name=hrst,proto3" json:"hrst,omitempty"`
-	SignBytes []byte   `protobuf:"bytes,3,opt,name=signBytes,proto3" json:"signBytes,omitempty"`
-	ChainID   string   `protobuf:"bytes,4,opt,name=chainID,proto3" json:"chainID,omitempty"`
+	Uuid      []byte   `protobuf:"bytes,1,opt,name=uuid,proto3" json:"uuid,omitempty"`
+	Nonces    []*Nonce `protobuf:"bytes,2,rep,name=nonces,proto3" json:"nonces,omitempty"`
+	Hrst      *HRST    `protobuf:"bytes,3,opt,name=hrst,proto3" json:"hrst,omitempty"`
+	SignBytes []byte   `protobuf:"bytes,4,opt,name=signBytes,proto3" json:"signBytes,omitempty"`
+	ChainID   string   `protobuf:"bytes,5,opt,name=chainID,proto3" json:"chainID,omitempty"`
 }
 
 func (m *SetNoncesAndSignRequest) Reset()         { *m = SetNoncesAndSignRequest{} }
 func (m *SetNoncesAndSignRequest) String() string { return proto.CompactTextString(m) }
 func (*SetNoncesAndSignRequest) ProtoMessage()    {}
 func (*SetNoncesAndSignRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_b7a1f695b94b848a, []int{5}
+	return fileDescriptor_b7a1f695b94b848a, []int{6}
 }
 func (m *SetNoncesAndSignRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -390,6 +443,13 @@ func (m *SetNoncesAndSignRequest) XXX_DiscardUnknown() {
 }
 
 var xxx_messageInfo_SetNoncesAndSignRequest proto.InternalMessageInfo
+
+func (m *SetNoncesAndSignRequest) GetUuid() []byte {
+	if m != nil {
+		return m.Uuid
+	}
+	return nil
+}
 
 func (m *SetNoncesAndSignRequest) GetNonces() []*Nonce {
 	if m != nil {
@@ -429,7 +489,7 @@ func (m *SetNoncesAndSignResponse) Reset()         { *m = SetNoncesAndSignRespon
 func (m *SetNoncesAndSignResponse) String() string { return proto.CompactTextString(m) }
 func (*SetNoncesAndSignResponse) ProtoMessage()    {}
 func (*SetNoncesAndSignResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_b7a1f695b94b848a, []int{6}
+	return fileDescriptor_b7a1f695b94b848a, []int{7}
 }
 func (m *SetNoncesAndSignResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -480,15 +540,14 @@ func (m *SetNoncesAndSignResponse) GetSignature() []byte {
 }
 
 type GetNoncesRequest struct {
-	Hrst    *HRST  `protobuf:"bytes,1,opt,name=hrst,proto3" json:"hrst,omitempty"`
-	ChainID string `protobuf:"bytes,2,opt,name=chainID,proto3" json:"chainID,omitempty"`
+	Uuids [][]byte `protobuf:"bytes,1,rep,name=uuids,proto3" json:"uuids,omitempty"`
 }
 
 func (m *GetNoncesRequest) Reset()         { *m = GetNoncesRequest{} }
 func (m *GetNoncesRequest) String() string { return proto.CompactTextString(m) }
 func (*GetNoncesRequest) ProtoMessage()    {}
 func (*GetNoncesRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_b7a1f695b94b848a, []int{7}
+	return fileDescriptor_b7a1f695b94b848a, []int{8}
 }
 func (m *GetNoncesRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -517,29 +576,22 @@ func (m *GetNoncesRequest) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_GetNoncesRequest proto.InternalMessageInfo
 
-func (m *GetNoncesRequest) GetHrst() *HRST {
+func (m *GetNoncesRequest) GetUuids() [][]byte {
 	if m != nil {
-		return m.Hrst
+		return m.Uuids
 	}
 	return nil
 }
 
-func (m *GetNoncesRequest) GetChainID() string {
-	if m != nil {
-		return m.ChainID
-	}
-	return ""
-}
-
 type GetNoncesResponse struct {
-	Nonces []*Nonce `protobuf:"bytes,1,rep,name=nonces,proto3" json:"nonces,omitempty"`
+	Nonces []*UUIDNonce `protobuf:"bytes,1,rep,name=nonces,proto3" json:"nonces,omitempty"`
 }
 
 func (m *GetNoncesResponse) Reset()         { *m = GetNoncesResponse{} }
 func (m *GetNoncesResponse) String() string { return proto.CompactTextString(m) }
 func (*GetNoncesResponse) ProtoMessage()    {}
 func (*GetNoncesResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_b7a1f695b94b848a, []int{8}
+	return fileDescriptor_b7a1f695b94b848a, []int{9}
 }
 func (m *GetNoncesResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -568,7 +620,7 @@ func (m *GetNoncesResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_GetNoncesResponse proto.InternalMessageInfo
 
-func (m *GetNoncesResponse) GetNonces() []*Nonce {
+func (m *GetNoncesResponse) GetNonces() []*UUIDNonce {
 	if m != nil {
 		return m.Nonces
 	}
@@ -583,7 +635,7 @@ func (m *TransferLeadershipRequest) Reset()         { *m = TransferLeadershipReq
 func (m *TransferLeadershipRequest) String() string { return proto.CompactTextString(m) }
 func (*TransferLeadershipRequest) ProtoMessage()    {}
 func (*TransferLeadershipRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_b7a1f695b94b848a, []int{9}
+	return fileDescriptor_b7a1f695b94b848a, []int{10}
 }
 func (m *TransferLeadershipRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -628,7 +680,7 @@ func (m *TransferLeadershipResponse) Reset()         { *m = TransferLeadershipRe
 func (m *TransferLeadershipResponse) String() string { return proto.CompactTextString(m) }
 func (*TransferLeadershipResponse) ProtoMessage()    {}
 func (*TransferLeadershipResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_b7a1f695b94b848a, []int{10}
+	return fileDescriptor_b7a1f695b94b848a, []int{11}
 }
 func (m *TransferLeadershipResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -678,7 +730,7 @@ func (m *GetLeaderRequest) Reset()         { *m = GetLeaderRequest{} }
 func (m *GetLeaderRequest) String() string { return proto.CompactTextString(m) }
 func (*GetLeaderRequest) ProtoMessage()    {}
 func (*GetLeaderRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_b7a1f695b94b848a, []int{11}
+	return fileDescriptor_b7a1f695b94b848a, []int{12}
 }
 func (m *GetLeaderRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -708,14 +760,14 @@ func (m *GetLeaderRequest) XXX_DiscardUnknown() {
 var xxx_messageInfo_GetLeaderRequest proto.InternalMessageInfo
 
 type GetLeaderResponse struct {
-	Leader string `protobuf:"bytes,1,opt,name=leader,proto3" json:"leader,omitempty"`
+	Leader int32 `protobuf:"varint,1,opt,name=leader,proto3" json:"leader,omitempty"`
 }
 
 func (m *GetLeaderResponse) Reset()         { *m = GetLeaderResponse{} }
 func (m *GetLeaderResponse) String() string { return proto.CompactTextString(m) }
 func (*GetLeaderResponse) ProtoMessage()    {}
 func (*GetLeaderResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_b7a1f695b94b848a, []int{12}
+	return fileDescriptor_b7a1f695b94b848a, []int{13}
 }
 func (m *GetLeaderResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -744,18 +796,91 @@ func (m *GetLeaderResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_GetLeaderResponse proto.InternalMessageInfo
 
-func (m *GetLeaderResponse) GetLeader() string {
+func (m *GetLeaderResponse) GetLeader() int32 {
 	if m != nil {
 		return m.Leader
 	}
-	return ""
+	return 0
 }
+
+type PingRequest struct {
+}
+
+func (m *PingRequest) Reset()         { *m = PingRequest{} }
+func (m *PingRequest) String() string { return proto.CompactTextString(m) }
+func (*PingRequest) ProtoMessage()    {}
+func (*PingRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_b7a1f695b94b848a, []int{14}
+}
+func (m *PingRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *PingRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_PingRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *PingRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_PingRequest.Merge(m, src)
+}
+func (m *PingRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *PingRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_PingRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_PingRequest proto.InternalMessageInfo
+
+type PingResponse struct {
+}
+
+func (m *PingResponse) Reset()         { *m = PingResponse{} }
+func (m *PingResponse) String() string { return proto.CompactTextString(m) }
+func (*PingResponse) ProtoMessage()    {}
+func (*PingResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_b7a1f695b94b848a, []int{15}
+}
+func (m *PingResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *PingResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_PingResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *PingResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_PingResponse.Merge(m, src)
+}
+func (m *PingResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *PingResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_PingResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_PingResponse proto.InternalMessageInfo
 
 func init() {
 	proto.RegisterType((*Block)(nil), "strangelove.horcrux.Block")
 	proto.RegisterType((*SignBlockRequest)(nil), "strangelove.horcrux.SignBlockRequest")
 	proto.RegisterType((*SignBlockResponse)(nil), "strangelove.horcrux.SignBlockResponse")
 	proto.RegisterType((*Nonce)(nil), "strangelove.horcrux.Nonce")
+	proto.RegisterType((*UUIDNonce)(nil), "strangelove.horcrux.UUIDNonce")
 	proto.RegisterType((*HRST)(nil), "strangelove.horcrux.HRST")
 	proto.RegisterType((*SetNoncesAndSignRequest)(nil), "strangelove.horcrux.SetNoncesAndSignRequest")
 	proto.RegisterType((*SetNoncesAndSignResponse)(nil), "strangelove.horcrux.SetNoncesAndSignResponse")
@@ -765,6 +890,8 @@ func init() {
 	proto.RegisterType((*TransferLeadershipResponse)(nil), "strangelove.horcrux.TransferLeadershipResponse")
 	proto.RegisterType((*GetLeaderRequest)(nil), "strangelove.horcrux.GetLeaderRequest")
 	proto.RegisterType((*GetLeaderResponse)(nil), "strangelove.horcrux.GetLeaderResponse")
+	proto.RegisterType((*PingRequest)(nil), "strangelove.horcrux.PingRequest")
+	proto.RegisterType((*PingResponse)(nil), "strangelove.horcrux.PingResponse")
 }
 
 func init() {
@@ -772,50 +899,54 @@ func init() {
 }
 
 var fileDescriptor_b7a1f695b94b848a = []byte{
-	// 681 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x55, 0xdf, 0x4e, 0xd4, 0x4e,
-	0x14, 0xde, 0xd9, 0x6d, 0xf7, 0xc7, 0x1e, 0xf8, 0x25, 0x30, 0x1a, 0x2c, 0x8d, 0xd9, 0x6c, 0x26,
-	0x6a, 0x48, 0x94, 0x5d, 0x83, 0x26, 0x5e, 0x83, 0x26, 0x68, 0x34, 0x68, 0x0a, 0x57, 0x4a, 0x48,
-	0xba, 0xdd, 0x61, 0xdb, 0xb8, 0x74, 0x96, 0x99, 0x29, 0xc2, 0x03, 0x78, 0xcf, 0x8d, 0x6f, 0xe2,
-	0x43, 0x78, 0xc9, 0xa5, 0x97, 0x06, 0x5e, 0xc4, 0xcc, 0x74, 0x5a, 0xda, 0xd2, 0x45, 0x62, 0xbc,
-	0x6a, 0xcf, 0xe9, 0xf9, 0xf3, 0x7d, 0xe7, 0x7c, 0x33, 0x05, 0x22, 0x24, 0xf7, 0xe3, 0x31, 0x9d,
-	0xb0, 0x63, 0x3a, 0x08, 0x19, 0x0f, 0x78, 0x72, 0x32, 0x08, 0x98, 0x88, 0xc6, 0x31, 0xe5, 0xfd,
-	0x29, 0x67, 0x92, 0xe1, 0x3b, 0x85, 0x98, 0xbe, 0x89, 0x21, 0x5f, 0x11, 0xd8, 0x9b, 0x13, 0x16,
-	0x7c, 0xc6, 0xcb, 0xd0, 0x0e, 0x69, 0x34, 0x0e, 0xa5, 0x83, 0x7a, 0x68, 0xb5, 0xe5, 0x19, 0x0b,
-	0xdf, 0x05, 0x9b, 0xb3, 0x24, 0x1e, 0x39, 0x4d, 0xed, 0x4e, 0x0d, 0x8c, 0xc1, 0x12, 0x92, 0x4e,
-	0x9d, 0x56, 0x0f, 0xad, 0xda, 0x9e, 0x7e, 0xc7, 0xf7, 0xa1, 0xa3, 0x1a, 0x6e, 0x9e, 0x4a, 0x2a,
-	0x1c, 0xab, 0x87, 0x56, 0x17, 0xbc, 0x2b, 0x87, 0xfa, 0x2a, 0xa3, 0x43, 0x2a, 0xa4, 0x7f, 0x38,
-	0x75, 0x6c, 0x5d, 0xeb, 0xca, 0x41, 0xf6, 0x61, 0x71, 0x47, 0x85, 0x2a, 0x28, 0x1e, 0x3d, 0x4a,
-	0xa8, 0x90, 0xd8, 0x81, 0xff, 0x82, 0xd0, 0x8f, 0xe2, 0x37, 0xaf, 0x34, 0xa4, 0x8e, 0x97, 0x99,
-	0xf8, 0x29, 0xd8, 0x43, 0x15, 0xa9, 0x31, 0xcd, 0xaf, 0xbb, 0xfd, 0x1a, 0x6a, 0xfd, 0xb4, 0x56,
-	0x1a, 0x48, 0xde, 0xc3, 0x52, 0xa1, 0xbe, 0x98, 0xb2, 0x58, 0xd0, 0x0c, 0xb0, 0x2f, 0x13, 0x4e,
-	0x75, 0x0b, 0x03, 0x58, 0x3b, 0xca, 0x80, 0x9b, 0x55, 0xc0, 0xdf, 0x10, 0xd8, 0xdb, 0x2c, 0x0e,
-	0x28, 0x76, 0x61, 0x4e, 0xb0, 0x84, 0x07, 0xd4, 0xe0, 0xb4, 0xbd, 0xdc, 0xc6, 0x0f, 0xe0, 0xff,
-	0x11, 0x15, 0x32, 0x8a, 0x7d, 0x19, 0x31, 0x45, 0xa4, 0xa9, 0x03, 0xca, 0x4e, 0x35, 0xfa, 0x69,
-	0x32, 0x7c, 0x4b, 0x4f, 0xf5, 0x38, 0x17, 0x3c, 0x63, 0xa9, 0xd1, 0x8b, 0xd0, 0xe7, 0xd4, 0x0c,
-	0x33, 0x35, 0xca, 0xa8, 0xed, 0x0a, 0x6a, 0x72, 0x00, 0xd6, 0x6b, 0x6f, 0x67, 0xf7, 0xdf, 0xac,
-	0xf3, 0x8a, 0xbf, 0x55, 0xe5, 0xff, 0x1d, 0xc1, 0xbd, 0x1d, 0x2a, 0xf5, 0x08, 0xc4, 0x46, 0x3c,
-	0x52, 0xd3, 0xcd, 0x16, 0xb7, 0x0e, 0xed, 0x58, 0xfb, 0x1d, 0xd4, 0x6b, 0xcd, 0xdc, 0x8f, 0x4e,
-	0xf5, 0x4c, 0x24, 0x5e, 0x03, 0x2b, 0xe4, 0x42, 0x9a, 0x8d, 0xae, 0xd4, 0x66, 0x28, 0x62, 0x9e,
-	0x0e, 0x2b, 0x6b, 0xad, 0x55, 0xd5, 0x5a, 0x41, 0x39, 0x56, 0x49, 0x39, 0xe4, 0x04, 0x9c, 0xeb,
-	0xa8, 0x8d, 0x1c, 0x7a, 0x30, 0xaf, 0xc1, 0x7c, 0x48, 0x86, 0x93, 0x28, 0x30, 0x82, 0x28, 0xba,
-	0x6e, 0x96, 0x44, 0x79, 0x31, 0xad, 0xea, 0x62, 0x3e, 0xc1, 0xe2, 0x56, 0xd6, 0x39, 0x1b, 0x54,
-	0x46, 0x1a, 0xdd, 0x8e, 0x74, 0x81, 0x56, 0xb3, 0x4c, 0x6b, 0x0b, 0x96, 0x0a, 0xc5, 0x0d, 0x9f,
-	0xbf, 0x58, 0x03, 0x79, 0x01, 0x2b, 0xbb, 0xdc, 0x8f, 0xc5, 0x01, 0xe5, 0xef, 0xa8, 0x3f, 0xa2,
-	0x5c, 0x84, 0xd1, 0x34, 0x83, 0xeb, 0xc2, 0xdc, 0x44, 0x3b, 0xf3, 0x13, 0x99, 0xdb, 0x64, 0x1f,
-	0xdc, 0xba, 0x44, 0x03, 0xe5, 0x86, 0x4c, 0x75, 0x46, 0xd2, 0xf7, 0x8d, 0xd1, 0x88, 0x53, 0x21,
-	0x0c, 0xb7, 0xb2, 0x93, 0x60, 0x3d, 0xbe, 0xb4, 0xb4, 0xc1, 0x43, 0x1e, 0x6b, 0xd6, 0x99, 0xcf,
-	0xb4, 0x5a, 0x86, 0x76, 0x9a, 0x69, 0x1a, 0x19, 0x6b, 0xfd, 0xcc, 0x82, 0xb9, 0x97, 0xe6, 0x46,
-	0xc4, 0x7b, 0xd0, 0xc9, 0xaf, 0x03, 0xfc, 0xb0, 0x76, 0x2e, 0xd5, 0xeb, 0xc8, 0x7d, 0xf4, 0xa7,
-	0xb0, 0x14, 0x00, 0x69, 0xe0, 0x23, 0x58, 0xac, 0x8a, 0x0c, 0x3f, 0xa9, 0xcf, 0xae, 0x3f, 0x41,
-	0xee, 0xda, 0x2d, 0xa3, 0xf3, 0x96, 0x7b, 0xd0, 0xc9, 0x05, 0x30, 0x83, 0x50, 0x55, 0x7d, 0x33,
-	0x08, 0x5d, 0xd3, 0x11, 0x69, 0xe0, 0x2f, 0x80, 0xaf, 0x2f, 0x17, 0xf7, 0x6b, 0xf3, 0x67, 0xca,
-	0xc7, 0x1d, 0xdc, 0x3a, 0xbe, 0x42, 0x2b, 0xfd, 0x34, 0x9b, 0x56, 0x49, 0x15, 0xb3, 0x69, 0x95,
-	0x85, 0x42, 0x1a, 0x9b, 0xdb, 0x3f, 0x2e, 0xba, 0xe8, 0xfc, 0xa2, 0x8b, 0x7e, 0x5d, 0x74, 0xd1,
-	0xd9, 0x65, 0xb7, 0x71, 0x7e, 0xd9, 0x6d, 0xfc, 0xbc, 0xec, 0x36, 0x3e, 0x3e, 0x1f, 0x47, 0x32,
-	0x4c, 0x86, 0xfd, 0x80, 0x1d, 0x0e, 0x0a, 0xd5, 0xd6, 0x8e, 0x69, 0xac, 0x0e, 0xb3, 0xc8, 0xff,
-	0xb1, 0xa9, 0x9e, 0x06, 0xfa, 0x0f, 0x3b, 0x6c, 0xeb, 0xc7, 0xb3, 0xdf, 0x01, 0x00, 0x00, 0xff,
-	0xff, 0x36, 0x4a, 0x79, 0x05, 0x8e, 0x07, 0x00, 0x00,
+	// 744 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x56, 0xdf, 0x4f, 0xd3, 0x50,
+	0x14, 0x5e, 0xb7, 0x76, 0xb2, 0x33, 0x30, 0x70, 0x25, 0x58, 0x1a, 0xb3, 0xcc, 0x1b, 0x35, 0x4b,
+	0x94, 0xcd, 0x4c, 0xa3, 0xcf, 0x20, 0x89, 0x12, 0x14, 0x49, 0x07, 0x2f, 0x86, 0x90, 0x74, 0xdd,
+	0x65, 0x6d, 0x1c, 0xed, 0xb8, 0xf7, 0x16, 0xe1, 0x0f, 0xf0, 0xdd, 0x17, 0xff, 0x27, 0x1e, 0x79,
+	0xf4, 0x4d, 0x03, 0xff, 0x88, 0xb9, 0xb7, 0xb7, 0x65, 0x2d, 0x1d, 0xf0, 0xc0, 0xd3, 0x7a, 0x4e,
+	0xcf, 0x8f, 0xef, 0xfb, 0xf6, 0xdd, 0x9b, 0x02, 0x66, 0x9c, 0x3a, 0xc1, 0x90, 0x8c, 0xc2, 0x63,
+	0xd2, 0xf1, 0x42, 0xea, 0xd2, 0xe8, 0xa4, 0xe3, 0x86, 0xcc, 0x1f, 0x06, 0x84, 0xb6, 0xc7, 0x34,
+	0xe4, 0x21, 0x7a, 0x34, 0x51, 0xd3, 0x56, 0x35, 0xf8, 0xa7, 0x06, 0xc6, 0xda, 0x28, 0x74, 0xbf,
+	0xa3, 0x25, 0xa8, 0x7a, 0xc4, 0x1f, 0x7a, 0xdc, 0xd4, 0x9a, 0x5a, 0xab, 0x62, 0xab, 0x08, 0x2d,
+	0x82, 0x41, 0xc3, 0x28, 0x18, 0x98, 0x65, 0x99, 0x8e, 0x03, 0x84, 0x40, 0x67, 0x9c, 0x8c, 0xcd,
+	0x4a, 0x53, 0x6b, 0x19, 0xb6, 0x7c, 0x46, 0x4f, 0xa0, 0x26, 0x16, 0xae, 0x9d, 0x72, 0xc2, 0x4c,
+	0xbd, 0xa9, 0xb5, 0x66, 0xed, 0xab, 0x84, 0x78, 0xcb, 0xfd, 0x43, 0xc2, 0xb8, 0x73, 0x38, 0x36,
+	0x0d, 0x39, 0xeb, 0x2a, 0x81, 0xf7, 0x61, 0xbe, 0x27, 0x4a, 0x05, 0x14, 0x9b, 0x1c, 0x45, 0x84,
+	0x71, 0x64, 0xc2, 0x03, 0xd7, 0x73, 0xfc, 0x60, 0x63, 0x5d, 0x42, 0xaa, 0xd9, 0x49, 0x88, 0x5e,
+	0x83, 0xd1, 0x17, 0x95, 0x12, 0x53, 0xbd, 0x6b, 0xb5, 0x0b, 0xa8, 0xb5, 0xe3, 0x59, 0x71, 0x21,
+	0xfe, 0x0a, 0x0b, 0x13, 0xf3, 0xd9, 0x38, 0x0c, 0x18, 0x49, 0x00, 0x3b, 0x3c, 0xa2, 0x44, 0xae,
+	0x50, 0x80, 0x65, 0x22, 0x0b, 0xb8, 0x9c, 0x07, 0xfc, 0x5b, 0x03, 0x63, 0x2b, 0x0c, 0x5c, 0x82,
+	0x2c, 0x98, 0x61, 0x61, 0x44, 0x5d, 0xa2, 0x70, 0x1a, 0x76, 0x1a, 0xa3, 0x67, 0x30, 0x37, 0x20,
+	0x8c, 0xfb, 0x81, 0xc3, 0xfd, 0x50, 0x10, 0x29, 0xcb, 0x82, 0x6c, 0x52, 0x48, 0x3f, 0x8e, 0xfa,
+	0x9b, 0xe4, 0x54, 0xca, 0x39, 0x6b, 0xab, 0x48, 0x48, 0xcf, 0x3c, 0x87, 0x12, 0x25, 0x66, 0x1c,
+	0x64, 0x51, 0x1b, 0x39, 0xd4, 0xb8, 0x07, 0xb5, 0xdd, 0xdd, 0x8d, 0xf5, 0x18, 0x1a, 0x02, 0x3d,
+	0x8a, 0xfc, 0x81, 0xe2, 0x26, 0x9f, 0x51, 0x17, 0xaa, 0x81, 0x78, 0xc9, 0xcc, 0x72, 0xb3, 0x32,
+	0x55, 0x3c, 0xd9, 0x6f, 0xab, 0x4a, 0x7c, 0x00, 0xfa, 0x27, 0xbb, 0xb7, 0x73, 0x3f, 0x1e, 0xb9,
+	0x12, 0x55, 0xcf, 0x8b, 0x7a, 0xa6, 0xc1, 0xe3, 0x1e, 0xe1, 0x72, 0x39, 0x5b, 0x0d, 0x06, 0xe2,
+	0x2f, 0x4b, 0xdc, 0x70, 0x4f, 0x5c, 0xd0, 0x0a, 0xe8, 0x1e, 0x65, 0x5c, 0xa2, 0xaa, 0x77, 0x97,
+	0x0b, 0x3b, 0x04, 0x59, 0x5b, 0x96, 0xdd, 0x62, 0xea, 0x09, 0x8b, 0x1a, 0x19, 0x8b, 0xe2, 0x13,
+	0x30, 0xaf, 0x33, 0x51, 0xbe, 0x6b, 0x42, 0x5d, 0x82, 0xd9, 0x8e, 0xfa, 0x23, 0xdf, 0x55, 0x8c,
+	0x26, 0x53, 0x37, 0x7b, 0x2f, 0xeb, 0x80, 0x4a, 0xde, 0x01, 0x2d, 0x98, 0xff, 0x98, 0x6c, 0x4e,
+	0xc4, 0x5b, 0x04, 0x43, 0x08, 0xc6, 0x4c, 0xad, 0x59, 0x11, 0x4e, 0x92, 0x01, 0xde, 0x84, 0x85,
+	0x89, 0x4a, 0x05, 0xee, 0x5d, 0xaa, 0xa9, 0x26, 0x35, 0x6d, 0x14, 0x2a, 0x94, 0x7a, 0x2c, 0xf5,
+	0xc8, 0x7b, 0x58, 0xde, 0xa1, 0x4e, 0xc0, 0x0e, 0x08, 0xfd, 0x4c, 0x9c, 0x01, 0xa1, 0xcc, 0xf3,
+	0xc7, 0xc9, 0x7e, 0x0b, 0x66, 0x46, 0x32, 0x99, 0x9e, 0xe5, 0x34, 0xc6, 0xfb, 0x60, 0x15, 0x35,
+	0x2a, 0x38, 0x37, 0x74, 0x8a, 0xd3, 0x15, 0x3f, 0xaf, 0x0e, 0x06, 0x94, 0x30, 0x26, 0x95, 0xaa,
+	0xd9, 0xd9, 0x24, 0x46, 0x52, 0x8f, 0x78, 0xb4, 0xc2, 0x83, 0x5f, 0x4a, 0xe6, 0x49, 0x4e, 0xad,
+	0x5a, 0x82, 0x6a, 0xdc, 0xa9, 0x8e, 0xb1, 0x8a, 0xf0, 0x1c, 0xd4, 0xb7, 0xfd, 0x60, 0x98, 0xf4,
+	0x3e, 0x84, 0xd9, 0x38, 0x8c, 0xdb, 0xba, 0x7f, 0x75, 0x98, 0xf9, 0xa0, 0xae, 0x5a, 0xb4, 0x07,
+	0xb5, 0xf4, 0x9e, 0x41, 0xcf, 0x0b, 0xa5, 0xcb, 0xdf, 0x73, 0xd6, 0x8b, 0xdb, 0xca, 0xe2, 0x45,
+	0xb8, 0x84, 0x8e, 0x60, 0x3e, 0x6f, 0x2a, 0xf4, 0xaa, 0xb8, 0xbb, 0xf8, 0x14, 0x59, 0x2b, 0x77,
+	0xac, 0x4e, 0x57, 0xee, 0x41, 0x2d, 0xf5, 0xc8, 0x14, 0x42, 0x79, 0xb7, 0x4d, 0x21, 0x74, 0xcd,
+	0x6a, 0xb8, 0x84, 0x7e, 0x00, 0xba, 0xfe, 0xdf, 0xa3, 0x76, 0x61, 0xff, 0x54, 0x77, 0x59, 0x9d,
+	0x3b, 0xd7, 0xe7, 0x68, 0xc5, 0xaf, 0xa6, 0xd3, 0xca, 0x98, 0x66, 0x3a, 0xad, 0xac, 0x8f, 0x70,
+	0x09, 0x7d, 0x01, 0x5d, 0x58, 0x04, 0x35, 0x0b, 0x3b, 0x26, 0xcc, 0x64, 0x3d, 0xbd, 0xa1, 0x22,
+	0x19, 0xb7, 0xb6, 0x75, 0x76, 0xd1, 0xd0, 0xce, 0x2f, 0x1a, 0xda, 0xbf, 0x8b, 0x86, 0xf6, 0xeb,
+	0xb2, 0x51, 0x3a, 0xbf, 0x6c, 0x94, 0xfe, 0x5c, 0x36, 0x4a, 0xdf, 0xde, 0x0e, 0x7d, 0xee, 0x45,
+	0xfd, 0xb6, 0x1b, 0x1e, 0x76, 0x26, 0x06, 0xad, 0x1c, 0x93, 0x40, 0xdc, 0x05, 0x2c, 0xfd, 0x16,
+	0x88, 0xed, 0xd9, 0x91, 0x5f, 0x02, 0xfd, 0xaa, 0xfc, 0x79, 0xf3, 0x3f, 0x00, 0x00, 0xff, 0xff,
+	0x97, 0xd9, 0x62, 0x0b, 0x36, 0x08, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -835,6 +966,7 @@ type CosignerClient interface {
 	GetNonces(ctx context.Context, in *GetNoncesRequest, opts ...grpc.CallOption) (*GetNoncesResponse, error)
 	TransferLeadership(ctx context.Context, in *TransferLeadershipRequest, opts ...grpc.CallOption) (*TransferLeadershipResponse, error)
 	GetLeader(ctx context.Context, in *GetLeaderRequest, opts ...grpc.CallOption) (*GetLeaderResponse, error)
+	Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error)
 }
 
 type cosignerClient struct {
@@ -890,6 +1022,15 @@ func (c *cosignerClient) GetLeader(ctx context.Context, in *GetLeaderRequest, op
 	return out, nil
 }
 
+func (c *cosignerClient) Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error) {
+	out := new(PingResponse)
+	err := c.cc.Invoke(ctx, "/strangelove.horcrux.Cosigner/Ping", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CosignerServer is the server API for Cosigner service.
 type CosignerServer interface {
 	SignBlock(context.Context, *SignBlockRequest) (*SignBlockResponse, error)
@@ -897,6 +1038,7 @@ type CosignerServer interface {
 	GetNonces(context.Context, *GetNoncesRequest) (*GetNoncesResponse, error)
 	TransferLeadership(context.Context, *TransferLeadershipRequest) (*TransferLeadershipResponse, error)
 	GetLeader(context.Context, *GetLeaderRequest) (*GetLeaderResponse, error)
+	Ping(context.Context, *PingRequest) (*PingResponse, error)
 }
 
 // UnimplementedCosignerServer can be embedded to have forward compatible implementations.
@@ -917,6 +1059,9 @@ func (*UnimplementedCosignerServer) TransferLeadership(ctx context.Context, req 
 }
 func (*UnimplementedCosignerServer) GetLeader(ctx context.Context, req *GetLeaderRequest) (*GetLeaderResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetLeader not implemented")
+}
+func (*UnimplementedCosignerServer) Ping(ctx context.Context, req *PingRequest) (*PingResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
 }
 
 func RegisterCosignerServer(s grpc1.Server, srv CosignerServer) {
@@ -1013,6 +1158,24 @@ func _Cosigner_GetLeader_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Cosigner_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CosignerServer).Ping(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/strangelove.horcrux.Cosigner/Ping",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CosignerServer).Ping(ctx, req.(*PingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _Cosigner_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "strangelove.horcrux.Cosigner",
 	HandlerType: (*CosignerServer)(nil),
@@ -1036,6 +1199,10 @@ var _Cosigner_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetLeader",
 			Handler:    _Cosigner_GetLeader_Handler,
+		},
+		{
+			MethodName: "Ping",
+			Handler:    _Cosigner_Ping_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -1223,6 +1390,50 @@ func (m *Nonce) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *UUIDNonce) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *UUIDNonce) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *UUIDNonce) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Nonces) > 0 {
+		for iNdEx := len(m.Nonces) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Nonces[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintCosigner(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	if len(m.Uuid) > 0 {
+		i -= len(m.Uuid)
+		copy(dAtA[i:], m.Uuid)
+		i = encodeVarintCosigner(dAtA, i, uint64(len(m.Uuid)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
 func (m *HRST) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -1291,14 +1502,14 @@ func (m *SetNoncesAndSignRequest) MarshalToSizedBuffer(dAtA []byte) (int, error)
 		copy(dAtA[i:], m.ChainID)
 		i = encodeVarintCosigner(dAtA, i, uint64(len(m.ChainID)))
 		i--
-		dAtA[i] = 0x22
+		dAtA[i] = 0x2a
 	}
 	if len(m.SignBytes) > 0 {
 		i -= len(m.SignBytes)
 		copy(dAtA[i:], m.SignBytes)
 		i = encodeVarintCosigner(dAtA, i, uint64(len(m.SignBytes)))
 		i--
-		dAtA[i] = 0x1a
+		dAtA[i] = 0x22
 	}
 	if m.Hrst != nil {
 		{
@@ -1310,7 +1521,7 @@ func (m *SetNoncesAndSignRequest) MarshalToSizedBuffer(dAtA []byte) (int, error)
 			i = encodeVarintCosigner(dAtA, i, uint64(size))
 		}
 		i--
-		dAtA[i] = 0x12
+		dAtA[i] = 0x1a
 	}
 	if len(m.Nonces) > 0 {
 		for iNdEx := len(m.Nonces) - 1; iNdEx >= 0; iNdEx-- {
@@ -1323,8 +1534,15 @@ func (m *SetNoncesAndSignRequest) MarshalToSizedBuffer(dAtA []byte) (int, error)
 				i = encodeVarintCosigner(dAtA, i, uint64(size))
 			}
 			i--
-			dAtA[i] = 0xa
+			dAtA[i] = 0x12
 		}
+	}
+	if len(m.Uuid) > 0 {
+		i -= len(m.Uuid)
+		copy(dAtA[i:], m.Uuid)
+		i = encodeVarintCosigner(dAtA, i, uint64(len(m.Uuid)))
+		i--
+		dAtA[i] = 0xa
 	}
 	return len(dAtA) - i, nil
 }
@@ -1391,24 +1609,14 @@ func (m *GetNoncesRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if len(m.ChainID) > 0 {
-		i -= len(m.ChainID)
-		copy(dAtA[i:], m.ChainID)
-		i = encodeVarintCosigner(dAtA, i, uint64(len(m.ChainID)))
-		i--
-		dAtA[i] = 0x12
-	}
-	if m.Hrst != nil {
-		{
-			size, err := m.Hrst.MarshalToSizedBuffer(dAtA[:i])
-			if err != nil {
-				return 0, err
-			}
-			i -= size
-			i = encodeVarintCosigner(dAtA, i, uint64(size))
+	if len(m.Uuids) > 0 {
+		for iNdEx := len(m.Uuids) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.Uuids[iNdEx])
+			copy(dAtA[i:], m.Uuids[iNdEx])
+			i = encodeVarintCosigner(dAtA, i, uint64(len(m.Uuids[iNdEx])))
+			i--
+			dAtA[i] = 0xa
 		}
-		i--
-		dAtA[i] = 0xa
 	}
 	return len(dAtA) - i, nil
 }
@@ -1560,13 +1768,57 @@ func (m *GetLeaderResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if len(m.Leader) > 0 {
-		i -= len(m.Leader)
-		copy(dAtA[i:], m.Leader)
-		i = encodeVarintCosigner(dAtA, i, uint64(len(m.Leader)))
+	if m.Leader != 0 {
+		i = encodeVarintCosigner(dAtA, i, uint64(m.Leader))
 		i--
-		dAtA[i] = 0xa
+		dAtA[i] = 0x8
 	}
+	return len(dAtA) - i, nil
+}
+
+func (m *PingRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *PingRequest) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *PingRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	return len(dAtA) - i, nil
+}
+
+func (m *PingResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *PingResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *PingResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
 	return len(dAtA) - i, nil
 }
 
@@ -1666,6 +1918,25 @@ func (m *Nonce) Size() (n int) {
 	return n
 }
 
+func (m *UUIDNonce) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Uuid)
+	if l > 0 {
+		n += 1 + l + sovCosigner(uint64(l))
+	}
+	if len(m.Nonces) > 0 {
+		for _, e := range m.Nonces {
+			l = e.Size()
+			n += 1 + l + sovCosigner(uint64(l))
+		}
+	}
+	return n
+}
+
 func (m *HRST) Size() (n int) {
 	if m == nil {
 		return 0
@@ -1693,6 +1964,10 @@ func (m *SetNoncesAndSignRequest) Size() (n int) {
 	}
 	var l int
 	_ = l
+	l = len(m.Uuid)
+	if l > 0 {
+		n += 1 + l + sovCosigner(uint64(l))
+	}
 	if len(m.Nonces) > 0 {
 		for _, e := range m.Nonces {
 			l = e.Size()
@@ -1740,13 +2015,11 @@ func (m *GetNoncesRequest) Size() (n int) {
 	}
 	var l int
 	_ = l
-	if m.Hrst != nil {
-		l = m.Hrst.Size()
-		n += 1 + l + sovCosigner(uint64(l))
-	}
-	l = len(m.ChainID)
-	if l > 0 {
-		n += 1 + l + sovCosigner(uint64(l))
+	if len(m.Uuids) > 0 {
+		for _, b := range m.Uuids {
+			l = len(b)
+			n += 1 + l + sovCosigner(uint64(l))
+		}
 	}
 	return n
 }
@@ -1811,10 +2084,27 @@ func (m *GetLeaderResponse) Size() (n int) {
 	}
 	var l int
 	_ = l
-	l = len(m.Leader)
-	if l > 0 {
-		n += 1 + l + sovCosigner(uint64(l))
+	if m.Leader != 0 {
+		n += 1 + sovCosigner(uint64(m.Leader))
 	}
+	return n
+}
+
+func (m *PingRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	return n
+}
+
+func (m *PingResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
 	return n
 }
 
@@ -2395,6 +2685,124 @@ func (m *Nonce) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *UUIDNonce) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowCosigner
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: UUIDNonce: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: UUIDNonce: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Uuid", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowCosigner
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthCosigner
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthCosigner
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Uuid = append(m.Uuid[:0], dAtA[iNdEx:postIndex]...)
+			if m.Uuid == nil {
+				m.Uuid = []byte{}
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Nonces", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowCosigner
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthCosigner
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthCosigner
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Nonces = append(m.Nonces, &Nonce{})
+			if err := m.Nonces[len(m.Nonces)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipCosigner(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthCosigner
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *HRST) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2552,6 +2960,40 @@ func (m *SetNoncesAndSignRequest) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Uuid", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowCosigner
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthCosigner
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthCosigner
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Uuid = append(m.Uuid[:0], dAtA[iNdEx:postIndex]...)
+			if m.Uuid == nil {
+				m.Uuid = []byte{}
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Nonces", wireType)
 			}
 			var msglen int
@@ -2584,7 +3026,7 @@ func (m *SetNoncesAndSignRequest) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 2:
+		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Hrst", wireType)
 			}
@@ -2620,7 +3062,7 @@ func (m *SetNoncesAndSignRequest) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 3:
+		case 4:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field SignBytes", wireType)
 			}
@@ -2654,7 +3096,7 @@ func (m *SetNoncesAndSignRequest) Unmarshal(dAtA []byte) error {
 				m.SignBytes = []byte{}
 			}
 			iNdEx = postIndex
-		case 4:
+		case 5:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ChainID", wireType)
 			}
@@ -2875,9 +3317,9 @@ func (m *GetNoncesRequest) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Hrst", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Uuids", wireType)
 			}
-			var msglen int
+			var byteLen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowCosigner
@@ -2887,59 +3329,23 @@ func (m *GetNoncesRequest) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				msglen |= int(b&0x7F) << shift
+				byteLen |= int(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			if msglen < 0 {
+			if byteLen < 0 {
 				return ErrInvalidLengthCosigner
 			}
-			postIndex := iNdEx + msglen
+			postIndex := iNdEx + byteLen
 			if postIndex < 0 {
 				return ErrInvalidLengthCosigner
 			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if m.Hrst == nil {
-				m.Hrst = &HRST{}
-			}
-			if err := m.Hrst.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ChainID", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowCosigner
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthCosigner
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthCosigner
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.ChainID = string(dAtA[iNdEx:postIndex])
+			m.Uuids = append(m.Uuids, make([]byte, postIndex-iNdEx))
+			copy(m.Uuids[len(m.Uuids)-1], dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -3020,7 +3426,7 @@ func (m *GetNoncesResponse) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Nonces = append(m.Nonces, &Nonce{})
+			m.Nonces = append(m.Nonces, &UUIDNonce{})
 			if err := m.Nonces[len(m.Nonces)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
@@ -3322,10 +3728,10 @@ func (m *GetLeaderResponse) Unmarshal(dAtA []byte) error {
 		}
 		switch fieldNum {
 		case 1:
-			if wireType != 2 {
+			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Leader", wireType)
 			}
-			var stringLen uint64
+			m.Leader = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowCosigner
@@ -3335,24 +3741,111 @@ func (m *GetLeaderResponse) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
+				m.Leader |= int32(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipCosigner(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthCosigner
 			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthCosigner
-			}
-			if postIndex > l {
+			if (iNdEx + skippy) > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Leader = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *PingRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowCosigner
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PingRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PingRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipCosigner(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthCosigner
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *PingResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowCosigner
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PingResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PingResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
 		default:
 			iNdEx = preIndex
 			skippy, err := skipCosigner(dAtA[iNdEx:])

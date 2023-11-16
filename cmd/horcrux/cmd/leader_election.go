@@ -83,7 +83,7 @@ horcrux elect 2 # elect specific leader`,
 				return err
 			}
 
-			fmt.Printf("Leader election successful. New leader: %s\n", res.Leader)
+			fmt.Printf("Leader election successful. New leader: %d\n", res.Leader)
 
 			return nil
 		},
@@ -173,7 +173,7 @@ func getLeaderCmd() *cobra.Command {
 				return err
 			}
 
-			fmt.Printf("Current leader: %s\n", res.Leader)
+			fmt.Printf("Current leader: %d\n", res.Leader)
 
 			return nil
 		},

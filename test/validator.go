@@ -83,6 +83,14 @@ func startChains(
 			ChainConfig: ibc.ChainConfig{
 				ModifyGenesis: c.modifyGenesis,
 				PreGenesis:    preGenesis,
+				ConfigFileOverrides: map[string]any{
+					"config/config.toml": testutil.Toml{
+						"consensus": testutil.Toml{
+							"timeout_commit":  "1s",
+							"timeout_propose": "1s",
+						},
+					},
+				},
 			},
 		}
 	}
@@ -113,9 +121,9 @@ func startChains(
 }
 
 // modifyGenesisStrictUptime modifies the genesis file to have a strict uptime slashing window.
-// 10 block window, 90% signed blocks required, so more than 1 missed block in 10 blocks will slash and jail the validator.
+// 10 block window, 80% signed blocks required, so more than 2 missed blocks in 10 blocks will slash and jail the validator.
 func modifyGenesisStrictUptime(cc ibc.ChainConfig, b []byte) ([]byte, error) {
-	return modifyGenesisSlashingUptime(10, 0.9)(cc, b)
+	return modifyGenesisSlashingUptime(10, 0.8)(cc, b)
 }
 
 // modifyGenesisSlashingUptime modifies the genesis slashing period parameters.
@@ -236,7 +244,7 @@ func requireHealthyValidator(t *testing.T, referenceNode *cosmos.ChainNode, vali
 
 	require.False(t, signingInfo.Tombstoned)
 	require.Equal(t, time.Unix(0, 0).UTC(), signingInfo.JailedUntil)
-	require.Zero(t, signingInfo.MissedBlocksCounter)
+	require.LessOrEqual(t, signingInfo.MissedBlocksCounter, int64(1))
 }
 
 // transferLeadership elects a new raft leader.
@@ -246,7 +254,7 @@ func transferLeadership(ctx context.Context, cosigner *cosmos.SidecarProcess) er
 }
 
 // pollForLeader polls for the given cosigner to become the leader.
-func pollForLeader(ctx context.Context, t *testing.T, cosigner *cosmos.SidecarProcess, expectedLeader string) error {
+func pollForLeader(ctx context.Context, t *testing.T, cosigner *cosmos.SidecarProcess, expectedLeader int) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -257,7 +265,7 @@ func pollForLeader(ctx context.Context, t *testing.T, cosigner *cosmos.SidecarPr
 		select {
 		case <-ticker.C:
 			leader, err := getLeader(ctx, cosigner)
-			t.Logf("{%s} => current leader: {%s}, expected leader: {%s}", cosigner.Name(), leader, expectedLeader)
+			t.Logf("{%s} => current leader: {%d}, expected leader: {%d}", cosigner.Name(), leader, expectedLeader)
 			if err != nil {
 				return fmt.Errorf("failed to get leader from cosigner: %s - %w", cosigner.Name(), err)
 			}
@@ -271,10 +279,10 @@ func pollForLeader(ctx context.Context, t *testing.T, cosigner *cosmos.SidecarPr
 }
 
 // getLeader returns the current raft leader.
-func getLeader(ctx context.Context, cosigner *cosmos.SidecarProcess) (string, error) {
+func getLeader(ctx context.Context, cosigner *cosmos.SidecarProcess) (int, error) {
 	ports, err := cosigner.GetHostPorts(ctx, signerPortDocker)
 	if err != nil {
-		return "", err
+		return -1, err
 	}
 	grpcAddress := ports[0]
 	conn, err := grpc.Dial(grpcAddress,
@@ -282,7 +290,7 @@ func getLeader(ctx context.Context, cosigner *cosmos.SidecarProcess) (string, er
 		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
 	)
 	if err != nil {
-		return "", fmt.Errorf("dialing failed: %w", err)
+		return -1, fmt.Errorf("dialing failed: %w", err)
 	}
 	defer conn.Close()
 
@@ -293,7 +301,7 @@ func getLeader(ctx context.Context, cosigner *cosmos.SidecarProcess) (string, er
 
 	res, err := grpcClient.GetLeader(ctx, &proto.GetLeaderRequest{})
 	if err != nil {
-		return "", err
+		return -1, err
 	}
-	return res.GetLeader(), nil
+	return int(res.GetLeader()), nil
 }

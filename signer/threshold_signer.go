@@ -1,12 +1,11 @@
 package signer
 
+import "time"
+
 // Interface for the local signer whether it's a soft sign or HSM
 type ThresholdSigner interface {
 	// PubKey returns the public key bytes for the combination of all cosigners.
 	PubKey() []byte
-
-	// GenerateNonces deals nonces for all cosigners.
-	GenerateNonces() (Nonces, error)
 
 	// Sign signs a byte payload with the provided nonces.
 	Sign(nonces []Nonce, payload []byte) ([]byte, error)
@@ -19,6 +18,11 @@ type ThresholdSigner interface {
 type Nonces struct {
 	PubKey []byte
 	Shares [][]byte
+}
+
+type NoncesWithExpiration struct {
+	Expiration time.Time
+	Nonces     []Nonces
 }
 
 // Nonce is the ephemeral information from another cosigner destined for this cosigner.

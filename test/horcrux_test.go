@@ -138,12 +138,11 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 }
 
 // TestDownedSigners2of3 tests taking down 2 nodes at a time in the 2/3 threshold horcrux cluster for a period of time.
-
 func TestDownedSigners2of3(t *testing.T) {
 	ctx := context.Background()
 
 	const (
-		totalValidators   = 2
+		totalValidators   = 4
 		totalSigners      = 3
 		threshold         = 2
 		totalSentries     = 3
@@ -153,6 +152,8 @@ func TestDownedSigners2of3(t *testing.T) {
 	cw, pubKey := startChainSingleNodeAndHorcruxThreshold(
 		ctx, t, totalValidators, totalSigners, threshold, totalSentries, sentriesPerSigner,
 	)
+
+	require.NoError(t, testutil.WaitForBlocks(ctx, 15, cw.chain))
 
 	ourValidator := cw.chain.Validators[0]
 	requireHealthyValidator(t, ourValidator, pubKey.Address())
@@ -165,7 +166,7 @@ func TestDownedSigners2of3(t *testing.T) {
 		require.NoError(t, cosigner.StopContainer(ctx))
 
 		t.Logf("{%s} -> Waiting for blocks after stopping cosigner {%s}", ourValidator.Name(), cosigner.Name())
-		require.NoError(t, testutil.WaitForBlocks(ctx, 5, cw.chain))
+		require.NoError(t, testutil.WaitForBlocks(ctx, 15, cw.chain))
 
 		requireHealthyValidator(t, ourValidator, pubKey.Address())
 
@@ -173,7 +174,7 @@ func TestDownedSigners2of3(t *testing.T) {
 		require.NoError(t, cosigner.StartContainer(ctx))
 
 		t.Logf("{%s} -> Waiting for blocks after restarting cosigner {%s}", ourValidator.Name(), cosigner.Name())
-		require.NoError(t, testutil.WaitForBlocks(ctx, 5, cw.chain))
+		require.NoError(t, testutil.WaitForBlocks(ctx, 15, cw.chain))
 
 		requireHealthyValidator(t, ourValidator, pubKey.Address())
 	}
@@ -184,7 +185,7 @@ func TestDownedSigners3of5(t *testing.T) {
 	ctx := context.Background()
 
 	const (
-		totalValidators   = 2
+		totalValidators   = 4
 		totalSigners      = 5
 		threshold         = 3
 		totalSentries     = 3
@@ -194,6 +195,8 @@ func TestDownedSigners3of5(t *testing.T) {
 	cw, pubKey := startChainSingleNodeAndHorcruxThreshold(
 		ctx, t, totalValidators, totalSigners, threshold, totalSentries, sentriesPerSigner,
 	)
+
+	require.NoError(t, testutil.WaitForBlocks(ctx, 15, cw.chain))
 
 	ourValidator := cw.chain.Validators[0]
 	requireHealthyValidator(t, ourValidator, pubKey.Address())
@@ -221,13 +224,13 @@ func TestDownedSigners3of5(t *testing.T) {
 		}
 
 		t.Logf("{%s} -> Waiting for blocks after stopping cosigner {%s}", ourValidator.Name(), cosigner2.Name())
-		require.NoError(t, testutil.WaitForBlocks(ctx, 5, cw.chain))
+		require.NoError(t, testutil.WaitForBlocks(ctx, 15, cw.chain))
 
 		requireHealthyValidator(t, ourValidator, pubKey.Address())
 
 		t.Logf("{%s} -> Restarting cosigner...", cosigner1.Name())
 		require.NoError(t, cosigner1.StartContainer(ctx))
-		require.NoError(t, testutil.WaitForBlocks(ctx, 5, cw.chain))
+		require.NoError(t, testutil.WaitForBlocks(ctx, 15, cw.chain))
 
 		requireHealthyValidator(t, ourValidator, pubKey.Address())
 	}
@@ -269,7 +272,7 @@ func TestLeaderElection2of3(t *testing.T) {
 			for _, s := range cosigners {
 				s := s
 				eg.Go(func() error {
-					return pollForLeader(ctx, t, s, cosigner.Name()+":"+signerPort)
+					return pollForLeader(ctx, t, s, cosigner.Index+1)
 				})
 			}
 			if err := eg.Wait(); err == nil {
@@ -278,7 +281,7 @@ func TestLeaderElection2of3(t *testing.T) {
 
 			// electing a specific leader can fail, but this is okay as long as all nodes agree on one leader.
 			// will retry electing the specific leader in the next iteration.
-			var commonLeader string
+			var commonLeader int
 			for i, s := range cosigners {
 				leader, err := getLeader(ctx, s)
 				require.NoErrorf(t, err, "failed to get leader from signer: %s", s.Name())

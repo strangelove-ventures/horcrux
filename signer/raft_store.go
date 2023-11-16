@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -287,11 +288,19 @@ func (s *RaftStore) IsLeader() bool {
 	return s.raft.State() == raft.Leader
 }
 
-func (s *RaftStore) GetLeader() raft.ServerAddress {
+func (s *RaftStore) GetLeader() int {
 	if s == nil || s.raft == nil {
-		return ""
+		return -1
 	}
-	return s.raft.Leader()
+	_, leaderID := s.raft.LeaderWithID()
+	if leaderID == "" {
+		return -1
+	}
+	id, err := strconv.Atoi(string(leaderID))
+	if err != nil {
+		return -1
+	}
+	return id
 }
 
 func (s *RaftStore) ShareSigned(lss ChainSignStateConsensus) error {

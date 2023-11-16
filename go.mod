@@ -12,6 +12,7 @@ require (
 	github.com/cosmos/gogoproto v1.4.10
 	github.com/ethereum/go-ethereum v1.12.0
 	github.com/gogo/protobuf v1.3.2
+	github.com/google/uuid v1.3.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/hashicorp/raft v1.5.0
 	github.com/hashicorp/raft-boltdb/v2 v2.2.2

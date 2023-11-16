@@ -57,10 +57,10 @@ func (s *RemoteSignerGRPCServer) OnStop() {
 	s.server.GracefulStop()
 }
 
-func (s *RemoteSignerGRPCServer) PubKey(_ context.Context, req *proto.PubKeyRequest) (*proto.PubKeyResponse, error) {
+func (s *RemoteSignerGRPCServer) PubKey(ctx context.Context, req *proto.PubKeyRequest) (*proto.PubKeyResponse, error) {
 	totalPubKeyRequests.Inc()
 
-	pubKey, err := s.validator.GetPubKey(req.ChainId)
+	pubKey, err := s.validator.GetPubKey(ctx, req.ChainId)
 	if err != nil {
 		s.logger.Error(
 			"Failed to get Pub Key",
@@ -76,12 +76,12 @@ func (s *RemoteSignerGRPCServer) PubKey(_ context.Context, req *proto.PubKeyRequ
 }
 
 func (s *RemoteSignerGRPCServer) Sign(
-	_ context.Context,
+	ctx context.Context,
 	req *proto.SignBlockRequest,
 ) (*proto.SignBlockResponse, error) {
 	chainID, block := req.ChainID, BlockFromProto(req.Block)
 
-	signature, timestamp, err := signAndTrack(s.logger, s.validator, chainID, block)
+	signature, timestamp, err := signAndTrack(ctx, s.logger, s.validator, chainID, block)
 	if err != nil {
 		return nil, err
 	}
@@ -93,12 +93,13 @@ func (s *RemoteSignerGRPCServer) Sign(
 }
 
 func signAndTrack(
+	ctx context.Context,
 	logger cometlog.Logger,
 	validator PrivValidator,
 	chainID string,
 	block Block,
 ) ([]byte, time.Time, error) {
-	signature, timestamp, err := validator.Sign(chainID, block)
+	signature, timestamp, err := validator.Sign(ctx, chainID, block)
 	if err != nil {
 		switch typedErr := err.(type) {
 		case *BeyondBlockError:
