@@ -238,3 +238,12 @@ You now can sleep much better at night because you are much less likely to have 
 `horcrux elect` - Elect a new cluster leader. Pass an optional argument with the intended leader ID to elect that cosigner as the new leader, e.g. `horcrux elect 3` to elect cosigner with `shardID: 3` as leader. This is an optimistic leader election, it is not guaranteed that the exact requested leader will be elected.
 
 `horcrux address` - Get the public key address as both hex and optionally the validator consensus bech32 address. To retrieve the valcons bech32 address, pass an optional argument with the chain's bech32 prefix, e.g. `horcrux address cosmos`
+
+## Steps to Migrate a Peer on a New IP
+
+To change the DNS/IP of a cosigner:
+
+- update config files on each cosigner
+- bring all cosigners down
+- remove the .horcrux/raft directory on all cosigners
+- restart all cosigners
