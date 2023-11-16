@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -726,8 +725,23 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 						return err
 					}
 
-					// TODO only do this if errors.Is(context.Cacnceled) or network errors
-					if !strings.Contains(err.Error(), "regression") {
+					hre := new(HeightRegressionError)
+					rre := new(RoundRegressionError)
+					sre := new(StepRegressionError)
+					ese := new(EmptySignBytesError)
+					ase := new(AlreadySignedVoteError)
+					dbe := new(DiffBlockIDsError)
+					cde := new(ConflictingDataError)
+					ue := new(UnmarshalError)
+
+					if !errors.As(err, &hre) &&
+						!errors.As(err, &rre) &&
+						!errors.As(err, &sre) &&
+						!errors.As(err, &ese) &&
+						!errors.As(err, &ue) &&
+						!errors.As(err, &ase) &&
+						!errors.As(err, &dbe) &&
+						!errors.As(err, &cde) {
 						pv.cosignerHealth.MarkUnhealthy(cosigner)
 						pv.nonceCache.ClearNonces(cosigner)
 					}
