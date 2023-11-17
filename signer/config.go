@@ -349,7 +349,7 @@ func ChainNodesFromFlag(nodes []string) (ChainNodes, error) {
 
 func PubKey(bech32BasePrefix string, pubKey crypto.PubKey) (string, error) {
 	if bech32BasePrefix != "" {
-		pubkey, err := cryptocodec.FromTmPubKeyInterface(pubKey)
+		pubkey, err := cryptocodec.FromCmtPubKeyInterface(pubKey)
 		if err != nil {
 			return "", err
 		}
@@ -366,7 +366,7 @@ func PubKey(bech32BasePrefix string, pubKey crypto.PubKey) (string, error) {
 	var pk *cryptotypes.PubKey
 	registry.RegisterInterface("cosmos.crypto.PubKey", pk)
 	registry.RegisterImplementations(pk, &ed25519.PubKey{})
-	sdkPK, err := cryptocodec.FromTmPubKeyInterface(pubKey)
+	sdkPK, err := cryptocodec.FromCmtPubKeyInterface(pubKey)
 	if err != nil {
 		return "", err
 	}
