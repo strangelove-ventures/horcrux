@@ -218,8 +218,8 @@ func convertValidatorToHorcrux(
 			ThresholdModeConfig: &signer.ThresholdModeConfig{
 				Threshold:   int(threshold),
 				Cosigners:   cosigners,
-				GRPCTimeout: "1500ms",
-				RaftTimeout: "1500ms",
+				GRPCTimeout: "200ms",
+				RaftTimeout: "200ms",
 			},
 			ChainNodes: chainNodes,
 			DebugAddr:  fmt.Sprintf("0.0.0.0:%s", debugPort),

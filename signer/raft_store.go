@@ -139,6 +139,9 @@ func (s *RaftStore) Open() (*raftgrpctransport.Manager, error) {
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(s.NodeID)
 	config.LogLevel = "ERROR"
+	config.ElectionTimeout = s.RaftTimeout
+	config.HeartbeatTimeout = s.RaftTimeout
+	config.LeaderLeaseTimeout = s.RaftTimeout / 2
 
 	// Create the snapshot store. This allows the Raft to truncate the log.
 	snapshots, err := raft.NewFileSnapshotStore(s.RaftDir, retainSnapshotCount, os.Stderr)

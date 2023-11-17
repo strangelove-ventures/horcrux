@@ -521,8 +521,8 @@ func configureAndStartSidecars(
 			ThresholdModeConfig: &signer.ThresholdModeConfig{
 				Threshold:   threshold,
 				Cosigners:   cosignersConfig,
-				GRPCTimeout: "1500ms",
-				RaftTimeout: "1500ms",
+				GRPCTimeout: "200ms",
+				RaftTimeout: "200ms",
 			},
 			ChainNodes: chainNodes,
 			GRPCAddr:   grpcAddr,

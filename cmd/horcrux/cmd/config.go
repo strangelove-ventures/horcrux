@@ -151,9 +151,9 @@ for threshold signer mode, --cosigner flags and --threshold flag are required.
 		"listen address for debug server and prometheus metrics in format localhost:8543",
 	)
 	f.StringP(flagKeyDir, "k", "", "key directory if other than home directory")
-	f.String(flagRaftTimeout, "1500ms", "cosigner raft timeout value, \n"+
+	f.String(flagRaftTimeout, "500ms", "cosigner raft timeout value, \n"+
 		"accepts valid duration strings for Go's time.ParseDuration() e.g. 1s, 1000ms, 1.5m")
-	f.String(flagGRPCTimeout, "1500ms", "cosigner grpc timeout value, \n"+
+	f.String(flagGRPCTimeout, "500ms", "cosigner grpc timeout value, \n"+
 		"accepts valid duration strings for Go's time.ParseDuration() e.g. 1s, 1000ms, 1.5m")
 	f.BoolP(flagOverwrite, "o", false, "overwrite an existing config.yaml")
 	f.Bool(

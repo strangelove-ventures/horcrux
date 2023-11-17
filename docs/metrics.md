@@ -22,8 +22,8 @@ thresholdMode:
     p2pAddr: tcp://localhost:5002
   - shardID: 3
     p2pAddr: tcp://localhost:5003
-  grpcTimeout: 1500ms
-  raftTimeout: 1500ms
+  grpcTimeout: 500ms
+  raftTimeout: 500ms
 chainNodes:
 - privValAddr: tcp://localhost:2300
 debugAddr: 0.0.0.0:6001
