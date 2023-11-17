@@ -465,6 +465,9 @@ func (pv *ThresholdValidator) getNoncesFallback(
 ) (*CosignerUUIDNonces, []Cosigner, error) {
 	nonces := make(map[Cosigner]CosignerNonces)
 
+	drainedNonceCache.Inc()
+	totalDrainedNonceCache.Inc()
+
 	var wg sync.WaitGroup
 	wg.Add(pv.threshold)
 
@@ -527,7 +530,7 @@ func (pv *ThresholdValidator) waitForPeerNonces(
 	peerStartTime := time.Now()
 	peerNonces, err := peer.GetNonces(ctx, []uuid.UUID{u})
 	if err != nil {
-		missedNonces.WithLabelValues(peer.GetAddress()).Add(float64(1))
+		missedNonces.WithLabelValues(peer.GetAddress()).Inc()
 		totalMissedNonces.WithLabelValues(peer.GetAddress()).Inc()
 
 		pv.logger.Error("Error getting nonces", "cosigner", peer.GetID(), "err", err)
@@ -668,6 +671,8 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 			return nil, stamp, fmt.Errorf("failed to get nonces: %w", errors.Join(err, fallbackErr))
 		}
 		dontIterateFastestCosigners = true
+	} else {
+		drainedNonceCache.Set(0)
 	}
 
 	nextFastestCosignerIndex := pv.threshold - 1

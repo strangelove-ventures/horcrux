@@ -214,6 +214,18 @@ var (
 		},
 		[]string{"peerid"},
 	)
+	drainedNonceCache = promauto.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "signer_drained_nonce_cache",
+			Help: "Consecutive Nonces Requested When Cache is Drained",
+		},
+	)
+	totalDrainedNonceCache = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Name: "signer_total_drained_nonce_cache",
+			Help: "Total Nonces Requested When Cache is Drained",
+		},
+	)
 
 	sentryConnectTries = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
