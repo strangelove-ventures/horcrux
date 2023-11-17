@@ -28,8 +28,8 @@ func TestConfigInitCmd(t *testing.T) {
 				"-c", "tcp://10.168.1.2:2222",
 				"-c", "tcp://10.168.1.3:2222",
 				"-t", "2",
-				"--raft-timeout", "1500ms",
-				"--grpc-timeout", "1500ms",
+				"--raft-timeout", "500ms",
+				"--grpc-timeout", "500ms",
 			},
 			expectConfig: `signMode: threshold
 thresholdMode:
@@ -41,8 +41,8 @@ thresholdMode:
     p2pAddr: tcp://10.168.1.2:2222
   - shardID: 3
     p2pAddr: tcp://10.168.1.3:2222
-  grpcTimeout: 1500ms
-  raftTimeout: 1500ms
+  grpcTimeout: 500ms
+  raftTimeout: 500ms
 chainNodes:
 - privValAddr: tcp://10.168.0.1:1234
 - privValAddr: tcp://10.168.0.2:1234
@@ -76,8 +76,8 @@ grpcAddr: ""
 				"-c", "tcp://10.168.1.2:2222",
 				"-c", "tcp://10.168.1.3:2222",
 				"-t", "2",
-				"--raft-timeout", "1500ms",
-				"--grpc-timeout", "1500ms",
+				"--raft-timeout", "500ms",
+				"--grpc-timeout", "500ms",
 			},
 			expectErr: `parse "://10.168.0.1:1234": missing protocol scheme`,
 		},
@@ -91,8 +91,8 @@ grpcAddr: ""
 				"-c", "tcp://10.168.1.2:2222",
 				"-c", "tcp://10.168.1.3:2222",
 				"-t", "2",
-				"--raft-timeout", "1500ms",
-				"--grpc-timeout", "1500ms",
+				"--raft-timeout", "500ms",
+				"--grpc-timeout", "500ms",
 			},
 			expectErr: `failed to parse cosigner (shard ID: 1) p2p address: parse "://10.168.1.1:2222": missing protocol scheme`,
 		},
@@ -106,8 +106,8 @@ grpcAddr: ""
 				"-c", "tcp://10.168.1.2:2222",
 				"-c", "tcp://10.168.1.3:2222",
 				"-t", "1",
-				"--raft-timeout", "1500ms",
-				"--grpc-timeout", "1500ms",
+				"--raft-timeout", "500ms",
+				"--grpc-timeout", "500ms",
 			},
 			expectErr: "threshold (1) must be greater than number of shards (3) / 2",
 		},
@@ -122,7 +122,7 @@ grpcAddr: ""
 				"-c", "tcp://10.168.1.3:2222",
 				"-t", "2",
 				"--raft-timeout", "1500",
-				"--grpc-timeout", "1500ms",
+				"--grpc-timeout", "500ms",
 			},
 			expectErr: `invalid raftTimeout: time: missing unit in duration "1500"`,
 		},
@@ -136,7 +136,7 @@ grpcAddr: ""
 				"-c", "tcp://10.168.1.2:2222",
 				"-c", "tcp://10.168.1.3:2222",
 				"-t", "2",
-				"--raft-timeout", "1500ms",
+				"--raft-timeout", "500ms",
 				"--grpc-timeout", "1500",
 			},
 			expectErr: `invalid grpcTimeout: time: missing unit in duration "1500"`,

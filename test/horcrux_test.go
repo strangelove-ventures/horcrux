@@ -9,10 +9,10 @@ import (
 	"github.com/cometbft/cometbft/crypto"
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/strangelove-ventures/horcrux/signer"
-	interchaintest "github.com/strangelove-ventures/interchaintest/v7"
-	"github.com/strangelove-ventures/interchaintest/v7/chain/cosmos"
-	"github.com/strangelove-ventures/interchaintest/v7/ibc"
-	"github.com/strangelove-ventures/interchaintest/v7/testutil"
+	interchaintest "github.com/strangelove-ventures/interchaintest/v8"
+	"github.com/strangelove-ventures/interchaintest/v8/chain/cosmos"
+	"github.com/strangelove-ventures/interchaintest/v8/ibc"
+	"github.com/strangelove-ventures/interchaintest/v8/testutil"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zaptest"
 	"golang.org/x/sync/errgroup"
@@ -521,8 +521,8 @@ func configureAndStartSidecars(
 			ThresholdModeConfig: &signer.ThresholdModeConfig{
 				Threshold:   threshold,
 				Cosigners:   cosignersConfig,
-				GRPCTimeout: "1500ms",
-				RaftTimeout: "1500ms",
+				GRPCTimeout: "200ms",
+				RaftTimeout: "200ms",
 			},
 			ChainNodes: chainNodes,
 			GRPCAddr:   grpcAddr,

@@ -13,10 +13,10 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/strangelove-ventures/horcrux/signer"
-	interchaintest "github.com/strangelove-ventures/interchaintest/v7"
-	"github.com/strangelove-ventures/interchaintest/v7/chain/cosmos"
-	"github.com/strangelove-ventures/interchaintest/v7/ibc"
-	"github.com/strangelove-ventures/interchaintest/v7/testutil"
+	interchaintest "github.com/strangelove-ventures/interchaintest/v8"
+	"github.com/strangelove-ventures/interchaintest/v8/chain/cosmos"
+	"github.com/strangelove-ventures/interchaintest/v8/ibc"
+	"github.com/strangelove-ventures/interchaintest/v8/testutil"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
@@ -218,8 +218,8 @@ func convertValidatorToHorcrux(
 			ThresholdModeConfig: &signer.ThresholdModeConfig{
 				Threshold:   int(threshold),
 				Cosigners:   cosigners,
-				GRPCTimeout: "1500ms",
-				RaftTimeout: "1500ms",
+				GRPCTimeout: "200ms",
+				RaftTimeout: "200ms",
 			},
 			ChainNodes: chainNodes,
 			DebugAddr:  fmt.Sprintf("0.0.0.0:%s", debugPort),
