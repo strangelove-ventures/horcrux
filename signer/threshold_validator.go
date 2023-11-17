@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -15,6 +14,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var _ PrivValidator = &ThresholdValidator{}
@@ -735,13 +736,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 						return err
 					}
 
-					// TODO how can we determine error type when it's wrapped in an RPCError?
-					if !strings.Contains(err.Error(), "regression") &&
-						!strings.Contains(err.Error(), ErrEmptySignBytes.Error()) &&
-						!strings.Contains(err.Error(), "refusing to sign") &&
-						!strings.Contains(err.Error(), "differing block IDs") &&
-						!strings.Contains(err.Error(), "conflicting data") &&
-						!strings.Contains(err.Error(), "cannot be unmarshalled into") {
+					if c := status.Code(err); c == codes.DeadlineExceeded || c == codes.NotFound || c == codes.Unavailable {
 						pv.cosignerHealth.MarkUnhealthy(cosigner)
 						pv.nonceCache.ClearNonces(cosigner)
 					}
