@@ -106,14 +106,14 @@ func (rs *ReconnRemoteSigner) loop(ctx context.Context) {
 			timer := time.NewTimer(connRetrySec * time.Second)
 			conn, err = rs.establishConnection(ctx)
 			if err == nil {
-				sentryConnectTries.Set(0)
+				sentryConnectTries.WithLabelValues(rs.address).Set(0)
 				timer.Stop()
 				rs.Logger.Info("Connected to Sentry", "address", rs.address)
 				break
 			}
 
-			sentryConnectTries.Add(1)
-			totalSentryConnectTries.Inc()
+			sentryConnectTries.WithLabelValues(rs.address).Add(1)
+			totalSentryConnectTries.WithLabelValues(rs.address).Inc()
 			retries++
 			rs.Logger.Error(
 				"Error establishing connection, will retry",
@@ -226,7 +226,7 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(
 }
 
 func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) cometprotoprivval.Message {
-	totalPubKeyRequests.Inc()
+	totalPubKeyRequests.WithLabelValues(chainID).Inc()
 	msgSum := &cometprotoprivval.Message_PubKeyResponse{PubKeyResponse: &cometprotoprivval.PubKeyResponse{
 		PubKey: cometprotocrypto.PublicKey{},
 		Error:  nil,
