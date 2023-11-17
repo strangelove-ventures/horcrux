@@ -611,6 +611,13 @@ func (pv *ThresholdValidator) proxyIfNecessary(
 func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Block) ([]byte, time.Time, error) {
 	height, round, step, stamp, signBytes := block.Height, block.Round, block.Step, block.Timestamp, block.SignBytes
 
+	log := pv.logger.With(
+		"chain_id", chainID,
+		"height", height,
+		"round", round,
+		"type", signType(step),
+	)
+
 	if err := pv.LoadSignStateIfNecessary(chainID); err != nil {
 		return nil, stamp, err
 	}
@@ -623,13 +630,8 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 	}
 
 	totalRaftLeader.Inc()
-	pv.logger.Debug(
-		"I am the leader. Managing the sign process for this block",
-		"chain_id", chainID,
-		"height", height,
-		"round", round,
-		"step", step,
-	)
+
+	log.Debug("I am the leader. Managing the sign process for this block")
 
 	timeStartSignBlock := time.Now()
 
@@ -646,7 +648,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 		return nil, stamp, fmt.Errorf("error saving last sign state initiated: %w", err)
 	}
 	if existingSignature != nil {
-		pv.logger.Debug("Returning existing signature", "signature", fmt.Sprintf("%x", existingSignature))
+		log.Debug("Returning existing signature", "signature", fmt.Sprintf("%x", existingSignature))
 		return existingSignature, existingTimestamp, nil
 	}
 
@@ -723,9 +725,9 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 					SignBytes: signBytes,
 				})
 				if err != nil {
-					pv.logger.Error(
+					log.Error(
 						"Cosigner failed to set nonces and sign",
-						"id", cosigner.GetID(),
+						"cosigner", cosigner.GetID(),
 						"err", err.Error(),
 					)
 
@@ -735,7 +737,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 
 					// TODO how can we determine error type when it's wrapped in an RPCError?
 					if !strings.Contains(err.Error(), "regression") &&
-						!strings.Contains(err.Error(), EmptySignBytesError.Error()) &&
+						!strings.Contains(err.Error(), ErrEmptySignBytes.Error()) &&
 						!strings.Contains(err.Error(), "refusing to sign") &&
 						!strings.Contains(err.Error(), "differing block IDs") &&
 						!strings.Contains(err.Error(), "conflicting data") &&
@@ -842,20 +844,16 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 	if err != nil {
 		// this is not required for double sign protection, so we don't need to return an error here.
 		// this is only an additional mechanism that will catch double signs earlier in the sign process.
-		pv.logger.Error("Error emitting LSS", err.Error())
+		log.Error("Error emitting LSS", err.Error())
 	}
 
 	timeSignBlock := time.Since(timeStartSignBlock)
 	timeSignBlockSec := timeSignBlock.Seconds()
 	timedSignBlockLag.Observe(timeSignBlockSec)
 
-	pv.logger.Info(
+	log.Info(
 		"Signed",
-		"chain_id", chainID,
-		"height", height,
-		"round", round,
-		"type", signType(step),
-		"duration_ms", timeSignBlock.Round(time.Millisecond),
+		"duration_ms", float64(timeSignBlock.Microseconds())/1000,
 	)
 
 	return signature, stamp, nil
