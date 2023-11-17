@@ -348,11 +348,7 @@ func newStepRegressionError(height, round int64, regressed, last int8) *StepRegr
 	}
 }
 
-type EmptySignBytesError struct{}
-
-func (e *EmptySignBytesError) Error() string {
-	return "no SignBytes found"
-}
+var EmptySignBytesError = errors.New("no SignBytes found")
 
 // CheckHRS checks the given height, round, step (HRS) against that of the
 // SignState. It returns an error if the arguments constitute a regression,
@@ -380,7 +376,7 @@ func (signState *SignState) CheckHRS(hrst HRSTKey) (bool, error) {
 					}
 					return true, nil
 				}
-				return false, new(EmptySignBytesError)
+				return false, EmptySignBytesError
 			}
 		}
 	}

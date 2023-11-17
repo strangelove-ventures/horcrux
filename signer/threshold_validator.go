@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -732,23 +733,13 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 						return err
 					}
 
-					hre := new(HeightRegressionError)
-					rre := new(RoundRegressionError)
-					sre := new(StepRegressionError)
-					ese := new(EmptySignBytesError)
-					ase := new(AlreadySignedVoteError)
-					dbe := new(DiffBlockIDsError)
-					cde := new(ConflictingDataError)
-					ue := new(UnmarshalError)
-
-					if !errors.As(err, &hre) &&
-						!errors.As(err, &rre) &&
-						!errors.As(err, &sre) &&
-						!errors.As(err, &ese) &&
-						!errors.As(err, &ue) &&
-						!errors.As(err, &ase) &&
-						!errors.As(err, &dbe) &&
-						!errors.As(err, &cde) {
+					// TODO how can we determine error type when it's wrapped in an RPCError?
+					if !strings.Contains(err.Error(), "regression") &&
+						!strings.Contains(err.Error(), EmptySignBytesError.Error()) &&
+						!strings.Contains(err.Error(), "refusing to sign") &&
+						!strings.Contains(err.Error(), "differing block IDs") &&
+						!strings.Contains(err.Error(), "conflicting data") &&
+						!strings.Contains(err.Error(), "cannot be unmarshalled into") {
 						pv.cosignerHealth.MarkUnhealthy(cosigner)
 						pv.nonceCache.ClearNonces(cosigner)
 					}
