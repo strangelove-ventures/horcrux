@@ -85,6 +85,7 @@ func NewThresholdValidator(
 		defaultGetNoncesInterval,
 		defaultGetNoncesTimeout,
 		uint8(threshold),
+		nil,
 	)
 	return &ThresholdValidator{
 		logger:                      logger,
