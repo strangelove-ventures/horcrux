@@ -96,8 +96,6 @@ func (nc *NonceCache) Set(uuid uuid.UUID, cn *CachedNonce) {
 }
 
 func (nc *NonceCache) GetSortedByExpiration() []*CachedNonce {
-	nc.mu.RLock()
-	defer nc.mu.RUnlock()
 	cns := make([]*CachedNonce, 0, len(nc.cache))
 	for _, cn := range nc.cache {
 		cns = append(cns, cn)
