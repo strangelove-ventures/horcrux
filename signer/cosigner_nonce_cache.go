@@ -301,8 +301,8 @@ func (cnc *CosignerNonceCache) Start(ctx context.Context) {
 }
 
 func (cnc *CosignerNonceCache) GetNonces(fastestPeers []Cosigner) (*CosignerUUIDNonces, error) {
-	cnc.cache.mu.RLock()
-	defer cnc.cache.mu.RUnlock()
+	cnc.cache.mu.Lock()
+	defer cnc.cache.mu.Unlock()
 CheckNoncesLoop:
 	for _, cn := range cnc.cache.GetSortedByExpiration() {
 		var nonces CosignerNonces
@@ -321,9 +321,7 @@ CheckNoncesLoop:
 			}
 		}
 
-		cnc.cache.mu.RUnlock()
-		cnc.clearNonce(cn.UUID)
-		cnc.cache.mu.RLock()
+		delete(cnc.cache.cache, cn.UUID)
 
 		// all peers found
 		return &CosignerUUIDNonces{
@@ -348,15 +346,10 @@ func (cnc *CosignerNonceCache) PruneNonces() {
 	defer cnc.cache.mu.Unlock()
 	for u, cn := range cnc.cache.cache {
 		if time.Now().After(cn.Expiration) {
+			fmt.Printf("Pruning nonce %s\n", u)
 			delete(cnc.cache.cache, u)
 		}
 	}
-}
-
-func (cnc *CosignerNonceCache) clearNonce(uuid uuid.UUID) {
-	cnc.cache.mu.Lock()
-	defer cnc.cache.mu.Unlock()
-	delete(cnc.cache.cache, uuid)
 }
 
 func (cnc *CosignerNonceCache) ClearNonces(cosigner Cosigner) {
