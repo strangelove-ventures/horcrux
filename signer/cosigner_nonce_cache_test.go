@@ -125,10 +125,15 @@ func TestNonceCacheExpiration(t *testing.T) {
 
 	count, pruned := mp.Result()
 
+	// we should have pruned at least three times after
+	// waiting for a second with a reconcile interval of 250ms
 	require.GreaterOrEqual(t, count, 3)
+
+	// we should have pruned at least the number of nonces we loaded and knew would expire
 	require.GreaterOrEqual(t, pruned, loadN)
 
 	cancel()
 
+	// the cache should have at most the trim padding since no nonces are being consumed.
 	require.LessOrEqual(t, nonceCache.cache.Size(), targetTrim)
 }
