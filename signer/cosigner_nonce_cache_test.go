@@ -16,16 +16,11 @@ type mockPruner struct {
 	pruned int
 }
 
-func (mp *mockPruner) PruneNonces() {
-	mp.cnc.cache.mu.Lock()
-	defer mp.cnc.cache.mu.Unlock()
+func (mp *mockPruner) PruneNonces() int {
 	mp.count++
-	for u, cn := range mp.cnc.cache.cache {
-		if time.Now().After(cn.Expiration) {
-			mp.pruned++
-			delete(mp.cnc.cache.cache, u)
-		}
-	}
+	pruned := mp.cnc.PruneNonces()
+	mp.pruned += pruned
+	return pruned
 }
 
 func TestNonceCacheDemand(t *testing.T) {
@@ -68,8 +63,7 @@ func TestNonceCacheDemand(t *testing.T) {
 
 	cancel()
 
-	target := int(nonceCache.noncesPerMinute*.01) + int(nonceCache.noncesPerMinute/30) + 100
-	require.LessOrEqual(t, size, target)
+	require.LessOrEqual(t, size, nonceCache.target())
 
 	require.Greater(t, mp.count, 0)
 	require.Equal(t, 0, mp.pruned)
