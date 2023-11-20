@@ -163,12 +163,6 @@ func (cnc *CosignerNonceCache) reconcile(ctx context.Context) {
 	if noncesPerMin < 0 {
 		noncesPerMin = 0
 	}
-	cnc.logger.Debug("Reconciling nonces",
-		"remaining", remainingNonces,
-		"lastReconcileNonces", lastReconcileNonces,
-		"noncesPerMin", noncesPerMin,
-		"timeSinceLastReconcile", timeSinceLastReconcile,
-	)
 
 	if cnc.noncesPerMinute == 0 {
 		// initialize nonces per minute for weighted average

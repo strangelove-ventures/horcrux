@@ -48,7 +48,7 @@ func TestNonceCacheDemand(t *testing.T) {
 		&MockLeader{id: 1, leader: &ThresholdValidator{myCosigner: lcs[0]}},
 		500*time.Millisecond,
 		100*time.Millisecond,
-		1*time.Second,
+		5*time.Second,
 		2,
 		mp,
 	)
