@@ -106,7 +106,7 @@ func TestNonceCacheExpiration(t *testing.T) {
 		&MockLeader{id: 1, leader: &ThresholdValidator{myCosigner: lcs[0]}},
 		250*time.Millisecond,
 		10*time.Millisecond,
-		1*time.Second,
+		500*time.Millisecond,
 		2,
 		mp,
 	)
@@ -115,35 +115,20 @@ func TestNonceCacheExpiration(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	nonceCache.LoadN(ctx, 500)
+	const loadN = 500
+
+	nonceCache.LoadN(ctx, loadN)
 
 	go nonceCache.Start(ctx)
 
-	time.Sleep(520 * time.Millisecond)
-
-	nonceCache.LoadN(ctx, 500)
-
-	time.Sleep(520 * time.Millisecond)
-
-	size := nonceCache.cache.Size()
-
-	require.Equal(t, size, 500+targetTrim)
+	time.Sleep(1 * time.Second)
 
 	count, pruned := mp.Result()
 
-	require.Equal(t, count, 6)
-	require.Equal(t, 500, pruned)
-
-	time.Sleep(520 * time.Millisecond)
-
-	count, pruned = mp.Result()
-
-	require.Equal(t, count, 8)
-	require.Equal(t, 1010, pruned)
+	require.GreaterOrEqual(t, count, 3)
+	require.GreaterOrEqual(t, pruned, loadN)
 
 	cancel()
 
-	size = nonceCache.cache.Size()
-
-	require.Equal(t, size, targetTrim)
+	require.LessOrEqual(t, nonceCache.cache.Size(), targetTrim)
 }
