@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNonceCache(t *testing.T) {
+func TestNonceCache(_ *testing.T) {
 	nc := NonceCache{}
 	for i := 0; i < 10; i++ {
 		nc.Add(&CachedNonce{UUID: uuid.New(), Expiration: time.Now().Add(1 * time.Second)})
@@ -59,7 +59,7 @@ func TestNonceCacheDemand(t *testing.T) {
 		&MockLeader{id: 1, leader: &ThresholdValidator{myCosigner: lcs[0]}},
 		500*time.Millisecond,
 		100*time.Millisecond,
-		5*time.Second,
+		defaultNonceExpiration,
 		2,
 		mp,
 	)
@@ -119,11 +119,11 @@ func TestNonceCacheExpiration(t *testing.T) {
 
 	go nonceCache.Start(ctx)
 
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(520 * time.Millisecond)
 
 	nonceCache.LoadN(ctx, 500)
 
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(520 * time.Millisecond)
 
 	size := nonceCache.cache.Size()
 
@@ -134,7 +134,7 @@ func TestNonceCacheExpiration(t *testing.T) {
 	require.Equal(t, count, 6)
 	require.Equal(t, 500, pruned)
 
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(520 * time.Millisecond)
 
 	count, pruned = mp.Result()
 
