@@ -8,8 +8,19 @@ import (
 	"time"
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
+
+func TestNonceCache(t *testing.T) {
+	nc := NonceCache{}
+	for i := 0; i < 10; i++ {
+		nc.Add(&CachedNonce{UUID: uuid.New(), Expiration: time.Now().Add(1 * time.Second)})
+	}
+
+	nc.Delete(nc.Size() - 1)
+	nc.Delete(0)
+}
 
 type mockPruner struct {
 	cnc    *CosignerNonceCache
