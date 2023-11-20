@@ -13,7 +13,8 @@ import (
 const (
 	defaultGetNoncesInterval = 3 * time.Second
 	defaultGetNoncesTimeout  = 4 * time.Second
-	nonceCacheExpiration     = 10 * time.Second // half of the local cosigner cache expiration
+	defaultNonceExpiration   = 10 * time.Second // half of the local cosigner cache expiration
+	targetTrim               = 10
 )
 
 type CosignerNonceCache struct {
@@ -28,6 +29,7 @@ type CosignerNonceCache struct {
 
 	getNoncesInterval time.Duration
 	getNoncesTimeout  time.Duration
+	nonceExpiration   time.Duration
 
 	threshold uint8
 
@@ -111,6 +113,7 @@ func NewCosignerNonceCache(
 	leader Leader,
 	getNoncesInterval time.Duration,
 	getNoncesTimeout time.Duration,
+	nonceExpiration time.Duration,
 	threshold uint8,
 	pruner NonceCachePruner,
 ) *CosignerNonceCache {
@@ -120,6 +123,7 @@ func NewCosignerNonceCache(
 		leader:            leader,
 		getNoncesInterval: getNoncesInterval,
 		getNoncesTimeout:  getNoncesTimeout,
+		nonceExpiration:   nonceExpiration,
 		threshold:         threshold,
 		pruner:            pruner,
 	}
@@ -140,12 +144,12 @@ func (cnc *CosignerNonceCache) getUuids(n int) []uuid.UUID {
 }
 
 func (cnc *CosignerNonceCache) target() int {
-	return int((cnc.noncesPerMinute/60)*cnc.getNoncesInterval.Seconds()*1.2) + int(cnc.noncesPerMinute/30) + 10
+	return int((cnc.noncesPerMinute/60)*cnc.getNoncesInterval.Seconds()*1.2) + int(cnc.noncesPerMinute/30) + targetTrim
 }
 
 func (cnc *CosignerNonceCache) reconcile(ctx context.Context) {
 	// prune expired nonces
-	_ = cnc.pruner.PruneNonces()
+	pruned := cnc.pruner.PruneNonces()
 
 	if !cnc.leader.IsLeader() {
 		return
@@ -153,11 +157,18 @@ func (cnc *CosignerNonceCache) reconcile(ctx context.Context) {
 	remainingNonces := cnc.cache.Size()
 	timeSinceLastReconcile := time.Since(cnc.lastReconcileTime)
 
+	lastReconcileNonces := cnc.lastReconcileNonces.Get()
 	// calculate nonces per minute
-	noncesPerMin := float64(cnc.lastReconcileNonces.Get()-remainingNonces) / timeSinceLastReconcile.Minutes()
+	noncesPerMin := float64(lastReconcileNonces-remainingNonces-pruned) / timeSinceLastReconcile.Minutes()
 	if noncesPerMin < 0 {
 		noncesPerMin = 0
 	}
+	cnc.logger.Debug("Reconciling nonces",
+		"remaining", remainingNonces,
+		"lastReconcileNonces", lastReconcileNonces,
+		"noncesPerMin", noncesPerMin,
+		"timeSinceLastReconcile", timeSinceLastReconcile,
+	)
 
 	if cnc.noncesPerMinute == 0 {
 		// initialize nonces per minute for weighted average
@@ -210,7 +221,7 @@ func (cnc *CosignerNonceCache) LoadN(ctx context.Context, n int) {
 	var wg sync.WaitGroup
 	wg.Add(len(cnc.cosigners))
 
-	expiration := time.Now().Add(nonceCacheExpiration)
+	expiration := time.Now().Add(cnc.nonceExpiration)
 
 	for i, p := range cnc.cosigners {
 		i := i
@@ -331,6 +342,11 @@ func (cnc *CosignerNonceCache) PruneNonces() int {
 		if time.Now().Before(cnc.cache.cache[i].Expiration) {
 			nonExpiredIndex = i
 			break
+		}
+		if i == 0 {
+			deleteCount := len(cnc.cache.cache)
+			cnc.cache.cache = nil
+			return deleteCount
 		}
 	}
 	deleteCount := len(cnc.cache.cache) - nonExpiredIndex - 1
