@@ -22,6 +22,52 @@ func TestNonceCache(_ *testing.T) {
 	nc.Delete(0)
 }
 
+func TestClearNonces(t *testing.T) {
+	lcs, _ := getTestLocalCosigners(t, 2, 3)
+	cosigners := make([]Cosigner, len(lcs))
+	for i, lc := range lcs {
+		cosigners[i] = lc
+	}
+
+	cnc := CosignerNonceCache{
+		threshold: 2,
+	}
+
+	for i := 0; i < 10; i++ {
+		// When deleting nonce for cosigner 1 ([0]),
+		// these nonce will drop below threshold and be deleted.
+		cnc.cache.Add(&CachedNonce{
+			UUID:       uuid.New(),
+			Expiration: time.Now().Add(1 * time.Second),
+			Nonces: []CosignerNoncesRel{
+				{Cosigner: cosigners[0]},
+				{Cosigner: cosigners[1]},
+			},
+		})
+		// When deleting nonce for cosigner 1 ([0]), these nonces will still be above threshold,
+		// so they will remain without cosigner 1.
+		cnc.cache.Add(&CachedNonce{
+			UUID:       uuid.New(),
+			Expiration: time.Now().Add(1 * time.Second),
+			Nonces: []CosignerNoncesRel{
+				{Cosigner: cosigners[0]},
+				{Cosigner: cosigners[1]},
+				{Cosigner: cosigners[2]},
+			},
+		})
+	}
+
+	require.Equal(t, 20, cnc.cache.Size())
+
+	cnc.ClearNonces(cosigners[0])
+
+	require.Equal(t, 10, cnc.cache.Size())
+
+	for _, n := range cnc.cache.cache {
+		require.Len(t, n.Nonces, 2)
+	}
+}
+
 type mockPruner struct {
 	cnc    *CosignerNonceCache
 	count  int
