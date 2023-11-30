@@ -13,7 +13,7 @@ import (
 	cometservice "github.com/cometbft/cometbft/libs/service"
 )
 
-func RequireNotRunning(pidFilePath string) error {
+func RequireNotRunning(log cometlog.Logger, pidFilePath string) error {
 	if _, err := os.Stat(pidFilePath); err != nil {
 		if os.IsNotExist(err) {
 			// lock file does not exist, can continue starting daemon
@@ -41,8 +41,7 @@ func RequireNotRunning(pidFilePath string) error {
 
 	process, err := os.FindProcess(int(pid))
 	if err != nil {
-		return fmt.Errorf(`unclean shutdown detected. PID file exists at %s but PID %d can not be found.
-manual deletion of PID file required. %w`, pidFilePath, pid, err)
+		return fmt.Errorf("error checking pid %d: %w", pid, err)
 	}
 
 	err = process.Signal(syscall.Signal(0))
@@ -50,8 +49,16 @@ manual deletion of PID file required. %w`, pidFilePath, pid, err)
 		return fmt.Errorf("horcrux is already running on PID: %d", pid)
 	}
 	if errors.Is(err, os.ErrProcessDone) {
-		return fmt.Errorf(`unclean shutdown detected. PID file exists at %s but PID %d is not running.
-manual deletion of PID file required`, pidFilePath, pid)
+		log.Error(
+			"Unclean shutdown detected. PID file exists at but process with that ID cannot be found. Removing lock file",
+			"pid", pid,
+			"pid_file", pidFilePath,
+			"error", err,
+		)
+		if err := os.Remove(pidFilePath); err != nil {
+			return fmt.Errorf("failed to delete pid file %s: %w", pidFilePath, err)
+		}
+		return nil
 	}
 
 	errno, ok := err.(syscall.Errno)
