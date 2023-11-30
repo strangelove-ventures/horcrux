@@ -17,18 +17,17 @@ func startCmd() *cobra.Command {
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			err := signer.RequireNotRunning(config.PidFile)
+			out := cmd.OutOrStdout()
+			logger := cometlog.NewTMLogger(cometlog.NewSyncWriter(out))
+
+			err := signer.RequireNotRunning(logger, config.PidFile)
 			if err != nil {
 				return err
 			}
 
-			out := cmd.OutOrStdout()
-
 			if _, err := legacyConfig(); err == nil {
 				return fmt.Errorf("this is a legacy config. run `horcrux config migrate` to migrate to the latest format")
 			}
-
-			logger := cometlog.NewTMLogger(cometlog.NewSyncWriter(out))
 
 			// create all directories up to the state directory
 			if err = os.MkdirAll(config.StateDir, 0700); err != nil {

@@ -14,6 +14,7 @@ import (
 	"github.com/strangelove-ventures/horcrux/signer"
 
 	cometjson "github.com/cometbft/cometbft/libs/json"
+	cometlog "github.com/cometbft/cometbft/libs/log"
 )
 
 // Snippet Taken from https://raw.githubusercontent.com/cometbft/cometbft/main/privval/file.go
@@ -82,6 +83,9 @@ func setStateCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			chainID := args[0]
 
+			out := cmd.OutOrStdout()
+			logger := cometlog.NewTMLogger(cometlog.NewSyncWriter(out))
+
 			if _, err := os.Stat(config.HomeDir); os.IsNotExist(err) {
 				cmd.SilenceUsage = false
 				return fmt.Errorf("%s does not exist, initialize config with horcrux config init and try again", config.HomeDir)
@@ -89,7 +93,7 @@ func setStateCmd() *cobra.Command {
 
 			// Resetting the priv_validator_state.json should only be allowed if the
 			// signer is not running.
-			if err := signer.RequireNotRunning(config.PidFile); err != nil {
+			if err := signer.RequireNotRunning(logger, config.PidFile); err != nil {
 				return err
 			}
 
@@ -109,7 +113,7 @@ func setStateCmd() *cobra.Command {
 				return err
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "Setting height %d\n", height)
+			fmt.Fprintf(out, "Setting height %d\n", height)
 
 			pv.NoncePublic, cs.NoncePublic = nil, nil
 			signState := signer.SignStateConsensus{
@@ -150,9 +154,12 @@ func importStateCmd() *cobra.Command {
 				return fmt.Errorf("%s does not exist, initialize config with horcrux config init and try again", config.HomeDir)
 			}
 
+			out := cmd.OutOrStdout()
+			logger := cometlog.NewTMLogger(cometlog.NewSyncWriter(out))
+
 			// Resetting the priv_validator_state.json should only be allowed if the
 			// signer is not running.
-			if err := signer.RequireNotRunning(config.PidFile); err != nil {
+			if err := signer.RequireNotRunning(logger, config.PidFile); err != nil {
 				return err
 			}
 
@@ -170,11 +177,11 @@ func importStateCmd() *cobra.Command {
 
 			// Allow user to paste in priv_validator_state.json
 
-			fmt.Println("IMPORTANT: Your validator should already be STOPPED.  You must copy the latest state..")
+			fmt.Fprintln(out, "IMPORTANT: Your validator should already be STOPPED.  You must copy the latest state..")
 			<-time.After(2 * time.Second)
-			fmt.Println("")
-			fmt.Println("Paste your old priv_validator_state.json.  Input a blank line after the pasted JSON to continue.")
-			fmt.Println("")
+			fmt.Fprintln(out, "")
+			fmt.Fprintln(out, "Paste your old priv_validator_state.json.  Input a blank line after the pasted JSON to continue.")
+			fmt.Fprintln(out, "")
 
 			var textBuffer strings.Builder
 

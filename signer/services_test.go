@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -72,7 +71,7 @@ func TestIsRunning(t *testing.T) {
 	pidBz, err := os.ReadFile(pidFilePath)
 	require.NoError(t, err)
 
-	err = signer.RequireNotRunning(pidFilePath)
+	err = signer.RequireNotRunning(cometlog.NewNopLogger(), pidFilePath)
 	expectedErrorMsg := fmt.Sprintf("horcrux is already running on PID: %s", strings.TrimSpace(string(pidBz)))
 	require.EqualError(t, err, expectedErrorMsg)
 }
@@ -81,20 +80,26 @@ func TestIsNotRunning(t *testing.T) {
 	homeDir := t.TempDir()
 	pidFilePath := filepath.Join(homeDir, "horcrux.pid")
 
-	err := signer.RequireNotRunning(pidFilePath)
+	err := signer.RequireNotRunning(cometlog.NewNopLogger(), pidFilePath)
 	require.NoError(t, err)
 }
 
-func getNonExistentPid() (int, error) {
+func maxPid() int {
+	const defaultMaxPid = 100000
 	maxPidBytes, err := os.ReadFile("/proc/sys/kernel/pid_max")
 	if err != nil {
-		return -1, err
+		return defaultMaxPid
 	}
-	maxPid, err := strconv.ParseUint(strings.TrimSpace(string(maxPidBytes)), 10, 64)
+	maxPid, err := strconv.ParseInt(strings.TrimSpace(string(maxPidBytes)), 10, 32)
 	if err != nil {
-		return -1, err
+		return defaultMaxPid
 	}
-	for pid := 1; pid <= int(maxPid); pid++ {
+	return int(maxPid)
+}
+
+func getUnusedPid() (int, error) {
+	max := maxPid()
+	for pid := 1; pid <= max; pid++ {
 		process, err := os.FindProcess(pid)
 		if err != nil {
 			continue
@@ -106,26 +111,15 @@ func getNonExistentPid() (int, error) {
 		if errors.Is(err, os.ErrProcessDone) {
 			return pid, nil
 		}
-		errno, ok := err.(syscall.Errno)
-		if !ok {
-			continue
-		}
-		if errno == syscall.ESRCH {
-			return pid, nil
-		}
 	}
 	return -1, errors.New("could not find unused PID")
 }
 
 func TestIsRunningNonExistentPid(t *testing.T) {
-	if runtime.GOOS != "linux" {
-		t.Skip("test only valid on Linux")
-	}
-
 	homeDir := t.TempDir()
 	pidFilePath := filepath.Join(homeDir, "horcrux.pid")
 
-	pid, err := getNonExistentPid()
+	pid, err := getUnusedPid()
 	require.NoError(t, err)
 
 	err = os.WriteFile(
@@ -135,10 +129,11 @@ func TestIsRunningNonExistentPid(t *testing.T) {
 	)
 	require.NoError(t, err, "error writing pid file")
 
-	err = signer.RequireNotRunning(pidFilePath)
-	expectedErrorMsg := fmt.Sprintf(`unclean shutdown detected. PID file exists at %s but PID %d is not running.
-manual deletion of PID file required`, pidFilePath, pid)
-	require.EqualError(t, err, expectedErrorMsg)
+	err = signer.RequireNotRunning(cometlog.NewNopLogger(), pidFilePath)
+	require.Nil(t, err)
+
+	_, err = os.Stat(pidFilePath)
+	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
 func TestConcurrentStart(t *testing.T) {
@@ -216,7 +211,7 @@ func TestIsRunningAndWaitForService(t *testing.T) {
 	}
 	panicFunction := func() {
 		defer recoverFromPanic()
-		err = signer.RequireNotRunning(pidFilePath)
+		err = signer.RequireNotRunning(cometlog.NewNopLogger(), pidFilePath)
 	}
 	go panicFunction()
 	wg.Wait()

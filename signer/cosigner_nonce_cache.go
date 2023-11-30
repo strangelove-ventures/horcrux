@@ -353,12 +353,14 @@ func (cnc *CosignerNonceCache) PruneNonces() int {
 func (cnc *CosignerNonceCache) ClearNonces(cosigner Cosigner) {
 	cnc.cache.mu.Lock()
 	defer cnc.cache.mu.Unlock()
-	for i, cn := range cnc.cache.cache {
+	for i := 0; i < len(cnc.cache.cache); i++ {
+		cn := cnc.cache.cache[i]
+
 		deleteID := -1
-		for i, n := range cn.Nonces {
+		for j, n := range cn.Nonces {
 			if n.Cosigner.GetID() == cosigner.GetID() {
 				// remove cosigner from this nonce.
-				deleteID = i
+				deleteID = j
 				break
 			}
 		}
@@ -366,6 +368,7 @@ func (cnc *CosignerNonceCache) ClearNonces(cosigner Cosigner) {
 			if len(cn.Nonces)-1 < int(cnc.threshold) {
 				// If cosigners on this nonce drops below threshold, delete it as it's no longer usable
 				cnc.cache.Delete(i)
+				i--
 			} else {
 				cn.Nonces = append(cn.Nonces[:deleteID], cn.Nonces[deleteID+1:]...)
 			}
