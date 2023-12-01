@@ -14,7 +14,6 @@ const (
 	defaultGetNoncesInterval = 3 * time.Second
 	defaultGetNoncesTimeout  = 4 * time.Second
 	defaultNonceExpiration   = 10 * time.Second // half of the local cosigner cache expiration
-	targetTrim               = 10
 )
 
 type CosignerNonceCache struct {
@@ -25,7 +24,6 @@ type CosignerNonceCache struct {
 
 	lastReconcileNonces lastCount
 	lastReconcileTime   time.Time
-	noncesPerMinute     float64
 
 	getNoncesInterval time.Duration
 	getNoncesTimeout  time.Duration
@@ -36,6 +34,53 @@ type CosignerNonceCache struct {
 	cache NonceCache
 
 	pruner NonceCachePruner
+
+	movingAverage *movingAverage
+
+	empty chan struct{}
+}
+
+type movingAverageItem struct {
+	timeSinceLastReconcile time.Duration
+	noncesPerMinute        float64
+}
+
+type movingAverage struct {
+	items  []movingAverageItem
+	period time.Duration
+}
+
+func newMovingAverage(period time.Duration) *movingAverage {
+	return &movingAverage{period: period}
+}
+
+func (m *movingAverage) add(
+	timeSinceLastReconcile time.Duration,
+	noncesPerMinute float64,
+) {
+	duration := timeSinceLastReconcile
+	keep := len(m.items) - 1
+	for i, e := range m.items {
+		duration += e.timeSinceLastReconcile
+		if duration >= m.period {
+			keep = i
+			break
+		}
+	}
+	m.items = append([]movingAverageItem{{timeSinceLastReconcile: timeSinceLastReconcile, noncesPerMinute: noncesPerMinute}}, m.items[:keep+1]...)
+}
+
+func (m *movingAverage) average() float64 {
+	weightedSum := float64(0)
+	duration := float64(0)
+
+	for _, e := range m.items {
+		d := float64(e.timeSinceLastReconcile)
+		weightedSum += e.noncesPerMinute * d
+		duration += d
+	}
+
+	return weightedSum / duration
 }
 
 type lastCount struct {
@@ -126,6 +171,8 @@ func NewCosignerNonceCache(
 		nonceExpiration:   nonceExpiration,
 		threshold:         threshold,
 		pruner:            pruner,
+		empty:             make(chan struct{}, 1),
+		movingAverage:     newMovingAverage(4 * getNoncesInterval), // weighted average over 4 intervals
 	}
 	// the only time pruner is expected to be non-nil is during tests, otherwise we use the cache logic.
 	if pruner == nil {
@@ -143,8 +190,12 @@ func (cnc *CosignerNonceCache) getUuids(n int) []uuid.UUID {
 	return uuids
 }
 
-func (cnc *CosignerNonceCache) target() int {
-	return int((cnc.noncesPerMinute/60)*cnc.getNoncesInterval.Seconds()*1.2) + int(cnc.noncesPerMinute/30) + targetTrim
+func (cnc *CosignerNonceCache) target(noncesPerMinute float64) int {
+	t := int((noncesPerMinute / 60) * ((cnc.getNoncesInterval.Seconds() * 1.2) + 0.5))
+	if t <= 0 {
+		return 1 // always target at least one nonce ready
+	}
+	return t
 }
 
 func (cnc *CosignerNonceCache) reconcile(ctx context.Context) {
@@ -164,33 +215,31 @@ func (cnc *CosignerNonceCache) reconcile(ctx context.Context) {
 		noncesPerMin = 0
 	}
 
-	if cnc.noncesPerMinute == 0 {
-		// initialize nonces per minute for weighted average
-		cnc.noncesPerMinute = noncesPerMin
-	} else {
-		// weighted average over last 4 intervals
-		cnc.noncesPerMinute = (cnc.noncesPerMinute*3 + noncesPerMin) / 4
-	}
-
-	defer func() {
-		cnc.lastReconcileNonces.Set(cnc.cache.Size())
-		cnc.lastReconcileTime = time.Now()
-	}()
+	cnc.movingAverage.add(timeSinceLastReconcile, noncesPerMin)
 
 	// calculate how many nonces we need to load to keep up with demand
 	// load 120% the number of nonces we need to keep up with demand,
 	// plus a couple seconds worth of nonces to account for nonce consumption during LoadN
 	// plus 10 for padding
 
-	t := cnc.target()
+	avgNoncesPerMin := cnc.movingAverage.average()
+	t := cnc.target(avgNoncesPerMin)
 	additional := t - remainingNonces
+
+	defer func() {
+		cnc.lastReconcileNonces.Set(remainingNonces + additional)
+		cnc.lastReconcileTime = time.Now()
+	}()
+
 	if additional <= 0 {
+		additional = 0
 		// we're ahead of demand, don't load any more
 		cnc.logger.Debug(
 			"Cosigner nonce cache ahead of demand",
 			"target", t,
 			"remaining", remainingNonces,
-			"noncesPerMin", cnc.noncesPerMinute,
+			"nonces_per_min", noncesPerMin,
+			"avg_nonces_per_min", avgNoncesPerMin,
 		)
 		return
 	}
@@ -200,7 +249,8 @@ func (cnc *CosignerNonceCache) reconcile(ctx context.Context) {
 		"target", t,
 		"remaining", remainingNonces,
 		"additional", additional,
-		"noncesPerMin", cnc.noncesPerMinute,
+		"nonces_per_min", noncesPerMin,
+		"avg_nonces_per_min", avgNoncesPerMin,
 	)
 
 	cnc.LoadN(ctx, additional)
@@ -282,6 +332,8 @@ func (cnc *CosignerNonceCache) Start(ctx context.Context) {
 			return
 		case <-ticker.C:
 			cnc.reconcile(ctx)
+		case <-cnc.empty:
+			cnc.reconcile(ctx)
 		}
 	}
 }
@@ -309,6 +361,11 @@ CheckNoncesLoop:
 
 		// remove this set of nonces from the cache
 		cnc.cache.Delete(i)
+
+		if len(cnc.cache.cache) == 0 {
+			cnc.logger.Debug("Nonce cache is empty, triggering reload")
+			cnc.empty <- struct{}{}
+		}
 
 		// all peers found
 		return &CosignerUUIDNonces{
