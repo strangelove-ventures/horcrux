@@ -287,5 +287,5 @@ func TestNonceCacheDemandSlowDefault(t *testing.T) {
 
 	cancel()
 
-	require.LessOrEqual(t, nonceCache.cache.Size(), nonceCache.target(nonceCache.movingAverage.average()))
+	require.LessOrEqual(t, nonceCache.cache.Size(), nonceCache.target(60/7))
 }
