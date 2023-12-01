@@ -22,6 +22,39 @@ func TestNonceCache(_ *testing.T) {
 	nc.Delete(0)
 }
 
+func TestMovingAverage(t *testing.T) {
+	ma := newMovingAverage(12 * time.Second)
+
+	ma.add(3*time.Second, 500)
+	require.Len(t, ma.items, 1)
+	require.Equal(t, float64(500), ma.average())
+
+	ma.add(3*time.Second, 100)
+	require.Len(t, ma.items, 2)
+	require.Equal(t, float64(300), ma.average())
+
+	ma.add(6*time.Second, 600)
+	require.Len(t, ma.items, 3)
+	require.Equal(t, float64(450), ma.average())
+
+	// should kick out the first one
+	ma.add(3*time.Second, 500)
+	require.Len(t, ma.items, 3)
+	require.Equal(t, float64(450), ma.average())
+
+	// should kick out the second one
+	ma.add(6*time.Second, 500)
+	require.Len(t, ma.items, 3)
+	require.Equal(t, float64(540), ma.average())
+
+	for i := 0; i < 5; i++ {
+		ma.add(2500*time.Millisecond, 1000)
+	}
+
+	require.Len(t, ma.items, 5)
+	require.Equal(t, float64(1000), ma.average())
+}
+
 func TestClearNonces(t *testing.T) {
 	lcs, _ := getTestLocalCosigners(t, 2, 3)
 	cosigners := make([]Cosigner, len(lcs))
@@ -131,10 +164,12 @@ func TestNonceCacheDemand(t *testing.T) {
 
 	cancel()
 
-	require.LessOrEqual(t, size, nonceCache.target())
+	require.LessOrEqual(t, size, nonceCache.target(nonceCache.movingAverage.average()))
 
-	require.Greater(t, mp.count, 0)
-	require.Equal(t, 0, mp.pruned)
+	count, pruned := mp.Result()
+
+	require.Greater(t, count, 0)
+	require.Equal(t, 0, pruned)
 }
 
 func TestNonceCacheExpiration(t *testing.T) {
@@ -180,6 +215,77 @@ func TestNonceCacheExpiration(t *testing.T) {
 
 	cancel()
 
-	// the cache should have at most the trim padding since no nonces are being consumed.
-	require.LessOrEqual(t, nonceCache.cache.Size(), targetTrim)
+	// the cache should be empty or 1 since no nonces are being consumed.
+	require.LessOrEqual(t, nonceCache.cache.Size(), 1)
+}
+
+func TestNonceCacheDemandSlow(t *testing.T) {
+	lcs, _ := getTestLocalCosigners(t, 2, 3)
+	cosigners := make([]Cosigner, len(lcs))
+	for i, lc := range lcs {
+		cosigners[i] = lc
+	}
+
+	nonceCache := NewCosignerNonceCache(
+		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)),
+		cosigners,
+		&MockLeader{id: 1, leader: &ThresholdValidator{myCosigner: lcs[0]}},
+		90*time.Millisecond,
+		100*time.Millisecond,
+		500*time.Millisecond,
+		2,
+		nil,
+	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go nonceCache.Start(ctx)
+
+	for i := 0; i < 10; i++ {
+		time.Sleep(200 * time.Millisecond)
+		require.Greater(t, nonceCache.cache.Size(), 0)
+		_, err := nonceCache.GetNonces([]Cosigner{cosigners[0], cosigners[1]})
+		require.NoError(t, err)
+	}
+
+	cancel()
+
+	require.LessOrEqual(t, nonceCache.cache.Size(), nonceCache.target(300))
+}
+
+func TestNonceCacheDemandSlowDefault(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	lcs, _ := getTestLocalCosigners(t, 2, 3)
+	cosigners := make([]Cosigner, len(lcs))
+	for i, lc := range lcs {
+		cosigners[i] = lc
+	}
+
+	nonceCache := NewCosignerNonceCache(
+		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)),
+		cosigners,
+		&MockLeader{id: 1, leader: &ThresholdValidator{myCosigner: lcs[0]}},
+		defaultGetNoncesInterval,
+		defaultGetNoncesTimeout,
+		defaultNonceExpiration,
+		2,
+		nil,
+	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go nonceCache.Start(ctx)
+
+	for i := 0; i < 10; i++ {
+		time.Sleep(7 * time.Second)
+		require.Greater(t, nonceCache.cache.Size(), 0)
+		_, err := nonceCache.GetNonces([]Cosigner{cosigners[0], cosigners[1]})
+		require.NoError(t, err)
+	}
+
+	cancel()
+
+	require.LessOrEqual(t, nonceCache.cache.Size(), nonceCache.target(60/7))
 }

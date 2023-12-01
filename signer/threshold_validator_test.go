@@ -400,6 +400,8 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 
 		err := tv.LoadSignStateIfNecessary(testChainID)
 		require.NoError(t, err)
+
+		require.NoError(t, tv.Start(ctx))
 	}
 
 	quit := make(chan bool)
