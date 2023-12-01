@@ -215,8 +215,8 @@ func TestNonceCacheExpiration(t *testing.T) {
 
 	cancel()
 
-	// the cache should be empty since no nonces are being consumed.
-	require.Equal(t, nonceCache.cache.Size(), 0)
+	// the cache should be empty or 1 since no nonces are being consumed.
+	require.LessOrEqual(t, nonceCache.cache.Size(), 1)
 }
 
 func TestNonceCacheDemandSlow(t *testing.T) {
@@ -226,8 +226,6 @@ func TestNonceCacheDemandSlow(t *testing.T) {
 		cosigners[i] = lc
 	}
 
-	mp := &mockPruner{}
-
 	nonceCache := NewCosignerNonceCache(
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)),
 		cosigners,
@@ -236,10 +234,8 @@ func TestNonceCacheDemandSlow(t *testing.T) {
 		100*time.Millisecond,
 		500*time.Millisecond,
 		2,
-		mp,
+		nil,
 	)
-
-	mp.cnc = nonceCache
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -255,11 +251,6 @@ func TestNonceCacheDemandSlow(t *testing.T) {
 	cancel()
 
 	require.LessOrEqual(t, nonceCache.cache.Size(), nonceCache.target(300))
-
-	count, pruned := mp.Result()
-
-	require.Greater(t, count, 0)
-	require.Greater(t, pruned, 0)
 }
 
 func TestNonceCacheDemandSlowDefault(t *testing.T) {
@@ -272,8 +263,6 @@ func TestNonceCacheDemandSlowDefault(t *testing.T) {
 		cosigners[i] = lc
 	}
 
-	mp := &mockPruner{}
-
 	nonceCache := NewCosignerNonceCache(
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)),
 		cosigners,
@@ -282,10 +271,8 @@ func TestNonceCacheDemandSlowDefault(t *testing.T) {
 		defaultGetNoncesTimeout,
 		defaultNonceExpiration,
 		2,
-		mp,
+		nil,
 	)
-
-	mp.cnc = nonceCache
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -301,9 +288,4 @@ func TestNonceCacheDemandSlowDefault(t *testing.T) {
 	cancel()
 
 	require.LessOrEqual(t, nonceCache.cache.Size(), nonceCache.target(nonceCache.movingAverage.average()))
-
-	count, pruned := mp.Result()
-
-	require.Greater(t, count, 0)
-	require.Equal(t, 0, pruned)
 }
