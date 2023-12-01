@@ -67,7 +67,10 @@ func (m *movingAverage) add(
 			break
 		}
 	}
-	m.items = append([]movingAverageItem{{timeSinceLastReconcile: timeSinceLastReconcile, noncesPerMinute: noncesPerMinute}}, m.items[:keep+1]...)
+	m.items = append(
+		[]movingAverageItem{{timeSinceLastReconcile: timeSinceLastReconcile, noncesPerMinute: noncesPerMinute}},
+		m.items[:keep+1]...,
+	)
 }
 
 func (m *movingAverage) average() float64 {
