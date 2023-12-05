@@ -1,4 +1,4 @@
-package signer
+package types
 
 import (
 	"github.com/strangelove-ventures/horcrux/signer/proto"
@@ -60,7 +60,7 @@ func HRSTKeyFromProto(hrs *proto.HRST) HRSTKey {
 	}
 }
 
-func (hrst HRSTKey) toProto() *proto.HRST {
+func (hrst HRSTKey) ToProto() *proto.HRST {
 	return &proto.HRST{
 		Height:    hrst.Height,
 		Round:     hrst.Round,

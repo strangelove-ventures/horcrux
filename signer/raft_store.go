@@ -10,6 +10,7 @@ package signer
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 	"io"
 	"net"
 	"net/url"
@@ -306,7 +307,7 @@ func (s *RaftStore) GetLeader() int {
 	return id
 }
 
-func (s *RaftStore) ShareSigned(lss ChainSignStateConsensus) error {
+func (s *RaftStore) ShareSigned(lss types.ChainSignStateConsensus) error {
 	return s.Emit(raftEventLSS, lss)
 }
 

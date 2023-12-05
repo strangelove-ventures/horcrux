@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/strangelove-ventures/horcrux/pkg/types"
+
 	"github.com/cometbft/cometbft/libs/log"
 	cometrpcjsontypes "github.com/cometbft/cometbft/rpc/jsonrpc/types"
 	"github.com/google/uuid"
@@ -51,11 +53,11 @@ type ThresholdValidator struct {
 type ChainSignState struct {
 	// stores the last sign state for a block we have fully signed
 	// Cached to respond to SignVote requests if we already have a signature
-	lastSignState      *SignState
+	lastSignState      *types.SignState
 	lastSignStateMutex *sync.Mutex
 
 	// stores the last sign state that we've started progress on
-	lastSignStateInitiated      *SignState
+	lastSignStateInitiated      *types.SignState
 	lastSignStateInitiatedMutex *sync.Mutex
 }
 
@@ -119,7 +121,7 @@ func (pv *ThresholdValidator) Start(ctx context.Context) error {
 // sign process if it is greater than the current high watermark. A mutex is used to avoid concurrent
 // state updates. The disk write is scheduled in a separate goroutine which will perform an atomic write.
 // pendingDiskWG is used upon termination in pendingDiskWG to ensure all writes have completed.
-func (pv *ThresholdValidator) SaveLastSignedState(chainID string, signState SignStateConsensus) error {
+func (pv *ThresholdValidator) SaveLastSignedState(chainID string, signState types.SignStateConsensus) error {
 	css := pv.mustLoadChainState(chainID)
 
 	css.lastSignStateMutex.Lock()
@@ -145,12 +147,12 @@ func (pv *ThresholdValidator) mustLoadChainState(chainID string) ChainSignState 
 // sign process if it is greater than the current high watermark. A mutex is used to avoid concurrent
 // state updates. The disk write is scheduled in a separate goroutine which will perform an atomic write.
 // pendingDiskWG is used upon termination in pendingDiskWG to ensure all writes have completed.
-func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, block *Block) ([]byte, time.Time, error) {
+func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, block *types.Block) ([]byte, time.Time, error) {
 	css := pv.mustLoadChainState(chainID)
 
 	height, round, step := block.Height, block.Round, block.Step
 
-	err := css.lastSignStateInitiated.Save(NewSignStateConsensus(height, round, step), &pv.pendingDiskWG)
+	err := css.lastSignStateInitiated.Save(types.NewSignStateConsensus(height, round, step), &pv.pendingDiskWG)
 	if err == nil {
 		// good to sign
 		return nil, time.Time{}, nil
@@ -159,7 +161,7 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, block
 	// There was an error saving the last sign state, so check if there is an existing signature for this block.
 	existingSignature, existingTimestamp, sameBlockErr := pv.getExistingBlockSignature(chainID, block)
 
-	if _, ok := err.(*SameHRSError); !ok {
+	if _, ok := err.(*types.SameHRSError); !ok {
 		if sameBlockErr == nil {
 			return existingSignature, block.Timestamp, nil
 		}
@@ -189,14 +191,14 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, block
 	// intended usage of cond lock prior to cond.Wait().
 	// cond.Wait() will unlock cond.L while it blocks waiting, then re-lock when unblocking from
 	// the cond.Broadcast().
-	css.lastSignState.cond.L.Lock()
-	defer css.lastSignState.cond.L.Unlock()
+	css.lastSignState.Cond.L.Lock()
+	defer css.lastSignState.Cond.L.Unlock()
 	for i := 0; i < pv.maxWaitForSameBlockAttempts; i++ {
 		// block until sign state is saved. It will notify and unblock when block is next signed.
-		css.lastSignState.cond.WaitWithTimeout(pv.grpcTimeout)
+		css.lastSignState.Cond.WaitWithTimeout(pv.grpcTimeout)
 
 		// check if HRS exists in cache now
-		ssc, ok := css.lastSignState.cache[block.HRSKey()]
+		ssc, ok := css.lastSignState.Cache[block.HRSKey()]
 		if !ok {
 			pv.logger.Debug(
 				"Block does not yet exist in cache while waiting for signature",
@@ -239,19 +241,20 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, block
 
 // notifyBlockSignError will alert any waiting goroutines that an error
 // has occurred during signing and a retry can be attempted.
-func (pv *ThresholdValidator) notifyBlockSignError(chainID string, hrs HRSKey, signBytes []byte) {
+func (pv *ThresholdValidator) notifyBlockSignError(chainID string, hrs types.HRSKey, signBytes []byte) {
 	css := pv.mustLoadChainState(chainID)
 
-	css.lastSignState.mu.Lock()
-	css.lastSignState.cache[hrs] = SignStateConsensus{
+	css.lastSignState.Lock() // Call alias lock function.
+	css.lastSignState.Cache[hrs] = types.SignStateConsensus{
 		Height: hrs.Height,
 		Round:  hrs.Round,
 		Step:   hrs.Step,
 		// empty signature to indicate error
 		SignBytes: signBytes,
 	}
-	css.lastSignState.mu.Unlock()
-	css.lastSignState.cond.Broadcast()
+
+	css.lastSignState.Unlock()
+	css.lastSignState.Cond.Broadcast()
 }
 
 // Stop safely shuts down the ThresholdValidator.
@@ -276,43 +279,8 @@ func (pv *ThresholdValidator) GetPubKey(_ context.Context, chainID string) ([]by
 	return pubKey.Bytes(), nil
 }
 
-type Block struct {
-	Height    int64
-	Round     int64
-	Step      int8
-	SignBytes []byte
-	Timestamp time.Time
-}
-
-func (block Block) HRSKey() HRSKey {
-	return HRSKey{
-		Height: block.Height,
-		Round:  block.Round,
-		Step:   block.Step,
-	}
-}
-
-func (block Block) HRSTKey() HRSTKey {
-	return HRSTKey{
-		Height:    block.Height,
-		Round:     block.Round,
-		Step:      block.Step,
-		Timestamp: block.Timestamp.UnixNano(),
-	}
-}
-
-func (block Block) ToProto() *proto.Block {
-	return &proto.Block{
-		Height:    block.Height,
-		Round:     block.Round,
-		Step:      int32(block.Step),
-		SignBytes: block.SignBytes,
-		Timestamp: block.Timestamp.UnixNano(),
-	}
-}
-
-func BlockFromProto(block *proto.Block) Block {
-	return Block{
+func BlockFromProto(block *proto.Block) types.Block {
+	return types.Block{
 		Height:    block.Height,
 		Round:     block.Round,
 		Step:      int8(block.Step),
@@ -327,7 +295,7 @@ type BeyondBlockError struct {
 
 func (e *BeyondBlockError) Error() string { return e.msg }
 
-func (pv *ThresholdValidator) newBeyondBlockError(chainID string, hrs HRSKey) *BeyondBlockError {
+func (pv *ThresholdValidator) newBeyondBlockError(chainID string, hrs types.HRSKey) *BeyondBlockError {
 	css := pv.mustLoadChainState(chainID)
 
 	lss := css.lastSignStateInitiated
@@ -346,7 +314,7 @@ type StillWaitingForBlockError struct {
 
 func (e *StillWaitingForBlockError) Error() string { return e.msg }
 
-func newStillWaitingForBlockError(chainID string, hrs HRSKey) *StillWaitingForBlockError {
+func newStillWaitingForBlockError(chainID string, hrs types.HRSKey) *StillWaitingForBlockError {
 	return &StillWaitingForBlockError{
 		msg: fmt.Sprintf("[%s] Still waiting for block %d.%d.%d",
 			chainID, hrs.Height, hrs.Round, hrs.Step),
@@ -359,7 +327,7 @@ type SameBlockError struct {
 
 func (e *SameBlockError) Error() string { return e.msg }
 
-func newSameBlockError(chainID string, hrs HRSKey) *SameBlockError {
+func newSameBlockError(chainID string, hrs types.HRSKey) *SameBlockError {
 	return &SameBlockError{
 		msg: fmt.Sprintf("[%s] Same block: %d.%d.%d",
 			chainID, hrs.Height, hrs.Round, hrs.Step),
@@ -371,13 +339,13 @@ func (pv *ThresholdValidator) LoadSignStateIfNecessary(chainID string) error {
 		return nil
 	}
 
-	signState, err := LoadOrCreateSignState(pv.config.PrivValStateFile(chainID))
+	signState, err := types.LoadOrCreateSignState(pv.config.PrivValStateFile(chainID))
 	if err != nil {
 		return err
 	}
 
 	lastSignStateInitiated := signState.FreshCache()
-	lastSignStateInitiated.filePath = os.DevNull
+	lastSignStateInitiated.FilePath = os.DevNull
 
 	pv.chainState.Store(chainID, ChainSignState{
 		lastSignState:          signState,
@@ -393,7 +361,7 @@ func (pv *ThresholdValidator) LoadSignStateIfNecessary(chainID string) error {
 // getExistingBlockSignature returns the existing block signature and no error if the signature is valid for the block.
 // It returns nil signature and nil error if there is no signature and it's okay to sign (fresh or again).
 // It returns an error if we have already signed a greater block, or if we are still waiting for in in-progress sign.
-func (pv *ThresholdValidator) getExistingBlockSignature(chainID string, block *Block) ([]byte, time.Time, error) {
+func (pv *ThresholdValidator) getExistingBlockSignature(chainID string, block *types.Block) ([]byte, time.Time, error) {
 	css := pv.mustLoadChainState(chainID)
 
 	latestBlock, existingSignature := css.lastSignState.GetFromCache(block.HRSKey())
@@ -418,8 +386,8 @@ func (pv *ThresholdValidator) getExistingBlockSignature(chainID string, block *B
 // if the block sign request is for a proposal or if the bytes to sign are identical.
 func (pv *ThresholdValidator) compareBlockSignatureAgainstSSC(
 	chainID string,
-	block *Block,
-	existingSignature *SignStateConsensus,
+	block *types.Block,
+	existingSignature *types.SignStateConsensus,
 ) ([]byte, time.Time, error) {
 	stamp, signBytes := block.Timestamp, block.SignBytes
 
@@ -430,7 +398,7 @@ func (pv *ThresholdValidator) compareBlockSignatureAgainstSSC(
 	}
 
 	// If a proposal has already been signed for this HRS, or the sign payload is identical, return the existing signature.
-	if block.Step == stepPropose || bytes.Equal(signBytes, existingSignature.SignBytes) {
+	if block.Step == types.StepPropose || bytes.Equal(signBytes, existingSignature.SignBytes) {
 		return existingSignature.Signature, block.Timestamp, nil
 	}
 
@@ -448,8 +416,8 @@ func (pv *ThresholdValidator) compareBlockSignatureAgainstSSC(
 // equal to the block.
 func (pv *ThresholdValidator) compareBlockSignatureAgainstHRS(
 	chainID string,
-	block *Block,
-	hrs HRSKey,
+	block *types.Block,
+	hrs types.HRSKey,
 ) error {
 	blockHRS := block.HRSKey()
 
@@ -556,7 +524,7 @@ func (pv *ThresholdValidator) waitForPeerNonces(
 func (pv *ThresholdValidator) proxyIfNecessary(
 	ctx context.Context,
 	chainID string,
-	block Block,
+	block types.Block,
 ) (bool, []byte, time.Time, error) {
 	height, round, step, stamp := block.Height, block.Round, block.Step, block.Timestamp
 
@@ -611,14 +579,14 @@ func (pv *ThresholdValidator) proxyIfNecessary(
 	return true, signRes.Signature, stamp, nil
 }
 
-func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Block) ([]byte, time.Time, error) {
+func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block types.Block) ([]byte, time.Time, error) {
 	height, round, step, stamp, signBytes := block.Height, block.Round, block.Step, block.Timestamp, block.SignBytes
 
 	log := pv.logger.With(
 		"chain_id", chainID,
 		"height", height,
 		"round", round,
-		"type", signType(step),
+		"type", types.SignType(step),
 	)
 
 	if err := pv.LoadSignStateIfNecessary(chainID); err != nil {
@@ -638,7 +606,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 
 	timeStartSignBlock := time.Now()
 
-	hrst := HRSTKey{
+	hrst := types.HRSTKey{
 		Height:    height,
 		Round:     round,
 		Step:      step,
@@ -811,9 +779,9 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 		return nil, stamp, errors.New("combined signature is not valid")
 	}
 
-	newLss := ChainSignStateConsensus{
+	newLss := types.ChainSignStateConsensus{
 		ChainID: chainID,
-		SignStateConsensus: SignStateConsensus{
+		SignStateConsensus: types.SignStateConsensus{
 			Height:    height,
 			Round:     round,
 			Step:      step,
@@ -829,7 +797,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 	err = css.lastSignState.Save(newLss.SignStateConsensus, &pv.pendingDiskWG)
 	css.lastSignStateMutex.Unlock()
 	if err != nil {
-		if _, isSameHRSError := err.(*SameHRSError); !isSameHRSError {
+		if _, isSameHRSError := err.(*types.SameHRSError); !isSameHRSError {
 
 			pv.notifyBlockSignError(chainID, block.HRSKey(), signBytes)
 			return nil, stamp, fmt.Errorf("error saving last sign state: %w", err)

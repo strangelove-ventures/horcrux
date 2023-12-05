@@ -2,6 +2,7 @@ package signer
 
 import (
 	"context"
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 	"net"
 	"time"
 
@@ -99,7 +100,7 @@ func signAndTrack(
 	logger cometlog.Logger,
 	validator PrivValidator,
 	chainID string,
-	block Block,
+	block types.Block,
 ) ([]byte, time.Time, error) {
 	signature, timestamp, err := validator.Sign(ctx, chainID, block)
 	if err != nil {
@@ -107,7 +108,7 @@ func signAndTrack(
 		case *BeyondBlockError:
 			logger.Debug(
 				"Rejecting sign request",
-				"type", signType(block.Step),
+				"type", types.SignType(block.Step),
 				"chain_id", chainID,
 				"height", block.Height,
 				"round", block.Round,
@@ -117,7 +118,7 @@ func signAndTrack(
 		default:
 			logger.Error(
 				"Failed to sign",
-				"type", signType(block.Step),
+				"type", types.SignType(block.Step),
 				"chain_id", chainID,
 				"height", block.Height,
 				"round", block.Round,
@@ -135,7 +136,7 @@ func signAndTrack(
 	}
 	logger.Info(
 		"Signed",
-		"type", signType(block.Step),
+		"type", types.SignType(block.Step),
 		"chain_id", chainID,
 		"height", block.Height,
 		"round", block.Round,
@@ -144,11 +145,11 @@ func signAndTrack(
 	)
 
 	switch block.Step {
-	case stepPropose:
+	case types.StepPropose:
 		lastProposalHeight.WithLabelValues(chainID).Set(float64(block.Height))
 		lastProposalRound.WithLabelValues(chainID).Set(float64(block.Round))
 		totalProposalsSigned.WithLabelValues(chainID).Inc()
-	case stepPrevote:
+	case types.StepPrevote:
 		// Determine number of heights since the last Prevote
 		stepSize := block.Height - previousPrevoteHeight
 		if previousPrevoteHeight != 0 && stepSize > 1 {
@@ -165,7 +166,7 @@ func signAndTrack(
 		lastPrevoteHeight.WithLabelValues(chainID).Set(float64(block.Height))
 		lastPrevoteRound.WithLabelValues(chainID).Set(float64(block.Round))
 		totalPrevotesSigned.WithLabelValues(chainID).Inc()
-	case stepPrecommit:
+	case types.StepPrecommit:
 		stepSize := block.Height - previousPrecommitHeight
 		if previousPrecommitHeight != 0 && stepSize > 1 {
 			missedPrecommits.WithLabelValues(chainID).Add(float64(stepSize))

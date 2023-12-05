@@ -3,6 +3,7 @@ package signer
 import (
 	"context"
 	"fmt"
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/raft"
@@ -53,7 +54,7 @@ func (rpc *CosignerGRPCServer) SetNoncesAndSign(
 			UUID:   uuid.UUID(req.Uuid),
 			Nonces: CosignerNoncesFromProto(req.GetNonces()),
 		},
-		HRST:      HRSTKeyFromProto(req.GetHrst()),
+		HRST:      types.HRSTKeyFromProto(req.GetHrst()),
 		SignBytes: req.GetSignBytes(),
 	})
 	if err != nil {

@@ -3,6 +3,7 @@ package signer
 import (
 	"context"
 	"fmt"
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 	"net"
 	"time"
 
@@ -22,7 +23,7 @@ const connRetrySec = 2
 // PrivValidator is a wrapper for tendermint PrivValidator,
 // with additional Stop method for safe shutdown.
 type PrivValidator interface {
-	Sign(ctx context.Context, chainID string, block Block) ([]byte, time.Time, error)
+	Sign(ctx context.Context, chainID string, block types.Block) ([]byte, time.Time, error)
 	GetPubKey(ctx context.Context, chainID string) ([]byte, error)
 	Stop()
 }
@@ -136,7 +137,7 @@ func (rs *ReconnRemoteSigner) loop(ctx context.Context) {
 			return
 		}
 
-		req, err := ReadMsg(conn)
+		req, err := types.ReadMsg(conn)
 		if err != nil {
 			rs.Logger.Error(
 				"Failed to read message from connection",
@@ -151,7 +152,7 @@ func (rs *ReconnRemoteSigner) loop(ctx context.Context) {
 		// handleRequest handles request errors. We always send back a response
 		res := rs.handleRequest(req)
 
-		err = WriteMsg(conn, res)
+		err = types.WriteMsg(conn, res)
 		if err != nil {
 			rs.Logger.Error(
 				"Failed to write message to connection",
@@ -186,7 +187,7 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *cometp
 		Error: nil,
 	}}
 
-	signature, timestamp, err := signAndTrack(context.TODO(), rs.Logger, rs.privVal, chainID, VoteToBlock(chainID, vote))
+	signature, timestamp, err := signAndTrack(context.TODO(), rs.Logger, rs.privVal, chainID, types.VoteToBlock(chainID, vote))
 	if err != nil {
 		msgSum.SignedVoteResponse.Error = getRemoteSignerError(err)
 		return cometprotoprivval.Message{Sum: msgSum}
@@ -213,7 +214,7 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(
 		rs.Logger,
 		rs.privVal,
 		chainID,
-		ProposalToBlock(chainID, proposal),
+		types.ProposalToBlock(chainID, proposal),
 	)
 	if err != nil {
 		msgSum.SignedProposalResponse.Error = getRemoteSignerError(err)

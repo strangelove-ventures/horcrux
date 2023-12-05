@@ -1,13 +1,13 @@
 package cmd
 
 import (
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 	"io"
 	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/signer"
 	"github.com/stretchr/testify/require"
 )
 
@@ -64,7 +64,7 @@ func TestStateSetCmd(t *testing.T) {
 				height, err := strconv.ParseInt(tc.args[1], 10, 64)
 				require.NoError(t, err)
 
-				ss, err := signer.LoadSignState(filepath.Join(stateDir, chainID+"_priv_validator_state.json"))
+				ss, err := types.LoadSignState(filepath.Join(stateDir, chainID+"_priv_validator_state.json"))
 				require.NoError(t, err)
 				require.Equal(t, height, ss.Height)
 				require.Equal(t, int64(0), ss.Round)
@@ -73,7 +73,7 @@ func TestStateSetCmd(t *testing.T) {
 				require.Nil(t, ss.Signature)
 				require.Nil(t, ss.SignBytes)
 
-				ss, err = signer.LoadSignState(filepath.Join(stateDir, chainID+"_share_sign_state.json"))
+				ss, err = types.LoadSignState(filepath.Join(stateDir, chainID+"_share_sign_state.json"))
 				require.NoError(t, err)
 				require.Equal(t, height, ss.Height)
 				require.Equal(t, int64(0), ss.Round)

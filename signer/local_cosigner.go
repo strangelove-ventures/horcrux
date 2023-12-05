@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/strangelove-ventures/horcrux/pkg/types"
+
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	cometlog "github.com/cometbft/cometbft/libs/log"
@@ -54,7 +56,7 @@ func NewLocalCosigner(
 type ChainState struct {
 	// lastSignState stores the last sign state for an HRS we have fully signed
 	// incremented whenever we are asked to sign an HRS
-	lastSignState *SignState
+	lastSignState *types.SignState
 	// signer generates nonces, combines nonces, signs, and verifies signatures.
 	signer ThresholdSigner
 }
@@ -114,7 +116,7 @@ func (cosigner *LocalCosigner) combinedNonces(myID int, threshold uint8, uuid uu
 // than the current high watermark. A mutex is used to avoid concurrent state updates.
 // The disk write is scheduled in a separate goroutine which will perform an atomic write.
 // pendingDiskWG is used upon termination in pendingDiskWG to ensure all writes have completed.
-func (cosigner *LocalCosigner) SaveLastSignedState(chainID string, signState SignStateConsensus) error {
+func (cosigner *LocalCosigner) SaveLastSignedState(chainID string, signState types.SignStateConsensus) error {
 	ccs, err := cosigner.getChainState(chainID)
 	if err != nil {
 		return err
@@ -217,12 +219,12 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	// This function has multiple exit points.  Only start time can be guaranteed
 	metricsTimeKeeper.SetPreviousLocalSignStart(time.Now())
 
-	hrst, err := UnpackHRST(req.SignBytes)
+	hrst, err := types.UnpackHRST(req.SignBytes)
 	if err != nil {
 		return res, err
 	}
 
-	existingSignature, err := ccs.lastSignState.existingSignatureOrErrorIfRegression(hrst, req.SignBytes)
+	existingSignature, err := ccs.lastSignState.ExistingSignatureOrErrorIfRegression(hrst, req.SignBytes)
 	if err != nil {
 		return res, err
 	}
@@ -246,7 +248,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		return res, err
 	}
 
-	err = ccs.lastSignState.Save(SignStateConsensus{
+	err = ccs.lastSignState.Save(types.SignStateConsensus{
 		Height:    hrst.Height,
 		Round:     hrst.Round,
 		Step:      hrst.Step,
@@ -255,7 +257,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	}, &cosigner.pendingDiskWG)
 
 	if err != nil {
-		if _, isSameHRSError := err.(*SameHRSError); !isSameHRSError {
+		if _, isSameHRSError := err.(*types.SameHRSError); !isSameHRSError {
 			return res, err
 		}
 	}
@@ -298,7 +300,7 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 		return nil
 	}
 
-	signState, err := LoadOrCreateSignState(cosigner.config.CosignerStateFile(chainID))
+	signState, err := types.LoadOrCreateSignState(cosigner.config.CosignerStateFile(chainID))
 	if err != nil {
 		return err
 	}

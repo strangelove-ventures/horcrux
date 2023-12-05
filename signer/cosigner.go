@@ -2,6 +2,7 @@ package signer
 
 import (
 	"context"
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 	"time"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
@@ -103,7 +104,7 @@ func CosignerNoncesFromProto(secretParts []*proto.Nonce) []CosignerNonce {
 
 type CosignerSignBlockRequest struct {
 	ChainID string
-	Block   *Block
+	Block   *types.Block
 }
 
 type CosignerSignBlockResponse struct {
@@ -140,6 +141,6 @@ func (n CosignerUUIDNoncesMultiple) toProto() []*proto.UUIDNonce {
 type CosignerSetNoncesAndSignRequest struct {
 	ChainID   string
 	Nonces    *CosignerUUIDNonces
-	HRST      HRSTKey
+	HRST      types.HRSTKey
 	SignBytes []byte
 }

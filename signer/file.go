@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	htypes "github.com/strangelove-ventures/horcrux/pkg/types"
 	"os"
 	"time"
 
@@ -18,7 +19,7 @@ import (
 	"github.com/cometbft/cometbft/types"
 )
 
-//-------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------
 
 // FilePVKey stores the immutable part of PrivValidator.
 type FilePVKey struct {
@@ -46,7 +47,7 @@ func (pvKey FilePVKey) Save() {
 	}
 }
 
-//-------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------
 
 // FilePVLastSignState stores the mutable part of PrivValidator.
 type FilePVLastSignState struct {
@@ -116,7 +117,7 @@ func (lss *FilePVLastSignState) Save() {
 	}
 }
 
-//-------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------
 
 // FilePV implements PrivValidator using data persisted to disk
 // to prevent double signing.
@@ -200,7 +201,7 @@ func (pv *FilePV) GetPubKey() (crypto.PubKey, error) {
 	return pv.Key.PubKey, nil
 }
 
-func (pv *FilePV) Sign(block Block) ([]byte, time.Time, error) {
+func (pv *FilePV) Sign(block htypes.Block) ([]byte, time.Time, error) {
 	height, round, step, signBytes := block.Height, int32(block.Round), block.Step, block.SignBytes
 
 	lss := pv.LastSignState
@@ -219,11 +220,11 @@ func (pv *FilePV) Sign(block Block) ([]byte, time.Time, error) {
 		switch {
 		case bytes.Equal(signBytes, lss.SignBytes):
 			return lss.Signature, block.Timestamp, nil
-		case block.Step == stepPropose:
+		case block.Step == htypes.StepPropose:
 			if timestamp, ok := checkProposalsOnlyDifferByTimestamp(lss.SignBytes, signBytes); ok {
 				return lss.Signature, timestamp, nil
 			}
-		case block.Step == stepPrevote || block.Step == stepPrecommit:
+		case block.Step == htypes.StepPrevote || block.Step == htypes.StepPrecommit:
 			if timestamp, ok := checkVotesOnlyDifferByTimestamp(lss.SignBytes, signBytes); ok {
 				return lss.Signature, timestamp, nil
 			}
@@ -283,7 +284,7 @@ func (pv *FilePV) saveSigned(height int64, round int32, step int8,
 	pv.LastSignState.Save()
 }
 
-//-----------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------
 
 // returns the timestamp from the lastSignBytes.
 // returns true if the only difference in the votes is their timestamp.

@@ -1,6 +1,7 @@
 package signer
 
 import (
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 	"sync"
 )
 
@@ -29,6 +30,6 @@ func (m *MockLeader) GetLeader() int {
 	return m.id
 }
 
-func (m *MockLeader) ShareSigned(_ ChainSignStateConsensus) error {
+func (m *MockLeader) ShareSigned(_ types.ChainSignStateConsensus) error {
 	return nil
 }

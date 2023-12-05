@@ -3,6 +3,7 @@ package signer
 import (
 	"context"
 	"fmt"
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 	"os"
 	"sync"
 	"time"
@@ -49,7 +50,7 @@ func (pv *SingleSignerValidator) GetPubKey(_ context.Context, chainID string) ([
 }
 
 // SignVote implements types.PrivValidator
-func (pv *SingleSignerValidator) Sign(_ context.Context, chainID string, block Block) ([]byte, time.Time, error) {
+func (pv *SingleSignerValidator) Sign(_ context.Context, chainID string, block types.Block) ([]byte, time.Time, error) {
 	chainState, err := pv.loadChainStateIfNecessary(chainID)
 	if err != nil {
 		return nil, block.Timestamp, err

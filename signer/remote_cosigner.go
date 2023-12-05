@@ -112,7 +112,7 @@ func (cosigner *RemoteCosigner) SetNoncesAndSign(
 		Uuid:      req.Nonces.UUID[:],
 		ChainID:   req.ChainID,
 		Nonces:    req.Nonces.Nonces.toProto(),
-		Hrst:      req.HRST.toProto(),
+		Hrst:      req.HRST.ToProto(),
 		SignBytes: req.SignBytes,
 	})
 	if err != nil {

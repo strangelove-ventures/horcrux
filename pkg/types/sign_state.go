@@ -1,4 +1,4 @@
-package signer
+package types
 
 import (
 	"bytes"
@@ -19,19 +19,19 @@ import (
 )
 
 const (
-	stepPropose   int8 = 1
-	stepPrevote   int8 = 2
-	stepPrecommit int8 = 3
+	StepPropose   int8 = 1
+	StepPrevote   int8 = 2
+	StepPrecommit int8 = 3
 	blocksToCache      = 3
 )
 
-func signType(step int8) string {
+func SignType(step int8) string {
 	switch step {
-	case stepPropose:
+	case StepPropose:
 		return "proposal"
-	case stepPrevote:
+	case StepPrevote:
 		return "prevote"
-	case stepPrecommit:
+	case StepPrecommit:
 		return "precommit"
 	default:
 		return "unknown"
@@ -41,9 +41,9 @@ func signType(step int8) string {
 func CanonicalVoteToStep(vote *cometproto.CanonicalVote) int8 {
 	switch vote.Type {
 	case cometproto.PrevoteType:
-		return stepPrevote
+		return StepPrevote
 	case cometproto.PrecommitType:
-		return stepPrecommit
+		return StepPrecommit
 	default:
 		panic("Unknown vote type")
 	}
@@ -52,9 +52,9 @@ func CanonicalVoteToStep(vote *cometproto.CanonicalVote) int8 {
 func VoteToStep(vote *cometproto.Vote) int8 {
 	switch vote.Type {
 	case cometproto.PrevoteType:
-		return stepPrevote
+		return StepPrevote
 	case cometproto.PrecommitType:
-		return stepPrecommit
+		return StepPrecommit
 	default:
 		panic("Unknown vote type")
 	}
@@ -71,7 +71,7 @@ func VoteToBlock(chainID string, vote *cometproto.Vote) Block {
 }
 
 func ProposalToStep(_ *cometproto.Proposal) int8 {
-	return stepPropose
+	return StepPropose
 }
 
 func ProposalToBlock(chainID string, proposal *cometproto.Proposal) Block {
@@ -86,11 +86,11 @@ func ProposalToBlock(chainID string, proposal *cometproto.Proposal) Block {
 
 func StepToType(step int8) cometproto.SignedMsgType {
 	switch step {
-	case stepPropose:
+	case StepPropose:
 		return cometproto.ProposalType
-	case stepPrevote:
+	case StepPrevote:
 		return cometproto.PrevoteType
-	case stepPrecommit:
+	case StepPrecommit:
 		return cometproto.PrecommitType
 	default:
 		panic("Unknown step")
@@ -106,15 +106,22 @@ type SignState struct {
 	Signature   []byte              `json:"signature,omitempty"`
 	SignBytes   cometbytes.HexBytes `json:"signbytes,omitempty"`
 
-	filePath string
+	FilePath string
 
-	// mu protects the cache and is used for signaling with cond.
+	// mu protects the Cache and is used for signaling with Cond.
 	mu    sync.RWMutex
-	cache map[HRSKey]SignStateConsensus
-	cond  *cond.Cond
+	Cache map[HRSKey]SignStateConsensus
+	Cond  *cond.Cond
 }
 
-func (signState *SignState) existingSignatureOrErrorIfRegression(hrst HRSTKey, signBytes []byte) ([]byte, error) {
+func (signState *SignState) Lock() {
+	signState.mu.Lock()
+}
+
+func (signState *SignState) Unlock() {
+	signState.mu.Unlock()
+}
+func (signState *SignState) ExistingSignatureOrErrorIfRegression(hrst HRSTKey, signBytes []byte) ([]byte, error) {
 	signState.mu.RLock()
 	defer signState.mu.RUnlock()
 
@@ -206,22 +213,22 @@ func (signState *SignState) GetFromCache(hrs HRSKey) (HRSKey, *SignStateConsensu
 	signState.mu.RLock()
 	defer signState.mu.RUnlock()
 	latestBlock := signState.hrsKeyLocked()
-	if ssc, ok := signState.cache[hrs]; ok {
+	if ssc, ok := signState.Cache[hrs]; ok {
 		return latestBlock, &ssc
 	}
 	return latestBlock, nil
 }
 
-// cacheAndMarshal will cache a SignStateConsensus for it's HRS and return the marshalled bytes.
+// cacheAndMarshal will Cache a SignStateConsensus for it's HRS and return the marshalled bytes.
 func (signState *SignState) cacheAndMarshal(ssc SignStateConsensus) []byte {
 	signState.mu.Lock()
 	defer signState.mu.Unlock()
 
-	signState.cache[ssc.HRSKey()] = ssc
+	signState.Cache[ssc.HRSKey()] = ssc
 
-	for hrs := range signState.cache {
+	for hrs := range signState.Cache {
 		if hrs.Height < ssc.Height-blocksToCache {
-			delete(signState.cache, hrs)
+			delete(signState.Cache, hrs)
 		}
 	}
 
@@ -258,7 +265,7 @@ func (signState *SignState) Save(
 
 	// Broadcast to waiting goroutines to notify them that an
 	// existing signature for their HRS may now be available.
-	signState.cond.Broadcast()
+	signState.Cond.Broadcast()
 
 	if pendingDiskWG != nil {
 		pendingDiskWG.Add(1)
@@ -275,7 +282,7 @@ func (signState *SignState) Save(
 
 // Save persists the FilePvLastSignState to its filePath.
 func (signState *SignState) save(jsonBytes []byte) {
-	outFile := signState.filePath
+	outFile := signState.FilePath
 	if outFile == os.DevNull {
 		return
 	}
@@ -420,14 +427,14 @@ func (signState *SignState) FreshCache() *SignState {
 		NoncePublic: signState.NoncePublic,
 		Signature:   signState.Signature,
 		SignBytes:   signState.SignBytes,
-		cache:       make(map[HRSKey]SignStateConsensus),
+		Cache:       make(map[HRSKey]SignStateConsensus),
 
-		filePath: signState.filePath,
+		FilePath: signState.FilePath,
 	}
 
-	newSignState.cond = cond.New(&newSignState.mu)
+	newSignState.Cond = cond.New(&newSignState.mu)
 
-	newSignState.cache[HRSKey{
+	newSignState.Cache[HRSKey{
 		Height: signState.Height,
 		Round:  signState.Round,
 		Step:   signState.Step,
@@ -456,7 +463,7 @@ func LoadSignState(filepath string) (*SignState, error) {
 		return nil, err
 	}
 
-	state.filePath = filepath
+	state.FilePath = filepath
 
 	return state.FreshCache(), nil
 }
@@ -472,10 +479,10 @@ func LoadOrCreateSignState(filepath string) (*SignState, error) {
 		// the only scenario where we want to create a new sign state file is when the file does not exist.
 		// Make an empty sign state and save it.
 		state := &SignState{
-			filePath: filepath,
-			cache:    make(map[HRSKey]SignStateConsensus),
+			FilePath: filepath,
+			Cache:    make(map[HRSKey]SignStateConsensus),
 		}
-		state.cond = cond.New(&state.mu)
+		state.Cond = cond.New(&state.mu)
 
 		jsonBytes, err := cometjson.MarshalIndent(state, "", "  ")
 		if err != nil {
@@ -500,9 +507,9 @@ func (signState *SignStateConsensus) OnlyDifferByTimestamp(signBytes []byte) err
 }
 
 func onlyDifferByTimestamp(step int8, signStateSignBytes, signBytes []byte) error {
-	if step == stepPropose {
+	if step == StepPropose {
 		return checkProposalOnlyDifferByTimestamp(signStateSignBytes, signBytes)
-	} else if step == stepPrevote || step == stepPrecommit {
+	} else if step == StepPrevote || step == StepPrecommit {
 		return checkVoteOnlyDifferByTimestamp(signStateSignBytes, signBytes)
 	}
 

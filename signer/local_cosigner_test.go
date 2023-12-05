@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 	"os"
 	"path/filepath"
 	"testing"
@@ -123,7 +124,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 
 	now := time.Now()
 
-	hrst := HRSTKey{
+	hrst := types.HRSTKey{
 		Height:    1,
 		Round:     0,
 		Step:      2,

@@ -2,6 +2,7 @@ package signer
 
 import (
 	"encoding/json"
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 )
 
 const (
@@ -20,7 +21,7 @@ func (f *fsm) shouldRetain(key string) bool {
 }
 
 func (f *fsm) handleLSSEvent(value string) {
-	lss := &ChainSignStateConsensus{}
+	lss := &types.ChainSignStateConsensus{}
 	err := json.Unmarshal([]byte(value), lss)
 	if err != nil {
 		f.logger.Error(
