@@ -1,8 +1,9 @@
 package signer
 
 import (
-	"github.com/strangelove-ventures/horcrux/pkg/types"
 	"sync"
+
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 )
 
 var _ Leader = (*MockLeader)(nil)

@@ -2,6 +2,7 @@ package signer
 
 import (
 	"encoding/json"
+
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 )
 

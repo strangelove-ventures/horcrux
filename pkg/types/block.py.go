@@ -1,8 +1,9 @@
 package types
 
 import (
-	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/signer/proto"
 )
 
 type Block struct {

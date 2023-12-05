@@ -123,24 +123,34 @@ func (signState *SignState) GetCache(hrs HRSKey) (SignStateConsensus, bool) {
 func (signState *SignState) SetCache(hrs HRSKey, signStateConsensus SignStateConsensus) {
 	signState.cache[hrs] = signStateConsensus
 }
+
+// CondWaitWithTimeout is the same as
+// WaitWithTimeout is same as Wait() call, but will only wait up to a given timeout.
 func (signState *SignState) CondWaitWithTimeout(t time.Duration) {
 	signState.cond.WaitWithTimeout(t)
 }
 
+// Condunlock unlocks the SignState's cond.L field.
 func (signState *SignState) CondUnlock() {
 	signState.cond.L.Unlock()
 }
+
+// CondWait notifies all goroutines waiting on the SignState's cond field that something has changed.
 func (signState *SignState) CondBroadcast() {
 	signState.cond.Broadcast()
 }
 
+// CondLock locks the SignState's cond.sync.locker
 func (signState *SignState) CondLock() {
 	signState.cond.L.Lock()
 }
+
+// Lock locks the SignState's mutex.
 func (signState *SignState) Lock() {
 	signState.mu.Lock()
 }
 
+// Unlock unlocks the SignState's mutex.
 func (signState *SignState) Unlock() {
 	signState.mu.Unlock()
 }

@@ -2,9 +2,10 @@ package signer
 
 import (
 	"context"
-	"github.com/strangelove-ventures/horcrux/pkg/types"
 	"path/filepath"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 
 	"os"
 	"testing"

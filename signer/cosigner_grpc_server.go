@@ -3,6 +3,7 @@ package signer
 import (
 	"context"
 	"fmt"
+
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 
 	"github.com/google/uuid"

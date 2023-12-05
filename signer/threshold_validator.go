@@ -147,7 +147,8 @@ func (pv *ThresholdValidator) mustLoadChainState(chainID string) ChainSignState 
 // sign process if it is greater than the current high watermark. A mutex is used to avoid concurrent
 // state updates. The disk write is scheduled in a separate goroutine which will perform an atomic write.
 // pendingDiskWG is used upon termination in pendingDiskWG to ensure all writes have completed.
-func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, block *types.Block) ([]byte, time.Time, error) {
+func (pv *ThresholdValidator) SaveLastSignedStateInitiated(
+	chainID string, block *types.Block) ([]byte, time.Time, error) {
 	css := pv.mustLoadChainState(chainID)
 
 	height, round, step := block.Height, block.Round, block.Step

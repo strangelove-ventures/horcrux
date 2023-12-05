@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	htypes "github.com/strangelove-ventures/horcrux/pkg/types"
 	"os"
 	"time"
+
+	htypes "github.com/strangelove-ventures/horcrux/pkg/types"
 
 	"github.com/cosmos/gogoproto/proto"
 

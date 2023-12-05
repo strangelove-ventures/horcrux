@@ -3,10 +3,11 @@ package signer
 import (
 	"context"
 	"fmt"
-	"github.com/strangelove-ventures/horcrux/pkg/types"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 )
 
 var _ PrivValidator = &SingleSignerValidator{}

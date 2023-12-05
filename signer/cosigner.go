@@ -2,8 +2,9 @@ package signer
 
 import (
 	"context"
-	"github.com/strangelove-ventures/horcrux/pkg/types"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	"github.com/google/uuid"

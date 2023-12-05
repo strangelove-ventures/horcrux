@@ -2,9 +2,10 @@ package signer
 
 import (
 	"context"
-	"github.com/strangelove-ventures/horcrux/pkg/types"
 	"net"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	cometservice "github.com/cometbft/cometbft/libs/service"

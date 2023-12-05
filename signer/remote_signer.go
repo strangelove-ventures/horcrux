@@ -3,9 +3,10 @@ package signer
 import (
 	"context"
 	"fmt"
-	"github.com/strangelove-ventures/horcrux/pkg/types"
 	"net"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	cometcryptoencoding "github.com/cometbft/cometbft/crypto/encoding"
@@ -181,13 +182,16 @@ func (rs *ReconnRemoteSigner) handleRequest(req cometprotoprivval.Message) comet
 	}
 }
 
-func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *cometproto.Vote) cometprotoprivval.Message {
-	msgSum := &cometprotoprivval.Message_SignedVoteResponse{SignedVoteResponse: &cometprotoprivval.SignedVoteResponse{
-		Vote:  cometproto.Vote{},
-		Error: nil,
-	}}
+func (rs *ReconnRemoteSigner) handleSignVoteRequest(
+	chainID string, vote *cometproto.Vote) cometprotoprivval.Message {
+	msgSum := &cometprotoprivval.Message_SignedVoteResponse{
+		SignedVoteResponse: &cometprotoprivval.SignedVoteResponse{
+			Vote:  cometproto.Vote{},
+			Error: nil,
+		}}
 
-	signature, timestamp, err := signAndTrack(context.TODO(), rs.Logger, rs.privVal, chainID, types.VoteToBlock(chainID, vote))
+	signature, timestamp, err := signAndTrack(
+		context.TODO(), rs.Logger, rs.privVal, chainID, types.VoteToBlock(chainID, vote))
 	if err != nil {
 		msgSum.SignedVoteResponse.Error = getRemoteSignerError(err)
 		return cometprotoprivval.Message{Sum: msgSum}
