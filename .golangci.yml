@@ -99,6 +99,8 @@ linters-settings:
         alias: boltdb
       - pkg: math/rand
         alias: mrand
+      - pkg: github.com/strangelove-ventures/horcrux/pkg/types
+        alias: htypes
   maligned:
     suggest-new: true
   govet:
