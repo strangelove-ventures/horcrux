@@ -62,7 +62,7 @@ func (ch *CosignerHealth) Start(ctx context.Context) {
 func (ch *CosignerHealth) MarkUnhealthy(cosigner Cosigner) {
 	ch.mu.Lock()
 	defer ch.mu.Unlock()
-	ch.rtt[cosigner.GetID()] = -1
+	ch.rtt[cosigner.GetIndex()] = -1
 }
 
 func (ch *CosignerHealth) updateRTT(ctx context.Context, cosigner *RemoteCosigner, wg *sync.WaitGroup) {
@@ -72,7 +72,7 @@ func (ch *CosignerHealth) updateRTT(ctx context.Context, cosigner *RemoteCosigne
 	defer func() {
 		ch.mu.Lock()
 		defer ch.mu.Unlock()
-		ch.rtt[cosigner.GetID()] = rtt
+		ch.rtt[cosigner.GetIndex()] = rtt
 	}()
 	start := time.Now()
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
@@ -80,7 +80,7 @@ func (ch *CosignerHealth) updateRTT(ctx context.Context, cosigner *RemoteCosigne
 
 	_, err := cosigner.client.Ping(ctx, &proto.PingRequest{})
 	if err != nil {
-		ch.logger.Error("Failed to ping", "cosigner", cosigner.GetID(), "error", err)
+		ch.logger.Error("Failed to ping", "cosigner", cosigner.GetIndex(), "error", err)
 		return
 	}
 	rtt = time.Since(start).Nanoseconds()
@@ -94,8 +94,8 @@ func (ch *CosignerHealth) GetFastest() []Cosigner {
 	copy(fastest, ch.cosigners)
 
 	sort.Slice(fastest, func(i, j int) bool {
-		rtt1, ok1 := ch.rtt[fastest[i].GetID()]
-		rtt2, ok2 := ch.rtt[fastest[j].GetID()]
+		rtt1, ok1 := ch.rtt[fastest[i].GetIndex()]
+		rtt2, ok2 := ch.rtt[fastest[j].GetIndex()]
 		if rtt1 == -1 || !ok1 {
 			return false
 		}

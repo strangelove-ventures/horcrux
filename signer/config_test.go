@@ -167,7 +167,7 @@ func TestValidateThresholdModeConfig(t *testing.T) {
 					},
 				},
 			},
-			expectErr: fmt.Errorf("failed to parse cosigner (shard ID: 1) p2p address: %w", &url.Error{
+			expectErr: fmt.Errorf("failed to parse cosigner (shard Index: 1) p2p address: %w", &url.Error{
 				Op:  "parse",
 				URL: ":2222",
 				Err: fmt.Errorf("missing protocol scheme"),
@@ -517,7 +517,7 @@ func TestCosignerRSAPubKeysConfigValidate(t *testing.T) {
 					P2PAddr: "tcp://127.0.0.1:2224",
 				},
 			},
-			expectErr: fmt.Errorf("cosigner shard ID 3 in args is out of range, must be between 1 and 2, inclusive"),
+			expectErr: fmt.Errorf("cosigner shard Index 3 in args is out of range, must be between 1 and 2, inclusive"),
 		},
 		{
 			name: "duplicate cosigner",
@@ -532,7 +532,7 @@ func TestCosignerRSAPubKeysConfigValidate(t *testing.T) {
 				},
 			},
 			expectErr: fmt.Errorf(
-				"found duplicate cosigner shard ID(s) in args: map[2:[tcp://127.0.0.1:2223 tcp://127.0.0.1:2223]]",
+				"found duplicate cosigner shard Index(s) in args: map[2:[tcp://127.0.0.1:2223 tcp://127.0.0.1:2223]]",
 			),
 		},
 	}

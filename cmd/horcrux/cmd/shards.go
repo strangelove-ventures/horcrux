@@ -150,7 +150,7 @@ func createCosignerEd25519ShardsCmd() *cobra.Command {
 	_ = cmd.MarkFlagRequired(flagThreshold)
 	f.String(flagKeyFile, "", "priv_validator_key.json file to shard")
 	_ = cmd.MarkFlagRequired(flagKeyFile)
-	f.String(flagChainID, "", "key shards will sign for this chain ID")
+	f.String(flagChainID, "", "key shards will sign for this chain Index")
 	_ = cmd.MarkFlagRequired(flagChainID)
 
 	return cmd

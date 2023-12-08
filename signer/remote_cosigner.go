@@ -39,9 +39,9 @@ func NewRemoteCosigner(id int, address string) (*RemoteCosigner, error) {
 	return cosigner, nil
 }
 
-// GetID returns the ID of the remote cosigner
+// GetID returns the Index of the remote cosigner
 // Implements the cosigner interface
-func (cosigner *RemoteCosigner) GetID() int {
+func (cosigner *RemoteCosigner) GetIndex() int {
 	return cosigner.id
 }
 
@@ -78,7 +78,7 @@ func getGRPCClient(address string) (proto.CosignerClient, error) {
 	return proto.NewCosignerClient(conn), nil
 }
 
-// Implements the cosigner interface
+// GetNonces implements the cosigner interface
 func (cosigner *RemoteCosigner) GetNonces(
 	ctx context.Context,
 	uuids []uuid.UUID,

@@ -18,7 +18,7 @@ type MockLeader struct {
 func (m *MockLeader) IsLeader() bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.leader != nil && m.leader.myCosigner.GetID() == m.id
+	return m.leader != nil && m.leader.myCosigner.GetIndex() == m.id
 }
 
 func (m *MockLeader) SetLeader(tv *ThresholdValidator) {

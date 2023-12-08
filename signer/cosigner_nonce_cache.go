@@ -285,7 +285,7 @@ func (cnc *CosignerNonceCache) LoadN(ctx context.Context, n int) {
 				missedNonces.WithLabelValues(p.GetAddress()).Add(float64(1))
 				totalMissedNonces.WithLabelValues(p.GetAddress()).Inc()
 
-				cnc.logger.Error("Failed to get nonces from peer", "peer", p.GetID(), "error", err)
+				cnc.logger.Error("Failed to get nonces from peer", "peer", p.GetIndex(), "error", err)
 				return
 			}
 
@@ -350,7 +350,7 @@ CheckNoncesLoop:
 		for _, p := range fastestPeers {
 			found := false
 			for _, n := range cn.Nonces {
-				if n.Cosigner.GetID() == p.GetID() {
+				if n.Cosigner.GetIndex() == p.GetIndex() {
 					found = true
 					nonces = append(nonces, n.Nonces...)
 					break
@@ -383,7 +383,7 @@ CheckNoncesLoop:
 	// no nonces found
 	cosignerInts := make([]int, len(fastestPeers))
 	for i, p := range fastestPeers {
-		cosignerInts[i] = p.GetID()
+		cosignerInts[i] = p.GetIndex()
 	}
 	return nil, fmt.Errorf("no nonces found involving cosigners %+v", cosignerInts)
 }
@@ -418,7 +418,7 @@ func (cnc *CosignerNonceCache) ClearNonces(cosigner Cosigner) {
 
 		deleteID := -1
 		for j, n := range cn.Nonces {
-			if n.Cosigner.GetID() == cosigner.GetID() {
+			if n.Cosigner.GetIndex() == cosigner.GetIndex() {
 				// remove cosigner from this nonce.
 				deleteID = j
 				break

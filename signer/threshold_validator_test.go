@@ -54,7 +54,7 @@ func loadKeyForLocalCosigner(
 	key := CosignerEd25519Key{
 		PubKey:       pubKey,
 		PrivateShard: privateShard,
-		ID:           cosigner.GetID(),
+		ID:           cosigner.GetIndex(),
 	}
 
 	keyBz, err := key.MarshalJSON()
@@ -71,7 +71,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	thresholdCosigners := make([]Cosigner, 0, threshold-1)
 
 	for i, cosigner := range cosigners {
-		require.Equal(t, i+1, cosigner.GetID())
+		require.Equal(t, i+1, cosigner.GetIndex())
 
 		if i != 0 && len(thresholdCosigners) != int(threshold)-1 {
 			thresholdCosigners = append(thresholdCosigners, cosigner)
@@ -131,7 +131,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	_, _, err = validator.Sign(ctx, testChainID, block)
 	require.NoError(t, err)
 
-	// construct different block ID for proposal at same height as highest signed
+	// construct different block Index for proposal at same height as highest signed
 	randHash := cometrand.Bytes(tmhash.Size)
 	blockID := cometproto.BlockID{Hash: randHash,
 		PartSetHeader: cometproto.PartSetHeader{Total: 5, Hash: randHash}}
@@ -162,7 +162,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 	validator.nonceCache.LoadN(ctx, 1)
 
-	// lower LSS should sign for different chain ID
+	// lower LSS should sign for different chain Index
 	_, _, err = validator.Sign(ctx, testChainID2, types.ProposalToBlock(testChainID2, &proposal))
 	require.NoError(t, err)
 
@@ -381,7 +381,7 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 				peers = append(peers, otherCosigner)
 			}
 		}
-		leaders[i] = &MockLeader{id: cosigner.GetID(), leader: leader}
+		leaders[i] = &MockLeader{id: cosigner.GetIndex(), leader: leader}
 		tv := NewThresholdValidator(
 			cometlog.NewNopLogger(),
 			cosigner.config,
@@ -430,7 +430,7 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 			for _, l := range leaders {
 				l.SetLeader(newLeader)
 			}
-			t.Logf("New leader: %d", newLeader.myCosigner.GetID())
+			t.Logf("New leader: %d", newLeader.myCosigner.GetIndex())
 
 			// time with new leader
 			time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond) //nolint:gosec

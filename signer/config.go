@@ -242,7 +242,7 @@ type CosignersConfig []CosignerConfig
 func (cosigners CosignersConfig) Validate() error {
 	// Check IDs to make sure none are duplicated
 	if dupl := duplicateCosigners(cosigners); len(dupl) != 0 {
-		return fmt.Errorf("found duplicate cosigner shard ID(s) in args: %v", dupl)
+		return fmt.Errorf("found duplicate cosigner shard Index(s) in args: %v", dupl)
 	}
 
 	shards := len(cosigners)
@@ -250,18 +250,18 @@ func (cosigners CosignersConfig) Validate() error {
 	// Make sure that the cosigner IDs match the number of cosigners.
 	for _, cosigner := range cosigners {
 		if cosigner.ShardID < 1 || cosigner.ShardID > shards {
-			return fmt.Errorf("cosigner shard ID %d in args is out of range, must be between 1 and %d, inclusive",
+			return fmt.Errorf("cosigner shard Index %d in args is out of range, must be between 1 and %d, inclusive",
 				cosigner.ShardID, shards)
 		}
 
 		url, err := url.Parse(cosigner.P2PAddr)
 		if err != nil {
-			return fmt.Errorf("failed to parse cosigner (shard ID: %d) p2p address: %w", cosigner.ShardID, err)
+			return fmt.Errorf("failed to parse cosigner (shard Index: %d) p2p address: %w", cosigner.ShardID, err)
 		}
 
 		host, _, err := net.SplitHostPort(url.Host)
 		if err != nil {
-			return fmt.Errorf("failed to parse cosigner (shard ID: %d) host port: %w", cosigner.ShardID, err)
+			return fmt.Errorf("failed to parse cosigner (shard Index: %d) host port: %w", cosigner.ShardID, err)
 		}
 
 		if host == "0.0.0.0" {
@@ -287,7 +287,7 @@ func duplicateCosigners(cosigners []CosignerConfig) (duplicates map[int][]string
 
 	for shardID, cosigners := range idAddrs {
 		if len(cosigners) == 1 {
-			// One address per ID is correct.
+			// One address per Index is correct.
 			delete(idAddrs, shardID)
 		}
 	}

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 
 	"gitlab.com/unit410/edwards25519"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
@@ -31,7 +32,7 @@ func NewThresholdSignerSoft(config *RuntimeConfig, id int, chainID string) (*Thr
 	}
 
 	if key.ID != id {
-		return nil, fmt.Errorf("key shard ID (%d) in (%s) does not match cosigner ID (%d)", key.ID, keyFile, id)
+		return nil, fmt.Errorf("key shard Index (%d) in (%s) does not match cosigner Index (%d)", key.ID, keyFile, id)
 	}
 
 	s := ThresholdSignerSoft{
@@ -48,7 +49,7 @@ func (s *ThresholdSignerSoft) PubKey() []byte {
 	return s.pubKey
 }
 
-func (s *ThresholdSignerSoft) Sign(nonces []Nonce, payload []byte) ([]byte, error) {
+func (s *ThresholdSignerSoft) Sign(nonces []types.Nonce, payload []byte) ([]byte, error) {
 	nonceShare, noncePub, err := s.sumNonces(nonces)
 	if err != nil {
 		return nil, fmt.Errorf("failed to combine nonces: %w", err)
@@ -59,7 +60,7 @@ func (s *ThresholdSignerSoft) Sign(nonces []Nonce, payload []byte) ([]byte, erro
 	return append(noncePub, sig...), nil
 }
 
-func (s *ThresholdSignerSoft) sumNonces(nonces []Nonce) (tsed25519.Scalar, tsed25519.Element, error) {
+func (s *ThresholdSignerSoft) sumNonces(nonces []types.Nonce) (tsed25519.Scalar, tsed25519.Element, error) {
 	shareParts := make([]tsed25519.Scalar, len(nonces))
 	publicKeys := make([]tsed25519.Element, len(nonces))
 
@@ -85,13 +86,13 @@ func (s *ThresholdSignerSoft) sumNonces(nonces []Nonce) (tsed25519.Scalar, tsed2
 	return nonceShare, noncePub, nil
 }
 
-func GenerateNonces(threshold, total uint8) (Nonces, error) {
+func GenerateNonces(threshold, total uint8) (types.Nonces, error) {
 	secret := make([]byte, 32)
 	if _, err := rand.Read(secret); err != nil {
-		return Nonces{}, err
+		return types.Nonces{}, err
 	}
 
-	nonces := Nonces{
+	nonces := types.Nonces{
 		PubKey: tsed25519.ScalarMultiplyBase(secret),
 		Shares: make([][]byte, total),
 	}
@@ -105,13 +106,13 @@ func GenerateNonces(threshold, total uint8) (Nonces, error) {
 	return nonces, nil
 }
 
-func (s *ThresholdSignerSoft) CombineSignatures(signatures []PartialSignature) ([]byte, error) {
+func (s *ThresholdSignerSoft) CombineSignatures(signatures []types.PartialSignature) ([]byte, error) {
 	sigIds := make([]int, len(signatures))
 	shareSigs := make([][]byte, len(signatures))
 	var ephPub []byte
 
 	for i, sig := range signatures {
-		sigIds[i] = sig.ID
+		sigIds[i] = sig.Index
 		if i == 0 {
 			ephPub = sig.Signature[:32]
 		} else if !bytes.Equal(sig.Signature[:32], ephPub) {

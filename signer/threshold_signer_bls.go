@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 
 	"gitlab.com/unit410/edwards25519"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
@@ -30,7 +31,7 @@ func NewThresholdSignerSoftBLS(config *RuntimeConfig, id int, chainID string) (*
 	}
 
 	if key.ID != id {
-		return nil, fmt.Errorf("key shard ID (%d) in (%s) does not match cosigner ID (%d)", key.ID, keyFile, id)
+		return nil, fmt.Errorf("key shard Index (%d) in (%s) does not match cosigner Index (%d)", key.ID, keyFile, id)
 	}
 
 	s := ThresholdSignerSoftBLS{
@@ -47,7 +48,7 @@ func (s *ThresholdSignerSoftBLS) PubKey() []byte {
 	return s.pubKey
 }
 
-func (s *ThresholdSignerSoftBLS) Sign(nonces []Nonce, payload []byte) ([]byte, error) {
+func (s *ThresholdSignerSoftBLS) Sign(nonces []types.Nonce, payload []byte) ([]byte, error) {
 	nonceShare, noncePub, err := s.sumNonces(nonces)
 	if err != nil {
 		return nil, fmt.Errorf("failed to combine nonces: %w", err)
@@ -58,7 +59,7 @@ func (s *ThresholdSignerSoftBLS) Sign(nonces []Nonce, payload []byte) ([]byte, e
 	return append(noncePub, sig...), nil
 }
 
-func (s *ThresholdSignerSoftBLS) sumNonces(nonces []Nonce) (tsed25519.Scalar, tsed25519.Element, error) {
+func (s *ThresholdSignerSoftBLS) sumNonces(nonces []types.Nonce) (tsed25519.Scalar, tsed25519.Element, error) {
 	shareParts := make([]tsed25519.Scalar, len(nonces))
 	publicKeys := make([]tsed25519.Element, len(nonces))
 
@@ -84,13 +85,13 @@ func (s *ThresholdSignerSoftBLS) sumNonces(nonces []Nonce) (tsed25519.Scalar, ts
 	return nonceShare, noncePub, nil
 }
 
-func (s *ThresholdSignerSoftBLS) CombineSignatures(signatures []PartialSignature) ([]byte, error) {
+func (s *ThresholdSignerSoftBLS) CombineSignatures(signatures []types.PartialSignature) ([]byte, error) {
 	sigIds := make([]int, len(signatures))
 	shareSigs := make([][]byte, len(signatures))
 	var ephPub []byte
 
 	for i, sig := range signatures {
-		sigIds[i] = sig.ID
+		sigIds[i] = sig.Index
 		if i == 0 {
 			ephPub = sig.Signature[:32]
 		} else if !bytes.Equal(sig.Signature[:32], ephPub) {

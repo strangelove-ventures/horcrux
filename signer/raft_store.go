@@ -188,7 +188,7 @@ func (s *RaftStore) Open() (*raftgrpctransport.Manager, error) {
 	}
 	for _, c := range s.Cosigners {
 		configuration.Servers = append(configuration.Servers, raft.Server{
-			ID:      raft.ServerID(fmt.Sprint(c.GetID())),
+			ID:      raft.ServerID(fmt.Sprint(c.GetIndex())), // TODO: Refactor out the use of cosigner.
 			Address: raft.ServerAddress(p2pURLToRaftAddress(c.GetAddress())),
 		})
 	}
@@ -261,10 +261,10 @@ func (s *RaftStore) Join(nodeID, addr string) error {
 	}
 
 	for _, srv := range configFuture.Configuration().Servers {
-		// If a node already exists with either the joining node's ID or address,
+		// If a node already exists with either the joining node's Index or address,
 		// that node may need to be removed from the config first.
 		if srv.ID == raft.ServerID(nodeID) || srv.Address == raft.ServerAddress(addr) {
-			// However if *both* the ID and the address are the same, then nothing -- not even
+			// However if *both* the Index and the address are the same, then nothing -- not even
 			// a join operation -- is needed.
 			if srv.Address == raft.ServerAddress(addr) && srv.ID == raft.ServerID(nodeID) {
 				s.logger.Error("node already member of cluster, ignoring join request", nodeID, addr)

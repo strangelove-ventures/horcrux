@@ -17,6 +17,7 @@ type CosignerGRPCServer struct {
 	cosigner           *LocalCosigner
 	thresholdValidator *ThresholdValidator
 	raftStore          *RaftStore
+	// TODO: add logger and not rely on raftStore.logger
 	proto.UnimplementedCosignerServer
 }
 
@@ -104,6 +105,7 @@ func (rpc *CosignerGRPCServer) GetNonces(
 	}, nil
 }
 
+// TODO: // TransferLeadership should not be a CosignerGRPCServer method?
 func (rpc *CosignerGRPCServer) TransferLeadership(
 	_ context.Context,
 	req *proto.TransferLeadershipRequest,
@@ -114,10 +116,10 @@ func (rpc *CosignerGRPCServer) TransferLeadership(
 	leaderID := req.GetLeaderID()
 	if leaderID != "" {
 		for _, c := range rpc.raftStore.Cosigners {
-			shardID := fmt.Sprint(c.GetID())
+			shardID := fmt.Sprint(c.GetIndex())
 			if shardID == leaderID {
 				raftAddress := p2pURLToRaftAddress(c.GetAddress())
-				fmt.Printf("Transferring leadership to ID: %s - Address: %s\n", shardID, raftAddress)
+				fmt.Printf("Transferring leadership to Index: %s - Address: %s\n", shardID, raftAddress)
 				rpc.raftStore.raft.LeadershipTransferToServer(raft.ServerID(shardID), raft.ServerAddress(raftAddress))
 				return &proto.TransferLeadershipResponse{LeaderID: shardID, LeaderAddress: raftAddress}, nil
 			}

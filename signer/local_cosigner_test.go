@@ -173,7 +173,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 		err = cosigner.LoadSignStateIfNecessary(testChainID)
 		require.NoError(t, err)
 
-		require.Equal(t, cosigner.GetID(), id)
+		require.Equal(t, cosigner.GetIndex(), id)
 
 		if i < int(threshold) {
 			thresholdCosigners[i] = cosigner
@@ -194,7 +194,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 
 	signBytes := comet.VoteSignBytes("chain-id", &vote)
 
-	sigs := make([]PartialSignature, threshold)
+	sigs := make([]types.PartialSignature, threshold)
 
 	for i, cosigner := range thresholdCosigners {
 		cosignerNonces := make([]CosignerNonce, 0, threshold-1)
@@ -205,7 +205,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 			}
 
 			for _, n := range nonce {
-				if n.DestinationID == cosigner.GetID() {
+				if n.DestinationID == cosigner.GetIndex() {
 					cosignerNonces = append(cosignerNonces, n)
 				}
 			}
@@ -222,8 +222,8 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 		})
 		require.NoError(t, err)
 
-		sigs[i] = PartialSignature{
-			ID:        cosigner.GetID(),
+		sigs[i] = types.PartialSignature{
+			Index:     cosigner.GetIndex(),
 			Signature: sigRes.Signature,
 		}
 	}

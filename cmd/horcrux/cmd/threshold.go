@@ -55,7 +55,7 @@ func NewThresholdValidator(
 	}
 
 	if p2pListen == "" {
-		return nil, nil, fmt.Errorf("cosigner config does not exist for our shard ID %d", security.GetID())
+		return nil, nil, fmt.Errorf("cosigner config does not exist for our shard Index %d", security.GetID())
 	}
 
 	localCosigner := signer.NewLocalCosigner(
@@ -74,7 +74,7 @@ func NewThresholdValidator(
 		return nil, nil, fmt.Errorf("error creating raft directory: %w", err)
 	}
 
-	// RAFT node ID is the cosigner ID
+	// RAFT node Index is the cosigner Index
 	nodeID := fmt.Sprint(security.GetID())
 
 	// Start RAFT store listener

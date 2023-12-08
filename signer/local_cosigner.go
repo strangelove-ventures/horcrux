@@ -33,7 +33,7 @@ type LocalCosigner struct {
 	address       string
 	pendingDiskWG sync.WaitGroup
 
-	nonces map[uuid.UUID]*NoncesWithExpiration
+	nonces map[uuid.UUID]*types.NoncesWithExpiration
 	// protects the nonces map
 	noncesMu sync.RWMutex
 }
@@ -49,7 +49,7 @@ func NewLocalCosigner(
 		config:   config,
 		security: security,
 		address:  address,
-		nonces:   make(map[uuid.UUID]*NoncesWithExpiration),
+		nonces:   make(map[uuid.UUID]*types.NoncesWithExpiration),
 	}
 }
 
@@ -86,7 +86,7 @@ func (cosigner *LocalCosigner) pruneNonces() {
 	}
 }
 
-func (cosigner *LocalCosigner) combinedNonces(myID int, threshold uint8, uuid uuid.UUID) ([]Nonce, error) {
+func (cosigner *LocalCosigner) combinedNonces(myID int, threshold uint8, uuid uuid.UUID) ([]types.Nonce, error) {
 	cosigner.noncesMu.RLock()
 	defer cosigner.noncesMu.RUnlock()
 
@@ -95,7 +95,7 @@ func (cosigner *LocalCosigner) combinedNonces(myID int, threshold uint8, uuid uu
 		return nil, errors.New("no metadata at HRS")
 	}
 
-	combinedNonces := make([]Nonce, 0, threshold)
+	combinedNonces := make([]types.Nonce, 0, threshold)
 
 	// calculate secret and public keys
 	for _, c := range nonces.Nonces {
@@ -103,7 +103,7 @@ func (cosigner *LocalCosigner) combinedNonces(myID int, threshold uint8, uuid uu
 			continue
 		}
 
-		combinedNonces = append(combinedNonces, Nonce{
+		combinedNonces = append(combinedNonces, types.Nonce{
 			Share:  c.Shares[myID-1],
 			PubKey: c.PubKey,
 		})
@@ -136,7 +136,7 @@ func (cosigner *LocalCosigner) waitForSignStatesToFlushToDisk() {
 
 // GetID returns the id of the cosigner
 // Implements Cosigner interface
-func (cosigner *LocalCosigner) GetID() int {
+func (cosigner *LocalCosigner) GetIndex() int {
 	return cosigner.security.GetID()
 }
 
@@ -176,7 +176,7 @@ func (cosigner *LocalCosigner) GetPubKey(chainID string) (cometcrypto.PubKey, er
 }
 
 // CombineSignatures combines partial signatures into a full signature.
-func (cosigner *LocalCosigner) CombineSignatures(chainID string, signatures []PartialSignature) ([]byte, error) {
+func (cosigner *LocalCosigner) CombineSignatures(chainID string, signatures []types.PartialSignature) ([]byte, error) {
 	ccs, err := cosigner.getChainState(chainID)
 	if err != nil {
 		return nil, err
@@ -235,7 +235,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	}
 
 	nonces, err := cosigner.combinedNonces(
-		cosigner.GetID(),
+		cosigner.GetIndex(),
 		uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
 		req.UUID,
 	)
@@ -274,9 +274,9 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	return res, nil
 }
 
-func (cosigner *LocalCosigner) generateNonces() ([]Nonces, error) {
+func (cosigner *LocalCosigner) generateNonces() ([]types.Nonces, error) {
 	total := len(cosigner.config.Config.ThresholdModeConfig.Cosigners)
-	meta := make([]Nonces, total)
+	meta := make([]types.Nonces, total)
 
 	nonces, err := GenerateNonces(
 		uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
@@ -286,7 +286,7 @@ func (cosigner *LocalCosigner) generateNonces() ([]Nonces, error) {
 		return nil, err
 	}
 
-	meta[cosigner.GetID()-1] = nonces
+	meta[cosigner.GetIndex()-1] = nonces
 
 	return meta, nil
 }
@@ -307,7 +307,7 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 
 	var signer ThresholdSigner
 
-	signer, err = NewThresholdSignerSoft(cosigner.config, cosigner.GetID(), chainID)
+	signer, err = NewThresholdSignerSoft(cosigner.config, cosigner.GetIndex(), chainID)
 	if err != nil {
 		return err
 	}
@@ -331,7 +331,7 @@ func (cosigner *LocalCosigner) GetNonces(
 
 	res := make(CosignerUUIDNoncesMultiple, len(uuids))
 
-	id := cosigner.GetID()
+	id := cosigner.GetIndex()
 
 	var outerEg errgroup.Group
 	// getting nonces requires encrypting and signing for each cosigner,
@@ -387,7 +387,7 @@ func (cosigner *LocalCosigner) GetNonces(
 	return res, nil
 }
 
-func (cosigner *LocalCosigner) generateNoncesIfNecessary(uuid uuid.UUID) (*NoncesWithExpiration, error) {
+func (cosigner *LocalCosigner) generateNoncesIfNecessary(uuid uuid.UUID) (*types.NoncesWithExpiration, error) {
 	// protects the meta map
 	cosigner.noncesMu.Lock()
 	defer cosigner.noncesMu.Unlock()
@@ -401,7 +401,7 @@ func (cosigner *LocalCosigner) generateNoncesIfNecessary(uuid uuid.UUID) (*Nonce
 		return nil, err
 	}
 
-	res := NoncesWithExpiration{
+	res := types.NoncesWithExpiration{
 		Nonces:     newNonces,
 		Expiration: time.Now().Add(nonceExpiration),
 	}
@@ -418,7 +418,7 @@ func (cosigner *LocalCosigner) getNonce(
 ) (CosignerNonce, error) {
 	zero := CosignerNonce{}
 
-	id := cosigner.GetID()
+	id := cosigner.GetIndex()
 
 	meta, err := cosigner.generateNoncesIfNecessary(uuid)
 	if err != nil {
@@ -464,7 +464,7 @@ func (cosigner *LocalCosigner) setNonce(uuid uuid.UUID, nonce CosignerNonce) err
 	if n.Nonces[nonce.SourceID-1].Shares == nil {
 		n.Nonces[nonce.SourceID-1].Shares = make([][]byte, len(cosigner.config.Config.ThresholdModeConfig.Cosigners))
 	}
-	n.Nonces[nonce.SourceID-1].Shares[cosigner.GetID()-1] = nonceShare
+	n.Nonces[nonce.SourceID-1].Shares[cosigner.GetIndex()-1] = nonceShare
 	n.Nonces[nonce.SourceID-1].PubKey = noncePub
 
 	return nil

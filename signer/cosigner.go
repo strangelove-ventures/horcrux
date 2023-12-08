@@ -1,3 +1,6 @@
+/*
+Package signer: Cosinger is responsible for the network communication between the cosigners
+*/
 package signer
 
 import (
@@ -11,12 +14,19 @@ import (
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 )
 
+type Localcosigner interface {
+	// TODO - add methods
+}
+type Remotecosigner interface {
+	// TODO - add methods
+}
+
 // Cosigner interface is a set of methods for an m-of-n threshold signature.
 // This interface abstracts the underlying key storage and management
 type Cosigner interface {
-	// Get the ID of the cosigner
-	// The ID is the shamir index: 1, 2, etc...
-	GetID() int
+	// GetIndex gets the index of the cosigner
+	// The index is the shamir index: 1, 2, etc...
+	GetIndex() int
 
 	// Get the P2P URL (GRPC and Raft)
 	GetAddress() string
@@ -37,7 +47,7 @@ type Cosigners []Cosigner
 
 func (cosigners Cosigners) GetByID(id int) Cosigner {
 	for _, cosigner := range cosigners {
-		if cosigner.GetID() == id {
+		if cosigner.GetIndex() == id {
 			return cosigner
 		}
 	}

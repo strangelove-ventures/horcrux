@@ -24,7 +24,7 @@ func leaderElectionCmd() *cobra.Command {
 		Use:   "elect [node_id]",
 		Short: "Elect new raft leader",
 		Long: `To choose the next eligible leader, pass no argument.
-To choose a specific leader, pass that leader's ID as an argument.
+To choose a specific leader, pass that leader's Index as an argument.
 `,
 		Args: cobra.RangeArgs(0, 1),
 		Example: `horcrux elect # elect next eligible leader
@@ -140,7 +140,7 @@ func getLeaderCmd() *cobra.Command {
 			}
 
 			if p2pListen == "" {
-				return fmt.Errorf("cosigner config does not exist for our shard ID %d", id)
+				return fmt.Errorf("cosigner config does not exist for our shard Index %d", id)
 			}
 
 			retryOpts := []grpcretry.CallOption{

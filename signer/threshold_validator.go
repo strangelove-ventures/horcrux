@@ -77,7 +77,7 @@ func NewThresholdValidator(
 	copy(allCosigners[1:], peerCosigners)
 
 	for _, cosigner := range peerCosigners {
-		logger.Debug("Peer cosigner", "id", cosigner.GetID())
+		logger.Debug("Peer cosigner", "id", cosigner.GetIndex())
 	}
 
 	nc := NewCosignerNonceCache(
@@ -162,7 +162,8 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(
 	// There was an error saving the last sign state, so check if there is an existing signature for this block.
 	existingSignature, existingTimestamp, sameBlockErr := pv.getExistingBlockSignature(chainID, block)
 
-	if _, ok := err.(*types.SameHRSError); !ok {
+	var sameHRSError *types.SameHRSError
+	if !errors.As(err, &sameHRSError) {
 		if sameBlockErr == nil {
 			return existingSignature, block.Timestamp, nil
 		}
@@ -178,7 +179,8 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(
 		return nil, time.Time{}, nil
 	}
 
-	if _, ok := sameBlockErr.(*StillWaitingForBlockError); !ok {
+	var stillWaitingForBlockError *StillWaitingForBlockError
+	if !errors.As(sameBlockErr, &stillWaitingForBlockError) {
 		// we have an error other than still waiting for block. return error.
 		return nil, existingTimestamp, fmt.Errorf(
 			"same block error, but we are not still waiting for signature: %w",
@@ -506,7 +508,7 @@ func (pv *ThresholdValidator) waitForPeerNonces(
 		missedNonces.WithLabelValues(peer.GetAddress()).Inc()
 		totalMissedNonces.WithLabelValues(peer.GetAddress()).Inc()
 
-		pv.logger.Error("Error getting nonces", "cosigner", peer.GetID(), "err", err)
+		pv.logger.Error("Error getting nonces", "cosigner", peer.GetIndex(), "err", err)
 		return
 	}
 
@@ -546,7 +548,7 @@ func (pv *ThresholdValidator) proxyIfNecessary(
 		return true, nil, stamp, fmt.Errorf("timed out waiting for raft leader")
 	}
 
-	if leader == pv.myCosigner.GetID() {
+	if leader == pv.myCosigner.GetIndex() {
 		return false, nil, time.Time{}, nil
 	}
 
@@ -673,7 +675,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 	cosignersForThisBlockInt := make([]int, len(cosignersForThisBlock))
 
 	for i, cosigner := range cosignersForThisBlock {
-		cosignersForThisBlockInt[i] = cosigner.GetID()
+		cosignersForThisBlockInt[i] = cosigner.GetIndex()
 	}
 
 	// destination for share signatures
@@ -692,18 +694,18 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 				// set peerNonces and sign in single rpc call.
 				sigRes, err := cosigner.SetNoncesAndSign(signCtx, CosignerSetNoncesAndSignRequest{
 					ChainID:   chainID,
-					Nonces:    nonces.For(cosigner.GetID()),
+					Nonces:    nonces.For(cosigner.GetIndex()),
 					HRST:      hrst,
 					SignBytes: signBytes,
 				})
 				if err != nil {
 					log.Error(
 						"Cosigner failed to set nonces and sign",
-						"cosigner", cosigner.GetID(),
+						"cosigner", cosigner.GetIndex(),
 						"err", err.Error(),
 					)
 
-					if cosigner.GetID() == pv.myCosigner.GetID() {
+					if cosigner.GetIndex() == pv.myCosigner.GetIndex() {
 						return err
 					}
 
@@ -726,7 +728,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 				if cosigner != pv.myCosigner {
 					timedCosignerSignLag.WithLabelValues(cosigner.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
 				}
-				shareSignatures[cosigner.GetID()-1] = sigRes.Signature
+				shareSignatures[cosigner.GetIndex()-1] = sigRes.Signature
 
 				return nil
 			}
@@ -742,7 +744,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 	timedSignBlockCosignerLag.Observe(time.Since(timeStartSignBlock).Seconds())
 
 	// collect all valid responses into array of partial signatures
-	shareSigs := make([]PartialSignature, 0, pv.threshold)
+	shareSigs := make([]types.PartialSignature, 0, pv.threshold)
 	for idx, shareSig := range shareSignatures {
 		if len(shareSig) == 0 {
 			continue
@@ -753,8 +755,8 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 
 		// we are ok to use the share signatures - complete boolean
 		// prevents future concurrent access
-		shareSigs = append(shareSigs, PartialSignature{
-			ID:        idx + 1,
+		shareSigs = append(shareSigs, types.PartialSignature{
+			Index:     idx + 1,
 			Signature: sig,
 		})
 	}

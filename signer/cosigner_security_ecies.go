@@ -130,7 +130,7 @@ func NewCosignerSecurityECIES(key CosignerECIESKey) *CosignerSecurityECIES {
 	return c
 }
 
-// GetID returns the ID of the cosigner.
+// GetID returns the Index of the cosigner.
 func (c *CosignerSecurityECIES) GetID() int {
 	return c.key.ID
 }
@@ -141,10 +141,10 @@ func (c *CosignerSecurityECIES) EncryptAndSign(id int, noncePub []byte, nonceSha
 		SourceID: c.key.ID,
 	}
 
-	// grab the cosigner info for the ID being requested
+	// grab the cosigner info for the Index being requested
 	pubKey, ok := c.eciesPubKeys[id]
 	if !ok {
-		return nonce, fmt.Errorf("unknown cosigner ID: %d", id)
+		return nonce, fmt.Errorf("unknown cosigner Index: %d", id)
 	}
 
 	var encryptedPub []byte

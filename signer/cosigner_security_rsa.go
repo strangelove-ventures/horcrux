@@ -122,7 +122,7 @@ func NewCosignerSecurityRSA(key CosignerRSAKey) *CosignerSecurityRSA {
 	return c
 }
 
-// GetID returns the ID of the cosigner.
+// GetID returns the Index of the cosigner.
 func (c *CosignerSecurityRSA) GetID() int {
 	return c.key.ID
 }
@@ -133,10 +133,10 @@ func (c *CosignerSecurityRSA) EncryptAndSign(id int, noncePub []byte, nonceShare
 		SourceID: c.key.ID,
 	}
 
-	// grab the cosigner info for the ID being requested
+	// grab the cosigner info for the Index being requested
 	pubKey, ok := c.rsaPubKeys[id]
 	if !ok {
-		return nonce, fmt.Errorf("unknown cosigner ID: %d", id)
+		return nonce, fmt.Errorf("unknown cosigner Index: %d", id)
 	}
 
 	var encryptedPub []byte

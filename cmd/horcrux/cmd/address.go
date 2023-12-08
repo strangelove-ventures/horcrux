@@ -47,7 +47,7 @@ func addressCmd() *cobra.Command {
 
 				key, err := signer.LoadCosignerEd25519Key(keyFile)
 				if err != nil {
-					return fmt.Errorf("error reading cosigner key: %w, check that key is present for chain ID: %s", err, chainID)
+					return fmt.Errorf("error reading cosigner key: %w, check that key is present for chain Index: %s", err, chainID)
 				}
 
 				pubKey = key.PubKey
@@ -58,7 +58,7 @@ func addressCmd() *cobra.Command {
 				}
 				keyFile, err := config.KeyFileExistsSingleSigner(chainID)
 				if err != nil {
-					return fmt.Errorf("error reading priv-validator key: %w, check that key is present for chain ID: %s", err, chainID)
+					return fmt.Errorf("error reading priv-validator key: %w, check that key is present for chain Index: %s", err, chainID)
 				}
 
 				filePV := cometprivval.LoadFilePVEmptyState(keyFile, "")

@@ -71,7 +71,7 @@ func TestSingleSignerValidator(t *testing.T) {
 	_, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposal))
 	require.NoError(t, err)
 
-	// construct different block ID for proposal at same height as highest signed
+	// construct different block Index for proposal at same height as highest signed
 	randHash := cometrand.Bytes(tmhash.Size)
 	blockID := cometproto.BlockID{Hash: randHash,
 		PartSetHeader: cometproto.PartSetHeader{Total: 5, Hash: randHash}}
@@ -93,7 +93,7 @@ func TestSingleSignerValidator(t *testing.T) {
 	_, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposal))
 	require.Error(t, err, "double sign!")
 
-	// lower LSS should sign for different chain ID
+	// lower LSS should sign for different chain Index
 	_, _, err = validator.Sign(ctx, "different", types.ProposalToBlock("different", &proposal))
 	require.NoError(t, err)
 
