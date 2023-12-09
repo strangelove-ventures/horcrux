@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
@@ -22,7 +23,7 @@ type CosignerNonceCache struct {
 
 	leader Leader
 
-	lastReconcileNonces lastCount
+	lastReconcileNonces atomic.Uint64
 	lastReconcileTime   time.Time
 
 	getNoncesInterval time.Duration
@@ -84,29 +85,6 @@ func (m *movingAverage) average() float64 {
 	}
 
 	return weightedSum / duration
-}
-
-type lastCount struct {
-	count int
-	mu    sync.RWMutex
-}
-
-func (lc *lastCount) Set(n int) {
-	lc.mu.Lock()
-	defer lc.mu.Unlock()
-	lc.count = n
-}
-
-func (lc *lastCount) Inc() {
-	lc.mu.Lock()
-	defer lc.mu.Unlock()
-	lc.count++
-}
-
-func (lc *lastCount) Get() int {
-	lc.mu.RLock()
-	defer lc.mu.RUnlock()
-	return lc.count
 }
 
 type NonceCachePruner interface {
@@ -174,7 +152,7 @@ func NewCosignerNonceCache(
 		nonceExpiration:   nonceExpiration,
 		threshold:         threshold,
 		pruner:            pruner,
-		empty:             make(chan struct{}, 1),
+		empty:             make(chan struct{}, 1000),               // buffer up to 1000 empty events so that we don't ever block
 		movingAverage:     newMovingAverage(4 * getNoncesInterval), // weighted average over 4 intervals
 	}
 	// the only time pruner is expected to be non-nil is during tests, otherwise we use the cache logic.
@@ -211,9 +189,9 @@ func (cnc *CosignerNonceCache) reconcile(ctx context.Context) {
 	remainingNonces := cnc.cache.Size()
 	timeSinceLastReconcile := time.Since(cnc.lastReconcileTime)
 
-	lastReconcileNonces := cnc.lastReconcileNonces.Get()
+	lastReconcileNonces := cnc.lastReconcileNonces.Load()
 	// calculate nonces per minute
-	noncesPerMin := float64(lastReconcileNonces-remainingNonces-pruned) / timeSinceLastReconcile.Minutes()
+	noncesPerMin := float64(int(lastReconcileNonces)-remainingNonces-pruned) / timeSinceLastReconcile.Minutes()
 	if noncesPerMin < 0 {
 		noncesPerMin = 0
 	}
@@ -230,7 +208,7 @@ func (cnc *CosignerNonceCache) reconcile(ctx context.Context) {
 	additional := t - remainingNonces
 
 	defer func() {
-		cnc.lastReconcileNonces.Set(remainingNonces + additional)
+		cnc.lastReconcileNonces.Store(uint64(remainingNonces + additional))
 		cnc.lastReconcileTime = time.Now()
 	}()
 
@@ -325,7 +303,7 @@ func (cnc *CosignerNonceCache) LoadN(ctx context.Context, n int) {
 }
 
 func (cnc *CosignerNonceCache) Start(ctx context.Context) {
-	cnc.lastReconcileNonces.Set(cnc.cache.Size())
+	cnc.lastReconcileNonces.Store(uint64(cnc.cache.Size()))
 	cnc.lastReconcileTime = time.Now()
 
 	ticker := time.NewTicker(cnc.getNoncesInterval)
@@ -334,10 +312,13 @@ func (cnc *CosignerNonceCache) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			cnc.reconcile(ctx)
 		case <-cnc.empty:
-			cnc.reconcile(ctx)
+			// clear out channel
+			for len(cnc.empty) > 0 {
+				<-cnc.empty
+			}
 		}
+		cnc.reconcile(ctx)
 	}
 }
 
@@ -365,7 +346,7 @@ CheckNoncesLoop:
 		// remove this set of nonces from the cache
 		cnc.cache.Delete(i)
 
-		if len(cnc.cache.cache) == 0 {
+		if len(cnc.cache.cache) == 0 && len(cnc.empty) == 0 {
 			cnc.logger.Debug("Nonce cache is empty, triggering reload")
 			cnc.empty <- struct{}{}
 		}
@@ -378,7 +359,7 @@ CheckNoncesLoop:
 	}
 
 	// increment so it's taken into account in the nonce burn rate in the next reconciliation
-	cnc.lastReconcileNonces.Inc()
+	cnc.lastReconcileNonces.Add(1)
 
 	// no nonces found
 	cosignerInts := make([]int, len(fastestPeers))

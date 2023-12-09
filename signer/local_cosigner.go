@@ -387,10 +387,10 @@ func (cosigner *LocalCosigner) GetNonces(
 
 func (cosigner *LocalCosigner) generateNoncesIfNecessary(uuid uuid.UUID) (*NoncesWithExpiration, error) {
 	// protects the meta map
-	cosigner.noncesMu.Lock()
-	defer cosigner.noncesMu.Unlock()
-
-	if nonces, ok := cosigner.nonces[uuid]; ok {
+	cosigner.noncesMu.RLock()
+	nonces, ok := cosigner.nonces[uuid]
+	cosigner.noncesMu.RUnlock()
+	if ok {
 		return nonces, nil
 	}
 
@@ -404,7 +404,10 @@ func (cosigner *LocalCosigner) generateNoncesIfNecessary(uuid uuid.UUID) (*Nonce
 		Expiration: time.Now().Add(nonceExpiration),
 	}
 
+	cosigner.noncesMu.Lock()
 	cosigner.nonces[uuid] = &res
+	cosigner.noncesMu.Unlock()
+
 	return &res, nil
 }
 
