@@ -94,7 +94,8 @@ grpcAddr: ""
 				"--raft-timeout", "500ms",
 				"--grpc-timeout", "500ms",
 			},
-			expectErr: `failed to parse cosigner (shard Index: 1) p2p address: parse "://10.168.1.1:2222": missing protocol scheme`,
+			expectErr: `failed to parse cosigner (shard Index: 1) p2p address: 
+									parse "://10.168.1.1:2222": missing protocol scheme`,
 		},
 		{
 			name: "invalid threshold",

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 
 	"gitlab.com/unit410/edwards25519"
