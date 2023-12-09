@@ -152,8 +152,9 @@ func NewCosignerNonceCache(
 		nonceExpiration:   nonceExpiration,
 		threshold:         threshold,
 		pruner:            pruner,
-		empty:             make(chan struct{}, 1000),               // buffer up to 1000 empty events so that we don't ever block
-		movingAverage:     newMovingAverage(4 * getNoncesInterval), // weighted average over 4 intervals
+		// buffer up to 1000 empty events so that we don't ever block
+		empty:         make(chan struct{}, 1000),
+		movingAverage: newMovingAverage(4 * getNoncesInterval), // weighted average over 4 intervals
 	}
 	// the only time pruner is expected to be non-nil is during tests, otherwise we use the cache logic.
 	if pruner == nil {
