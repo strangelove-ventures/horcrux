@@ -2,8 +2,6 @@ package signer
 
 import (
 	"encoding/json"
-	"os"
-
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	cometcryptoencoding "github.com/cometbft/cometbft/crypto/encoding"
@@ -12,6 +10,7 @@ import (
 )
 
 // CosignerEd25519Key is a single Ed255219 key shard for an m-of-n threshold signer.
+// TODO: CosignerEd25519Key is almost a duplicate of ThresholdSignerEd25519Key
 type CosignerEd25519Key struct {
 	PubKey       cometcrypto.PubKey `json:"pubKey"`
 	PrivateShard []byte             `json:"privateShard"`
@@ -82,20 +81,4 @@ func (key *CosignerEd25519Key) UnmarshalJSON(data []byte) error {
 
 	key.PubKey = pubkey
 	return nil
-}
-
-// LoadCosignerEd25519Key loads a CosignerEd25519Key from file.
-func LoadCosignerEd25519Key(file string) (CosignerEd25519Key, error) {
-	pvKey := CosignerEd25519Key{}
-	keyJSONBytes, err := os.ReadFile(file)
-	if err != nil {
-		return pvKey, err
-	}
-
-	err = json.Unmarshal(keyJSONBytes, &pvKey)
-	if err != nil {
-		return pvKey, err
-	}
-
-	return pvKey, nil
 }

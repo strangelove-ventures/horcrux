@@ -257,7 +257,7 @@ func getShardedPrivvalKey(ctx context.Context, node *cosmos.ChainNode, threshold
 		return nil, nil, err
 	}
 
-	ed25519Shards := signer.CreateCosignerEd25519Shards(pvKey, threshold, shards)
+	ed25519Shards := signer.CreateEd25519ThresholdSignShards(pvKey, threshold, shards)
 
 	return ed25519Shards, pvKey.PubKey, nil
 }

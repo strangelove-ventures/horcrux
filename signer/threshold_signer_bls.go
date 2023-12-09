@@ -26,7 +26,7 @@ func NewThresholdSignerSoftBLS(config *RuntimeConfig, id int, chainID string) (*
 		return nil, err
 	}
 
-	key, err := LoadCosignerEd25519Key(keyFile)
+	key, err := LoadThresholdSignerEd25519Key(keyFile)
 	if err != nil {
 		return nil, fmt.Errorf("error reading cosigner key: %s", err)
 	}

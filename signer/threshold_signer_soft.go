@@ -27,7 +27,7 @@ func NewThresholdSignerSoft(config *RuntimeConfig, id int, chainID string) (*Thr
 		return nil, err
 	}
 
-	key, err := LoadCosignerEd25519Key(keyFile)
+	key, err := LoadThresholdSignerEd25519Key(keyFile)
 	if err != nil {
 		return nil, fmt.Errorf("error reading cosigner key: %s", err)
 	}
@@ -87,6 +87,7 @@ func (s *ThresholdSignerSoft) sumNonces(nonces []types.Nonce) (tsed25519.Scalar,
 	return nonceShare, noncePub, nil
 }
 
+// GenerateNonces is a function that generates Nonces to be used in the MPC
 func GenerateNonces(threshold, total uint8) (types.Nonces, error) {
 	secret := make([]byte, 32)
 	if _, err := rand.Read(secret); err != nil {

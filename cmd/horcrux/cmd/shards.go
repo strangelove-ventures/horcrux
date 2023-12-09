@@ -112,7 +112,7 @@ func createCosignerEd25519ShardsCmd() *cobra.Command {
 				return nil
 			}
 
-			csKeys, err := signer.CreateCosignerEd25519ShardsFromFile(keyFile, threshold, shards)
+			csKeys, err := signer.CreateEd25519ThresholdSignShardsFromFile(keyFile, threshold, shards)
 			if err != nil {
 				return err
 			}

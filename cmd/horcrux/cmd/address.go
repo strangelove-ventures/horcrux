@@ -45,9 +45,9 @@ func addressCmd() *cobra.Command {
 					return err
 				}
 
-				key, err := signer.LoadCosignerEd25519Key(keyFile)
+				key, err := signer.LoadThresholdSignerEd25519Key(keyFile)
 				if err != nil {
-					return fmt.Errorf("error reading cosigner key: %w, check that key is present for chain Index: %s", err, chainID)
+					return fmt.Errorf("error reading threshold key: %w, check that key is present for chain id: %s", err, chainID)
 				}
 
 				pubKey = key.PubKey
