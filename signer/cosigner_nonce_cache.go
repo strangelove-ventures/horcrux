@@ -306,7 +306,7 @@ func (cnc *CosignerNonceCache) Start(ctx context.Context) {
 	cnc.lastReconcileNonces.Store(uint64(cnc.cache.Size()))
 	cnc.lastReconcileTime = time.Now()
 
-	ticker := time.NewTicker(cnc.getNoncesInterval)
+	ticker := time.NewTimer(cnc.getNoncesInterval)
 	for {
 		select {
 		case <-ctx.Done():
@@ -319,6 +319,7 @@ func (cnc *CosignerNonceCache) Start(ctx context.Context) {
 			}
 		}
 		cnc.reconcile(ctx)
+		ticker.Reset(cnc.getNoncesInterval)
 	}
 }
 
