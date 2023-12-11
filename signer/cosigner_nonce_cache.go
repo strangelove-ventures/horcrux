@@ -374,23 +374,23 @@ CheckNoncesLoop:
 func (cnc *CosignerNonceCache) PruneNonces() int {
 	cnc.cache.mu.Lock()
 	defer cnc.cache.mu.Unlock()
-	nonExpiredIndex := len(cnc.cache.cache) - 1
-	for i := len(cnc.cache.cache) - 1; i >= 0; i-- {
+	nonExpiredIndex := -1
+	for i := 0; i < len(cnc.cache.cache); i++ {
 		if time.Now().Before(cnc.cache.cache[i].Expiration) {
 			nonExpiredIndex = i
 			break
 		}
-		if i == 0 {
+		if i == (len(cnc.cache.cache) - 1) {
 			deleteCount := len(cnc.cache.cache)
 			cnc.cache.cache = nil
 			return deleteCount
 		}
 	}
-	deleteCount := len(cnc.cache.cache) - nonExpiredIndex - 1
-	if nonExpiredIndex != len(cnc.cache.cache)-1 {
-		cnc.cache.cache = cnc.cache.cache[:nonExpiredIndex+1]
+	if nonExpiredIndex != -1 {
+		cnc.cache.cache = cnc.cache.cache[nonExpiredIndex:]
 	}
-	return deleteCount
+	// return delete count
+	return nonExpiredIndex + 1
 }
 
 func (cnc *CosignerNonceCache) ClearNonces(cosigner Cosigner) {
