@@ -181,9 +181,9 @@ func TestNonceCacheExpiration(t *testing.T) {
 
 	mp := &mockPruner{}
 
-	noncesExpiration := 500*time.Millisecond
+	noncesExpiration := 500 * time.Millisecond
 	getNoncesInterval := noncesExpiration / 5
-	getNoncesTimeout := 10*time.Millisecond
+	getNoncesTimeout := 10 * time.Millisecond
 	nonceCache := NewCosignerNonceCache(
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)),
 		cosigners,
@@ -206,13 +206,13 @@ func TestNonceCacheExpiration(t *testing.T) {
 	go nonceCache.Start(ctx)
 
 	// Sleep for 1/2 nonceExpiration, no nonces should have expired yet
-	time.Sleep(noncesExpiration * 1/2)
+	time.Sleep(noncesExpiration / 2)
 
 	// Load second set of 100 nonces
 	nonceCache.LoadN(ctx, loadN)
 
 	// Wait for first set of nonces to expire + wait for the interval to have run
-	time.Sleep(noncesExpiration * 1/2 + getNoncesInterval)
+	time.Sleep((noncesExpiration / 2) + getNoncesInterval)
 
 	count, pruned := mp.Result()
 

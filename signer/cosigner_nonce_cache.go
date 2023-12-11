@@ -392,7 +392,6 @@ func (cnc *CosignerNonceCache) PruneNonces() int {
 		deleteCount = nonExpiredIndex
 		cnc.cache.cache = cnc.cache.cache[nonExpiredIndex:]
 	}
-	
 	return deleteCount
 }
 
