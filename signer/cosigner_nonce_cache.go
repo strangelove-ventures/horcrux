@@ -380,17 +380,20 @@ func (cnc *CosignerNonceCache) PruneNonces() int {
 			nonExpiredIndex = i
 			break
 		}
-		if i == (len(cnc.cache.cache) - 1) {
-			deleteCount := len(cnc.cache.cache)
-			cnc.cache.cache = nil
-			return deleteCount
-		}
 	}
-	if nonExpiredIndex != -1 {
+
+	var deleteCount int
+	if nonExpiredIndex == -1 {
+		// No non-expired nonces, delete everything
+		deleteCount = len(cnc.cache.cache)
+		cnc.cache.cache = nil
+	} else {
+		// Prune everything up to the non-expired nonce
+		deleteCount = nonExpiredIndex
 		cnc.cache.cache = cnc.cache.cache[nonExpiredIndex:]
 	}
-	// return delete count
-	return nonExpiredIndex + 1
+	
+	return deleteCount
 }
 
 func (cnc *CosignerNonceCache) ClearNonces(cosigner Cosigner) {

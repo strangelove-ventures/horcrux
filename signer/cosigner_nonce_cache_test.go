@@ -168,8 +168,8 @@ func TestNonceCacheDemand(t *testing.T) {
 
 	count, pruned := mp.Result()
 
-	require.Greater(t, count, 0)
-	require.Equal(t, 0, pruned)
+	require.Greater(t, 0, count, "count of pruning calls must be greater than 0")
+	require.Equal(t, 0, pruned, "no nonces should have been pruned")
 }
 
 func TestNonceCacheExpiration(t *testing.T) {
@@ -181,13 +181,16 @@ func TestNonceCacheExpiration(t *testing.T) {
 
 	mp := &mockPruner{}
 
+	noncesExpiration := 500*time.Millisecond
+	getNoncesInterval := noncesExpiration / 5
+	getNoncesTimeout := 10*time.Millisecond
 	nonceCache := NewCosignerNonceCache(
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)),
 		cosigners,
 		&MockLeader{id: 1, leader: &ThresholdValidator{myCosigner: lcs[0]}},
-		250*time.Millisecond,
-		10*time.Millisecond,
-		500*time.Millisecond,
+		getNoncesInterval,
+		getNoncesTimeout,
+		noncesExpiration,
 		2,
 		mp,
 	)
@@ -196,27 +199,35 @@ func TestNonceCacheExpiration(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	const loadN = 500
-
+	const loadN = 100
+	// Load first set of 100 nonces
 	nonceCache.LoadN(ctx, loadN)
 
 	go nonceCache.Start(ctx)
 
-	time.Sleep(1 * time.Second)
+	// Sleep for 1/2 nonceExpiration, no nonces should have expired yet
+	time.Sleep(noncesExpiration * 1/2)
+
+	// Load second set of 100 nonces
+	nonceCache.LoadN(ctx, loadN)
+
+	// Wait for first set of nonces to expire + wait for the interval to have run
+	time.Sleep(noncesExpiration * 1/2 + getNoncesInterval)
 
 	count, pruned := mp.Result()
 
-	// we should have pruned at least three times after
-	// waiting for a second with a reconcile interval of 250ms
-	require.GreaterOrEqual(t, count, 3)
+	// we should have pruned at least 5 times after
+	// waiting for 600ms with a reconcile interval of 100ms
+	require.GreaterOrEqual(t, count, 5)
 
-	// we should have pruned at least the number of nonces we loaded and knew would expire
-	require.GreaterOrEqual(t, pruned, loadN)
+	// we should have pruned only the first set of nonces
+	// The second set of nonces should not have expired yet and we should not have load any more
+	require.Equal(t, pruned, loadN)
 
 	cancel()
 
-	// the cache should be empty or 1 since no nonces are being consumed.
-	require.LessOrEqual(t, nonceCache.cache.Size(), 1)
+	// the cache should be 100 (loadN) as the second set should not have expired.
+	require.LessOrEqual(t, nonceCache.cache.Size(), loadN)
 }
 
 func TestNonceCacheDemandSlow(t *testing.T) {
