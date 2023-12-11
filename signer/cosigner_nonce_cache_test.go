@@ -98,7 +98,23 @@ func TestClearNonces(t *testing.T) {
 
 	for _, n := range cnc.cache.cache {
 		require.Len(t, n.Nonces, 2)
+		oneFound := false
+		twoFound := false
+		for _, cnr := range n.Nonces {
+			if cnr.Cosigner == cosigners[1] {
+				oneFound = true
+			}
+			if cnr.Cosigner == cosigners[2] {
+				twoFound = true
+			}
+		}
+		require.True(t, oneFound)
+		require.True(t, twoFound)
 	}
+
+	cnc.ClearNonces(cosigners[1])
+
+	require.Equal(t, 0, cnc.cache.Size())
 }
 
 type mockPruner struct {
