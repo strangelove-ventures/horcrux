@@ -168,7 +168,7 @@ func TestNonceCacheDemand(t *testing.T) {
 
 	count, pruned := mp.Result()
 
-	require.Greater(t, 0, count, "count of pruning calls must be greater than 0")
+	require.Greater(t, count, 0, "count of pruning calls must be greater than 0")
 	require.Equal(t, 0, pruned, "no nonces should have been pruned")
 }
 
