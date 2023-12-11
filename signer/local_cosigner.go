@@ -340,6 +340,11 @@ func (cosigner *LocalCosigner) GetNonces(
 		u := u
 
 		outerEg.Go(func() error {
+			meta, err := cosigner.generateNoncesIfNecessary(u)
+			if err != nil {
+				return err
+			}
+
 			var eg errgroup.Group
 
 			nonces := make([]CosignerNonce, total-1)
@@ -353,7 +358,7 @@ func (cosigner *LocalCosigner) GetNonces(
 				i := i
 
 				eg.Go(func() error {
-					secretPart, err := cosigner.getNonce(u, peerID)
+					secretPart, err := cosigner.getNonce(meta, peerID)
 
 					if i >= id {
 						nonces[i-1] = secretPart
@@ -387,10 +392,10 @@ func (cosigner *LocalCosigner) GetNonces(
 
 func (cosigner *LocalCosigner) generateNoncesIfNecessary(uuid uuid.UUID) (*NoncesWithExpiration, error) {
 	// protects the meta map
-	cosigner.noncesMu.Lock()
-	defer cosigner.noncesMu.Unlock()
-
-	if nonces, ok := cosigner.nonces[uuid]; ok {
+	cosigner.noncesMu.RLock()
+	nonces, ok := cosigner.nonces[uuid]
+	cosigner.noncesMu.RUnlock()
+	if ok {
 		return nonces, nil
 	}
 
@@ -404,24 +409,22 @@ func (cosigner *LocalCosigner) generateNoncesIfNecessary(uuid uuid.UUID) (*Nonce
 		Expiration: time.Now().Add(nonceExpiration),
 	}
 
+	cosigner.noncesMu.Lock()
 	cosigner.nonces[uuid] = &res
+	cosigner.noncesMu.Unlock()
+
 	return &res, nil
 }
 
 // Get the ephemeral secret part for an ephemeral share
 // The ephemeral secret part is encrypted for the receiver
 func (cosigner *LocalCosigner) getNonce(
-	uuid uuid.UUID,
+	meta *NoncesWithExpiration,
 	peerID int,
 ) (CosignerNonce, error) {
 	zero := CosignerNonce{}
 
 	id := cosigner.GetID()
-
-	meta, err := cosigner.generateNoncesIfNecessary(uuid)
-	if err != nil {
-		return zero, err
-	}
 
 	ourCosignerMeta := meta.Nonces[id-1]
 	nonce, err := cosigner.security.EncryptAndSign(peerID, ourCosignerMeta.PubKey, ourCosignerMeta.Shares[peerID-1])
