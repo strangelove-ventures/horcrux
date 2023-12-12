@@ -735,7 +735,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 						"err", err.Error(),
 					)
 
-					if strings.Contains(err.Error(), "unexpected state, metadata does not exist for U:") {
+					if strings.Contains(err.Error(), errUnexpectedState) {
 						pv.nonceCache.ClearNonces(cosigner)
 					}
 

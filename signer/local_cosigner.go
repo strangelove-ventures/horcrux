@@ -435,6 +435,8 @@ func (cosigner *LocalCosigner) getNonce(
 	return nonce, nil
 }
 
+const errUnexpectedState = "unexpected state, metadata does not exist for U:"
+
 // setNonce stores a nonce provided by another cosigner
 func (cosigner *LocalCosigner) setNonce(uuid uuid.UUID, nonce CosignerNonce) error {
 	// Verify the source signature
@@ -456,7 +458,8 @@ func (cosigner *LocalCosigner) setNonce(uuid uuid.UUID, nonce CosignerNonce) err
 	// generate metadata placeholder
 	if !ok {
 		return fmt.Errorf(
-			"unexpected state, metadata does not exist for U: %s",
+			"%s %s",
+			errUnexpectedState,
 			uuid,
 		)
 	}
