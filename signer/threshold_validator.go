@@ -84,7 +84,7 @@ func NewThresholdValidator(
 		allCosigners,
 		leader,
 		defaultGetNoncesInterval,
-		defaultGetNoncesTimeout,
+		grpcTimeout,
 		defaultNonceExpiration,
 		uint8(threshold),
 		nil,
