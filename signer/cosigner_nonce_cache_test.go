@@ -181,7 +181,7 @@ func TestNonceCacheExpiration(t *testing.T) {
 
 	mp := &mockPruner{}
 
-	noncesExpiration := 500 * time.Millisecond
+	noncesExpiration := 1000 * time.Millisecond
 	getNoncesInterval := noncesExpiration / 5
 	getNoncesTimeout := 10 * time.Millisecond
 	nonceCache := NewCosignerNonceCache(
@@ -217,7 +217,7 @@ func TestNonceCacheExpiration(t *testing.T) {
 	count, pruned := mp.Result()
 
 	// we should have pruned at least 5 times after
-	// waiting for 600ms with a reconcile interval of 100ms
+	// waiting for 1200ms with a reconcile interval of 200ms
 	require.GreaterOrEqual(t, count, 5)
 
 	// we should have pruned only the first set of nonces
