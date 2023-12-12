@@ -15,6 +15,7 @@ const (
 	defaultGetNoncesInterval = 3 * time.Second
 	defaultGetNoncesTimeout  = 4 * time.Second
 	defaultNonceExpiration   = 10 * time.Second // half of the local cosigner cache expiration
+	nonceOverallocation      = 1.5
 )
 
 type CosignerNonceCache struct {
@@ -198,7 +199,7 @@ func (cnc *CosignerNonceCache) getUuids(n int) []uuid.UUID {
 }
 
 func (cnc *CosignerNonceCache) target(noncesPerMinute float64) int {
-	t := int((noncesPerMinute / 60) * ((cnc.getNoncesInterval.Seconds() * 1.2) + 0.5))
+	t := int((noncesPerMinute / 60) * ((cnc.getNoncesInterval.Seconds() * nonceOverallocation) + float64(cnc.getNoncesTimeout.Seconds())))
 	if t <= 0 {
 		return 1 // always target at least one nonce ready
 	}
@@ -332,12 +333,12 @@ func (cnc *CosignerNonceCache) Start(ctx context.Context) {
 	cnc.lastReconcileNonces.Store(uint64(cnc.cache.Size()))
 	cnc.lastReconcileTime = time.Now()
 
-	ticker := time.NewTimer(cnc.getNoncesInterval)
+	timer := time.NewTimer(cnc.getNoncesInterval)
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.C:
+		case <-timer.C:
 		case <-cnc.empty:
 			// clear out channel
 			for len(cnc.empty) > 0 {
@@ -345,7 +346,7 @@ func (cnc *CosignerNonceCache) Start(ctx context.Context) {
 			}
 		}
 		cnc.reconcile(ctx)
-		ticker.Reset(cnc.getNoncesInterval)
+		timer.Reset(cnc.getNoncesInterval)
 	}
 }
 
