@@ -32,7 +32,7 @@ type CosignerNonceCache struct {
 
 	threshold uint8
 
-	cache NonceCache
+	cache *NonceCache
 
 	pruner NonceCachePruner
 
@@ -112,6 +112,30 @@ func (nc *NonceCache) Delete(index int) {
 	nc.cache = append(nc.cache[:index], nc.cache[index+1:]...)
 }
 
+func (nc *NonceCache) PruneNonces() int {
+	nc.mu.Lock()
+	defer nc.mu.Unlock()
+	nonExpiredIndex := -1
+	for i := 0; i < len(nc.cache); i++ {
+		if time.Now().Before(nc.cache[i].Expiration) {
+			nonExpiredIndex = i
+			break
+		}
+	}
+
+	var deleteCount int
+	if nonExpiredIndex == -1 {
+		// No non-expired nonces, delete everything
+		deleteCount = len(nc.cache)
+		nc.cache = nil
+	} else {
+		// Prune everything up to the non-expired nonce
+		deleteCount = nonExpiredIndex
+		nc.cache = nc.cache[nonExpiredIndex:]
+	}
+	return deleteCount
+}
+
 type CosignerNoncesRel struct {
 	Cosigner Cosigner
 	Nonces   CosignerNonces
@@ -152,13 +176,14 @@ func NewCosignerNonceCache(
 		nonceExpiration:   nonceExpiration,
 		threshold:         threshold,
 		pruner:            pruner,
+		cache:             new(NonceCache),
 		// buffer up to 1000 empty events so that we don't ever block
 		empty:         make(chan struct{}, 1000),
 		movingAverage: newMovingAverage(4 * getNoncesInterval), // weighted average over 4 intervals
 	}
 	// the only time pruner is expected to be non-nil is during tests, otherwise we use the cache logic.
 	if pruner == nil {
-		cnc.pruner = cnc
+		cnc.pruner = cnc.cache
 	}
 
 	return cnc
@@ -369,30 +394,6 @@ CheckNoncesLoop:
 		cosignerInts[i] = p.GetID()
 	}
 	return nil, fmt.Errorf("no nonces found involving cosigners %+v", cosignerInts)
-}
-
-func (cnc *CosignerNonceCache) PruneNonces() int {
-	cnc.cache.mu.Lock()
-	defer cnc.cache.mu.Unlock()
-	nonExpiredIndex := -1
-	for i := 0; i < len(cnc.cache.cache); i++ {
-		if time.Now().Before(cnc.cache.cache[i].Expiration) {
-			nonExpiredIndex = i
-			break
-		}
-	}
-
-	var deleteCount int
-	if nonExpiredIndex == -1 {
-		// No non-expired nonces, delete everything
-		deleteCount = len(cnc.cache.cache)
-		cnc.cache.cache = nil
-	} else {
-		// Prune everything up to the non-expired nonce
-		deleteCount = nonExpiredIndex
-		cnc.cache.cache = cnc.cache.cache[nonExpiredIndex:]
-	}
-	return deleteCount
 }
 
 func (cnc *CosignerNonceCache) ClearNonces(cosigner Cosigner) {
