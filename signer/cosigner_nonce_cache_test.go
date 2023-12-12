@@ -64,6 +64,7 @@ func TestClearNonces(t *testing.T) {
 
 	cnc := CosignerNonceCache{
 		threshold: 2,
+		cache:     new(NonceCache),
 	}
 
 	for i := 0; i < 10; i++ {
@@ -118,14 +119,14 @@ func TestClearNonces(t *testing.T) {
 }
 
 type mockPruner struct {
-	cnc    *CosignerNonceCache
+	cache  *NonceCache
 	count  int
 	pruned int
 	mu     sync.Mutex
 }
 
 func (mp *mockPruner) PruneNonces() int {
-	pruned := mp.cnc.PruneNonces()
+	pruned := mp.cache.PruneNonces()
 	mp.mu.Lock()
 	defer mp.mu.Unlock()
 	mp.count++
@@ -159,7 +160,7 @@ func TestNonceCacheDemand(t *testing.T) {
 		mp,
 	)
 
-	mp.cnc = nonceCache
+	mp.cache = nonceCache.cache
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -184,8 +185,8 @@ func TestNonceCacheDemand(t *testing.T) {
 
 	count, pruned := mp.Result()
 
-	require.Greater(t, count, 0)
-	require.Equal(t, 0, pruned)
+	require.Greater(t, count, 0, "count of pruning calls must be greater than 0")
+	require.Equal(t, 0, pruned, "no nonces should have been pruned")
 }
 
 func TestNonceCacheExpiration(t *testing.T) {
@@ -197,42 +198,206 @@ func TestNonceCacheExpiration(t *testing.T) {
 
 	mp := &mockPruner{}
 
+	noncesExpiration := 1000 * time.Millisecond
+	getNoncesInterval := noncesExpiration / 5
+	getNoncesTimeout := 10 * time.Millisecond
 	nonceCache := NewCosignerNonceCache(
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)),
 		cosigners,
 		&MockLeader{id: 1, leader: &ThresholdValidator{myCosigner: lcs[0]}},
-		250*time.Millisecond,
-		10*time.Millisecond,
-		500*time.Millisecond,
+		getNoncesInterval,
+		getNoncesTimeout,
+		noncesExpiration,
 		2,
 		mp,
 	)
 
-	mp.cnc = nonceCache
+	mp.cache = nonceCache.cache
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	const loadN = 500
-
+	const loadN = 100
+	// Load first set of 100 nonces
 	nonceCache.LoadN(ctx, loadN)
 
 	go nonceCache.Start(ctx)
 
-	time.Sleep(1 * time.Second)
+	// Sleep for 1/2 nonceExpiration, no nonces should have expired yet
+	time.Sleep(noncesExpiration / 2)
+
+	// Load second set of 100 nonces
+	nonceCache.LoadN(ctx, loadN)
+
+	// Wait for first set of nonces to expire + wait for the interval to have run
+	time.Sleep((noncesExpiration / 2) + getNoncesInterval)
 
 	count, pruned := mp.Result()
 
-	// we should have pruned at least three times after
-	// waiting for a second with a reconcile interval of 250ms
-	require.GreaterOrEqual(t, count, 3)
+	// we should have pruned at least 5 times after
+	// waiting for 1200ms with a reconcile interval of 200ms
+	require.GreaterOrEqual(t, count, 5)
 
-	// we should have pruned at least the number of nonces we loaded and knew would expire
-	require.GreaterOrEqual(t, pruned, loadN)
+	// we should have pruned only the first set of nonces
+	// The second set of nonces should not have expired yet and we should not have load any more
+	require.Equal(t, pruned, loadN)
 
 	cancel()
 
-	// the cache should be empty or 1 since no nonces are being consumed.
-	require.LessOrEqual(t, nonceCache.cache.Size(), 1)
+	// the cache should be 100 (loadN) as the second set should not have expired.
+	require.LessOrEqual(t, nonceCache.cache.Size(), loadN)
+}
+
+func TestNonceCachePrune(t *testing.T) {
+	type testCase struct {
+		name     string
+		nonces   []*CachedNonce
+		expected []*CachedNonce
+	}
+
+	now := time.Now()
+
+	testCases := []testCase{
+		{
+			name:     "no nonces",
+			nonces:   nil,
+			expected: nil,
+		},
+		{
+			name: "no expired nonces",
+			nonces: []*CachedNonce{
+				{
+					UUID:       uuid.MustParse("d6ef381f-6234-432d-b204-d8957fe60360"),
+					Expiration: now.Add(1 * time.Second),
+				},
+				{
+					UUID:       uuid.MustParse("cdc3673d-7946-459a-b458-cbbde0eecd04"),
+					Expiration: now.Add(2 * time.Second),
+				},
+				{
+					UUID:       uuid.MustParse("38c6a201-0b8b-46eb-ab69-c7b2716d408e"),
+					Expiration: now.Add(3 * time.Second),
+				},
+				{
+					UUID:       uuid.MustParse("5caf5ab2-d460-430f-87fa-8ed2983ae8fb"),
+					Expiration: now.Add(4 * time.Second),
+				},
+			},
+			expected: []*CachedNonce{
+				{
+					UUID:       uuid.MustParse("d6ef381f-6234-432d-b204-d8957fe60360"),
+					Expiration: now.Add(1 * time.Second),
+				},
+				{
+					UUID:       uuid.MustParse("cdc3673d-7946-459a-b458-cbbde0eecd04"),
+					Expiration: now.Add(2 * time.Second),
+				},
+				{
+					UUID:       uuid.MustParse("38c6a201-0b8b-46eb-ab69-c7b2716d408e"),
+					Expiration: now.Add(3 * time.Second),
+				},
+				{
+					UUID:       uuid.MustParse("5caf5ab2-d460-430f-87fa-8ed2983ae8fb"),
+					Expiration: now.Add(4 * time.Second),
+				},
+			},
+		},
+		{
+			name: "first nonce is expired",
+			nonces: []*CachedNonce{
+				{
+					UUID:       uuid.MustParse("d6ef381f-6234-432d-b204-d8957fe60360"),
+					Expiration: now.Add(-1 * time.Second),
+				},
+				{
+					UUID:       uuid.MustParse("cdc3673d-7946-459a-b458-cbbde0eecd04"),
+					Expiration: now.Add(2 * time.Second),
+				},
+				{
+					UUID:       uuid.MustParse("38c6a201-0b8b-46eb-ab69-c7b2716d408e"),
+					Expiration: now.Add(3 * time.Second),
+				},
+				{
+					UUID:       uuid.MustParse("5caf5ab2-d460-430f-87fa-8ed2983ae8fb"),
+					Expiration: now.Add(4 * time.Second),
+				},
+			},
+			expected: []*CachedNonce{
+				{
+					UUID:       uuid.MustParse("cdc3673d-7946-459a-b458-cbbde0eecd04"),
+					Expiration: now.Add(2 * time.Second),
+				},
+				{
+					UUID:       uuid.MustParse("38c6a201-0b8b-46eb-ab69-c7b2716d408e"),
+					Expiration: now.Add(3 * time.Second),
+				},
+				{
+					UUID:       uuid.MustParse("5caf5ab2-d460-430f-87fa-8ed2983ae8fb"),
+					Expiration: now.Add(4 * time.Second),
+				},
+			},
+		},
+		{
+			name: "all but last nonce expired",
+			nonces: []*CachedNonce{
+				{
+					UUID:       uuid.MustParse("d6ef381f-6234-432d-b204-d8957fe60360"),
+					Expiration: now.Add(-1 * time.Second),
+				},
+				{
+					UUID:       uuid.MustParse("cdc3673d-7946-459a-b458-cbbde0eecd04"),
+					Expiration: now.Add(-1 * time.Second),
+				},
+				{
+					UUID:       uuid.MustParse("38c6a201-0b8b-46eb-ab69-c7b2716d408e"),
+					Expiration: now.Add(-1 * time.Second),
+				},
+				{
+					UUID:       uuid.MustParse("5caf5ab2-d460-430f-87fa-8ed2983ae8fb"),
+					Expiration: now.Add(4 * time.Second),
+				},
+			},
+			expected: []*CachedNonce{
+				{
+					UUID:       uuid.MustParse("5caf5ab2-d460-430f-87fa-8ed2983ae8fb"),
+					Expiration: now.Add(4 * time.Second),
+				},
+			},
+		},
+		{
+			name: "all nonces expired",
+			nonces: []*CachedNonce{
+				{
+					UUID:       uuid.MustParse("d6ef381f-6234-432d-b204-d8957fe60360"),
+					Expiration: now.Add(-1 * time.Second),
+				},
+				{
+					UUID:       uuid.MustParse("cdc3673d-7946-459a-b458-cbbde0eecd04"),
+					Expiration: now.Add(-1 * time.Second),
+				},
+				{
+					UUID:       uuid.MustParse("38c6a201-0b8b-46eb-ab69-c7b2716d408e"),
+					Expiration: now.Add(-1 * time.Second),
+				},
+				{
+					UUID:       uuid.MustParse("5caf5ab2-d460-430f-87fa-8ed2983ae8fb"),
+					Expiration: now.Add(-1 * time.Second),
+				},
+			},
+			expected: nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		nc := NonceCache{
+			cache: tc.nonces,
+		}
+
+		pruned := nc.PruneNonces()
+
+		require.Equal(t, len(tc.nonces)-len(tc.expected), pruned, tc.name)
+
+		require.Equal(t, tc.expected, nc.cache, tc.name)
+	}
 }
 
 func TestNonceCacheDemandSlow(t *testing.T) {
