@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -733,6 +734,10 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Bl
 						"cosigner", cosigner.GetID(),
 						"err", err.Error(),
 					)
+
+					if strings.Contains(err.Error(), errUnexpectedState) {
+						pv.nonceCache.ClearNonces(cosigner)
+					}
 
 					if cosigner.GetID() == pv.myCosigner.GetID() {
 						return err
