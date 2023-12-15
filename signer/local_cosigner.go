@@ -29,7 +29,7 @@ type LocalCosigner struct {
 	logger        cometlog.Logger
 	config        *RuntimeConfig
 	security      CosignerSecurity
-	chainState    sync.Map
+	chainState    sync.Map // TODO: Add type so its not any?
 	address       string
 	pendingDiskWG sync.WaitGroup
 
@@ -53,6 +53,7 @@ func NewLocalCosigner(
 	}
 }
 
+// FIX: Maybe name this something else and move the curve here as well.
 type ChainState struct {
 	// lastSignState stores the last sign state for an HRS we have fully signed
 	// incremented whenever we are asked to sign an HRS
