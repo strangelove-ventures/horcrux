@@ -226,6 +226,8 @@ require (
 	github.com/zondax/ledger-go v0.14.3 // indirect
 	gitlab.com/unit410/edwards25519 v0.0.0-20220725154547-61980033348e // indirect
 	gitlab.com/unit410/threshold-ed25519 v0.0.0-20220812172601-56783212c4cc // indirect
+	go.dedis.ch/fixbuf v1.0.3 // indirect
+	go.dedis.ch/kyber/v3 v3.1.0 // indirect
 	go.etcd.io/bbolt v1.3.8 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect

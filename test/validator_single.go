@@ -2,11 +2,13 @@ package test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"testing"
 
-	"github.com/cometbft/cometbft/crypto"
+	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/cometbft/cometbft/privval"
 	"github.com/docker/docker/client"
@@ -32,7 +34,7 @@ func testChainSingleNodeAndHorcruxSingle(
 	err := testutil.WaitForBlocks(ctx, 20, cw.chain)
 	require.NoError(t, err)
 
-	requireHealthyValidator(t, cw.chain.Validators[0], pubKey.Address())
+	requireHealthyValidator(t, cw.chain.Validators[0], sha256.New().Sum(pubKey)[:20])
 }
 
 // startChainSingleNodeAndHorcruxSingle starts a single chain with a single horcrux (single-sign mode) validator and single node validators for the rest.
@@ -41,11 +43,11 @@ func startChainSingleNodeAndHorcruxSingle(
 	t *testing.T,
 	totalValidators int, // total number of validators on chain (one horcrux + single node for the rest)
 	totalSentries int, // number of sentry nodes for the single horcrux validator
-) (*chainWrapper, crypto.PubKey) {
+) (*chainWrapper, []byte) {
 	client, network := interchaintest.DockerSetup(t)
 	logger := zaptest.NewLogger(t)
 
-	var pubKey crypto.PubKey
+	var pubKey []byte
 
 	cw := &chainWrapper{
 		totalValidators: totalValidators,
@@ -65,7 +67,7 @@ func preGenesisSingleNodeAndHorcruxSingle(
 	logger *zap.Logger,
 	client *client.Client,
 	network string,
-	pubKey *crypto.PubKey) func(*chainWrapper) func(ibc.ChainConfig) error {
+	pubKey *[]byte) func(*chainWrapper) func(ibc.ChainConfig) error {
 	return func(cw *chainWrapper) func(ibc.ChainConfig) error {
 		return func(cc ibc.ChainConfig) error {
 			horcruxValidator := cw.chain.Validators[0]
@@ -75,7 +77,7 @@ func preGenesisSingleNodeAndHorcruxSingle(
 				return err
 			}
 
-			*pubKey = pvKey.PubKey
+			*pubKey = pvKey.PubKey.Value
 
 			sentries := append(cosmos.ChainNodes{horcruxValidator}, cw.chain.FullNodes...)
 
@@ -119,7 +121,7 @@ func writeConfigAndKeysSingle(
 	chainID string,
 	singleSigner *cosmos.SidecarProcess,
 	config signer.Config,
-	pvKey privval.FilePVKey,
+	key *signer.TMPrivvalFile,
 ) error {
 	configBz, err := json.Marshal(config)
 	if err != nil {
@@ -128,6 +130,17 @@ func writeConfigAndKeysSingle(
 
 	if err := singleSigner.WriteFile(ctx, configBz, ".horcrux/config.yaml"); err != nil {
 		return fmt.Errorf("failed to write config.yaml: %w", err)
+	}
+
+	address, err := hex.DecodeString(key.Address)
+	if err != nil {
+		return fmt.Errorf("failed to decode address: %w", err)
+	}
+
+	pvKey := privval.FilePVKey{
+		Address: address,
+		PubKey:  cometcryptoed25519.PubKey(key.PubKey.Value),
+		PrivKey: cometcryptoed25519.PrivKey(key.PrivKey.Value),
 	}
 
 	pvKeyBz, err := cometjson.Marshal(pvKey)

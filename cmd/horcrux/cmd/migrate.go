@@ -103,7 +103,7 @@ func (key *v2CosignerKey) UnmarshalJSON(data []byte) error {
 
 	// Prior to the tendermint protobuf migration, the public key bytes in key files
 	// were encoded using the go-amino libraries via
-	// cdc.MarshalBinaryBare(CosignerEd25519Key.PubKey)
+	// cdc.MarshalBinaryBare(CosignerKey.PubKey)
 	//
 	// To support reading the public key bytes from these key files, we fallback to
 	// amino unmarshalling if the protobuf unmarshalling fails
@@ -218,13 +218,13 @@ func migrateCmd() *cobra.Command {
 				return err
 			}
 
-			newEd25519Key := signer.CosignerEd25519Key{
-				PubKey:       legacyCosignerKey.PubKey,
+			newEd25519Key := signer.CosignerKey{
+				PubKey:       legacyCosignerKey.PubKey.Bytes(),
 				PrivateShard: legacyCosignerKey.ShareKey,
 				ID:           legacyCosignerKey.ID,
 			}
 
-			newEd25519KeyBz, err := newEd25519Key.MarshalJSON()
+			newEd25519KeyBz, err := json.Marshal(newEd25519Key)
 			if err != nil {
 				return fmt.Errorf("failed to marshal new Ed25519 key to json: %w", err)
 			}

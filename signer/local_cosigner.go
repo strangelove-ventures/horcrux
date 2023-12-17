@@ -187,18 +187,20 @@ func (cosigner *LocalCosigner) CombineSignatures(chainID string, signatures []Pa
 // Implements Cosigner interface
 func (cosigner *LocalCosigner) VerifySignature(chainID string, payload, signature []byte) bool {
 	if err := cosigner.LoadSignStateIfNecessary(chainID); err != nil {
+		fmt.Printf("error loading sign state: %s\n", err)
 		return false
 	}
 
 	ccs, err := cosigner.getChainState(chainID)
 	if err != nil {
+		fmt.Printf("error getting chain state: %s\n", err)
 		return false
 	}
 
 	sig := make([]byte, len(signature))
 	copy(sig, signature)
 
-	return cometcryptoed25519.PubKey(ccs.signer.PubKey()).VerifySignature(payload, sig)
+	return ccs.signer.VerifySignature(payload, sig)
 }
 
 // Sign the sign request using the cosigner's shard
@@ -276,7 +278,7 @@ func (cosigner *LocalCosigner) generateNonces() ([]Nonces, error) {
 	total := len(cosigner.config.Config.ThresholdModeConfig.Cosigners)
 	meta := make([]Nonces, total)
 
-	nonces, err := GenerateNonces(
+	nonces, err := GenerateNoncesEd25519(
 		uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
 		uint8(total),
 	)
@@ -303,11 +305,27 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 		return err
 	}
 
-	var signer ThresholdSigner
-
-	signer, err = NewThresholdSignerSoft(cosigner.config, cosigner.GetID(), chainID)
+	keyFile, err := cosigner.config.KeyFileExistsCosigner(chainID)
 	if err != nil {
 		return err
+	}
+
+	key, err := LoadCosignerKey(keyFile)
+	if err != nil {
+		return fmt.Errorf("error reading cosigner key: %s", err)
+	}
+
+	var signer ThresholdSigner
+	switch key.KeyType {
+	case CosignerKeyTypeBn254:
+		signer, err = NewThresholdSignerSoftBn254(key, uint8(cosigner.config.Config.ThresholdModeConfig.Threshold), uint8(len(cosigner.config.Config.ThresholdModeConfig.Cosigners)))
+		if err != nil {
+			return err
+		}
+	default:
+		fallthrough
+	case CosignerKeyTypeEd25519:
+		signer = NewThresholdSignerSoftEd25519(key, uint8(cosigner.config.Config.ThresholdModeConfig.Threshold), uint8(len(cosigner.config.Config.ThresholdModeConfig.Cosigners)))
 	}
 
 	cosigner.chainState.Store(chainID, &ChainState{

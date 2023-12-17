@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -136,8 +137,8 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 	for i := 0; i < int(total); i++ {
 		id := i + 1
 
-		key := CosignerEd25519Key{
-			PubKey:       pubKey,
+		key := CosignerKey{
+			PubKey:       pubKey.Bytes(),
 			PrivateShard: privShards[i],
 			ID:           id,
 		}
@@ -161,7 +162,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 			"",
 		)
 
-		keyBz, err := key.MarshalJSON()
+		keyBz, err := json.Marshal(key)
 		require.NoError(t, err)
 		err = os.WriteFile(cosigner.config.KeyFilePathCosigner(testChainID), keyBz, 0600)
 		require.NoError(t, err)
