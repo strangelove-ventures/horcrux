@@ -9,11 +9,10 @@ import (
 	"time"
 
 	cometbytes "github.com/cometbft/cometbft/libs/bytes"
-	cometjson "github.com/cometbft/cometbft/libs/json"
-	"github.com/cometbft/cometbft/privval"
 	"github.com/cosmos/cosmos-sdk/types/bech32"
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	"github.com/docker/docker/client"
+	"github.com/strangelove-ventures/horcrux/v3/signer"
 	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 	interchaintest "github.com/strangelove-ventures/interchaintest/v8"
 	"github.com/strangelove-ventures/interchaintest/v8/chain/cosmos"
@@ -175,18 +174,18 @@ func horcruxProxySidecar(ctx context.Context, node *cosmos.ChainNode, name strin
 }
 
 // getPrivvalKey reads the priv_validator_key.json file from the given node.
-func getPrivvalKey(ctx context.Context, node *cosmos.ChainNode) (privval.FilePVKey, error) {
+func getPrivvalKey(ctx context.Context, node *cosmos.ChainNode) (*signer.TMPrivvalFile, error) {
 	keyBz, err := node.ReadFile(ctx, "config/priv_validator_key.json")
 	if err != nil {
-		return privval.FilePVKey{}, fmt.Errorf("failed to read priv_validator_key.json: %w", err)
+		return nil, fmt.Errorf("failed to read priv_validator_key.json: %w", err)
 	}
 
-	pvKey := privval.FilePVKey{}
-	if err := cometjson.Unmarshal(keyBz, &pvKey); err != nil {
-		return privval.FilePVKey{}, fmt.Errorf("failed to unmarshal priv validator key: %w", err)
+	var pvKey signer.TMPrivvalFile
+	if err := json.Unmarshal(keyBz, &pvKey); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal priv validator key: %w", err)
 	}
 
-	return pvKey, nil
+	return &pvKey, nil
 }
 
 // enablePrivvalListener enables the privval listener on the given sentry nodes.

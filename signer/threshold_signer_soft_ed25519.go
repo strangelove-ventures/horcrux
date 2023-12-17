@@ -6,49 +6,34 @@ import (
 	"errors"
 	"fmt"
 
+	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	"gitlab.com/unit410/edwards25519"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
-var _ ThresholdSigner = &ThresholdSignerSoft{}
+var _ ThresholdSigner = &ThresholdSignerSoftEd25519{}
 
-type ThresholdSignerSoft struct {
+type ThresholdSignerSoftEd25519 struct {
 	privateKeyShard []byte
 	pubKey          []byte
 	threshold       uint8
 	total           uint8
 }
 
-func NewThresholdSignerSoft(config *RuntimeConfig, id int, chainID string) (*ThresholdSignerSoft, error) {
-	keyFile, err := config.KeyFileExistsCosigner(chainID)
-	if err != nil {
-		return nil, err
-	}
-
-	key, err := LoadCosignerEd25519Key(keyFile)
-	if err != nil {
-		return nil, fmt.Errorf("error reading cosigner key: %s", err)
-	}
-
-	if key.ID != id {
-		return nil, fmt.Errorf("key shard ID (%d) in (%s) does not match cosigner ID (%d)", key.ID, keyFile, id)
-	}
-
-	s := ThresholdSignerSoft{
+func NewThresholdSignerSoftEd25519(key CosignerKey, threshold, total uint8) *ThresholdSignerSoftEd25519 {
+	return &ThresholdSignerSoftEd25519{
 		privateKeyShard: key.PrivateShard,
-		pubKey:          key.PubKey.Bytes(),
-		threshold:       uint8(config.Config.ThresholdModeConfig.Threshold),
-		total:           uint8(len(config.Config.ThresholdModeConfig.Cosigners)),
+		pubKey:          key.PubKey,
+		threshold:       threshold,
+		total:           total,
 	}
-
-	return &s, nil
 }
 
-func (s *ThresholdSignerSoft) PubKey() []byte {
+func (s *ThresholdSignerSoftEd25519) PubKey() []byte {
 	return s.pubKey
 }
 
-func (s *ThresholdSignerSoft) Sign(nonces []Nonce, payload []byte) ([]byte, error) {
+func (s *ThresholdSignerSoftEd25519) Sign(nonces []Nonce, payload []byte) ([]byte, error) {
 	nonceShare, noncePub, err := s.sumNonces(nonces)
 	if err != nil {
 		return nil, fmt.Errorf("failed to combine nonces: %w", err)
@@ -59,7 +44,7 @@ func (s *ThresholdSignerSoft) Sign(nonces []Nonce, payload []byte) ([]byte, erro
 	return append(noncePub, sig...), nil
 }
 
-func (s *ThresholdSignerSoft) sumNonces(nonces []Nonce) (tsed25519.Scalar, tsed25519.Element, error) {
+func (s *ThresholdSignerSoftEd25519) sumNonces(nonces []Nonce) (tsed25519.Scalar, tsed25519.Element, error) {
 	shareParts := make([]tsed25519.Scalar, len(nonces))
 	publicKeys := make([]tsed25519.Element, len(nonces))
 
@@ -85,7 +70,7 @@ func (s *ThresholdSignerSoft) sumNonces(nonces []Nonce) (tsed25519.Scalar, tsed2
 	return nonceShare, noncePub, nil
 }
 
-func GenerateNonces(threshold, total uint8) (Nonces, error) {
+func GenerateNoncesEd25519(threshold, total uint8) (Nonces, error) {
 	secret := make([]byte, 32)
 	if _, err := rand.Read(secret); err != nil {
 		return Nonces{}, err
@@ -105,7 +90,7 @@ func GenerateNonces(threshold, total uint8) (Nonces, error) {
 	return nonces, nil
 }
 
-func (s *ThresholdSignerSoft) CombineSignatures(signatures []PartialSignature) ([]byte, error) {
+func (s *ThresholdSignerSoftEd25519) CombineSignatures(signatures []PartialSignature) ([]byte, error) {
 	sigIds := make([]int, len(signatures))
 	shareSigs := make([][]byte, len(signatures))
 	var ephPub []byte
@@ -122,4 +107,8 @@ func (s *ThresholdSignerSoft) CombineSignatures(signatures []PartialSignature) (
 	combinedSig := tsed25519.CombineShares(s.total, sigIds, shareSigs)
 
 	return append(ephPub, combinedSig...), nil
+}
+
+func (s *ThresholdSignerSoftEd25519) VerifySignature(payload, signature []byte) bool {
+	return cometcryptoed25519.PubKey(s.pubKey).VerifySignature(payload, signature)
 }

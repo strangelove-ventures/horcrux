@@ -2,13 +2,13 @@ package test
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
 	"time"
 
-	"github.com/cometbft/cometbft/crypto"
 	"github.com/docker/docker/client"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
@@ -43,7 +43,9 @@ func testChainSingleNodeAndHorcruxThreshold(
 	err := testutil.WaitForBlocks(ctx, 20, cw.chain)
 	require.NoError(t, err)
 
-	requireHealthyValidator(t, ourValidator, pubKey.Address())
+	address := sha256.New().Sum(pubKey)[:20]
+
+	requireHealthyValidator(t, ourValidator, address)
 }
 
 // startChainSingleNodeAndHorcruxThreshold starts a single chain with a single horcrux (threshold mode) validator and single node validators for the rest of the validators.
@@ -55,12 +57,12 @@ func startChainSingleNodeAndHorcruxThreshold(
 	threshold uint8, // key shard threshold, and therefore how many horcrux signers must participate to sign a block
 	totalSentries int, // number of sentry nodes for the single horcrux validator
 	sentriesPerSigner int, // how many sentries should each horcrux signer connect to (min: 1, max: totalSentries)
-) (*chainWrapper, crypto.PubKey) {
+) (*chainWrapper, []byte) {
 	client, network := interchaintest.DockerSetup(t)
 	logger := zaptest.NewLogger(t)
 
 	var chain *cosmos.CosmosChain
-	var pubKey crypto.PubKey
+	var pubKey []byte
 
 	cw := &chainWrapper{
 		chain:           chain,
@@ -84,7 +86,7 @@ func preGenesisSingleNodeAndHorcruxThreshold(
 	totalSigners int, // total number of signers for the single horcrux validator
 	threshold uint8, // key shard threshold, and therefore how many horcrux signers must participate to sign a block
 	sentriesPerSigner int, // how many sentries should each horcrux signer connect to (min: 1, max: totalSentries)
-	pubKey *crypto.PubKey) func(*chainWrapper) func(ibc.ChainConfig) error {
+	pubKey *[]byte) func(*chainWrapper) func(ibc.ChainConfig) error {
 	return func(cw *chainWrapper) func(ibc.ChainConfig) error {
 		return func(cc ibc.ChainConfig) error {
 			horcruxValidator := cw.chain.Validators[0]
@@ -124,7 +126,7 @@ func preGenesisAllHorcruxThreshold(
 	sentriesPerValidator int, // how many sentries for each horcrux validator (min: sentriesPerSigner, max: totalSentries)
 	sentriesPerSigner int, // how many sentries should each horcrux signer connect to (min: 1, max: sentriesPerValidator)
 
-	pubKeys []crypto.PubKey) func(*chainWrapper) func(ibc.ChainConfig) error {
+	pubKeys [][]byte) func(*chainWrapper) func(ibc.ChainConfig) error {
 	return func(cw *chainWrapper) func(ibc.ChainConfig) error {
 		return func(cc ibc.ChainConfig) error {
 			fnsPerVal := sentriesPerValidator - 1 // minus 1 for the validator itself
@@ -174,7 +176,7 @@ func convertValidatorToHorcrux(
 	threshold uint8,
 	sentries cosmos.ChainNodes,
 	sentriesPerSigner int,
-) (crypto.PubKey, error) {
+) ([]byte, error) {
 	sentriesForCosigners := getSentriesForCosignerConnection(sentries, totalSigners, sentriesPerSigner)
 
 	ed25519Shards, pvPubKey, err := getShardedPrivvalKey(ctx, validator, threshold, uint8(totalSigners))
@@ -251,7 +253,7 @@ func convertValidatorToHorcrux(
 }
 
 // getPrivvalKey gets the privval key from the validator and creates threshold shards from it.
-func getShardedPrivvalKey(ctx context.Context, node *cosmos.ChainNode, threshold uint8, shards uint8) ([]signer.CosignerEd25519Key, crypto.PubKey, error) {
+func getShardedPrivvalKey(ctx context.Context, node *cosmos.ChainNode, threshold uint8, shards uint8) ([]signer.CosignerKey, []byte, error) {
 	pvKey, err := getPrivvalKey(ctx, node)
 	if err != nil {
 		return nil, nil, err
@@ -259,13 +261,13 @@ func getShardedPrivvalKey(ctx context.Context, node *cosmos.ChainNode, threshold
 
 	ed25519Shards := signer.CreateCosignerEd25519Shards(pvKey, threshold, shards)
 
-	return ed25519Shards, pvKey.PubKey, nil
+	return ed25519Shards, pvKey.PubKey.Value, nil
 }
 
 // chainEd25519Shard is a wrapper for a chain ID and a shard of an ed25519 consensus key.
 type chainEd25519Shard struct {
 	chainID string
-	key     signer.CosignerEd25519Key
+	key     signer.CosignerKey
 }
 
 // writeConfigAndKeysThreshold writes the config and keys for a horcrux cosigner to the sidecar's docker volume.
