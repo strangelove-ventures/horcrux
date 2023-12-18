@@ -134,7 +134,9 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	err = testutil.WaitForBlocks(ctx, 20, cw.chain)
 	require.NoError(t, err)
 
-	requireHealthyValidator(t, cw.chain.Validators[0], sha256.New().Sum(pubKey)[:20])
+	sha := sha256.Sum256(pubKey)
+
+	requireHealthyValidator(t, cw.chain.Validators[0], sha[:20])
 }
 
 // TestDownedSigners2of3 tests taking down 2 nodes at a time in the 2/3 threshold horcrux cluster for a period of time.
@@ -156,7 +158,9 @@ func TestDownedSigners2of3(t *testing.T) {
 	require.NoError(t, testutil.WaitForBlocks(ctx, 15, cw.chain))
 
 	ourValidator := cw.chain.Validators[0]
-	requireHealthyValidator(t, ourValidator, sha256.New().Sum(pubKey)[:20])
+	sha := sha256.Sum256(pubKey)
+	address := sha[:20]
+	requireHealthyValidator(t, ourValidator, address)
 
 	cosigners := ourValidator.Sidecars
 
@@ -168,7 +172,7 @@ func TestDownedSigners2of3(t *testing.T) {
 		t.Logf("{%s} -> Waiting for blocks after stopping cosigner {%s}", ourValidator.Name(), cosigner.Name())
 		require.NoError(t, testutil.WaitForBlocks(ctx, 15, cw.chain))
 
-		requireHealthyValidator(t, ourValidator, sha256.New().Sum(pubKey)[:20])
+		requireHealthyValidator(t, ourValidator, address)
 
 		t.Logf("{%s} -> Restarting signer...", cosigner.Name())
 		require.NoError(t, cosigner.StartContainer(ctx))
@@ -176,7 +180,7 @@ func TestDownedSigners2of3(t *testing.T) {
 		t.Logf("{%s} -> Waiting for blocks after restarting cosigner {%s}", ourValidator.Name(), cosigner.Name())
 		require.NoError(t, testutil.WaitForBlocks(ctx, 15, cw.chain))
 
-		requireHealthyValidator(t, ourValidator, sha256.New().Sum(pubKey)[:20])
+		requireHealthyValidator(t, ourValidator, address)
 	}
 }
 
@@ -199,7 +203,9 @@ func TestDownedSigners3of5(t *testing.T) {
 	require.NoError(t, testutil.WaitForBlocks(ctx, 15, cw.chain))
 
 	ourValidator := cw.chain.Validators[0]
-	requireHealthyValidator(t, ourValidator, sha256.New().Sum(pubKey)[:20])
+	sha := sha256.Sum256(pubKey)
+	address := sha[:20]
+	requireHealthyValidator(t, ourValidator, address)
 
 	cosigners := ourValidator.Sidecars
 
@@ -226,13 +232,13 @@ func TestDownedSigners3of5(t *testing.T) {
 		t.Logf("{%s} -> Waiting for blocks after stopping cosigner {%s}", ourValidator.Name(), cosigner2.Name())
 		require.NoError(t, testutil.WaitForBlocks(ctx, 15, cw.chain))
 
-		requireHealthyValidator(t, ourValidator, sha256.New().Sum(pubKey)[:20])
+		requireHealthyValidator(t, ourValidator, address)
 
 		t.Logf("{%s} -> Restarting cosigner...", cosigner1.Name())
 		require.NoError(t, cosigner1.StartContainer(ctx))
 		require.NoError(t, testutil.WaitForBlocks(ctx, 15, cw.chain))
 
-		requireHealthyValidator(t, ourValidator, sha256.New().Sum(pubKey)[:20])
+		requireHealthyValidator(t, ourValidator, address)
 	}
 }
 
@@ -253,7 +259,9 @@ func TestLeaderElection2of3(t *testing.T) {
 	)
 
 	ourValidator := cw.chain.Validators[0]
-	requireHealthyValidator(t, ourValidator, sha256.New().Sum(pubKey)[:20])
+	sha := sha256.Sum256(pubKey)
+	address := sha[:20]
+	requireHealthyValidator(t, ourValidator, address)
 
 	cosigners := ourValidator.Sidecars
 
@@ -295,7 +303,7 @@ func TestLeaderElection2of3(t *testing.T) {
 
 		require.NoError(t, testutil.WaitForBlocks(ctx, 5, cw.chain))
 
-		requireHealthyValidator(t, ourValidator, sha256.New().Sum(pubKey)[:20])
+		requireHealthyValidator(t, ourValidator, address)
 	}
 }
 
@@ -329,7 +337,8 @@ func TestChainPureHorcrux(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, p := range pubKeys {
-		requireHealthyValidator(t, cw.chain.Validators[0], sha256.New().Sum(p)[:20])
+		sha := sha256.Sum256(p)
+		requireHealthyValidator(t, cw.chain.Validators[0], sha[:20])
 	}
 }
 
@@ -444,7 +453,8 @@ func TestMultipleChainHorcrux(t *testing.T) {
 	testutil.WaitForBlocks(ctx, 20, chains...)
 
 	for i, p := range pubKeys {
-		requireHealthyValidator(t, chainWrappers[i].chain.Validators[0], sha256.New().Sum(p)[:20])
+		sha := sha256.Sum256(p)
+		requireHealthyValidator(t, chainWrappers[i].chain.Validators[0], sha[:20])
 	}
 }
 
@@ -706,6 +716,7 @@ func TestHorcruxProxyGRPC(t *testing.T) {
 	testutil.WaitForBlocks(ctx, 20, chains...)
 
 	for i, p := range pubKeys {
-		requireHealthyValidator(t, chainWrappers[i].chain.Validators[0], sha256.New().Sum(p)[:20])
+		sha := sha256.Sum256(p)
+		requireHealthyValidator(t, chainWrappers[i].chain.Validators[0], sha[:20])
 	}
 }

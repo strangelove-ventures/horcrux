@@ -34,7 +34,8 @@ func testChainSingleNodeAndHorcruxSingle(
 	err := testutil.WaitForBlocks(ctx, 20, cw.chain)
 	require.NoError(t, err)
 
-	requireHealthyValidator(t, cw.chain.Validators[0], sha256.New().Sum(pubKey)[:20])
+	sha := sha256.Sum256(pubKey)
+	requireHealthyValidator(t, cw.chain.Validators[0], sha[:20])
 }
 
 // startChainSingleNodeAndHorcruxSingle starts a single chain with a single horcrux (single-sign mode) validator and single node validators for the rest.

@@ -218,7 +218,8 @@ func migrateCmd() *cobra.Command {
 				return err
 			}
 
-			newEd25519Key := signer.CosignerKey{
+			newEd25519Key := &signer.CosignerKey{
+				KeyType:      signer.CosignerKeyTypeEd25519,
 				PubKey:       legacyCosignerKey.PubKey.Bytes(),
 				PrivateShard: legacyCosignerKey.ShareKey,
 				ID:           legacyCosignerKey.ID,
@@ -234,13 +235,13 @@ func migrateCmd() *cobra.Command {
 				return fmt.Errorf("failed to write new Ed25519 key to %s: %w", newEd25519Path, err)
 			}
 
-			newRSAKey := signer.CosignerRSAKey{
+			newRSAKey := &signer.CosignerRSAKey{
 				RSAKey:  legacyCosignerKey.RSAKey,
 				ID:      legacyCosignerKey.ID,
 				RSAPubs: legacyCosignerKey.RSAPubs,
 			}
 
-			newRSAKeyBz, err := newRSAKey.MarshalJSON()
+			newRSAKeyBz, err := json.Marshal(newRSAKey)
 			if err != nil {
 				return fmt.Errorf("failed to marshal new RSA key to json: %w", err)
 			}

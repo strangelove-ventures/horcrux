@@ -6,7 +6,7 @@ import (
 	"go.dedis.ch/kyber/v3"
 	"go.dedis.ch/kyber/v3/pairing/bn256"
 	"go.dedis.ch/kyber/v3/share"
-	"go.dedis.ch/kyber/v3/sign/bls"
+	"go.dedis.ch/kyber/v3/sign/bls" //nolint:staticcheck
 )
 
 var _ ThresholdSigner = &ThresholdSignerSoftBn254{}
@@ -44,7 +44,7 @@ func (s *ThresholdSignerSoftBn254) PubKey() []byte {
 	return pub
 }
 
-func (s *ThresholdSignerSoftBn254) Sign(nonces []Nonce, payload []byte) ([]byte, error) {
+func (s *ThresholdSignerSoftBn254) Sign(_ []Nonce, payload []byte) ([]byte, error) {
 	// nonceShare, noncePub, err := s.sumNonces(nonces)
 	// if err != nil {
 	// 	return nil, fmt.Errorf("failed to combine nonces: %w", err)

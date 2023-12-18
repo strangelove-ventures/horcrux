@@ -37,15 +37,15 @@ func testChainSingleNodeAndHorcruxThreshold(
 	cw, pubKey := startChainSingleNodeAndHorcruxThreshold(ctx, t, totalValidators, totalSigners, threshold, totalSentries, sentriesPerSigner)
 
 	ourValidator := cw.chain.Validators[0]
-	cosigners := ourValidator.Sidecars
-	go getCosignerMetrics(ctx, cosigners)
+	// cosigners := ourValidator.Sidecars
+	// go getCosignerMetrics(ctx, cosigners)
 
 	err := testutil.WaitForBlocks(ctx, 20, cw.chain)
 	require.NoError(t, err)
 
-	address := sha256.New().Sum(pubKey)[:20]
+	sha := sha256.Sum256(pubKey)
 
-	requireHealthyValidator(t, ourValidator, address)
+	requireHealthyValidator(t, ourValidator, sha[:20])
 }
 
 // startChainSingleNodeAndHorcruxThreshold starts a single chain with a single horcrux (threshold mode) validator and single node validators for the rest of the validators.
