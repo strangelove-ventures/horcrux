@@ -23,15 +23,12 @@ const (
 	PrivKeyName = "tendermint/PrivKeyBn254"
 	PubKeyName  = "tendermint/PubKeyBn254"
 	// PubKeySize is is the size, in bytes, of public keys as used in this package.
-	PubKeySize = 32
+	PubKeySize = 128
 	// PrivateKeySize is the size, in bytes, of private keys as used in this package.
 	PrivateKeySize = 64
 	// Size of an Bn254 signature. Namely the size of a compressed
 	// Bn254 point, and a field element. Both of which are 32 bytes.
 	SignatureSize = 64
-	// SeedSize is the size, in bytes, of private key seeds. These are the
-	// private key representations used by RFC 8032.
-	SeedSize = 32
 
 	KeyType = "bn254"
 )
