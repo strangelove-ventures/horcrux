@@ -2,8 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/strangelove-ventures/horcrux/pkg/connector"
 	"os"
+
+	"github.com/strangelove-ventures/horcrux/pkg/connector"
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/cometbft/cometbft/libs/service"

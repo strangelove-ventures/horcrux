@@ -3,10 +3,11 @@ package signer
 import (
 	"context"
 	"fmt"
-	"github.com/strangelove-ventures/horcrux/pkg/connector"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/connector"
 
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 )
