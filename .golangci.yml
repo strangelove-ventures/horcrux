@@ -99,6 +99,8 @@ linters-settings:
         alias: boltdb
       - pkg: math/rand
         alias: mrand
+      - pkg: github.com/consensys/gnark-crypto/ecc/bn254/ecdsa
+        alias: ecdsa_bn254
   maligned:
     suggest-new: true
   govet:

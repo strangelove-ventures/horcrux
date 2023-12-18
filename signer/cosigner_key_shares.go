@@ -5,7 +5,6 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 
 	"github.com/ethereum/go-ethereum/crypto/ecies"
@@ -37,7 +36,6 @@ func CreateCosignerShardsFromFile(priv string, threshold, shards uint8) ([]Cosig
 
 // CreateCosignerEd25519Shards creates CosignerKey objects from a privval.FilePVKey
 func CreateCosignerEd25519Shards(pv *TMPrivvalFile, threshold, shards uint8) []CosignerKey {
-	fmt.Printf("ED25519 pv.PrivKey.Value: %v, len: %d\n", pv.PrivKey.Value, len(pv.PrivKey.Value))
 	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(pv.PrivKey.Value[:32]), threshold, shards)
 	out := make([]CosignerKey, shards)
 	for i, shard := range privShards {
@@ -53,7 +51,6 @@ func CreateCosignerEd25519Shards(pv *TMPrivvalFile, threshold, shards uint8) []C
 
 // CreateCosignerEd25519Shards creates CosignerKey objects from a privval.FilePVKey
 func CreateCosignerBn254Shards(pv *TMPrivvalFile, threshold, shards uint8) []CosignerKey {
-	fmt.Printf("BN254 pv.PrivKey.Value: %v, len: %d\n", pv.PrivKey.Value, len(pv.PrivKey.Value))
 	suite := bn256.NewSuite()
 	secret := suite.G1().Scalar().SetBytes(pv.PrivKey.Value)
 	priPoly := share.NewPriPoly(suite.G2(), int(threshold), secret, suite.RandomStream())

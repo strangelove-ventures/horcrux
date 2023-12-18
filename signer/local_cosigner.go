@@ -318,14 +318,22 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 	var signer ThresholdSigner
 	switch key.KeyType {
 	case CosignerKeyTypeBn254:
-		signer, err = NewThresholdSignerSoftBn254(key, uint8(cosigner.config.Config.ThresholdModeConfig.Threshold), uint8(len(cosigner.config.Config.ThresholdModeConfig.Cosigners)))
+		signer, err = NewThresholdSignerSoftBn254(
+			key,
+			uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
+			uint8(len(cosigner.config.Config.ThresholdModeConfig.Cosigners)),
+		)
 		if err != nil {
 			return err
 		}
-	default:
-		fallthrough
 	case CosignerKeyTypeEd25519:
-		signer = NewThresholdSignerSoftEd25519(key, uint8(cosigner.config.Config.ThresholdModeConfig.Threshold), uint8(len(cosigner.config.Config.ThresholdModeConfig.Cosigners)))
+		fallthrough
+	default:
+		signer = NewThresholdSignerSoftEd25519(
+			key,
+			uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
+			uint8(len(cosigner.config.Config.ThresholdModeConfig.Cosigners)),
+		)
 	}
 
 	cosigner.chainState.Store(chainID, &ChainState{

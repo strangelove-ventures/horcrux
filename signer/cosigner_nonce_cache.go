@@ -199,7 +199,9 @@ func (cnc *CosignerNonceCache) getUuids(n int) []uuid.UUID {
 }
 
 func (cnc *CosignerNonceCache) target(noncesPerMinute float64) int {
-	t := int((noncesPerMinute / 60) * ((cnc.getNoncesInterval.Seconds() * nonceOverallocation) + float64(cnc.getNoncesTimeout.Seconds())))
+	t := int((noncesPerMinute / 60) *
+		((cnc.getNoncesInterval.Seconds() * nonceOverallocation) +
+			cnc.getNoncesTimeout.Seconds()))
 	if t <= 0 {
 		return 1 // always target at least one nonce ready
 	}
