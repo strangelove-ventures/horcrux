@@ -29,7 +29,7 @@ type ThresholdValidator struct {
 
 	grpcTimeout time.Duration
 
-	chainState sync.Map
+	chainState sync.Map // map[string]SignState, chainState["chainid"] -> types.SignState
 
 	// our own cosigner
 	myCosigner *LocalCosigner
@@ -137,7 +137,7 @@ func (pv *ThresholdValidator) mustLoadChainState(chainID string) ChainSignState 
 
 	css, ok := cs.(ChainSignState)
 	if !ok {
-		panic(fmt.Errorf("expected: (ChainSignState), actual: (%T)", cs))
+		panic(fmt.Errorf("expected: type (ChainSignState), actual type is: (%T)", cs))
 	}
 
 	return css

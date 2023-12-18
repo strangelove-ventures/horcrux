@@ -115,6 +115,7 @@ type SignState struct {
 	cond  *cond.Cond                    // private to avoid marshall issues
 }
 
+// GetCache is a get wrapper for [SignState.cache]
 func (signState *SignState) GetCache(hrs HRSKey) (SignStateConsensus, bool) {
 	ssc, err := signState.cache[hrs]
 	return ssc, err
@@ -130,12 +131,12 @@ func (signState *SignState) CondWaitWithTimeout(t time.Duration) {
 	signState.cond.WaitWithTimeout(t)
 }
 
-// Condunlock unlocks the SignState's cond.L field.
+// CondUnlock unlocks the SignState's cond.L field.
 func (signState *SignState) CondUnlock() {
 	signState.cond.L.Unlock()
 }
 
-// CondWait notifies all goroutines waiting on the SignState's cond field that something has changed.
+// CondBroadcast notifies all waiting goroutines that something has changed.
 func (signState *SignState) CondBroadcast() {
 	signState.cond.Broadcast()
 }

@@ -74,7 +74,7 @@ func NewThresholdValidator(
 		return nil, nil, fmt.Errorf("error creating raft directory: %w", err)
 	}
 
-	// RAFT node Index is the cosigner Index
+	// RAFT node ID is the cosigner id
 	nodeID := fmt.Sprint(security.GetID())
 
 	// Start RAFT store listener
