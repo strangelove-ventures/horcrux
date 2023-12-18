@@ -1,10 +1,15 @@
-package signer
+package connector
 
+/*
+Connector is the conections between the "sentry" (consensus nodes) and the Horcrux nodes.
+*/
 import (
 	"context"
 	"fmt"
 	"net"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/metrics"
 
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 
@@ -108,14 +113,14 @@ func (rs *ReconnRemoteSigner) loop(ctx context.Context) {
 			timer := time.NewTimer(connRetrySec * time.Second)
 			conn, err = rs.establishConnection(ctx)
 			if err == nil {
-				sentryConnectTries.WithLabelValues(rs.address).Set(0)
+				metrics.SentryConnectTries.WithLabelValues(rs.address).Set(0)
 				timer.Stop()
 				rs.Logger.Info("Connected to Sentry", "address", rs.address)
 				break
 			}
 
-			sentryConnectTries.WithLabelValues(rs.address).Add(1)
-			totalSentryConnectTries.WithLabelValues(rs.address).Inc()
+			metrics.SentryConnectTries.WithLabelValues(rs.address).Add(1)
+			metrics.TotalSentryConnectTries.WithLabelValues(rs.address).Inc()
 			retries++
 			rs.Logger.Error(
 				"Error establishing connection, will retry",
@@ -231,7 +236,7 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(
 }
 
 func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) cometprotoprivval.Message {
-	totalPubKeyRequests.WithLabelValues(chainID).Inc()
+	metrics.TotalPubKeyRequests.WithLabelValues(chainID).Inc()
 	msgSum := &cometprotoprivval.Message_PubKeyResponse{PubKeyResponse: &cometprotoprivval.PubKeyResponse{
 		PubKey: cometprotocrypto.PublicKey{},
 		Error:  nil,
@@ -288,7 +293,7 @@ func StartRemoteSigners(
 	nodes []string,
 ) ([]cometservice.Service, error) {
 	var err error
-	go StartMetrics()
+	go metrics.StartMetrics()
 	for _, node := range nodes {
 		// CometBFT requires a connection within 3 seconds of start or crashes
 		// A long timeout such as 30 seconds would cause the sentry to fail in loops

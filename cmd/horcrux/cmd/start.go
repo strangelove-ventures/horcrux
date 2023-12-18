@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/strangelove-ventures/horcrux/pkg/connector"
 	"os"
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
@@ -42,7 +43,7 @@ func startCmd() *cobra.Command {
 
 			acceptRisk, _ := cmd.Flags().GetBool(flagAcceptRisk)
 
-			var val signer.PrivValidator
+			var val connector.PrivValidator
 			var services []service.Service
 
 			switch config.Config.SignMode {
@@ -61,7 +62,7 @@ func startCmd() *cobra.Command {
 			}
 
 			if config.Config.GRPCAddr != "" {
-				grpcServer := signer.NewRemoteSignerGRPCServer(logger, val, config.Config.GRPCAddr)
+				grpcServer := connector.NewRemoteSignerGRPCServer(logger, val, config.Config.GRPCAddr)
 				services = append(services, grpcServer)
 
 				if err := grpcServer.Start(); err != nil {
@@ -71,7 +72,7 @@ func startCmd() *cobra.Command {
 
 			go EnableDebugAndMetrics(cmd.Context(), out)
 
-			services, err = signer.StartRemoteSigners(services, logger, val, config.Config.Nodes())
+			services, err = connector.StartRemoteSigners(services, logger, val, config.Config.Nodes())
 			if err != nil {
 				return fmt.Errorf("failed to start remote signer(s): %w", err)
 			}

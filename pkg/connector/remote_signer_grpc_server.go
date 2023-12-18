@@ -1,9 +1,11 @@
-package signer
+package connector
 
 import (
 	"context"
 	"net"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/metrics"
 
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 
@@ -62,7 +64,7 @@ func (s *RemoteSignerGRPCServer) OnStop() {
 func (s *RemoteSignerGRPCServer) PubKey(ctx context.Context, req *proto.PubKeyRequest) (*proto.PubKeyResponse, error) {
 	chainID := req.ChainId
 
-	totalPubKeyRequests.WithLabelValues(chainID).Inc()
+	metrics.TotalPubKeyRequests.WithLabelValues(chainID).Inc()
 
 	pubKey, err := s.validator.GetPubKey(ctx, chainID)
 	if err != nil {
@@ -83,7 +85,7 @@ func (s *RemoteSignerGRPCServer) Sign(
 	ctx context.Context,
 	req *proto.SignBlockRequest,
 ) (*proto.SignBlockResponse, error) {
-	chainID, block := req.ChainID, BlockFromProto(req.Block)
+	chainID, block := req.ChainID, types.BlockFromProto(req.Block)
 
 	signature, timestamp, err := signAndTrack(ctx, s.logger, s.validator, chainID, block)
 	if err != nil {
@@ -106,16 +108,16 @@ func signAndTrack(
 	signature, timestamp, err := validator.Sign(ctx, chainID, block)
 	if err != nil {
 		switch typedErr := err.(type) {
-		case *BeyondBlockError:
+		case *metrics.BeyondBlockError:
 			logger.Debug(
 				"Rejecting sign request",
 				"type", types.SignType(block.Step),
 				"chain_id", chainID,
 				"height", block.Height,
 				"round", block.Round,
-				"reason", typedErr.msg,
+				"reason", typedErr.Msg,
 			)
-			beyondBlockErrors.WithLabelValues(chainID).Inc()
+			metrics.BeyondBlockErrors.WithLabelValues(chainID).Inc()
 		default:
 			logger.Error(
 				"Failed to sign",
@@ -125,7 +127,7 @@ func signAndTrack(
 				"round", block.Round,
 				"error", err,
 			)
-			failedSignVote.WithLabelValues(chainID).Inc()
+			metrics.FailedSignVote.WithLabelValues(chainID).Inc()
 		}
 		return nil, block.Timestamp, err
 	}
@@ -147,41 +149,41 @@ func signAndTrack(
 
 	switch block.Step {
 	case types.StepPropose:
-		lastProposalHeight.WithLabelValues(chainID).Set(float64(block.Height))
-		lastProposalRound.WithLabelValues(chainID).Set(float64(block.Round))
-		totalProposalsSigned.WithLabelValues(chainID).Inc()
+		metrics.LastProposalHeight.WithLabelValues(chainID).Set(float64(block.Height))
+		metrics.LastProposalRound.WithLabelValues(chainID).Set(float64(block.Round))
+		metrics.TotalProposalsSigned.WithLabelValues(chainID).Inc()
 	case types.StepPrevote:
 		// Determine number of heights since the last Prevote
-		stepSize := block.Height - previousPrevoteHeight
-		if previousPrevoteHeight != 0 && stepSize > 1 {
-			missedPrevotes.WithLabelValues(chainID).Add(float64(stepSize))
-			totalMissedPrevotes.WithLabelValues(chainID).Add(float64(stepSize))
+		stepSize := block.Height - metrics.PreviousPrevoteHeight
+		if metrics.PreviousPrevoteHeight != 0 && stepSize > 1 {
+			metrics.MissedPrevotes.WithLabelValues(chainID).Add(float64(stepSize))
+			metrics.TotalMissedPrevotes.WithLabelValues(chainID).Add(float64(stepSize))
 		} else {
-			missedPrevotes.WithLabelValues(chainID).Set(0)
+			metrics.MissedPrevotes.WithLabelValues(chainID).Set(0)
 		}
 
-		previousPrevoteHeight = block.Height // remember last PrevoteHeight
+		metrics.PreviousPrevoteHeight = block.Height // remember last PrevoteHeight
 
-		metricsTimeKeeper.SetPreviousPrevote(time.Now())
+		metrics.MetricsTimeKeeper.SetPreviousPrevote(time.Now())
 
-		lastPrevoteHeight.WithLabelValues(chainID).Set(float64(block.Height))
-		lastPrevoteRound.WithLabelValues(chainID).Set(float64(block.Round))
-		totalPrevotesSigned.WithLabelValues(chainID).Inc()
+		metrics.LastPrevoteHeight.WithLabelValues(chainID).Set(float64(block.Height))
+		metrics.LastPrevoteRound.WithLabelValues(chainID).Set(float64(block.Round))
+		metrics.TotalPrevotesSigned.WithLabelValues(chainID).Inc()
 	case types.StepPrecommit:
-		stepSize := block.Height - previousPrecommitHeight
-		if previousPrecommitHeight != 0 && stepSize > 1 {
-			missedPrecommits.WithLabelValues(chainID).Add(float64(stepSize))
-			totalMissedPrecommits.WithLabelValues(chainID).Add(float64(stepSize))
+		stepSize := block.Height - metrics.PreviousPrecommitHeight
+		if metrics.PreviousPrecommitHeight != 0 && stepSize > 1 {
+			metrics.MissedPrecommits.WithLabelValues(chainID).Add(float64(stepSize))
+			metrics.TotalMissedPrecommits.WithLabelValues(chainID).Add(float64(stepSize))
 		} else {
-			missedPrecommits.WithLabelValues(chainID).Set(0)
+			metrics.MissedPrecommits.WithLabelValues(chainID).Set(0)
 		}
-		previousPrecommitHeight = block.Height // remember last PrecommitHeight
+		metrics.PreviousPrecommitHeight = block.Height // remember last PrecommitHeight
 
-		metricsTimeKeeper.SetPreviousPrecommit(time.Now())
+		metrics.MetricsTimeKeeper.SetPreviousPrecommit(time.Now())
 
-		lastPrecommitHeight.WithLabelValues(chainID).Set(float64(block.Height))
-		lastPrecommitRound.WithLabelValues(chainID).Set(float64(block.Round))
-		totalPrecommitsSigned.WithLabelValues(chainID).Inc()
+		metrics.LastPrecommitHeight.WithLabelValues(chainID).Set(float64(block.Height))
+		metrics.LastPrecommitRound.WithLabelValues(chainID).Set(float64(block.Round))
+		metrics.TotalPrecommitsSigned.WithLabelValues(chainID).Inc()
 	}
 
 	return signature, timestamp, nil

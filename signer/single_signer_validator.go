@@ -3,6 +3,7 @@ package signer
 import (
 	"context"
 	"fmt"
+	"github.com/strangelove-ventures/horcrux/pkg/connector"
 	"os"
 	"sync"
 	"time"
@@ -10,7 +11,7 @@ import (
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 )
 
-var _ PrivValidator = &SingleSignerValidator{}
+var _ connector.PrivValidator = &SingleSignerValidator{}
 
 // SingleSignerValidator guards access to an underlying PrivValidator by using mutexes
 // for each of the PrivValidator interface functions

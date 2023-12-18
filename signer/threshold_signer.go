@@ -2,16 +2,17 @@ package signer
 
 import (
 	"encoding/json"
+	"os"
+
 	"github.com/cometbft/cometbft/privval"
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
-	"os"
 )
 
 // Interface for the local signer whether it's a soft sign or HSM
 type ThresholdSigner interface {
-	// PubKey returns the public key bytes for the combination of all cosigners.
-	PubKey() []byte
+	// GetPubKey returns the public key bytes for the combination of all cosigners.
+	GetPubKey() []byte
 
 	// Sign signs a byte payload with the provided nonces.
 	Sign(nonces []types.Nonce, payload []byte) ([]byte, error)

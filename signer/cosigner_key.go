@@ -2,6 +2,7 @@ package signer
 
 import (
 	"encoding/json"
+
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	cometcryptoencoding "github.com/cometbft/cometbft/crypto/encoding"
@@ -10,7 +11,6 @@ import (
 )
 
 // CosignerEd25519Key is a single Ed255219 key shard for an m-of-n threshold signer.
-// TODO: CosignerEd25519Key is almost a duplicate of ThresholdSignerEd25519Key
 type CosignerEd25519Key struct {
 	PubKey       cometcrypto.PubKey `json:"pubKey"`
 	PrivateShard []byte             `json:"privateShard"`

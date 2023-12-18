@@ -37,7 +37,7 @@ func (rpc *CosignerGRPCServer) SignBlock(
 	ctx context.Context,
 	req *proto.SignBlockRequest,
 ) (*proto.SignBlockResponse, error) {
-	res, _, err := rpc.thresholdValidator.Sign(ctx, req.ChainID, BlockFromProto(req.Block))
+	res, _, err := rpc.thresholdValidator.Sign(ctx, req.ChainID, types.BlockFromProto(req.Block))
 	if err != nil {
 		return nil, err
 	}

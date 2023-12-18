@@ -46,7 +46,7 @@ func NewThresholdSignerSoft(config *RuntimeConfig, id int, chainID string) (*Thr
 	return &s, nil
 }
 
-func (s *ThresholdSignerSoft) PubKey() []byte {
+func (s *ThresholdSignerSoft) GetPubKey() []byte {
 	return s.pubKey
 }
 

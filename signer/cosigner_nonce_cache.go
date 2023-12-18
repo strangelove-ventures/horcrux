@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/strangelove-ventures/horcrux/pkg/metrics"
+
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/google/uuid"
 )
@@ -282,15 +284,15 @@ func (cnc *CosignerNonceCache) LoadN(ctx context.Context, n int) {
 			n, err := p.GetNonces(ctx, uuids)
 			if err != nil {
 				// Significant missing shares may lead to signature failure
-				missedNonces.WithLabelValues(p.GetAddress()).Add(float64(1))
-				totalMissedNonces.WithLabelValues(p.GetAddress()).Inc()
+				metrics.MissedNonces.WithLabelValues(p.GetAddress()).Add(float64(1))
+				metrics.TotalMissedNonces.WithLabelValues(p.GetAddress()).Inc()
 
 				cnc.logger.Error("Failed to get nonces from peer", "peer", p.GetIndex(), "error", err)
 				return
 			}
 
-			missedNonces.WithLabelValues(p.GetAddress()).Set(0)
-			timedCosignerNonceLag.WithLabelValues(p.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
+			metrics.MissedNonces.WithLabelValues(p.GetAddress()).Set(0)
+			metrics.TimedCosignerNonceLag.WithLabelValues(p.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
 
 			nonces[i] = &CachedNonceSingle{
 				Cosigner: p,

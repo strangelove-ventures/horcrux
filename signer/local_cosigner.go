@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/strangelove-ventures/horcrux/pkg/metrics"
+
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
@@ -173,7 +175,7 @@ func (cosigner *LocalCosigner) GetPubKey(chainID string) (cometcrypto.PubKey, er
 		return nil, err
 	}
 
-	return cometcryptoed25519.PubKey(ccs.signer.PubKey()), nil
+	return cometcryptoed25519.PubKey(ccs.signer.GetPubKey()), nil
 }
 
 // CombineSignatures combines partial signatures into a full signature.
@@ -201,7 +203,7 @@ func (cosigner *LocalCosigner) VerifySignature(chainID string, payload, signatur
 	sig := make([]byte, len(signature))
 	copy(sig, signature)
 
-	return cometcryptoed25519.PubKey(ccs.signer.PubKey()).VerifySignature(payload, sig)
+	return cometcryptoed25519.PubKey(ccs.signer.GetPubKey()).VerifySignature(payload, sig)
 }
 
 // Sign the sign request using the cosigner's shard
@@ -218,7 +220,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	}
 
 	// This function has multiple exit points.  Only start time can be guaranteed
-	metricsTimeKeeper.SetPreviousLocalSignStart(time.Now())
+	metrics.MetricsTimeKeeper.SetPreviousLocalSignStart(time.Now())
 
 	hrst, err := types.UnpackHRST(req.SignBytes)
 	if err != nil {
@@ -270,7 +272,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	res.Signature = sig
 
 	// Note - Function may return before this line so elapsed time for Finish may be multiple block times
-	metricsTimeKeeper.SetPreviousLocalSignFinish(time.Now())
+	metrics.MetricsTimeKeeper.SetPreviousLocalSignFinish(time.Now())
 
 	return res, nil
 }
@@ -326,7 +328,7 @@ func (cosigner *LocalCosigner) GetNonces(
 	_ context.Context,
 	uuids []uuid.UUID,
 ) (CosignerUUIDNoncesMultiple, error) {
-	metricsTimeKeeper.SetPreviousLocalNonce(time.Now())
+	metrics.MetricsTimeKeeper.SetPreviousLocalNonce(time.Now())
 
 	total := len(cosigner.config.Config.ThresholdModeConfig.Cosigners)
 

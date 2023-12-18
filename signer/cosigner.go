@@ -86,6 +86,7 @@ func (secretPart *CosignerNonce) toProto() *proto.Nonce {
 	}
 }
 
+// CosignerNonces are a list of CosignerNonce
 type CosignerNonces []CosignerNonce
 
 func (secretParts CosignerNonces) toProto() (out []*proto.Nonce) {

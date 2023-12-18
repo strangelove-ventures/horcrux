@@ -45,7 +45,7 @@ func NewThresholdSignerSoftBLS(config *RuntimeConfig, id int, chainID string) (*
 	return &s, nil
 }
 
-func (s *ThresholdSignerSoftBLS) PubKey() []byte {
+func (s *ThresholdSignerSoftBLS) GetPubKey() []byte {
 	return s.pubKey
 }
 

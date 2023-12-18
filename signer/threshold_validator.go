@@ -9,18 +9,20 @@ import (
 	"sync"
 	"time"
 
+	"github.com/strangelove-ventures/horcrux/pkg/connector"
+	"github.com/strangelove-ventures/horcrux/pkg/metrics"
+
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 
 	"github.com/cometbft/cometbft/libs/log"
 	cometrpcjsontypes "github.com/cometbft/cometbft/rpc/jsonrpc/types"
 	"github.com/google/uuid"
-	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-var _ PrivValidator = &ThresholdValidator{}
+var _ connector.PrivValidator = &ThresholdValidator{}
 
 type ThresholdValidator struct {
 	config *RuntimeConfig
@@ -282,28 +284,12 @@ func (pv *ThresholdValidator) GetPubKey(_ context.Context, chainID string) ([]by
 	return pubKey.Bytes(), nil
 }
 
-func BlockFromProto(block *proto.Block) types.Block {
-	return types.Block{
-		Height:    block.Height,
-		Round:     block.Round,
-		Step:      int8(block.Step),
-		SignBytes: block.SignBytes,
-		Timestamp: time.Unix(0, block.Timestamp),
-	}
-}
-
-type BeyondBlockError struct {
-	msg string
-}
-
-func (e *BeyondBlockError) Error() string { return e.msg }
-
-func (pv *ThresholdValidator) newBeyondBlockError(chainID string, hrs types.HRSKey) *BeyondBlockError {
+func (pv *ThresholdValidator) newBeyondBlockError(chainID string, hrs types.HRSKey) *metrics.BeyondBlockError {
 	css := pv.mustLoadChainState(chainID)
 
 	lss := css.lastSignStateInitiated
-	return &BeyondBlockError{
-		msg: fmt.Sprintf("[%s] Progress already started on block %d.%d.%d, skipping %d.%d.%d",
+	return &metrics.BeyondBlockError{
+		Msg: fmt.Sprintf("[%s] Progress already started on block %d.%d.%d, skipping %d.%d.%d",
 			chainID,
 			lss.Height, lss.Round, lss.Step,
 			hrs.Height, hrs.Round, hrs.Step,
@@ -324,15 +310,9 @@ func newStillWaitingForBlockError(chainID string, hrs types.HRSKey) *StillWaitin
 	}
 }
 
-type SameBlockError struct {
-	msg string
-}
-
-func (e *SameBlockError) Error() string { return e.msg }
-
-func newSameBlockError(chainID string, hrs types.HRSKey) *SameBlockError {
-	return &SameBlockError{
-		msg: fmt.Sprintf("[%s] Same block: %d.%d.%d",
+func newSameBlockError(chainID string, hrs types.HRSKey) *metrics.SameBlockError {
+	return &metrics.SameBlockError{
+		Msg: fmt.Sprintf("[%s] Same block: %d.%d.%d",
 			chainID, hrs.Height, hrs.Round, hrs.Step),
 	}
 }
@@ -395,7 +375,7 @@ func (pv *ThresholdValidator) compareBlockSignatureAgainstSSC(
 	stamp, signBytes := block.Timestamp, block.SignBytes
 
 	if err := pv.compareBlockSignatureAgainstHRS(chainID, block, existingSignature.HRSKey()); err != nil {
-		if _, ok := err.(*SameBlockError); !ok {
+		if _, ok := err.(*metrics.SameBlockError); !ok {
 			return nil, stamp, err
 		}
 	}
@@ -440,8 +420,8 @@ func (pv *ThresholdValidator) getNoncesFallback(
 ) (*CosignerUUIDNonces, []Cosigner, error) {
 	nonces := make(map[Cosigner]CosignerNonces)
 
-	drainedNonceCache.Inc()
-	totalDrainedNonceCache.Inc()
+	metrics.DrainedNonceCache.Inc()
+	metrics.TotalDrainedNonceCache.Inc()
 
 	var wg sync.WaitGroup
 	wg.Add(pv.threshold)
@@ -505,15 +485,15 @@ func (pv *ThresholdValidator) waitForPeerNonces(
 	peerStartTime := time.Now()
 	peerNonces, err := peer.GetNonces(ctx, []uuid.UUID{u})
 	if err != nil {
-		missedNonces.WithLabelValues(peer.GetAddress()).Inc()
-		totalMissedNonces.WithLabelValues(peer.GetAddress()).Inc()
+		metrics.MissedNonces.WithLabelValues(peer.GetAddress()).Inc()
+		metrics.TotalMissedNonces.WithLabelValues(peer.GetAddress()).Inc()
 
 		pv.logger.Error("Error getting nonces", "cosigner", peer.GetIndex(), "err", err)
 		return
 	}
 
-	missedNonces.WithLabelValues(peer.GetAddress()).Set(0)
-	timedCosignerNonceLag.WithLabelValues(peer.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
+	metrics.MissedNonces.WithLabelValues(peer.GetAddress()).Set(0)
+	metrics.TimedCosignerNonceLag.WithLabelValues(peer.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
 
 	// Check so that wg.Done is not called more than (threshold - 1) times which causes hardlock
 	mu.Lock()
@@ -544,7 +524,7 @@ func (pv *ThresholdValidator) proxyIfNecessary(
 	}
 
 	if leader == -1 {
-		totalRaftLeaderElectionTimeout.Inc()
+		metrics.TotalRaftLeaderElectionTimeout.Inc()
 		return true, nil, stamp, fmt.Errorf("timed out waiting for raft leader")
 	}
 
@@ -558,7 +538,7 @@ func (pv *ThresholdValidator) proxyIfNecessary(
 		"round", round,
 		"step", step,
 	)
-	totalNotRaftLeader.Inc()
+	metrics.TotalNotRaftLeader.Inc()
 
 	cosignerLeader := pv.peerCosigners.GetByID(leader)
 	if cosignerLeader == nil {
@@ -574,7 +554,7 @@ func (pv *ThresholdValidator) proxyIfNecessary(
 			rpcErrUnwrapped := err.(*cometrpcjsontypes.RPCError).Data
 			// Need to return BeyondBlockError after proxy since the error type will be lost over RPC
 			if len(rpcErrUnwrapped) > 33 && rpcErrUnwrapped[:33] == "Progress already started on block" {
-				return true, nil, stamp, &BeyondBlockError{msg: rpcErrUnwrapped}
+				return true, nil, stamp, &metrics.BeyondBlockError{Msg: rpcErrUnwrapped}
 			}
 		}
 		return true, nil, stamp, err
@@ -603,7 +583,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 		return proxySig, proxyStamp, err
 	}
 
-	totalRaftLeader.Inc()
+	metrics.TotalRaftLeader.Inc()
 
 	log.Debug("I am the leader. Managing the sign process for this block")
 
@@ -649,7 +629,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 		}
 		dontIterateFastestCosigners = true
 	} else {
-		drainedNonceCache.Set(0)
+		metrics.DrainedNonceCache.Set(0)
 	}
 
 	nextFastestCosignerIndex := pv.threshold - 1
@@ -665,11 +645,11 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 		return cosigner
 	}
 
-	timedSignBlockThresholdLag.Observe(time.Since(timeStartSignBlock).Seconds())
+	metrics.TimedSignBlockThresholdLag.Observe(time.Since(timeStartSignBlock).Seconds())
 
 	for _, peer := range pv.peerCosigners {
-		missedNonces.WithLabelValues(peer.GetAddress()).Set(0)
-		timedCosignerNonceLag.WithLabelValues(peer.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
+		metrics.MissedNonces.WithLabelValues(peer.GetAddress()).Set(0)
+		metrics.TimedCosignerNonceLag.WithLabelValues(peer.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
 	}
 
 	cosignersForThisBlockInt := make([]int, len(cosignersForThisBlock))
@@ -726,7 +706,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 				}
 
 				if cosigner != pv.myCosigner {
-					timedCosignerSignLag.WithLabelValues(cosigner.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
+					metrics.TimedCosignerSignLag.WithLabelValues(cosigner.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
 				}
 				shareSignatures[cosigner.GetIndex()-1] = sigRes.Signature
 
@@ -741,7 +721,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 		return nil, stamp, fmt.Errorf("error from cosigner(s): %s", err)
 	}
 
-	timedSignBlockCosignerLag.Observe(time.Since(timeStartSignBlock).Seconds())
+	metrics.TimedSignBlockCosignerLag.Observe(time.Since(timeStartSignBlock).Seconds())
 
 	// collect all valid responses into array of partial signatures
 	shareSigs := make([]types.PartialSignature, 0, pv.threshold)
@@ -762,7 +742,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 	}
 
 	if len(shareSigs) < pv.threshold {
-		totalInsufficientCosigners.Inc()
+		metrics.TotalInsufficientCosigners.Inc()
 		pv.notifyBlockSignError(chainID, block.HRSKey(), signBytes)
 		return nil, stamp, errors.New("not enough co-signers")
 	}
@@ -776,7 +756,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 
 	// verify the combined signature before saving to watermark
 	if !pv.myCosigner.VerifySignature(chainID, signBytes, signature) {
-		totalInvalidSignature.Inc()
+		metrics.TotalInvalidSignature.Inc()
 
 		pv.notifyBlockSignError(chainID, block.HRSKey(), signBytes)
 		return nil, stamp, errors.New("combined signature is not valid")
@@ -817,7 +797,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 
 	timeSignBlock := time.Since(timeStartSignBlock)
 	timeSignBlockSec := timeSignBlock.Seconds()
-	timedSignBlockLag.Observe(timeSignBlockSec)
+	metrics.TimedSignBlockLag.Observe(timeSignBlockSec)
 
 	log.Info(
 		"Signed",
