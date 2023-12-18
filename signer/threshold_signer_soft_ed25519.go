@@ -20,7 +20,7 @@ type ThresholdSignerSoftEd25519 struct {
 	total           uint8
 }
 
-func NewThresholdSignerSoftEd25519(key CosignerKey, threshold, total uint8) *ThresholdSignerSoftEd25519 {
+func NewThresholdSignerSoftEd25519(key *CosignerKey, threshold, total uint8) *ThresholdSignerSoftEd25519 {
 	return &ThresholdSignerSoftEd25519{
 		privateKeyShard: key.PrivateShard,
 		pubKey:          key.PubKey,

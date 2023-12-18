@@ -2,12 +2,15 @@ package signer
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	cometcryptoencoding "github.com/cometbft/cometbft/crypto/encoding"
-	cometprotocrypto "github.com/cometbft/cometbft/proto/tendermint/crypto"
+	"github.com/strangelove-ventures/horcrux/signer/bn254"
+	"github.com/strangelove-ventures/horcrux/signer/encoding"
+	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"github.com/tendermint/go-amino"
 )
 
@@ -22,7 +25,17 @@ type CosignerKey struct {
 func (key *CosignerKey) MarshalJSON() ([]byte, error) {
 	type Alias CosignerKey
 
-	protoPubkey, err := cometcryptoencoding.PubKeyToProto(cometcryptoed25519.PubKey(key.PubKey))
+	var pub cometcrypto.PubKey
+	switch key.KeyType {
+	case CosignerKeyTypeBn254:
+		pub = bn254.PubKey(key.PubKey)
+	case CosignerKeyTypeEd25519:
+		fallthrough
+	default:
+		pub = cometcryptoed25519.PubKey(key.PubKey)
+	}
+
+	protoPubkey, err := encoding.PubKeyToProto(pub)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +68,7 @@ func (key *CosignerKey) UnmarshalJSON(data []byte) error {
 	}
 
 	var pubkey cometcrypto.PubKey
-	var protoPubkey cometprotocrypto.PublicKey
+	var protoPubkey proto.PublicKey
 	err := protoPubkey.Unmarshal(aux.PubkeyBytes)
 
 	// Prior to the tendermint protobuf migration, the public key bytes in key files
@@ -65,19 +78,17 @@ func (key *CosignerKey) UnmarshalJSON(data []byte) error {
 	// To support reading the public key bytes from these key files, we fallback to
 	// amino unmarshalling if the protobuf unmarshalling fails
 	if err != nil {
-		var pub cometcryptoed25519.PubKey
 		codec := amino.NewCodec()
 		codec.RegisterInterface((*cometcrypto.PubKey)(nil), nil)
 		codec.RegisterConcrete(cometcryptoed25519.PubKey{}, "tendermint/PubKeyEd25519", nil)
-		codec.RegisterConcrete(cometcryptoed25519.PubKey{}, "tendermint/PubKeyBn254", nil)
 
-		errInner := codec.UnmarshalBinaryBare(aux.PubkeyBytes, &pub)
-		if errInner != nil {
-			return err
+		var pub cometcryptoed25519.PubKey
+		if errInner := codec.UnmarshalBinaryBare(aux.PubkeyBytes, &pub); errInner != nil {
+			return fmt.Errorf("error in unmarshal ed25519: %w", errors.Join(err, errInner))
 		}
 		pubkey = pub
 	} else {
-		pubkey, err = cometcryptoencoding.PubKeyFromProto(protoPubkey)
+		pubkey, err = encoding.PubKeyFromProto(protoPubkey)
 		if err != nil {
 			return err
 		}
@@ -88,8 +99,8 @@ func (key *CosignerKey) UnmarshalJSON(data []byte) error {
 }
 
 // LoadCosignerKey loads a CosignerKey from file.
-func LoadCosignerKey(file string) (CosignerKey, error) {
-	pvKey := CosignerKey{}
+func LoadCosignerKey(file string) (*CosignerKey, error) {
+	pvKey := new(CosignerKey)
 	keyJSONBytes, err := os.ReadFile(file)
 	if err != nil {
 		return pvKey, err
@@ -97,7 +108,7 @@ func LoadCosignerKey(file string) (CosignerKey, error) {
 
 	err = json.Unmarshal(keyJSONBytes, &pvKey)
 	if err != nil {
-		return pvKey, err
+		return pvKey, fmt.Errorf("error in unmarshal: %w", err)
 	}
 
 	return pvKey, nil

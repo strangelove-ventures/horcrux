@@ -6,6 +6,9 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	// required to register bn254 types for signing
+	_ "github.com/strangelove-ventures/horcrux/signer/bn254"
 )
 
 var _ PrivValidator = &SingleSignerValidator{}
