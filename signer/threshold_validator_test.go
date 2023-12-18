@@ -68,7 +68,7 @@ func loadKeyForLocalCosigner(
 	chainID string,
 	privateShard []byte,
 ) error {
-	key := CosignerKey{
+	key := &CosignerKey{
 		KeyType:      keyType,
 		PubKey:       pubKey,
 		PrivateShard: privateShard,
@@ -351,12 +351,10 @@ func getTestLocalCosigners(t *testing.T, keyType string, threshold, total uint8)
 		pk := pubPoly.Commit()
 		pubKey, err = pk.MarshalBinary()
 		require.NoError(t, err)
-		fmt.Printf("pubKey: %+v\n", pk)
 
 		for i, x := range priPoly.Shares(int(total)) {
 			privShards[i], err = x.V.MarshalBinary()
 			require.NoError(t, err)
-			fmt.Printf("share i: %d, %x\n", x.I, privShards[i])
 		}
 	}
 

@@ -137,7 +137,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 	for i := 0; i < int(total); i++ {
 		id := i + 1
 
-		key := CosignerKey{
+		key := &CosignerKey{
 			PubKey:       pubKey.Bytes(),
 			PrivateShard: privShards[i],
 			ID:           id,

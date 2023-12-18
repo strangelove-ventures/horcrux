@@ -20,7 +20,7 @@ type ThresholdSignerSoftBn254 struct {
 	suite *bn256.Suite
 }
 
-func NewThresholdSignerSoftBn254(key CosignerKey, threshold, total uint8) (*ThresholdSignerSoftBn254, error) {
+func NewThresholdSignerSoftBn254(key *CosignerKey, threshold, total uint8) (*ThresholdSignerSoftBn254, error) {
 	suite := bn256.NewSuite()
 	privateKey := suite.G2().Scalar().SetBytes(key.PrivateShard)
 	pubKey := suite.G2().Point()

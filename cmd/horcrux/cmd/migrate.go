@@ -10,10 +10,10 @@ import (
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	cometcryptoencoding "github.com/cometbft/cometbft/crypto/encoding"
-	cometprotocrypto "github.com/cometbft/cometbft/proto/tendermint/crypto"
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/v3/signer"
+	"github.com/strangelove-ventures/horcrux/v3/signer/encoding"
+	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 	amino "github.com/tendermint/go-amino"
 	"gopkg.in/yaml.v2"
 )
@@ -98,7 +98,7 @@ func (key *v2CosignerKey) UnmarshalJSON(data []byte) error {
 	}
 
 	var pubkey cometcrypto.PubKey
-	var protoPubkey cometprotocrypto.PublicKey
+	var protoPubkey proto.PublicKey
 	err = protoPubkey.Unmarshal(aux.PubkeyBytes)
 
 	// Prior to the tendermint protobuf migration, the public key bytes in key files
@@ -118,7 +118,7 @@ func (key *v2CosignerKey) UnmarshalJSON(data []byte) error {
 		}
 		pubkey = pub
 	} else {
-		pubkey, err = cometcryptoencoding.PubKeyFromProto(protoPubkey)
+		pubkey, err = encoding.PubKeyFromProto(protoPubkey)
 		if err != nil {
 			return err
 		}
