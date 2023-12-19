@@ -15,12 +15,15 @@ import (
 	"github.com/google/uuid"
 )
 
+/*
 const (
+
 	defaultGetNoncesInterval = 3 * time.Second
 	defaultGetNoncesTimeout  = 4 * time.Second
 	defaultNonceExpiration   = 10 * time.Second // half of the local cosigner cache expiration
-)
 
+)
+*/
 type CosignerNonceCache struct {
 	logger    cometlog.Logger
 	cosigners []nodes.Cosigner

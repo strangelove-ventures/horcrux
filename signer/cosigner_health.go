@@ -2,10 +2,11 @@ package signer
 
 import (
 	"context"
-	"github.com/strangelove-ventures/horcrux/pkg/nodes"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/nodes"
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
