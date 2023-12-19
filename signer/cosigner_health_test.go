@@ -46,18 +46,17 @@ func (m *MockLeader) ShareSigned(_ types.ChainSignStateConsensus) error {
 
 func TestCosignerHealth(t *testing.T) {
 
-	cosigner2, _ := nodes.NewRemoteCosigner(2, "")
-	cosigner3, _ := nodes.NewRemoteCosigner(3, "")
-	cosigner4, _ := nodes.NewRemoteCosigner(4, "")
-	cosigner5, _ := nodes.NewRemoteCosigner(5, "")
+	cosigner2 := nodes.InitRemoteCosigner(2, "", nil)
+	cosigner3 := nodes.InitRemoteCosigner(3, "", nil)
+	cosigner4 := nodes.InitRemoteCosigner(4, "", nil)
+	cosigner5 := nodes.InitRemoteCosigner(5, "", nil)
+
+	var cosigners []nodes.Cosigner
+	cosigners = append(cosigners, cosigner2, cosigner3, cosigner4, cosigner5)
+
 	ch := NewCosignerHealth(
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)),
-		[]nodes.Cosigner{
-			cosigner2,
-			cosigner3,
-			cosigner4,
-			cosigner5,
-		},
+		cosigners,
 		&MockLeader{id: 1},
 	)
 

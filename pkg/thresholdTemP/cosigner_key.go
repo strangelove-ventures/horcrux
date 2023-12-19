@@ -21,6 +21,7 @@ type ISignerKey interface {
 */
 
 // CosignerEd25519Key is a single Ed255219 key shard for an m-of-n threshold signer.
+// TODO: This should be renamed to SignerEd25519 and tbh Private shard should private.
 type CosignerEd25519Key struct {
 	PubKey       cometcrypto.PubKey `json:"pubKey"`
 	PrivateShard []byte             `json:"privateShard"`

@@ -23,20 +23,34 @@ type RemoteCosigner struct {
 	Client proto.CosignerClient
 }
 
-// NewRemoteCosigner returns a newly initialized RemoteCosigner
-func NewRemoteCosigner(id int, address string) (*RemoteCosigner, error) {
-	client, err := getGRPCClient(address)
-	if err != nil {
-		return nil, err
-	}
-
+// Placeholder function because of testing
+func InitRemoteCosigner(id int, address string, client proto.CosignerClient) *RemoteCosigner {
 	cosigner := &RemoteCosigner{
 		id:      id,
 		address: address,
 		Client:  client,
 	}
 
+	return cosigner
+}
+
+// NewRemoteCosigner returns a newly initialized RemoteCosigner
+func NewRemoteCosigner(id int, address string) (*RemoteCosigner, error) {
+	client, err := getGRPCClient(address)
+	if err != nil {
+		return nil, err
+	}
+	cosigner := InitRemoteCosigner(id, address, client)
 	return cosigner, nil
+	/*
+		cosigner := &RemoteCosigner{
+			id:      id,
+			address: address,
+			Client:  client,
+		}
+
+		return cosigner, nil
+	*/
 }
 
 // GetID returns the Index of the remote cosigner

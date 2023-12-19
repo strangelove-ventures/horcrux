@@ -10,7 +10,6 @@ package signer
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/strangelove-ventures/horcrux/pkg/nodes"
 	"io"
 	"net"
 	"net/url"
@@ -19,6 +18,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/nodes"
 
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 
