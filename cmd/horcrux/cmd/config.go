@@ -135,7 +135,7 @@ for threshold signer mode, --cosigner flags and --threshold flag are required.
 
 	f := cmd.Flags()
 	f.StringP(flagSignMode, "m", string(cconfig.SignModeThreshold),
-		`sign mode, "threshold" (recommended) or "single" (unsupported). threshold mode requires --cosigner (multiple) and --threshold`, // nolint
+		`sign mode, "threshold" (recommended) or "single" (unsupported). threshold mode requires --cosigner (multiple) and --threshold`, //nolint
 	)
 	f.StringSliceP(flagNode, "n", []string{}, "chain nodes in format tcp://{node-addr}:{privval-port} \n"+
 		"(e.g. --node tcp://sentry-1:1234 --node tcp://sentry-2:1234 --node tcp://sentry-3:1234 )")

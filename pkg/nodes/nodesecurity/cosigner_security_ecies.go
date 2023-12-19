@@ -137,7 +137,8 @@ func (c *CosignerSecurityECIES) GetID() int {
 }
 
 // EncryptAndSign encrypts the nonce and signs it for authentication.
-func (c *CosignerSecurityECIES) EncryptAndSign(id int, noncePub []byte, nonceShare []byte) (nodes.CosignerNonce, error) {
+func (c *CosignerSecurityECIES) EncryptAndSign(
+	id int, noncePub []byte, nonceShare []byte) (nodes.CosignerNonce, error) {
 	nonce := nodes.CosignerNonce{
 		SourceID: c.key.ID,
 	}
