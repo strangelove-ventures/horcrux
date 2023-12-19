@@ -31,7 +31,7 @@ func TestCosignerRSA(t *testing.T) {
 		pubKeys[i] = &key.PublicKey
 	}
 
-	securities := make([]nodes.ICosignerSecurity, 3)
+	securities := make([]*nodesecurity.CosignerSecurityRSA, 3)
 
 	for i := 0; i < 3; i++ {
 		key := nodesecurity.CosignerRSAKey{
@@ -58,7 +58,7 @@ func TestCosignerRSA(t *testing.T) {
 		}
 	}
 
-	err := testCosignerSecurity(t, securities)
+	err := testCosignerSecurityRSA(t, securities)
 	require.ErrorIs(t, rsa.ErrDecryption, err)
 }
 

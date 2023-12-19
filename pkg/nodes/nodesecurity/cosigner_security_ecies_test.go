@@ -52,12 +52,12 @@ func TestCosignerECIES(t *testing.T) {
 		}
 	}
 
-	err := testCosignerSecurity(t, securities)
+	err := testCosignerSecurityECIES(t, securities)
 	require.ErrorContains(t, err, "ecies: invalid message")
 	require.ErrorContains(t, err, "failed to decrypt")
 }
 
-func testCosignerSecurity(t *testing.T, securities []nodesecurity.CosignerSecurityECIES) error {
+func testCosignerSecurityRSA(t *testing.T, securities []*nodesecurity.CosignerSecurityRSA) error {
 	var (
 		mockPub   = []byte("mock_pub")
 		mockShare = []byte("mock_share")
@@ -77,6 +77,25 @@ func testCosignerSecurity(t *testing.T, securities []nodesecurity.CosignerSecuri
 	return err
 }
 
+func testCosignerSecurityECIES(t *testing.T, securities []nodesecurity.CosignerSecurityECIES) error {
+	var (
+		mockPub   = []byte("mock_pub")
+		mockShare = []byte("mock_share")
+	)
+
+	nonce, err := securities[0].EncryptAndSign(2, mockPub, mockShare)
+	require.NoError(t, err)
+
+	decryptedPub, decryptedShare, err := securities[1].DecryptAndVerify(1, nonce.PubKey, nonce.Share, nonce.Signature)
+	require.NoError(t, err)
+
+	require.Equal(t, mockPub, decryptedPub)
+	require.Equal(t, mockShare, decryptedShare)
+
+	_, _, err = securities[2].DecryptAndVerify(1, nonce.PubKey, nonce.Share, nonce.Signature)
+
+	return err
+}
 func TestConcurrentIterateCosignerECIES(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping in short mode")

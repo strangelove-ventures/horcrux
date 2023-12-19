@@ -44,7 +44,7 @@ func TestLocalCosignerSignRSA3of5(t *testing.T) {
 func testLocalCosignerSignRSA(t *testing.T, threshold, total uint8) {
 	t.Parallel()
 
-	security := make([]*nodesecurity.CosignerSecurityRSA, total)
+	security := make([]nodes.ICosignerSecurity, total)
 
 	keys := make([]*rsa.PrivateKey, total)
 	pubKeys := make([]*rsa.PublicKey, total)
@@ -105,7 +105,7 @@ func testLocalCosignerSignECIES(t *testing.T, threshold, total uint8) {
 	testLocalCosignerSign(t, threshold, total, security)
 }
 
-func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []*nodes.ICosignerSecurity) {
+func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []nodes.ICosignerSecurity) {
 	privateKey := cometcryptoed25519.GenPrivKey()
 
 	privKeyBytes := [64]byte{}
@@ -155,24 +155,24 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []*nod
 		cosignerDir := filepath.Join(tmpDir, fmt.Sprintf("cosigner%d", id))
 		err := os.Mkdir(cosignerDir, 0700)
 		require.NoError(t, err)
-
+		runtimeconfig := &config.RuntimeConfig{
+			HomeDir:  cosignerDir,
+			StateDir: cosignerDir,
+			Config:   cfg,
+		}
 		cosigner := nodes.NewLocalCosigner(
 			log.NewNopLogger(),
-			&config.RuntimeConfig{
-				HomeDir:  cosignerDir,
-				StateDir: cosignerDir,
-				Config:   cfg,
-			},
+			runtimeconfig,
 			security[i],
 			"",
 		)
 
 		keyBz, err := key.MarshalJSON()
 		require.NoError(t, err)
-		err = os.WriteFile(cosigner.config.KeyFilePathCosigner(testChainID), keyBz, 0600)
+		err = os.WriteFile(runtimeconfig.KeyFilePathCosigner(testChainID), keyBz, 0600)
 		require.NoError(t, err)
 
-		defer cosigner.waitForSignStatesToFlushToDisk()
+		defer cosigner.WaitForSignStatesToFlushToDisk()
 
 		err = cosigner.LoadSignStateIfNecessary(testChainID)
 		require.NoError(t, err)
