@@ -1,4 +1,4 @@
-package signer
+package signer_test
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/google/uuid"
+	"github.com/strangelove-ventures/horcrux/pkg/nodes"
 	"github.com/stretchr/testify/require"
 )
 
@@ -57,7 +58,7 @@ func TestMovingAverage(t *testing.T) {
 
 func TestClearNonces(t *testing.T) {
 	lcs, _ := getTestLocalCosigners(t, 2, 3)
-	cosigners := make([]Cosigner, len(lcs))
+	cosigners := make([]nodes.Cosigner, len(lcs))
 	for i, lc := range lcs {
 		cosigners[i] = lc
 	}
@@ -142,7 +143,7 @@ func (mp *mockPruner) Result() (int, int) {
 
 func TestNonceCacheDemand(t *testing.T) {
 	lcs, _ := getTestLocalCosigners(t, 2, 3)
-	cosigners := make([]Cosigner, len(lcs))
+	cosigners := make([]nodes.Cosigner, len(lcs))
 	for i, lc := range lcs {
 		cosigners[i] = lc
 	}
@@ -169,7 +170,7 @@ func TestNonceCacheDemand(t *testing.T) {
 	go nonceCache.Start(ctx)
 
 	for i := 0; i < 3000; i++ {
-		_, err := nonceCache.GetNonces([]Cosigner{cosigners[0], cosigners[1]})
+		_, err := nonceCache.GetNonces([]nodes.Cosigner{cosigners[0], cosigners[1]})
 		require.NoError(t, err)
 		time.Sleep(10 * time.Millisecond)
 		require.Greater(t, nonceCache.cache.Size(), 0)
@@ -191,7 +192,7 @@ func TestNonceCacheDemand(t *testing.T) {
 
 func TestNonceCacheExpiration(t *testing.T) {
 	lcs, _ := getTestLocalCosigners(t, 2, 3)
-	cosigners := make([]Cosigner, len(lcs))
+	cosigners := make([]nodes.Cosigner, len(lcs))
 	for i, lc := range lcs {
 		cosigners[i] = lc
 	}
@@ -402,7 +403,7 @@ func TestNonceCachePrune(t *testing.T) {
 
 func TestNonceCacheDemandSlow(t *testing.T) {
 	lcs, _ := getTestLocalCosigners(t, 2, 3)
-	cosigners := make([]Cosigner, len(lcs))
+	cosigners := make([]nodes.Cosigner, len(lcs))
 	for i, lc := range lcs {
 		cosigners[i] = lc
 	}
@@ -425,7 +426,7 @@ func TestNonceCacheDemandSlow(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		time.Sleep(200 * time.Millisecond)
 		require.Greater(t, nonceCache.cache.Size(), 0)
-		_, err := nonceCache.GetNonces([]Cosigner{cosigners[0], cosigners[1]})
+		_, err := nonceCache.GetNonces([]nodes.Cosigner{cosigners[0], cosigners[1]})
 		require.NoError(t, err)
 	}
 
@@ -439,7 +440,7 @@ func TestNonceCacheDemandSlowDefault(t *testing.T) {
 		t.Skip()
 	}
 	lcs, _ := getTestLocalCosigners(t, 2, 3)
-	cosigners := make([]Cosigner, len(lcs))
+	cosigners := make([]nodes.Cosigner, len(lcs))
 	for i, lc := range lcs {
 		cosigners[i] = lc
 	}
@@ -462,7 +463,7 @@ func TestNonceCacheDemandSlowDefault(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		time.Sleep(7 * time.Second)
 		require.Greater(t, nonceCache.cache.Size(), 0)
-		_, err := nonceCache.GetNonces([]Cosigner{cosigners[0], cosigners[1]})
+		_, err := nonceCache.GetNonces([]nodes.Cosigner{cosigners[0], cosigners[1]})
 		require.NoError(t, err)
 	}
 

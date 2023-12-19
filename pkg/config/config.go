@@ -1,4 +1,4 @@
-package signer
+package config
 
 import (
 	"fmt"
@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/nodes/nodesecurity"
 
 	"github.com/cometbft/cometbft/crypto"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -25,6 +27,13 @@ type SignMode string
 const (
 	SignModeThreshold SignMode = "threshold"
 	SignModeSingle    SignMode = "single"
+
+	// Default values for the nouncecahce
+	// TODO: Is this the best way to do this?
+	DefaultGetNoncesInterval = 3 * time.Second
+	DefaultGetNoncesTimeout  = 4 * time.Second
+	DefaultNonceExpiration   = 10 * time.Second // half of the local cosigner cache expiration
+
 )
 
 // Config maps to the on-disk yaml format
@@ -101,32 +110,32 @@ type RuntimeConfig struct {
 	Config     Config
 }
 
-func (c RuntimeConfig) CosignerSecurityECIES() (*CosignerSecurityECIES, error) {
+func (c RuntimeConfig) CosignerSecurityECIES() (*nodesecurity.CosignerSecurityECIES, error) {
 	keyFile, err := c.KeyFileExistsCosignerECIES()
 	if err != nil {
 		return nil, err
 	}
 
-	key, err := LoadCosignerECIESKey(keyFile)
+	key, err := nodesecurity.LoadCosignerECIESKey(keyFile)
 	if err != nil {
 		return nil, fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
 	}
 
-	return NewCosignerSecurityECIES(key), nil
+	return nodesecurity.NewCosignerSecurityECIES(key), nil
 }
 
-func (c RuntimeConfig) CosignerSecurityRSA() (*CosignerSecurityRSA, error) {
+func (c RuntimeConfig) CosignerSecurityRSA() (*nodesecurity.CosignerSecurityRSA, error) {
 	keyFile, err := c.KeyFileExistsCosignerRSA()
 	if err != nil {
 		return nil, err
 	}
 
-	key, err := LoadCosignerRSAKey(keyFile)
+	key, err := nodesecurity.LoadCosignerRSAKey(keyFile)
 	if err != nil {
 		return nil, fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
 	}
 
-	return NewCosignerSecurityRSA(key), nil
+	return nodesecurity.NewCosignerSecurityRSA(key), nil
 }
 
 func (c RuntimeConfig) cachedKeyDirectory() string {

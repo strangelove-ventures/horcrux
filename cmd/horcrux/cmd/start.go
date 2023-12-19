@@ -9,6 +9,7 @@ import (
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/cometbft/cometbft/libs/service"
 	"github.com/spf13/cobra"
+	cconfig "github.com/strangelove-ventures/horcrux/pkg/config"
 	"github.com/strangelove-ventures/horcrux/signer"
 )
 
@@ -48,12 +49,12 @@ func startCmd() *cobra.Command {
 			var services []service.Service
 
 			switch config.Config.SignMode {
-			case signer.SignModeThreshold:
+			case cconfig.SignModeThreshold:
 				services, val, err = NewThresholdValidator(cmd.Context(), logger)
 				if err != nil {
 					return err
 				}
-			case signer.SignModeSingle:
+			case cconfig.SignModeSingle:
 				val, err = NewSingleSignerValidator(out, acceptRisk)
 				if err != nil {
 					return err

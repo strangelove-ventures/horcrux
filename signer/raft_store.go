@@ -10,6 +10,7 @@ package signer
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/strangelove-ventures/horcrux/pkg/nodes"
 	"io"
 	"net"
 	"net/url"
@@ -54,7 +55,7 @@ type RaftStore struct {
 	RaftDir     string
 	RaftBind    string
 	RaftTimeout time.Duration
-	Cosigners   []Cosigner
+	Cosigners   []nodes.Cosigner
 
 	mu sync.Mutex
 	m  map[string]string // The key-value store for the system.
@@ -62,14 +63,14 @@ type RaftStore struct {
 	raft *raft.Raft // The consensus mechanism
 
 	logger             log.Logger
-	cosigner           *LocalCosigner
+	cosigner           *nodes.LocalCosigner
 	thresholdValidator *ThresholdValidator
 }
 
 // New returns a new Store.
 func NewRaftStore(
 	nodeID string, directory string, bindAddress string, timeout time.Duration,
-	logger log.Logger, cosigner *LocalCosigner, cosigners []Cosigner) *RaftStore {
+	logger log.Logger, cosigner *nodes.LocalCosigner, cosigners []nodes.Cosigner) *RaftStore {
 	cosignerRaftStore := &RaftStore{
 		NodeID:      nodeID,
 		RaftDir:     directory,

@@ -1,11 +1,13 @@
-package signer
+package signer_test
 
 import (
 	"context"
 	"path/filepath"
 	"time"
 
+	"github.com/strangelove-ventures/horcrux/pkg/config"
 	"github.com/strangelove-ventures/horcrux/pkg/types"
+	"github.com/strangelove-ventures/horcrux/signer"
 
 	"os"
 	"testing"
@@ -19,6 +21,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	testChainID  = "chain-1"
+	testChainID2 = "chain-2"
+	BitSize      = 4096
+)
+
 func TestSingleSignerValidator(t *testing.T) {
 	t.Skip("TODO: fix this test when run with 'make test'")
 
@@ -28,7 +36,7 @@ func TestSingleSignerValidator(t *testing.T) {
 	err := os.MkdirAll(stateDir, 0700)
 	require.NoError(t, err)
 
-	runtimeConfig := &RuntimeConfig{
+	runtimeConfig := &config.RuntimeConfig{
 		HomeDir:  tmpDir,
 		StateDir: filepath.Join(tmpDir, "state"),
 	}
@@ -48,7 +56,7 @@ func TestSingleSignerValidator(t *testing.T) {
 	err = os.WriteFile(runtimeConfig.KeyFilePathSingleSigner("different"), marshaled, 0600)
 	require.NoError(t, err)
 
-	validator := NewSingleSignerValidator(runtimeConfig)
+	validator := signer.NewSingleSignerValidator(runtimeConfig)
 
 	proposal := cometproto.Proposal{
 		Height: 1,
@@ -98,7 +106,7 @@ func TestSingleSignerValidator(t *testing.T) {
 	require.NoError(t, err)
 
 	// reinitialize validator to make sure new runtime will not allow double sign
-	validator = NewSingleSignerValidator(runtimeConfig)
+	validator = signer.NewSingleSignerValidator(runtimeConfig)
 
 	_, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposal))
 	require.Error(t, err, "double sign!")

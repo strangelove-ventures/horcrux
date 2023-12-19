@@ -1,4 +1,4 @@
-package signer
+package nodes
 
 import (
 	"context"
@@ -20,7 +20,7 @@ type RemoteCosigner struct {
 	id      int
 	address string
 
-	client proto.CosignerClient
+	Client proto.CosignerClient
 }
 
 // NewRemoteCosigner returns a newly initialized RemoteCosigner
@@ -33,7 +33,7 @@ func NewRemoteCosigner(id int, address string) (*RemoteCosigner, error) {
 	cosigner := &RemoteCosigner{
 		id:      id,
 		address: address,
-		client:  client,
+		Client:  client,
 	}
 
 	return cosigner, nil
@@ -88,7 +88,7 @@ func (cosigner *RemoteCosigner) GetNonces(
 		us[i] = make([]byte, 16)
 		copy(us[i], u[:])
 	}
-	res, err := cosigner.client.GetNonces(ctx, &proto.GetNoncesRequest{
+	res, err := cosigner.Client.GetNonces(ctx, &proto.GetNoncesRequest{
 		Uuids: us,
 	})
 	if err != nil {
@@ -108,7 +108,7 @@ func (cosigner *RemoteCosigner) GetNonces(
 func (cosigner *RemoteCosigner) SetNoncesAndSign(
 	ctx context.Context,
 	req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error) {
-	res, err := cosigner.client.SetNoncesAndSign(ctx, &proto.SetNoncesAndSignRequest{
+	res, err := cosigner.Client.SetNoncesAndSign(ctx, &proto.SetNoncesAndSignRequest{
 		Uuid:      req.Nonces.UUID[:],
 		ChainID:   req.ChainID,
 		Nonces:    req.Nonces.Nonces.toProto(),
@@ -129,7 +129,7 @@ func (cosigner *RemoteCosigner) Sign(
 	ctx context.Context,
 	req CosignerSignBlockRequest,
 ) (*CosignerSignBlockResponse, error) {
-	res, err := cosigner.client.SignBlock(ctx, &proto.SignBlockRequest{
+	res, err := cosigner.Client.SignBlock(ctx, &proto.SignBlockRequest{
 		ChainID: req.ChainID,
 		Block:   req.Block.ToProto(),
 	})

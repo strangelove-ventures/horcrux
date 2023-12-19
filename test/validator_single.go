@@ -10,7 +10,7 @@ import (
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/cometbft/cometbft/privval"
 	"github.com/docker/docker/client"
-	"github.com/strangelove-ventures/horcrux/signer"
+	"github.com/strangelove-ventures/horcrux/pkg/config"
 	interchaintest "github.com/strangelove-ventures/interchaintest/v8"
 	"github.com/strangelove-ventures/interchaintest/v8/chain/cosmos"
 	"github.com/strangelove-ventures/interchaintest/v8/ibc"
@@ -84,15 +84,15 @@ func preGenesisSingleNodeAndHorcruxSingle(
 				return err
 			}
 
-			chainNodes := make(signer.ChainNodes, len(sentries))
+			chainNodes := make(config.ChainNodes, len(sentries))
 			for i, sentry := range sentries {
-				chainNodes[i] = signer.ChainNode{
+				chainNodes[i] = config.ChainNode{
 					PrivValAddr: fmt.Sprintf("tcp://%s:1234", sentry.HostName()),
 				}
 			}
 
-			config := signer.Config{
-				SignMode:   signer.SignModeSingle,
+			config := config.Config{
+				SignMode:   config.SignModeSingle,
 				ChainNodes: chainNodes,
 			}
 
@@ -118,7 +118,7 @@ func writeConfigAndKeysSingle(
 	ctx context.Context,
 	chainID string,
 	singleSigner *cosmos.SidecarProcess,
-	config signer.Config,
+	config config.Config,
 	pvKey privval.FilePVKey,
 ) error {
 	configBz, err := json.Marshal(config)

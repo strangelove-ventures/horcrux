@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/strangelove-ventures/horcrux/pkg/nodes/nodesecurity"
+
 	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/client"
-	"github.com/strangelove-ventures/horcrux/signer"
 	"github.com/strangelove-ventures/horcrux/signer/multiresolver"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"google.golang.org/grpc"
@@ -116,14 +117,14 @@ func getLeaderCmd() *cobra.Command {
 					return fmt.Errorf("cosigner encryption keys not found (%s) - (%s): %w", keyFileECIES, keyFileRSA, err)
 				}
 
-				key, err := signer.LoadCosignerRSAKey(keyFileRSA)
+				key, err := nodesecurity.LoadCosignerRSAKey(keyFileRSA)
 				if err != nil {
 					return fmt.Errorf("error reading cosigner key (%s): %w", keyFileRSA, err)
 				}
 
 				id = key.ID
 			} else {
-				key, err := signer.LoadCosignerECIESKey(keyFileECIES)
+				key, err := nodesecurity.LoadCosignerECIESKey(keyFileECIES)
 				if err != nil {
 					return fmt.Errorf("error reading cosigner key (%s): %w", keyFileECIES, err)
 				}

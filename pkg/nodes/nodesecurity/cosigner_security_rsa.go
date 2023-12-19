@@ -1,4 +1,4 @@
-package signer
+package nodesecurity
 
 import (
 	"crypto"
@@ -11,10 +11,11 @@ import (
 	"os"
 
 	cometjson "github.com/cometbft/cometbft/libs/json"
+	"github.com/strangelove-ventures/horcrux/pkg/nodes"
 	"golang.org/x/sync/errgroup"
 )
 
-var _ CosignerSecurity = &CosignerSecurityRSA{}
+var _ nodes.ICosignerSecurity = &CosignerSecurityRSA{}
 
 // CosignerSecurityRSA is an implementation of CosignerSecurity using RSA for encryption and P5S for digital signature.
 type CosignerSecurityRSA struct {
@@ -22,7 +23,7 @@ type CosignerSecurityRSA struct {
 	rsaPubKeys map[int]CosignerRSAPubKey
 }
 
-// CosignerRSAKey is a cosigner's RSA public key.
+// CosignerRSAPubKey is a cosigner's RSA public key.
 type CosignerRSAPubKey struct {
 	ID        int
 	PublicKey rsa.PublicKey
@@ -128,8 +129,8 @@ func (c *CosignerSecurityRSA) GetID() int {
 }
 
 // EncryptAndSign encrypts the nonce and signs it for authentication.
-func (c *CosignerSecurityRSA) EncryptAndSign(id int, noncePub []byte, nonceShare []byte) (CosignerNonce, error) {
-	nonce := CosignerNonce{
+func (c *CosignerSecurityRSA) EncryptAndSign(id int, noncePub []byte, nonceShare []byte) (nodes.CosignerNonce, error) {
+	nonce := nodes.CosignerNonce{
 		SourceID: c.key.ID,
 	}
 
@@ -194,7 +195,7 @@ func (c *CosignerSecurityRSA) DecryptAndVerify(
 		return nil, nil, fmt.Errorf("unknown cosigner: %d", id)
 	}
 
-	digestMsg := CosignerNonce{
+	digestMsg := nodes.CosignerNonce{
 		SourceID: id,
 		PubKey:   encryptedNoncePub,
 		Share:    encryptedNonceShare,

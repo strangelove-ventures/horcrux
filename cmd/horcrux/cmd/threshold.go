@@ -9,6 +9,7 @@ import (
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	cometservice "github.com/cometbft/cometbft/libs/service"
+	"github.com/strangelove-ventures/horcrux/pkg/nodes"
 	"github.com/strangelove-ventures/horcrux/signer"
 )
 
@@ -24,11 +25,11 @@ func NewThresholdValidator(
 
 	thresholdCfg := config.Config.ThresholdModeConfig
 
-	remoteCosigners := make([]signer.Cosigner, 0, len(thresholdCfg.Cosigners)-1)
+	remoteCosigners := make([]nodes.Cosigner, 0, len(thresholdCfg.Cosigners)-1)
 
 	var p2pListen string
 
-	var security signer.CosignerSecurity
+	var security nodes.ICosignerSecurity
 	var eciesErr error
 	security, eciesErr = config.CosignerSecurityECIES()
 	if eciesErr != nil {
@@ -41,7 +42,7 @@ func NewThresholdValidator(
 
 	for _, c := range thresholdCfg.Cosigners {
 		if c.ShardID != security.GetID() {
-			rc, err := signer.NewRemoteCosigner(c.ShardID, c.P2PAddr)
+			rc, err := nodes.NewRemoteCosigner(c.ShardID, c.P2PAddr)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to initialize remote cosigner: %w", err)
 			}
@@ -58,7 +59,7 @@ func NewThresholdValidator(
 		return nil, nil, fmt.Errorf("cosigner config does not exist for our shard Index %d", security.GetID())
 	}
 
-	localCosigner := signer.NewLocalCosigner(
+	localCosigner := nodes.NewLocalCosigner(
 		logger,
 		&config,
 		security,

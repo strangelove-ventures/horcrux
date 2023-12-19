@@ -1,4 +1,4 @@
-package signer
+package thresholdTemP
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/strangelove-ventures/horcrux/pkg/config"
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 
 	"gitlab.com/unit410/edwards25519"
@@ -21,7 +22,7 @@ type ThresholdSignerSoft struct {
 	total           uint8
 }
 
-func NewThresholdSignerSoft(config *RuntimeConfig, id int, chainID string) (*ThresholdSignerSoft, error) {
+func NewThresholdSignerSoft(config *config.RuntimeConfig, id int, chainID string) (*ThresholdSignerSoft, error) {
 	keyFile, err := config.KeyFileExistsCosigner(chainID)
 	if err != nil {
 		return nil, err

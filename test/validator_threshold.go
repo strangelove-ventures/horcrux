@@ -12,7 +12,9 @@ import (
 	"github.com/docker/docker/client"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
-	"github.com/strangelove-ventures/horcrux/signer"
+	"github.com/strangelove-ventures/horcrux/pkg/config"
+	"github.com/strangelove-ventures/horcrux/pkg/nodes/nodesecurity"
+	"github.com/strangelove-ventures/horcrux/pkg/thresholdTemP"
 	interchaintest "github.com/strangelove-ventures/interchaintest/v8"
 	"github.com/strangelove-ventures/interchaintest/v8/chain/cosmos"
 	"github.com/strangelove-ventures/interchaintest/v8/ibc"
@@ -182,12 +184,12 @@ func convertValidatorToHorcrux(
 		return nil, err
 	}
 
-	eciesShards, err := signer.CreateCosignerECIESShards(totalSigners)
+	eciesShards, err := nodesecurity.CreateCosignerECIESShards(totalSigners)
 	if err != nil {
 		return nil, err
 	}
 
-	cosigners := make(signer.CosignersConfig, totalSigners)
+	cosigners := make(config.CosignersConfig, totalSigners)
 
 	for i := 0; i < totalSigners; i++ {
 		_, err := horcruxSidecar(ctx, validator, fmt.Sprintf("cosigner-%d", i+1), client, network)
@@ -195,7 +197,7 @@ func convertValidatorToHorcrux(
 			return nil, err
 		}
 
-		cosigners[i] = signer.CosignerConfig{
+		cosigners[i] = config.CosignerConfig{
 			ShardID: i + 1,
 			P2PAddr: fmt.Sprintf("tcp://%s:%s", validator.Sidecars[i].HostName(), signerPort),
 		}
@@ -206,16 +208,16 @@ func convertValidatorToHorcrux(
 		cosigner := validator.Sidecars[i]
 
 		sentriesForCosigner := sentriesForCosigners[i]
-		chainNodes := make(signer.ChainNodes, len(sentriesForCosigner))
+		chainNodes := make(config.ChainNodes, len(sentriesForCosigner))
 		for i, sentry := range sentriesForCosigner {
-			chainNodes[i] = signer.ChainNode{
+			chainNodes[i] = config.ChainNode{
 				PrivValAddr: fmt.Sprintf("tcp://%s:1234", sentry.HostName()),
 			}
 		}
 
-		config := signer.Config{
-			SignMode: signer.SignModeThreshold,
-			ThresholdModeConfig: &signer.ThresholdModeConfig{
+		config := config.Config{
+			SignMode: config.SignModeThreshold,
+			ThresholdModeConfig: &config.ThresholdModeConfig{
 				Threshold:   int(threshold),
 				Cosigners:   cosigners,
 				GRPCTimeout: "200ms",
@@ -251,13 +253,13 @@ func convertValidatorToHorcrux(
 }
 
 // getPrivvalKey gets the privval key from the validator and creates threshold shards from it.
-func getShardedPrivvalKey(ctx context.Context, node *cosmos.ChainNode, threshold uint8, shards uint8) ([]signer.CosignerEd25519Key, crypto.PubKey, error) {
+func getShardedPrivvalKey(ctx context.Context, node *cosmos.ChainNode, threshold uint8, shards uint8) ([]thresholdTemP.CosignerEd25519Key, crypto.PubKey, error) {
 	pvKey, err := getPrivvalKey(ctx, node)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	ed25519Shards := signer.CreateEd25519ThresholdSignShards(pvKey, threshold, shards)
+	ed25519Shards := thresholdTemP.CreateEd25519ThresholdSignShards(pvKey, threshold, shards)
 
 	return ed25519Shards, pvKey.PubKey, nil
 }
@@ -265,15 +267,15 @@ func getShardedPrivvalKey(ctx context.Context, node *cosmos.ChainNode, threshold
 // chainEd25519Shard is a wrapper for a chain Index and a shard of an ed25519 consensus key.
 type chainEd25519Shard struct {
 	chainID string
-	key     signer.CosignerEd25519Key
+	key     thresholdTemP.CosignerEd25519Key
 }
 
 // writeConfigAndKeysThreshold writes the config and keys for a horcrux cosigner to the sidecar's docker volume.
 func writeConfigAndKeysThreshold(
 	ctx context.Context,
 	cosigner *cosmos.SidecarProcess,
-	config signer.Config,
-	eciesKey signer.CosignerECIESKey,
+	config config.Config,
+	eciesKey nodesecurity.CosignerECIESKey,
 	ed25519Shards ...chainEd25519Shard,
 ) error {
 	configBz, err := yaml.Marshal(config)

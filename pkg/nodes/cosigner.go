@@ -1,8 +1,8 @@
+package nodes
+
 /*
 Package signer: Cosinger is responsible for the network communication between the cosigners
 */
-package signer
-
 import (
 	"context"
 	"time"
@@ -139,7 +139,7 @@ func (n *CosignerUUIDNonces) For(id int) *CosignerUUIDNonces {
 
 type CosignerUUIDNoncesMultiple []*CosignerUUIDNonces
 
-func (n CosignerUUIDNoncesMultiple) toProto() []*proto.UUIDNonce {
+func (n CosignerUUIDNoncesMultiple) ToProto() []*proto.UUIDNonce {
 	out := make([]*proto.UUIDNonce, len(n))
 	for i, nonces := range n {
 		out[i] = &proto.UUIDNonce{

@@ -1,21 +1,24 @@
-package signer
+package signer_test
 
 import (
 	"os"
 	"testing"
+
+	"github.com/strangelove-ventures/horcrux/pkg/nodes"
+	"github.com/strangelove-ventures/horcrux/signer"
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCosignerHealth(t *testing.T) {
-	ch := NewCosignerHealth(
+	ch := signer.NewCosignerHealth(
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)),
-		[]Cosigner{
-			&RemoteCosigner{id: 2},
-			&RemoteCosigner{id: 3},
-			&RemoteCosigner{id: 4},
-			&RemoteCosigner{id: 5},
+		[]nodes.Cosigner{
+			&nodes.RemoteCosigner{id: 2},
+			&nodes.RemoteCosigner{id: 3},
+			&nodes.RemoteCosigner{id: 4},
+			&nodes.RemoteCosigner{id: 5},
 		},
 		&MockLeader{id: 1},
 	)

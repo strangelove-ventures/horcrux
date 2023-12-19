@@ -1,4 +1,4 @@
-package signer
+package signer_test
 
 import (
 	"bytes"
@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/nodes"
+	"github.com/strangelove-ventures/horcrux/pkg/thresholdTemP"
 
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 
@@ -46,12 +49,12 @@ func TestThresholdValidator3of5(t *testing.T) {
 }
 
 func loadKeyForLocalCosigner(
-	cosigner *LocalCosigner,
+	cosigner *nodes.LocalCosigner,
 	pubKey cometcrypto.PubKey,
 	chainID string,
 	privateShard []byte,
 ) error {
-	key := CosignerEd25519Key{
+	key := thresholdTemP.CosignerEd25519Key{
 		PubKey:       pubKey,
 		PrivateShard: privateShard,
 		ID:           cosigner.GetIndex(),
@@ -68,7 +71,7 @@ func loadKeyForLocalCosigner(
 func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	cosigners, pubKey := getTestLocalCosigners(t, threshold, total)
 
-	thresholdCosigners := make([]Cosigner, 0, threshold-1)
+	thresholdCosigners := make([]nodes.Cosigner, 0, threshold-1)
 
 	for i, cosigner := range cosigners {
 		require.Equal(t, i+1, cosigner.GetIndex())
@@ -96,7 +99,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 	ctx := context.Background()
 
-	err := validator.LoadSignStateIfNecessary(testChainID)
+	err := validator.LoadSignStateIfNecessary(nodes.testChainID)
 	require.NoError(t, err)
 
 	proposal := cometproto.Proposal{
@@ -105,9 +108,9 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 		Type:   cometproto.ProposalType,
 	}
 
-	block := types.ProposalToBlock(testChainID, &proposal)
+	block := types.ProposalToBlock(nodes.testChainID, &proposal)
 
-	signature, _, err := validator.Sign(ctx, testChainID, block)
+	signature, _, err := validator.Sign(ctx, nodes.testChainID, block)
 	require.NoError(t, err)
 
 	require.True(t, pubKey.VerifySignature(block.SignBytes, signature))
@@ -123,12 +126,12 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 		Timestamp: time.Now(),
 	}
 
-	block = types.ProposalToBlock(testChainID, &proposal)
+	block = types.ProposalToBlock(nodes.testChainID, &proposal)
 
 	validator.nonceCache.LoadN(ctx, 1)
 
 	// should be able to sign same proposal with only differing timestamp
-	_, _, err = validator.Sign(ctx, testChainID, block)
+	_, _, err = validator.Sign(ctx, nodes.testChainID, block)
 	require.NoError(t, err)
 
 	// construct different block Index for proposal at same height as highest signed
@@ -147,7 +150,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 	// different than single-signer mode, threshold mode will be successful for this,
 	// but it will return the same signature as before.
-	signature, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposal))
+	signature, _, err = validator.Sign(ctx, nodes.testChainID, types.ProposalToBlock(nodes.testChainID, &proposal))
 	require.NoError(t, err)
 
 	require.True(t, bytes.Equal(firstSignature, signature))
@@ -157,13 +160,13 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	validator.nonceCache.LoadN(ctx, 1)
 
 	// should not be able to sign lower than highest signed
-	_, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposal))
+	_, _, err = validator.Sign(ctx, nodes.testChainID, types.ProposalToBlock(nodes.testChainID, &proposal))
 	require.Error(t, err, "double sign!")
 
 	validator.nonceCache.LoadN(ctx, 1)
 
 	// lower LSS should sign for different chain Index
-	_, _, err = validator.Sign(ctx, testChainID2, types.ProposalToBlock(testChainID2, &proposal))
+	_, _, err = validator.Sign(ctx, nodes.testChainID2, types.ProposalToBlock(nodes.testChainID2, &proposal))
 	require.NoError(t, err)
 
 	// reinitialize validator to make sure new runtime will not allow double sign
@@ -181,7 +184,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 	newValidator.nonceCache.LoadN(ctx, 1)
 
-	_, _, err = newValidator.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposal))
+	_, _, err = newValidator.Sign(ctx, nodes.testChainID, types.ProposalToBlock(nodes.testChainID, &proposal))
 	require.Error(t, err, "double sign!")
 
 	proposal = cometproto.Proposal{
@@ -202,15 +205,15 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	newValidator.nonceCache.LoadN(ctx, 3)
 
 	eg.Go(func() error {
-		_, _, err := newValidator.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposal))
+		_, _, err := newValidator.Sign(ctx, nodes.testChainID, types.ProposalToBlock(nodes.testChainID, &proposal))
 		return err
 	})
 	eg.Go(func() error {
-		_, _, err := newValidator.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposalClone))
+		_, _, err := newValidator.Sign(ctx, nodes.testChainID, types.ProposalToBlock(nodes.testChainID, &proposalClone))
 		return err
 	})
 	eg.Go(func() error {
-		_, _, err := newValidator.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposalClone2))
+		_, _, err := newValidator.Sign(ctx, nodes.testChainID, types.ProposalToBlock(nodes.testChainID, &proposalClone2))
 		return err
 	})
 	// signing higher block now should succeed
@@ -236,19 +239,19 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 		eg.Go(func() error {
 			start := time.Now()
-			_, _, err := newValidator.Sign(ctx, testChainID, types.VoteToBlock(testChainID, &prevote))
+			_, _, err := newValidator.Sign(ctx, nodes.testChainID, types.VoteToBlock(nodes.testChainID, &prevote))
 			t.Log("Sign time", "duration", time.Since(start))
 			return err
 		})
 		eg.Go(func() error {
 			start := time.Now()
-			_, _, err := newValidator.Sign(ctx, testChainID, types.VoteToBlock(testChainID, &prevoteClone))
+			_, _, err := newValidator.Sign(ctx, nodes.testChainID, types.VoteToBlock(nodes.testChainID, &prevoteClone))
 			t.Log("Sign time", "duration", time.Since(start))
 			return err
 		})
 		eg.Go(func() error {
 			start := time.Now()
-			_, _, err := newValidator.Sign(ctx, testChainID, types.VoteToBlock(testChainID, &prevoteClone2))
+			_, _, err := newValidator.Sign(ctx, nodes.testChainID, types.VoteToBlock(nodes.testChainID, &prevoteClone2))
 			t.Log("Sign time", "duration", time.Since(start))
 			return err
 		})
@@ -274,18 +277,18 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 		eg.Go(func() error {
 			start := time.Now()
 			t.Log("Sign time", "duration", time.Since(start))
-			_, _, err := newValidator.Sign(ctx, testChainID, types.VoteToBlock(testChainID, &precommit))
+			_, _, err := newValidator.Sign(ctx, nodes.testChainID, types.VoteToBlock(nodes.testChainID, &precommit))
 			return err
 		})
 		eg.Go(func() error {
 			start := time.Now()
 			t.Log("Sign time", "duration", time.Since(start))
-			_, _, err := newValidator.Sign(ctx, testChainID, types.VoteToBlock(testChainID, &precommitClone))
+			_, _, err := newValidator.Sign(ctx, nodes.testChainID, types.VoteToBlock(nodes.testChainID, &precommitClone))
 			return err
 		})
 		eg.Go(func() error {
 			start := time.Now()
-			_, _, err := newValidator.Sign(ctx, testChainID, types.VoteToBlock(testChainID, &precommitClone2))
+			_, _, err := newValidator.Sign(ctx, nodes.testChainID, types.VoteToBlock(nodes.testChainID, &precommitClone2))
 			t.Log("Sign time", "duration", time.Since(start))
 			return err
 		})
@@ -295,10 +298,10 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 	}
 }
 
-func getTestLocalCosigners(t *testing.T, threshold, total uint8) ([]*LocalCosigner, cometcrypto.PubKey) {
+func getTestLocalCosigners(t *testing.T, threshold, total uint8) ([]*nodes.LocalCosigner, cometcrypto.PubKey) {
 	eciesKeys := make([]*ecies.PrivateKey, total)
 	pubKeys := make([]*ecies.PublicKey, total)
-	cosigners := make([]*LocalCosigner, total)
+	cosigners := make([]*nodes.LocalCosigner, total)
 
 	for i := uint8(0); i < total; i++ {
 		eciesKey, err := ecies.GenerateKey(rand.Reader, secp256k1.S256(), nil)
@@ -333,17 +336,17 @@ func getTestLocalCosigners(t *testing.T, threshold, total uint8) ([]*LocalCosign
 			StateDir: cosignerDir,
 			Config: Config{
 				ThresholdModeConfig: &ThresholdModeConfig{
-					Threshold: int(threshold),
-					Cosigners: cosignersConfig,
+					Threshold:       int(threshold),
+					nodes.Cosigners: cosignersConfig,
 				},
 			},
 		}
 
-		cosigner := NewLocalCosigner(
+		cosigner := nodes.NewLocalCosigner(
 			cometlog.NewNopLogger(),
 			cosignerConfig,
-			NewCosignerSecurityECIES(
-				CosignerECIESKey{
+			nodes.NewCosignerSecurityECIES(
+				nodes.CosignerECIESKey{
 					ID:        i + 1,
 					ECIESKey:  eciesKeys[i],
 					ECIESPubs: pubKeys,
@@ -355,10 +358,10 @@ func getTestLocalCosigners(t *testing.T, threshold, total uint8) ([]*LocalCosign
 
 		cosigners[i] = cosigner
 
-		err = loadKeyForLocalCosigner(cosigner, privateKey.PubKey(), testChainID, privShards[i])
+		err = loadKeyForLocalCosigner(cosigner, privateKey.PubKey(), nodes.testChainID, privShards[i])
 		require.NoError(t, err)
 
-		err = loadKeyForLocalCosigner(cosigner, privateKey.PubKey(), testChainID2, privShards[i])
+		err = loadKeyForLocalCosigner(cosigner, privateKey.PubKey(), nodes.testChainID2, privShards[i])
 		require.NoError(t, err)
 	}
 
@@ -375,7 +378,7 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 	ctx := context.Background()
 
 	for i, cosigner := range cosigners {
-		peers := make([]Cosigner, 0, len(cosigners)-1)
+		peers := make([]nodes.Cosigner, 0, len(cosigners)-1)
 		for j, otherCosigner := range cosigners {
 			if i != j {
 				peers = append(peers, otherCosigner)
@@ -400,7 +403,7 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 		thresholdValidators = append(thresholdValidators, tv)
 		defer tv.Stop()
 
-		err := tv.LoadSignStateIfNecessary(testChainID)
+		err := tv.LoadSignStateIfNecessary(nodes.testChainID)
 		require.NoError(t, err)
 
 		require.NoError(t, tv.Start(ctx))
@@ -459,13 +462,13 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 					Type:   cometproto.ProposalType,
 				}
 
-				signature, _, err := tv.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposal))
+				signature, _, err := tv.Sign(ctx, nodes.testChainID, types.ProposalToBlock(nodes.testChainID, &proposal))
 				if err != nil {
 					t.Log("Proposal sign failed", "error", err)
 					return
 				}
 
-				signBytes := comet.ProposalSignBytes(testChainID, &proposal)
+				signBytes := comet.ProposalSignBytes(nodes.testChainID, &proposal)
 
 				sig := make([]byte, len(signature))
 				copy(sig, signature)
@@ -501,13 +504,13 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 					Type:   cometproto.PrevoteType,
 				}
 
-				signature, _, err := tv.Sign(ctx, testChainID, types.VoteToBlock(testChainID, &preVote))
+				signature, _, err := tv.Sign(ctx, nodes.testChainID, types.VoteToBlock(nodes.testChainID, &preVote))
 				if err != nil {
 					t.Log("PreVote sign failed", "error", err)
 					return
 				}
 
-				signBytes := comet.VoteSignBytes(testChainID, &preVote)
+				signBytes := comet.VoteSignBytes(nodes.testChainID, &preVote)
 
 				sig := make([]byte, len(signature))
 				copy(sig, signature)
@@ -543,13 +546,13 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 					Type:   cometproto.PrecommitType,
 				}
 
-				signature, _, err := tv.Sign(ctx, testChainID, types.VoteToBlock(testChainID, &preCommit))
+				signature, _, err := tv.Sign(ctx, nodes.testChainID, types.VoteToBlock(nodes.testChainID, &preCommit))
 				if err != nil {
 					t.Log("PreCommit sign failed", "error", err)
 					return
 				}
 
-				signBytes := comet.VoteSignBytes(testChainID, &preCommit)
+				signBytes := comet.VoteSignBytes(nodes.testChainID, &preCommit)
 
 				sig := make([]byte, len(signature))
 				copy(sig, signature)

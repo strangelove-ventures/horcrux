@@ -1,4 +1,4 @@
-package signer
+package nodesecurity_test
 
 import (
 	"crypto/rand"
@@ -7,6 +7,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
+	"github.com/strangelove-ventures/horcrux/pkg/nodes/nodesecurity"
+
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 )
@@ -25,20 +27,20 @@ func TestCosignerECIES(t *testing.T) {
 		pubs[i] = &key.PublicKey
 	}
 
-	securities := make([]CosignerSecurity, 3)
+	securities := make([]nodesecurity.CosignerSecurityECIES, 3)
 
 	for i := 0; i < 3; i++ {
-		key := CosignerECIESKey{
+		key := nodesecurity.CosignerECIESKey{
 			ID:        i + 1,
 			ECIESKey:  keys[i],
 			ECIESPubs: pubs,
 		}
-		securities[i] = NewCosignerSecurityECIES(key)
+		securities[i] = *nodesecurity.NewCosignerSecurityECIES(key)
 
 		bz, err := json.Marshal(&key)
 		require.NoError(t, err)
 
-		var key2 CosignerECIESKey
+		var key2 nodesecurity.CosignerECIESKey
 		require.NoError(t, json.Unmarshal(bz, &key2))
 		require.Equal(t, key, key2)
 
@@ -55,7 +57,7 @@ func TestCosignerECIES(t *testing.T) {
 	require.ErrorContains(t, err, "failed to decrypt")
 }
 
-func testCosignerSecurity(t *testing.T, securities []CosignerSecurity) error {
+func testCosignerSecurity(t *testing.T, securities []nodesecurity.CosignerSecurityECIES) error {
 	var (
 		mockPub   = []byte("mock_pub")
 		mockShare = []byte("mock_share")
@@ -91,14 +93,15 @@ func TestConcurrentIterateCosignerECIES(t *testing.T) {
 		pubs[i] = &key.PublicKey
 	}
 
-	securities := make([]CosignerSecurity, 3)
+	securities := make([]*nodesecurity.CosignerSecurityECIES, 3)
 
 	for i := 0; i < 3; i++ {
-		securities[i] = NewCosignerSecurityECIES(CosignerECIESKey{
-			ID:        i + 1,
-			ECIESKey:  keys[i],
-			ECIESPubs: pubs,
-		})
+		securities[i] = nodesecurity.NewCosignerSecurityECIES(
+			nodesecurity.CosignerECIESKey{
+				ID:        i + 1,
+				ECIESKey:  keys[i],
+				ECIESPubs: pubs,
+			})
 	}
 
 	for i := 0; i < 5000; i++ {

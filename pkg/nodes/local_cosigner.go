@@ -1,4 +1,4 @@
-package signer
+package nodes
 
 import (
 	"context"
@@ -7,7 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/strangelove-ventures/horcrux/pkg/config"
 	"github.com/strangelove-ventures/horcrux/pkg/metrics"
+	"github.com/strangelove-ventures/horcrux/pkg/thresholdTemP"
 
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 
@@ -29,8 +31,8 @@ const nonceExpiration = 20 * time.Second
 // Signing is thread safe.
 type LocalCosigner struct {
 	logger        cometlog.Logger
-	config        *RuntimeConfig
-	security      CosignerSecurity
+	config        *config.RuntimeConfig
+	security      ICosignerSecurity
 	chainState    sync.Map // TODO: Add type so its not any?
 	address       string
 	pendingDiskWG sync.WaitGroup
@@ -42,8 +44,8 @@ type LocalCosigner struct {
 
 func NewLocalCosigner(
 	logger cometlog.Logger,
-	config *RuntimeConfig,
-	security CosignerSecurity,
+	config *config.RuntimeConfig,
+	security ICosignerSecurity,
 	address string,
 ) *LocalCosigner {
 	return &LocalCosigner{
@@ -61,7 +63,7 @@ type ChainState struct {
 	// incremented whenever we are asked to sign an HRS
 	lastSignState *types.SignState
 	// signer generates nonces, combines nonces, signs, and verifies signatures.
-	signer ThresholdSigner
+	signer thresholdTemP.ThresholdSigner
 }
 
 // StartNoncePruner periodically prunes nonces that have expired.
@@ -131,9 +133,9 @@ func (cosigner *LocalCosigner) SaveLastSignedState(chainID string, signState typ
 	)
 }
 
-// waitForSignStatesToFlushToDisk waits for all state file writes queued
+// WaitForSignStatesToFlushToDisk waits for all state file writes queued
 // in SaveLastSignedState to complete before termination.
-func (cosigner *LocalCosigner) waitForSignStatesToFlushToDisk() {
+func (cosigner *LocalCosigner) WaitForSignStatesToFlushToDisk() {
 	cosigner.pendingDiskWG.Wait()
 }
 
@@ -281,7 +283,7 @@ func (cosigner *LocalCosigner) generateNonces() ([]types.Nonces, error) {
 	total := len(cosigner.config.Config.ThresholdModeConfig.Cosigners)
 	meta := make([]types.Nonces, total)
 
-	nonces, err := GenerateNonces(
+	nonces, err := thresholdTemP.GenerateNonces(
 		uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
 		uint8(total),
 	)
@@ -308,9 +310,9 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 		return err
 	}
 
-	var signer ThresholdSigner
+	var signer thresholdTemP.ThresholdSigner
 
-	signer, err = NewThresholdSignerSoft(cosigner.config, cosigner.GetIndex(), chainID)
+	signer, err = thresholdTemP.NewThresholdSignerSoft(cosigner.config, cosigner.GetIndex(), chainID)
 	if err != nil {
 		return err
 	}
@@ -440,7 +442,7 @@ func (cosigner *LocalCosigner) getNonce(
 	return nonce, nil
 }
 
-const errUnexpectedState = "unexpected state, metadata does not exist for U:"
+const ErrUnexpectedState = "unexpected state, metadata does not exist for U:"
 
 // setNonce stores a nonce provided by another cosigner
 func (cosigner *LocalCosigner) setNonce(uuid uuid.UUID, nonce CosignerNonce) error {
@@ -464,7 +466,7 @@ func (cosigner *LocalCosigner) setNonce(uuid uuid.UUID, nonce CosignerNonce) err
 	if !ok {
 		return fmt.Errorf(
 			"%s %s",
-			errUnexpectedState,
+			ErrUnexpectedState,
 			uuid,
 		)
 	}

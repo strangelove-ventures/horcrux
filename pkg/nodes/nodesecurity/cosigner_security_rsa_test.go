@@ -1,4 +1,4 @@
-package signer
+package nodesecurity_test
 
 import (
 	"crypto/rand"
@@ -6,8 +6,15 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/strangelove-ventures/horcrux/pkg/nodes"
+	"github.com/strangelove-ventures/horcrux/pkg/nodes/nodesecurity"
+
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
+)
+
+const (
+	bitSize = 2048
 )
 
 func TestCosignerRSA(t *testing.T) {
@@ -24,20 +31,20 @@ func TestCosignerRSA(t *testing.T) {
 		pubKeys[i] = &key.PublicKey
 	}
 
-	securities := make([]CosignerSecurity, 3)
+	securities := make([]nodes.ICosignerSecurity, 3)
 
 	for i := 0; i < 3; i++ {
-		key := CosignerRSAKey{
+		key := nodesecurity.CosignerRSAKey{
 			ID:      i + 1,
 			RSAKey:  *keys[i],
 			RSAPubs: pubKeys,
 		}
-		securities[i] = NewCosignerSecurityRSA(key)
+		securities[i] = nodesecurity.NewCosignerSecurityRSA(key)
 
 		bz, err := json.Marshal(&key)
 		require.NoError(t, err)
 
-		var key2 CosignerRSAKey
+		var key2 nodesecurity.CosignerRSAKey
 		require.NoError(t, json.Unmarshal(bz, &key2))
 		require.Equal(t, key, key2)
 
@@ -67,10 +74,10 @@ func TestConcurrentIterateCosignerRSA(t *testing.T) {
 		pubKeys[i] = &key.PublicKey
 	}
 
-	securities := make([]CosignerSecurity, 3)
+	securities := make([]nodes.ICosignerSecurity, 3)
 
 	for i := 0; i < 3; i++ {
-		securities[i] = NewCosignerSecurityRSA(CosignerRSAKey{
+		securities[i] = nodesecurity.NewCosignerSecurityRSA(nodesecurity.CosignerRSAKey{
 			ID:      i + 1,
 			RSAKey:  *keys[i],
 			RSAPubs: pubKeys,

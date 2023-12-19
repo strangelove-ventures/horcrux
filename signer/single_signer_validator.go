@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/strangelove-ventures/horcrux/pkg/config"
 	"github.com/strangelove-ventures/horcrux/pkg/connector"
 
 	"github.com/strangelove-ventures/horcrux/pkg/types"
@@ -17,7 +18,7 @@ var _ connector.PrivValidator = &SingleSignerValidator{}
 // SingleSignerValidator guards access to an underlying PrivValidator by using mutexes
 // for each of the PrivValidator interface functions
 type SingleSignerValidator struct {
-	config     *RuntimeConfig
+	config     *config.RuntimeConfig
 	chainState sync.Map
 }
 
@@ -33,7 +34,7 @@ type SingleSignerChainState struct {
 
 // NewSingleSignerValidator constructs a validator for single-sign mode (not recommended).
 // NewThresholdValidator is recommended, but single-sign mode can be used for convenience.
-func NewSingleSignerValidator(config *RuntimeConfig) *SingleSignerValidator {
+func NewSingleSignerValidator(config *config.RuntimeConfig) *SingleSignerValidator {
 	return &SingleSignerValidator{
 		config: config,
 	}

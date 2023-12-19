@@ -1,10 +1,12 @@
-package signer
+package signer_test
 
 import (
 	"crypto/rand"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/nodes"
 
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/libs/log"
@@ -30,11 +32,11 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 		ID:           1,
 	}
 
-	cosigner := NewLocalCosigner(
+	cosigner := nodes.NewLocalCosigner(
 		log.NewNopLogger(),
 		&RuntimeConfig{},
-		NewCosignerSecurityECIES(
-			CosignerECIESKey{
+		nodes.NewCosignerSecurityECIES(
+			nodes.CosignerECIESKey{
 				ID:        key.ID,
 				ECIESKey:  eciesKey,
 				ECIESPubs: []*ecies.PublicKey{&eciesKey.PublicKey},

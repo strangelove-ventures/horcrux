@@ -6,9 +6,12 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/strangelove-ventures/horcrux/pkg/nodes/nodesecurity"
+
 	"github.com/cometbft/cometbft/crypto"
 	dockertypes "github.com/docker/docker/api/types"
-	"github.com/strangelove-ventures/horcrux/signer"
+	"github.com/strangelove-ventures/horcrux/pkg/config"
+	"github.com/strangelove-ventures/horcrux/pkg/thresholdTemP"
 	interchaintest "github.com/strangelove-ventures/interchaintest/v8"
 	"github.com/strangelove-ventures/interchaintest/v8/chain/cosmos"
 	"github.com/strangelove-ventures/interchaintest/v8/ibc"
@@ -356,13 +359,13 @@ func TestMultipleChainHorcrux(t *testing.T) {
 	for i := 0; i < totalChains; i++ {
 		chainConfigs[i] = &cosignerChainConfig{
 			sentries: make([]cosmos.ChainNodes, sentriesPerSigner),
-			shards:   make([]signer.CosignerEd25519Key, totalSigners),
+			shards:   make([]thresholdTemP.CosignerEd25519Key, totalSigners),
 		}
 	}
 
 	cosignerSidecars := make(horcruxSidecars, totalSigners)
 
-	eciesShards, err := signer.CreateCosignerECIESShards(totalSigners)
+	eciesShards, err := nodesecurity.CreateCosignerECIESShards(totalSigners)
 	require.NoError(t, err)
 
 	var wg sync.WaitGroup
@@ -450,7 +453,7 @@ func TestMultipleChainHorcrux(t *testing.T) {
 
 type cosignerChainConfig struct {
 	chainID  string
-	shards   []signer.CosignerEd25519Key
+	shards   []thresholdTemP.CosignerEd25519Key
 	sentries []cosmos.ChainNodes
 }
 
@@ -464,7 +467,7 @@ type horcruxSidecars []horcruxSidecarProcess
 func configureAndStartSidecars(
 	ctx context.Context,
 	t *testing.T,
-	eciesShards []signer.CosignerECIESKey,
+	eciesShards []nodesecurity.CosignerECIESKey,
 	sidecars horcruxSidecars,
 	threshold int,
 	wg *sync.WaitGroup,
@@ -476,9 +479,9 @@ func configureAndStartSidecars(
 
 	totalSigners := len(sidecars)
 
-	cosignersConfig := make(signer.CosignersConfig, totalSigners)
+	cosignersConfig := make(config.CosignersConfig, totalSigners)
 	for i, s := range sidecars {
-		cosignersConfig[i] = signer.CosignerConfig{
+		cosignersConfig[i] = config.CosignerConfig{
 			ShardID: i + 1,
 			P2PAddr: fmt.Sprintf("tcp://%s:%s", s.cosigner.HostName(), signerPort),
 		}
@@ -492,14 +495,14 @@ func configureAndStartSidecars(
 			numSentries += len(chainConfig.sentries[i])
 		}
 
-		chainNodes := make(signer.ChainNodes, 0, numSentries)
+		chainNodes := make(config.ChainNodes, 0, numSentries)
 
 		ed25519Shards := make([]chainEd25519Shard, len(chainConfigs))
 
 		for j, chainConfig := range chainConfigs {
 			if s.proxy == nil {
 				for _, sentry := range chainConfig.sentries[i] {
-					chainNodes = append(chainNodes, signer.ChainNode{
+					chainNodes = append(chainNodes, config.ChainNode{
 						PrivValAddr: fmt.Sprintf("tcp://%s:1234", sentry.HostName()),
 					})
 				}
@@ -516,9 +519,9 @@ func configureAndStartSidecars(
 			grpcAddr = ":5555"
 		}
 
-		config := signer.Config{
-			SignMode: signer.SignModeThreshold,
-			ThresholdModeConfig: &signer.ThresholdModeConfig{
+		config := config.Config{
+			SignMode: config.SignModeThreshold,
+			ThresholdModeConfig: &config.ThresholdModeConfig{
 				Threshold:   threshold,
 				Cosigners:   cosignersConfig,
 				GRPCTimeout: "200ms",
@@ -591,13 +594,13 @@ func TestHorcruxProxyGRPC(t *testing.T) {
 	for i := 0; i < totalChains; i++ {
 		chainConfigs[i] = &cosignerChainConfig{
 			sentries: make([]cosmos.ChainNodes, sentriesPerSigner),
-			shards:   make([]signer.CosignerEd25519Key, totalSigners),
+			shards:   make([]thresholdTemP.CosignerEd25519Key, totalSigners),
 		}
 	}
 
 	cosignerSidecars := make(horcruxSidecars, totalSigners)
 
-	eciesShards, err := signer.CreateCosignerECIESShards(totalSigners)
+	eciesShards, err := nodesecurity.CreateCosignerECIESShards(totalSigners)
 	require.NoError(t, err)
 
 	var wg sync.WaitGroup

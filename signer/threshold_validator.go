@@ -10,6 +10,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/strangelove-ventures/horcrux/pkg/nodes"
+
+	"github.com/strangelove-ventures/horcrux/pkg/config"
 	"github.com/strangelove-ventures/horcrux/pkg/connector"
 	"github.com/strangelove-ventures/horcrux/pkg/metrics"
 
@@ -25,8 +28,23 @@ import (
 
 var _ connector.PrivValidator = &ThresholdValidator{}
 
+// TODO: Must be a better way to do this?
+type nodecacheconfigs struct {
+	defaultGetNoncesInterval time.Duration
+	defaultGetNoncesTimeout  time.Duration
+	defaultNonceExpiration   time.Duration
+}
+
+func nodecacheconfig() nodecacheconfigs {
+	return nodecacheconfigs{
+		defaultGetNoncesInterval: config.DefaultGetNoncesInterval,
+		defaultGetNoncesTimeout:  config.DefaultGetNoncesTimeout,
+		defaultNonceExpiration:   config.DefaultNonceExpiration,
+	}
+}
+
 type ThresholdValidator struct {
-	config *RuntimeConfig
+	config *config.RuntimeConfig
 
 	threshold int
 
@@ -35,10 +53,10 @@ type ThresholdValidator struct {
 	chainState sync.Map // map[string]SignState, chainState["chainid"] -> types.SignState
 
 	// our own cosigner
-	myCosigner *LocalCosigner
+	myCosigner *nodes.LocalCosigner
 
 	// peer cosigners
-	peerCosigners Cosigners
+	peerCosigners nodes.Cosigners
 
 	leader Leader
 
@@ -50,7 +68,35 @@ type ThresholdValidator struct {
 
 	cosignerHealth *CosignerHealth
 
+	// FIX: This f-up a lot. Now its like 3-4 places that
+	// spaggettio leaders, cosigners etc etc
 	nonceCache *CosignerNonceCache
+}
+
+type StillWaitingForBlockError struct {
+	msg string
+}
+
+func (e *StillWaitingForBlockError) Error() string { return e.msg }
+
+func newStillWaitingForBlockError(chainID string, hrs types.HRSKey) *StillWaitingForBlockError {
+	return &StillWaitingForBlockError{
+		msg: fmt.Sprintf("[%s] Still waiting for block %d.%d.%d",
+			chainID, hrs.Height, hrs.Round, hrs.Step),
+	}
+}
+
+type SameBlockError struct {
+	msg string
+}
+
+func (e *SameBlockError) Error() string { return e.msg }
+
+func newSameBlockError(chainID string, hrs types.HRSKey) *SameBlockError {
+	return &SameBlockError{
+		msg: fmt.Sprintf("[%s] Same block: %d.%d.%d",
+			chainID, hrs.Height, hrs.Round, hrs.Step),
+	}
 }
 
 type ChainSignState struct {
@@ -64,18 +110,37 @@ type ChainSignState struct {
 	lastSignStateInitiatedMutex *sync.Mutex
 }
 
+type BeyondBlockError struct {
+	msg string
+}
+
+func (e *BeyondBlockError) Error() string { return e.msg }
+
+func (pv *ThresholdValidator) newBeyondBlockError(chainID string, hrs types.HRSKey) *BeyondBlockError {
+	css := pv.mustLoadChainState(chainID)
+
+	lss := css.lastSignStateInitiated
+	return &BeyondBlockError{
+		msg: fmt.Sprintf("[%s] Progress already started on block %d.%d.%d, skipping %d.%d.%d",
+			chainID,
+			lss.Height, lss.Round, lss.Step,
+			hrs.Height, hrs.Round, hrs.Step,
+		),
+	}
+}
+
 // NewThresholdValidator creates and returns a new ThresholdValidator
 func NewThresholdValidator(
 	logger log.Logger,
-	config *RuntimeConfig,
+	config *config.RuntimeConfig,
 	threshold int,
 	grpcTimeout time.Duration,
 	maxWaitForSameBlockAttempts int,
-	myCosigner *LocalCosigner,
-	peerCosigners []Cosigner,
+	myCosigner *nodes.LocalCosigner,
+	peerCosigners []nodes.Cosigner,
 	leader Leader,
 ) *ThresholdValidator {
-	allCosigners := make([]Cosigner, len(peerCosigners)+1)
+	allCosigners := make([]nodes.Cosigner, len(peerCosigners)+1)
 	allCosigners[0] = myCosigner
 	copy(allCosigners[1:], peerCosigners)
 
@@ -83,13 +148,14 @@ func NewThresholdValidator(
 		logger.Debug("Peer cosigner", "id", cosigner.GetIndex())
 	}
 
+	nodecacheconfig := nodecacheconfig()
 	nc := NewCosignerNonceCache(
 		logger,
 		allCosigners,
 		leader,
-		defaultGetNoncesInterval,
-		defaultGetNoncesTimeout,
-		defaultNonceExpiration,
+		nodecacheconfig.defaultGetNoncesInterval,
+		nodecacheconfig.defaultGetNoncesTimeout,
+		nodecacheconfig.defaultNonceExpiration,
 		uint8(threshold),
 		nil,
 	)
@@ -272,7 +338,7 @@ func (pv *ThresholdValidator) Stop() {
 func (pv *ThresholdValidator) waitForSignStatesToFlushToDisk() {
 	pv.pendingDiskWG.Wait()
 
-	pv.myCosigner.waitForSignStatesToFlushToDisk()
+	pv.myCosigner.WaitForSignStatesToFlushToDisk()
 }
 
 // GetPubKey returns the public key of the validator.
@@ -283,39 +349,6 @@ func (pv *ThresholdValidator) GetPubKey(_ context.Context, chainID string) ([]by
 		return nil, err
 	}
 	return pubKey.Bytes(), nil
-}
-
-func (pv *ThresholdValidator) newBeyondBlockError(chainID string, hrs types.HRSKey) *metrics.BeyondBlockError {
-	css := pv.mustLoadChainState(chainID)
-
-	lss := css.lastSignStateInitiated
-	return &metrics.BeyondBlockError{
-		Msg: fmt.Sprintf("[%s] Progress already started on block %d.%d.%d, skipping %d.%d.%d",
-			chainID,
-			lss.Height, lss.Round, lss.Step,
-			hrs.Height, hrs.Round, hrs.Step,
-		),
-	}
-}
-
-type StillWaitingForBlockError struct {
-	msg string
-}
-
-func (e *StillWaitingForBlockError) Error() string { return e.msg }
-
-func newStillWaitingForBlockError(chainID string, hrs types.HRSKey) *StillWaitingForBlockError {
-	return &StillWaitingForBlockError{
-		msg: fmt.Sprintf("[%s] Still waiting for block %d.%d.%d",
-			chainID, hrs.Height, hrs.Round, hrs.Step),
-	}
-}
-
-func newSameBlockError(chainID string, hrs types.HRSKey) *metrics.SameBlockError {
-	return &metrics.SameBlockError{
-		Msg: fmt.Sprintf("[%s] Same block: %d.%d.%d",
-			chainID, hrs.Height, hrs.Round, hrs.Step),
-	}
 }
 
 func (pv *ThresholdValidator) LoadSignStateIfNecessary(chainID string) error {
@@ -418,8 +451,8 @@ func (pv *ThresholdValidator) compareBlockSignatureAgainstHRS(
 
 func (pv *ThresholdValidator) getNoncesFallback(
 	ctx context.Context,
-) (*CosignerUUIDNonces, []Cosigner, error) {
-	nonces := make(map[Cosigner]CosignerNonces)
+) (*nodes.CosignerUUIDNonces, []nodes.Cosigner, error) {
+	nonces := make(map[nodes.Cosigner]nodes.CosignerNonces)
 
 	metrics.DrainedNonceCache.Inc()
 	metrics.TotalDrainedNonceCache.Inc()
@@ -431,7 +464,7 @@ func (pv *ThresholdValidator) getNoncesFallback(
 
 	u := uuid.New()
 
-	allCosigners := make([]Cosigner, len(pv.peerCosigners)+1)
+	allCosigners := make([]nodes.Cosigner, len(pv.peerCosigners)+1)
 	allCosigners[0] = pv.myCosigner
 	copy(allCosigners[1:], pv.peerCosigners)
 
@@ -445,8 +478,8 @@ func (pv *ThresholdValidator) getNoncesFallback(
 		return nil, nil, errors.New("timed out waiting for ephemeral shares")
 	}
 
-	var thresholdNonces CosignerNonces
-	thresholdCosigners := make([]Cosigner, len(nonces))
+	var thresholdNonces nodes.CosignerNonces
+	thresholdCosigners := make([]nodes.Cosigner, len(nonces))
 	i := 0
 	for c, n := range nonces {
 		thresholdCosigners[i] = c
@@ -455,7 +488,7 @@ func (pv *ThresholdValidator) getNoncesFallback(
 		thresholdNonces = append(thresholdNonces, n...)
 	}
 
-	return &CosignerUUIDNonces{
+	return &nodes.CosignerUUIDNonces{
 		UUID:   u,
 		Nonces: thresholdNonces,
 	}, thresholdCosigners, nil
@@ -478,9 +511,9 @@ func waitUntilCompleteOrTimeout(wg *sync.WaitGroup, timeout time.Duration) bool 
 func (pv *ThresholdValidator) waitForPeerNonces(
 	ctx context.Context,
 	u uuid.UUID,
-	peer Cosigner,
+	peer nodes.Cosigner,
 	wg *sync.WaitGroup,
-	nonces map[Cosigner]CosignerNonces,
+	nonces map[nodes.Cosigner]nodes.CosignerNonces,
 	mu sync.Locker,
 ) {
 	peerStartTime := time.Now()
@@ -546,7 +579,7 @@ func (pv *ThresholdValidator) proxyIfNecessary(
 		return true, nil, stamp, fmt.Errorf("failed to find cosigner with id %d", leader)
 	}
 
-	signRes, err := cosignerLeader.(*RemoteCosigner).Sign(ctx, CosignerSignBlockRequest{
+	signRes, err := cosignerLeader.(*nodes.RemoteCosigner).Sign(ctx, nodes.CosignerSignBlockRequest{
 		ChainID: chainID,
 		Block:   &block,
 	})
@@ -613,7 +646,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 	peerStartTime := time.Now()
 
 	cosignersOrderedByFastest := pv.cosignerHealth.GetFastest()
-	cosignersForThisBlock := make([]Cosigner, pv.threshold)
+	cosignersForThisBlock := make([]nodes.Cosigner, pv.threshold)
 	cosignersForThisBlock[0] = pv.myCosigner
 	copy(cosignersForThisBlock[1:], cosignersOrderedByFastest[:pv.threshold-1])
 
@@ -635,7 +668,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 
 	nextFastestCosignerIndex := pv.threshold - 1
 	var nextFastestCosignerIndexMu sync.Mutex
-	getNextFastestCosigner := func() Cosigner {
+	getNextFastestCosigner := func() nodes.Cosigner {
 		nextFastestCosignerIndexMu.Lock()
 		defer nextFastestCosignerIndexMu.Unlock()
 		if nextFastestCosignerIndex >= len(cosignersOrderedByFastest) {
@@ -673,7 +706,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 				peerStartTime := time.Now()
 
 				// set peerNonces and sign in single rpc call.
-				sigRes, err := cosigner.SetNoncesAndSign(signCtx, CosignerSetNoncesAndSignRequest{
+				sigRes, err := cosigner.SetNoncesAndSign(signCtx, nodes.CosignerSetNoncesAndSignRequest{
 					ChainID:   chainID,
 					Nonces:    nonces.For(cosigner.GetIndex()),
 					HRST:      hrst,
@@ -686,7 +719,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 						"err", err.Error(),
 					)
 
-					if strings.Contains(err.Error(), errUnexpectedState) {
+					if strings.Contains(err.Error(), nodes.ErrUnexpectedState) {
 						pv.nonceCache.ClearNonces(cosigner)
 					}
 
