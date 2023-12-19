@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/pkg/nodes/nodesecurity"
-
 	"github.com/cometbft/cometbft/crypto"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/codec/legacy"
@@ -108,34 +106,6 @@ type RuntimeConfig struct {
 	StateDir   string
 	PidFile    string
 	Config     Config
-}
-
-func (c RuntimeConfig) CosignerSecurityECIES() (*nodesecurity.CosignerSecurityECIES, error) {
-	keyFile, err := c.KeyFileExistsCosignerECIES()
-	if err != nil {
-		return nil, err
-	}
-
-	key, err := nodesecurity.LoadCosignerECIESKey(keyFile)
-	if err != nil {
-		return nil, fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
-	}
-
-	return nodesecurity.NewCosignerSecurityECIES(key), nil
-}
-
-func (c RuntimeConfig) CosignerSecurityRSA() (*nodesecurity.CosignerSecurityRSA, error) {
-	keyFile, err := c.KeyFileExistsCosignerRSA()
-	if err != nil {
-		return nil, err
-	}
-
-	key, err := nodesecurity.LoadCosignerRSAKey(keyFile)
-	if err != nil {
-		return nil, fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
-	}
-
-	return nodesecurity.NewCosignerSecurityRSA(key), nil
 }
 
 func (c RuntimeConfig) cachedKeyDirectory() string {

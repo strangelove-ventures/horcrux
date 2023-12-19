@@ -9,12 +9,41 @@ import (
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	cometservice "github.com/cometbft/cometbft/libs/service"
+	cconfig "github.com/strangelove-ventures/horcrux/pkg/config"
 	"github.com/strangelove-ventures/horcrux/pkg/nodes"
+	"github.com/strangelove-ventures/horcrux/pkg/nodes/nodesecurity"
 	"github.com/strangelove-ventures/horcrux/signer"
 )
 
 const maxWaitForSameBlockAttempts = 3
 
+func CosignerSecurityECIES(c cconfig.RuntimeConfig) (*nodesecurity.CosignerSecurityECIES, error) {
+	keyFile, err := c.KeyFileExistsCosignerECIES()
+	if err != nil {
+		return nil, err
+	}
+
+	key, err := nodesecurity.LoadCosignerECIESKey(keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
+	}
+
+	return nodesecurity.NewCosignerSecurityECIES(key), nil
+}
+
+func CosignerSecurityRSA(c cconfig.RuntimeConfig) (*nodesecurity.CosignerSecurityRSA, error) {
+	keyFile, err := c.KeyFileExistsCosignerRSA()
+	if err != nil {
+		return nil, err
+	}
+
+	key, err := nodesecurity.LoadCosignerRSAKey(keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
+	}
+
+	return nodesecurity.NewCosignerSecurityRSA(key), nil
+}
 func NewThresholdValidator(
 	ctx context.Context,
 	logger cometlog.Logger,
@@ -31,10 +60,11 @@ func NewThresholdValidator(
 
 	var security nodes.ICosignerSecurity
 	var eciesErr error
-	security, eciesErr = config.CosignerSecurityECIES()
+	// TODO: This is really ugly and should be refactored
+	security, eciesErr = CosignerSecurityECIES(config)
 	if eciesErr != nil {
 		var rsaErr error
-		security, rsaErr = config.CosignerSecurityRSA()
+		security, rsaErr = CosignerSecurityRSA(config)
 		if rsaErr != nil {
 			return nil, nil, fmt.Errorf("failed to initialize cosigner ECIES / RSA security : %w / %w", eciesErr, rsaErr)
 		}
