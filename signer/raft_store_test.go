@@ -6,7 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/strangelove-ventures/horcrux/pkg/config"
 	"github.com/strangelove-ventures/horcrux/pkg/nodes"
+	"github.com/strangelove-ventures/horcrux/pkg/nodes/nodesecurity"
+	"github.com/strangelove-ventures/horcrux/pkg/thresholdTemP"
+	"github.com/strangelove-ventures/horcrux/signer"
 
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/libs/log"
@@ -26,7 +30,7 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 	eciesKey, err := ecies.GenerateKey(rand.Reader, secp256k1.S256(), nil)
 	require.NoError(t, err)
 
-	key := CosignerEd25519Key{
+	key := thresholdTemP.CosignerEd25519Key{
 		PubKey:       dummyPub,
 		PrivateShard: []byte{},
 		ID:           1,
@@ -34,9 +38,9 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 
 	cosigner := nodes.NewLocalCosigner(
 		log.NewNopLogger(),
-		&RuntimeConfig{},
-		nodes.NewCosignerSecurityECIES(
-			nodes.CosignerECIESKey{
+		&config.RuntimeConfig{},
+		nodesecurity.NewCosignerSecurityECIES(
+			nodesecurity.CosignerECIESKey{
 				ID:        key.ID,
 				ECIESKey:  eciesKey,
 				ECIESPubs: []*ecies.PublicKey{&eciesKey.PublicKey},
@@ -44,16 +48,18 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 		"",
 	)
 
-	s := &RaftStore{
-		NodeID:      "1",
-		RaftDir:     tmpDir,
-		RaftBind:    "127.0.0.1:0",
-		RaftTimeout: 1 * time.Second,
-		m:           make(map[string]string),
-		logger:      nil,
-		cosigner:    cosigner,
-	}
+	s := signer.NewRaftStore("1", tmpDir, "127.0.0.1:0", 1*time.Second, nil, cosigner, nil)
+	/*
+		s := &signer.RaftStore{
+			NodeID:      "1",
+			RaftDir:     tmpDir,
+			RaftBind:    "127.0.0.1:0",
+			RaftTimeout: 1 * time.Second,
 
+			logger:   nil,
+			cosigner: cosigner,
+		}
+	*/
 	if _, err := s.Open(); err != nil {
 		t.Fatalf("failed to open store: %s", err)
 	}

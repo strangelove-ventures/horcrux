@@ -1,24 +1,62 @@
-package signer_test
+package signer
 
 import (
 	"os"
+	"sync"
 	"testing"
 
-	"github.com/strangelove-ventures/horcrux/pkg/nodes"
-	"github.com/strangelove-ventures/horcrux/signer"
-
 	cometlog "github.com/cometbft/cometbft/libs/log"
+	"github.com/strangelove-ventures/horcrux/pkg/nodes"
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 
+var _ Leader = (*MockLeader)(nil)
+
+type MockThresholdValidator struct {
+	myCosigner *nodes.LocalCosigner
+}
+
+type MockLeader struct {
+	id int
+
+	mu     sync.Mutex
+	leader *MockThresholdValidator
+}
+
+func (m *MockLeader) IsLeader() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.leader != nil && m.leader.myCosigner.GetIndex() == m.id
+}
+
+func (m *MockLeader) SetLeader(tv *MockThresholdValidator) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.leader = tv
+}
+
+func (m *MockLeader) GetLeader() int {
+	return m.id
+}
+
+func (m *MockLeader) ShareSigned(_ types.ChainSignStateConsensus) error {
+	return nil
+}
+
 func TestCosignerHealth(t *testing.T) {
-	ch := signer.NewCosignerHealth(
+
+	cosigner2, _ := nodes.NewRemoteCosigner(2, "")
+	cosigner3, _ := nodes.NewRemoteCosigner(3, "")
+	cosigner4, _ := nodes.NewRemoteCosigner(4, "")
+	cosigner5, _ := nodes.NewRemoteCosigner(5, "")
+	ch := NewCosignerHealth(
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)),
 		[]nodes.Cosigner{
-			&nodes.RemoteCosigner{id: 2},
-			&nodes.RemoteCosigner{id: 3},
-			&nodes.RemoteCosigner{id: 4},
-			&nodes.RemoteCosigner{id: 5},
+			cosigner2,
+			cosigner3,
+			cosigner4,
+			cosigner5,
 		},
 		&MockLeader{id: 1},
 	)
