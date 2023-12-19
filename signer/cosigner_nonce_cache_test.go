@@ -153,7 +153,7 @@ func TestNonceCacheDemand(t *testing.T) {
 	nonceCache := NewCosignerNonceCache(
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)),
 		cosigners,
-		&MockLeader{id: 1, leader: &ThresholdValidator{myCosigner: lcs[0]}},
+		&MockLeader{id: 1, leader: &MockThresholdValidator{myCosigner: lcs[0]}},
 		500*time.Millisecond,
 		100*time.Millisecond,
 		defaultNonceExpiration,
@@ -205,7 +205,7 @@ func TestNonceCacheExpiration(t *testing.T) {
 	nonceCache := NewCosignerNonceCache(
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)),
 		cosigners,
-		&MockLeader{id: 1, leader: &ThresholdValidator{myCosigner: lcs[0]}},
+		&MockLeader{id: 1, leader: &MockThresholdValidator{myCosigner: lcs[0]}},
 		getNoncesInterval,
 		getNoncesTimeout,
 		noncesExpiration,
@@ -411,7 +411,7 @@ func TestNonceCacheDemandSlow(t *testing.T) {
 	nonceCache := NewCosignerNonceCache(
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)),
 		cosigners,
-		&MockLeader{id: 1, leader: &ThresholdValidator{myCosigner: lcs[0]}},
+		&MockLeader{id: 1, leader: &MockThresholdValidator{myCosigner: lcs[0]}},
 		90*time.Millisecond,
 		100*time.Millisecond,
 		500*time.Millisecond,
@@ -448,7 +448,7 @@ func TestNonceCacheDemandSlowDefault(t *testing.T) {
 	nonceCache := NewCosignerNonceCache(
 		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)),
 		cosigners,
-		&MockLeader{id: 1, leader: &ThresholdValidator{myCosigner: lcs[0]}},
+		&MockLeader{id: 1, leader: &MockThresholdValidator{myCosigner: lcs[0]}},
 		defaultGetNoncesInterval,
 		defaultGetNoncesTimeout,
 		defaultNonceExpiration,

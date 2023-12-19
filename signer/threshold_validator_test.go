@@ -1,4 +1,4 @@
-package signer_test
+package signer
 
 import (
 	"bytes"
