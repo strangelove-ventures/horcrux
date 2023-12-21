@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254"
-	horcrux_bn254 "github.com/strangelove-ventures/horcrux/signer/bn254"
+	horcrux_bn254 "github.com/strangelove-ventures/horcrux/v3/signer/bn254"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/sha3"

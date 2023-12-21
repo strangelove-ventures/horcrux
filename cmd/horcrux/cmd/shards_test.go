@@ -9,7 +9,7 @@ import (
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/cometbft/cometbft/privval"
 	"github.com/strangelove-ventures/horcrux/cmd/horcrux/cmd/testdata"
-	"github.com/strangelove-ventures/horcrux/signer"
+	"github.com/strangelove-ventures/horcrux/v3/signer"
 	"github.com/stretchr/testify/require"
 )
 
