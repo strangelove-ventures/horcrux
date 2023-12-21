@@ -6,7 +6,7 @@ import (
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	"github.com/google/uuid"
-	"github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 )
 
 // Cosigner interface is a set of methods for an m-of-n threshold signature.

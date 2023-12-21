@@ -13,7 +13,7 @@ import (
 	"github.com/cometbft/cometbft/libs/log"
 	cometrpcjsontypes "github.com/cometbft/cometbft/rpc/jsonrpc/types"
 	"github.com/google/uuid"
-	"github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

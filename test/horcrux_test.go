@@ -8,7 +8,7 @@ import (
 
 	"github.com/cometbft/cometbft/crypto"
 	dockertypes "github.com/docker/docker/api/types"
-	"github.com/strangelove-ventures/horcrux/signer"
+	"github.com/strangelove-ventures/horcrux/v3/signer"
 	interchaintest "github.com/strangelove-ventures/interchaintest/v8"
 	"github.com/strangelove-ventures/interchaintest/v8/chain/cosmos"
 	"github.com/strangelove-ventures/interchaintest/v8/ibc"

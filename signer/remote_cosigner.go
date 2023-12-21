@@ -8,7 +8,7 @@ import (
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	"github.com/google/uuid"
-	"github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )

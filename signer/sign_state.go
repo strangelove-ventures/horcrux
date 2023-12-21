@@ -15,7 +15,7 @@ import (
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	comet "github.com/cometbft/cometbft/types"
 	"github.com/gogo/protobuf/proto"
-	"github.com/strangelove-ventures/horcrux/signer/cond"
+	"github.com/strangelove-ventures/horcrux/v3/signer/cond"
 )
 
 const (

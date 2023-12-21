@@ -8,7 +8,7 @@ import (
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/strangelove-ventures/horcrux/signer"
+	"github.com/strangelove-ventures/horcrux/v3/signer"
 	"gopkg.in/yaml.v2"
 )
 

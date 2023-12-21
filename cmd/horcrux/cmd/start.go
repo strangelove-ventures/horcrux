@@ -7,7 +7,7 @@ import (
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/cometbft/cometbft/libs/service"
 	"github.com/spf13/cobra"
-	"github.com/strangelove-ventures/horcrux/signer"
+	"github.com/strangelove-ventures/horcrux/v3/signer"
 )
 
 func startCmd() *cobra.Command {

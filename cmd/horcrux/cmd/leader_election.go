@@ -7,10 +7,10 @@ import (
 
 	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"github.com/spf13/cobra"
-	"github.com/strangelove-ventures/horcrux/client"
-	"github.com/strangelove-ventures/horcrux/signer"
-	"github.com/strangelove-ventures/horcrux/signer/multiresolver"
-	"github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/strangelove-ventures/horcrux/v3/client"
+	"github.com/strangelove-ventures/horcrux/v3/signer"
+	"github.com/strangelove-ventures/horcrux/v3/signer/multiresolver"
+	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )

@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/raft"
-	"github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 )
 
 var _ proto.CosignerServer = &CosignerGRPCServer{}
