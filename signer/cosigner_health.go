@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
+
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 )
@@ -16,14 +18,14 @@ const (
 
 type CosignerHealth struct {
 	logger    cometlog.Logger
-	cosigners []Cosigner
+	cosigners []ICosigner
 	rtt       map[int]int64
 	mu        sync.RWMutex
 
 	leader Leader
 }
 
-func NewCosignerHealth(logger cometlog.Logger, cosigners []Cosigner, leader Leader) *CosignerHealth {
+func NewCosignerHealth(logger cometlog.Logger, cosigners []ICosigner, leader Leader) *CosignerHealth {
 	return &CosignerHealth{
 		logger:    logger,
 		cosigners: cosigners,
@@ -38,8 +40,8 @@ func (ch *CosignerHealth) Reconcile(ctx context.Context) {
 	}
 	var wg sync.WaitGroup
 	wg.Add(len(ch.cosigners))
-	for _, cosigner := range ch.cosigners {
-		if rc, ok := cosigner.(*RemoteCosigner); ok {
+	for _, remote_cosigner := range ch.cosigners {
+		if rc, ok := remote_cosigner.(*cosigner.RemoteCosigner); ok {
 			go ch.updateRTT(ctx, rc, &wg)
 		}
 	}
@@ -59,43 +61,43 @@ func (ch *CosignerHealth) Start(ctx context.Context) {
 	}
 }
 
-func (ch *CosignerHealth) MarkUnhealthy(cosigner Cosigner) {
+func (ch *CosignerHealth) MarkUnhealthy(cosigner ICosigner) {
 	ch.mu.Lock()
 	defer ch.mu.Unlock()
-	ch.rtt[cosigner.GetID()] = -1
+	ch.rtt[cosigner.GetIndex()] = -1
 }
 
-func (ch *CosignerHealth) updateRTT(ctx context.Context, cosigner *RemoteCosigner, wg *sync.WaitGroup) {
+func (ch *CosignerHealth) updateRTT(ctx context.Context, cosigner *cosigner.RemoteCosigner, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	rtt := int64(-1)
 	defer func() {
 		ch.mu.Lock()
 		defer ch.mu.Unlock()
-		ch.rtt[cosigner.GetID()] = rtt
+		ch.rtt[cosigner.GetIndex()] = rtt
 	}()
 	start := time.Now()
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
 
-	_, err := cosigner.client.Ping(ctx, &proto.PingRequest{})
+	_, err := cosigner.Client.Ping(ctx, &proto.PingRequest{})
 	if err != nil {
-		ch.logger.Error("Failed to ping", "cosigner", cosigner.GetID(), "error", err)
+		ch.logger.Error("Failed to ping", "cosigner", cosigner.GetIndex(), "error", err)
 		return
 	}
 	rtt = time.Since(start).Nanoseconds()
 }
 
-func (ch *CosignerHealth) GetFastest() []Cosigner {
+func (ch *CosignerHealth) GetFastest() []ICosigner {
 	ch.mu.RLock()
 	defer ch.mu.RUnlock()
 
-	fastest := make([]Cosigner, len(ch.cosigners))
+	fastest := make([]ICosigner, len(ch.cosigners))
 	copy(fastest, ch.cosigners)
 
 	sort.Slice(fastest, func(i, j int) bool {
-		rtt1, ok1 := ch.rtt[fastest[i].GetID()]
-		rtt2, ok2 := ch.rtt[fastest[j].GetID()]
+		rtt1, ok1 := ch.rtt[fastest[i].GetIndex()]
+		rtt2, ok2 := ch.rtt[fastest[j].GetIndex()]
 		if rtt1 == -1 || !ok1 {
 			return false
 		}

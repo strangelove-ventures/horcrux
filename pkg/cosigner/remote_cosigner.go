@@ -1,4 +1,4 @@
-package signer
+package cosigner
 
 import (
 	"context"
@@ -13,14 +13,26 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-var _ Cosigner = &RemoteCosigner{}
+// var _ Cosigner = &RemoteCosigner{}
 
 // RemoteCosigner uses CosignerGRPC to request signing from a remote cosigner
+// Remote Cosigner are the CLIENT!
 type RemoteCosigner struct {
 	id      int
 	address string
 
-	client proto.CosignerClient
+	Client proto.CosignerClient // GRPC Client
+}
+
+// Placeholder function because of testing
+func InitRemoteCosigner(id int, address string, client proto.CosignerClient) *RemoteCosigner {
+	cosigner := &RemoteCosigner{
+		id:      id,
+		address: address,
+		Client:  client,
+	}
+
+	return cosigner
 }
 
 // NewRemoteCosigner returns a newly initialized RemoteCosigner
@@ -29,19 +41,22 @@ func NewRemoteCosigner(id int, address string) (*RemoteCosigner, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	cosigner := &RemoteCosigner{
-		id:      id,
-		address: address,
-		client:  client,
-	}
-
+	cosigner := InitRemoteCosigner(id, address, client)
 	return cosigner, nil
+	/*
+		cosigner := &RemoteCosigner{
+			id:      id,
+			address: address,
+			Client:  client,
+		}
+
+		return cosigner, nil
+	*/
 }
 
-// GetID returns the ID of the remote cosigner
+// GetID returns the Index of the remote cosigner
 // Implements the cosigner interface
-func (cosigner *RemoteCosigner) GetID() int {
+func (cosigner *RemoteCosigner) GetIndex() int {
 	return cosigner.id
 }
 
@@ -78,7 +93,7 @@ func getGRPCClient(address string) (proto.CosignerClient, error) {
 	return proto.NewCosignerClient(conn), nil
 }
 
-// Implements the cosigner interface
+// GetNonces implements the cosigner interface
 func (cosigner *RemoteCosigner) GetNonces(
 	ctx context.Context,
 	uuids []uuid.UUID,
@@ -88,7 +103,7 @@ func (cosigner *RemoteCosigner) GetNonces(
 		us[i] = make([]byte, 16)
 		copy(us[i], u[:])
 	}
-	res, err := cosigner.client.GetNonces(ctx, &proto.GetNoncesRequest{
+	res, err := cosigner.Client.GetNonces(ctx, &proto.GetNoncesRequest{
 		Uuids: us,
 	})
 	if err != nil {
@@ -108,11 +123,11 @@ func (cosigner *RemoteCosigner) GetNonces(
 func (cosigner *RemoteCosigner) SetNoncesAndSign(
 	ctx context.Context,
 	req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error) {
-	res, err := cosigner.client.SetNoncesAndSign(ctx, &proto.SetNoncesAndSignRequest{
+	res, err := cosigner.Client.SetNoncesAndSign(ctx, &proto.SetNoncesAndSignRequest{
 		Uuid:      req.Nonces.UUID[:],
 		ChainID:   req.ChainID,
 		Nonces:    req.Nonces.Nonces.toProto(),
-		Hrst:      req.HRST.toProto(),
+		Hrst:      req.HRST.ToProto(),
 		SignBytes: req.SignBytes,
 	})
 	if err != nil {
@@ -129,7 +144,7 @@ func (cosigner *RemoteCosigner) Sign(
 	ctx context.Context,
 	req CosignerSignBlockRequest,
 ) (*CosignerSignBlockResponse, error) {
-	res, err := cosigner.client.SignBlock(ctx, &proto.SignBlockRequest{
+	res, err := cosigner.Client.SignBlock(ctx, &proto.SignBlockRequest{
 		ChainID: req.ChainID,
 		Block:   req.Block.ToProto(),
 	})

@@ -1,6 +1,6 @@
 // Provides a simple distributed key-value store. The keys and
 // associated values are changed via distributed consensus, meaning that the
-// values are changed only when a majority of nodes in the cluster agree on
+// values are changed only when a majority of cosigner in the cluster agree on
 // the new value.
 //
 // Distributed consensus is provided via the Raft algorithm, specifically the
@@ -18,6 +18,10 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
+
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 
 	"github.com/Jille/raft-grpc-leader-rpc/leaderhealth"
 	raftgrpctransport "github.com/Jille/raft-grpc-transport"
@@ -52,7 +56,7 @@ type RaftStore struct {
 	RaftDir     string
 	RaftBind    string
 	RaftTimeout time.Duration
-	Cosigners   []Cosigner
+	Cosigners   []ICosigner
 
 	mu sync.Mutex
 	m  map[string]string // The key-value store for the system.
@@ -60,14 +64,14 @@ type RaftStore struct {
 	raft *raft.Raft // The consensus mechanism
 
 	logger             log.Logger
-	cosigner           *LocalCosigner
+	cosigner           *cosigner.LocalCosigner
 	thresholdValidator *ThresholdValidator
 }
 
 // New returns a new Store.
 func NewRaftStore(
 	nodeID string, directory string, bindAddress string, timeout time.Duration,
-	logger log.Logger, cosigner *LocalCosigner, cosigners []Cosigner) *RaftStore {
+	logger log.Logger, cosigner *cosigner.LocalCosigner, cosigners []ICosigner) *RaftStore {
 	cosignerRaftStore := &RaftStore{
 		NodeID:      nodeID,
 		RaftDir:     directory,
@@ -103,7 +107,8 @@ func (s *RaftStore) init() error {
 		return err
 	}
 	grpcServer := grpc.NewServer()
-	proto.RegisterCosignerServer(grpcServer, NewCosignerGRPCServer(s.cosigner, s.thresholdValidator, s))
+	// proto.RegisterCosignerServer(grpcServer, NewNodeGRPCServer(s.cosigner, s.thresholdValidator, s))
+	proto.RegisterCosignerServer(grpcServer, NewNodeGRPCServer(s.thresholdValidator, s))
 	transportManager.Register(grpcServer)
 	leaderhealth.Setup(s.raft, grpcServer, []string{"Leader"})
 	raftadmin.Register(grpcServer, s.raft)
@@ -186,7 +191,7 @@ func (s *RaftStore) Open() (*raftgrpctransport.Manager, error) {
 	}
 	for _, c := range s.Cosigners {
 		configuration.Servers = append(configuration.Servers, raft.Server{
-			ID:      raft.ServerID(fmt.Sprint(c.GetID())),
+			ID:      raft.ServerID(fmt.Sprint(c.GetIndex())), // TODO: Refactor out the use of cosigner.
 			Address: raft.ServerAddress(p2pURLToRaftAddress(c.GetAddress())),
 		})
 	}
@@ -259,10 +264,10 @@ func (s *RaftStore) Join(nodeID, addr string) error {
 	}
 
 	for _, srv := range configFuture.Configuration().Servers {
-		// If a node already exists with either the joining node's ID or address,
+		// If a node already exists with either the joining node's Index or address,
 		// that node may need to be removed from the config first.
 		if srv.ID == raft.ServerID(nodeID) || srv.Address == raft.ServerAddress(addr) {
-			// However if *both* the ID and the address are the same, then nothing -- not even
+			// However if *both* the Index and the address are the same, then nothing -- not even
 			// a join operation -- is needed.
 			if srv.Address == raft.ServerAddress(addr) && srv.ID == raft.ServerID(nodeID) {
 				s.logger.Error("node already member of cluster, ignoring join request", nodeID, addr)
@@ -306,7 +311,7 @@ func (s *RaftStore) GetLeader() int {
 	return id
 }
 
-func (s *RaftStore) ShareSigned(lss ChainSignStateConsensus) error {
+func (s *RaftStore) ShareSigned(lss types.ChainSignStateConsensus) error {
 	return s.Emit(raftEventLSS, lss)
 }
 

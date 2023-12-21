@@ -7,19 +7,26 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
+
+	"github.com/strangelove-ventures/horcrux/pkg/metrics"
+
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/google/uuid"
 )
 
+/*
 const (
+
 	defaultGetNoncesInterval = 3 * time.Second
 	defaultGetNoncesTimeout  = 4 * time.Second
 	defaultNonceExpiration   = 10 * time.Second // half of the local cosigner cache expiration
-)
 
+)
+*/
 type CosignerNonceCache struct {
 	logger    cometlog.Logger
-	cosigners []Cosigner
+	cosigners []ICosigner
 
 	leader Leader
 
@@ -137,13 +144,13 @@ func (nc *NonceCache) PruneNonces() int {
 }
 
 type CosignerNoncesRel struct {
-	Cosigner Cosigner
-	Nonces   CosignerNonces
+	Cosigner ICosigner
+	Nonces   cosigner.CosignerNonces
 }
 
 type CachedNonceSingle struct {
-	Cosigner Cosigner
-	Nonces   CosignerUUIDNoncesMultiple
+	Cosigner ICosigner
+	Nonces   cosigner.CosignerUUIDNoncesMultiple
 }
 
 type CachedNonce struct {
@@ -159,7 +166,7 @@ type CachedNonce struct {
 
 func NewCosignerNonceCache(
 	logger cometlog.Logger,
-	cosigners []Cosigner,
+	cosigners []ICosigner,
 	leader Leader,
 	getNoncesInterval time.Duration,
 	getNoncesTimeout time.Duration,
@@ -286,15 +293,15 @@ func (cnc *CosignerNonceCache) LoadN(ctx context.Context, n int) {
 			n, err := p.GetNonces(ctx, uuids)
 			if err != nil {
 				// Significant missing shares may lead to signature failure
-				missedNonces.WithLabelValues(p.GetAddress()).Add(float64(1))
-				totalMissedNonces.WithLabelValues(p.GetAddress()).Inc()
+				metrics.MissedNonces.WithLabelValues(p.GetAddress()).Add(float64(1))
+				metrics.TotalMissedNonces.WithLabelValues(p.GetAddress()).Inc()
 
-				cnc.logger.Error("Failed to get nonces from peer", "peer", p.GetID(), "error", err)
+				cnc.logger.Error("Failed to get nonces from peer", "peer", p.GetIndex(), "error", err)
 				return
 			}
 
-			missedNonces.WithLabelValues(p.GetAddress()).Set(0)
-			timedCosignerNonceLag.WithLabelValues(p.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
+			metrics.MissedNonces.WithLabelValues(p.GetAddress()).Set(0)
+			metrics.TimedCosignerNonceLag.WithLabelValues(p.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
 
 			nonces[i] = &CachedNonceSingle{
 				Cosigner: p,
@@ -349,16 +356,16 @@ func (cnc *CosignerNonceCache) Start(ctx context.Context) {
 	}
 }
 
-func (cnc *CosignerNonceCache) GetNonces(fastestPeers []Cosigner) (*CosignerUUIDNonces, error) {
+func (cnc *CosignerNonceCache) GetNonces(fastestPeers []ICosigner) (*cosigner.CosignerUUIDNonces, error) {
 	cnc.cache.mu.Lock()
 	defer cnc.cache.mu.Unlock()
 CheckNoncesLoop:
 	for i, cn := range cnc.cache.cache {
-		var nonces CosignerNonces
+		var nonces cosigner.CosignerNonces
 		for _, p := range fastestPeers {
 			found := false
 			for _, n := range cn.Nonces {
-				if n.Cosigner.GetID() == p.GetID() {
+				if n.Cosigner.GetIndex() == p.GetIndex() {
 					found = true
 					nonces = append(nonces, n.Nonces...)
 					break
@@ -379,7 +386,7 @@ CheckNoncesLoop:
 		}
 
 		// all peers found
-		return &CosignerUUIDNonces{
+		return &cosigner.CosignerUUIDNonces{
 			UUID:   cn.UUID,
 			Nonces: nonces,
 		}, nil
@@ -391,12 +398,12 @@ CheckNoncesLoop:
 	// no nonces found
 	cosignerInts := make([]int, len(fastestPeers))
 	for i, p := range fastestPeers {
-		cosignerInts[i] = p.GetID()
+		cosignerInts[i] = p.GetIndex()
 	}
 	return nil, fmt.Errorf("no nonces found involving cosigners %+v", cosignerInts)
 }
 
-func (cnc *CosignerNonceCache) ClearNonces(cosigner Cosigner) {
+func (cnc *CosignerNonceCache) ClearNonces(cosigner ICosigner) {
 	cnc.cache.mu.Lock()
 	defer cnc.cache.mu.Unlock()
 	for i := 0; i < len(cnc.cache.cache); i++ {
@@ -404,7 +411,7 @@ func (cnc *CosignerNonceCache) ClearNonces(cosigner Cosigner) {
 
 		deleteID := -1
 		for j, n := range cn.Nonces {
-			if n.Cosigner.GetID() == cosigner.GetID() {
+			if n.Cosigner.GetIndex() == cosigner.GetIndex() {
 				// remove cosigner from this nonce.
 				deleteID = j
 				break

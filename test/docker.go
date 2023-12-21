@@ -19,7 +19,7 @@ type DockerImageBuildErrorDetail struct {
 }
 
 type DockerImageBuildLogAux struct {
-	ID string `json:"ID"`
+	ID string `json:"Index"`
 }
 
 type DockerImageBuildLog struct {
@@ -64,7 +64,7 @@ func BuildHorcruxImage(ctx context.Context, client *client.Client) error {
 			fmt.Printf(dockerLogLine.Stream)
 		}
 		if dockerLogLine.Aux != nil {
-			fmt.Printf("Image ID: %s\n", dockerLogLine.Aux.ID)
+			fmt.Printf("Image Index: %s\n", dockerLogLine.Aux.ID)
 		}
 		if dockerLogLine.Error != "" {
 			return errors.New(dockerLogLine.Error)

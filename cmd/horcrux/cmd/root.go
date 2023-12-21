@@ -8,11 +8,11 @@ import (
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/strangelove-ventures/horcrux/signer"
+	cconfig "github.com/strangelove-ventures/horcrux/pkg/config"
 	"gopkg.in/yaml.v2"
 )
 
-var config signer.RuntimeConfig
+var config cconfig.RuntimeConfig
 
 func rootCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -74,7 +74,7 @@ func initConfig() {
 	} else {
 		home = config.HomeDir
 	}
-	config = signer.RuntimeConfig{
+	config = cconfig.RuntimeConfig{
 		HomeDir:    home,
 		ConfigFile: filepath.Join(home, "config.yaml"),
 		StateDir:   filepath.Join(home, "state"),

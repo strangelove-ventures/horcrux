@@ -50,7 +50,7 @@ func RequireNotRunning(log cometlog.Logger, pidFilePath string) error {
 	}
 	if errors.Is(err, os.ErrProcessDone) {
 		log.Error(
-			"Unclean shutdown detected. PID file exists at but process with that ID cannot be found. Removing lock file",
+			"Unclean shutdown detected. PID file exists at but process with that Index cannot be found. Removing lock file",
 			"pid", pid,
 			"pid_file", pidFilePath,
 			"error", err,

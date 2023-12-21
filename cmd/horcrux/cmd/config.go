@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/strangelove-ventures/horcrux/signer"
+	cconfig "github.com/strangelove-ventures/horcrux/pkg/config"
 )
 
 const (
@@ -48,7 +48,7 @@ for threshold signer mode, --cosigner flags and --threshold flag are required.
 			bare, _ := cmdFlags.GetBool(flagBare)
 			nodes, _ := cmdFlags.GetStringSlice(flagNode)
 
-			cn, err := signer.ChainNodesFromFlag(nodes)
+			cn, err := cconfig.ChainNodesFromFlag(nodes)
 			if err != nil {
 				return err
 			}
@@ -60,7 +60,7 @@ for threshold signer mode, --cosigner flags and --threshold flag are required.
 					config.ConfigFile)
 			}
 
-			var cfg signer.Config
+			var cfg cconfig.Config
 
 			signMode, _ := cmdFlags.GetString(flagSignMode)
 			keyDirFlag, _ := cmdFlags.GetString(flagKeyDir)
@@ -70,21 +70,21 @@ for threshold signer mode, --cosigner flags and --threshold flag are required.
 			}
 			debugAddr, _ := cmdFlags.GetString(flagDebugAddr)
 			grpcAddr, _ := cmdFlags.GetString(flagGRPCAddress)
-			if signMode == string(signer.SignModeThreshold) {
+			if signMode == string(cconfig.SignModeThreshold) {
 				// Threshold Mode Config
 				cosignersFlag, _ := cmdFlags.GetStringSlice(flagCosigner)
 				threshold, _ := cmdFlags.GetInt(flagThreshold)
 				raftTimeout, _ := cmdFlags.GetString(flagRaftTimeout)
 				grpcTimeout, _ := cmdFlags.GetString(flagGRPCTimeout)
-				cosigners, err := signer.CosignersFromFlag(cosignersFlag)
+				cosigners, err := cconfig.CosignersFromFlag(cosignersFlag)
 				if err != nil {
 					return err
 				}
 
-				cfg = signer.Config{
-					SignMode:      signer.SignModeThreshold,
+				cfg = cconfig.Config{
+					SignMode:      cconfig.SignModeThreshold,
 					PrivValKeyDir: keyDir,
-					ThresholdModeConfig: &signer.ThresholdModeConfig{
+					ThresholdModeConfig: &cconfig.ThresholdModeConfig{
 						Threshold:   threshold,
 						Cosigners:   cosigners,
 						GRPCTimeout: grpcTimeout,
@@ -102,8 +102,8 @@ for threshold signer mode, --cosigner flags and --threshold flag are required.
 				}
 			} else {
 				// Single Signer Config
-				cfg = signer.Config{
-					SignMode:      signer.SignModeSingle,
+				cfg = cconfig.Config{
+					SignMode:      cconfig.SignModeSingle,
 					PrivValKeyDir: keyDir,
 					ChainNodes:    cn,
 					DebugAddr:     debugAddr,
@@ -134,10 +134,10 @@ for threshold signer mode, --cosigner flags and --threshold flag are required.
 	}
 
 	f := cmd.Flags()
-	f.StringP(flagSignMode, "m", string(signer.SignModeThreshold),
-		`sign mode, "threshold" (recommended) or "single" (unsupported). threshold mode requires --cosigner (multiple) and --threshold`, //nolint
+	f.StringP(flagSignMode, "m", string(cconfig.SignModeThreshold),
+		`sign mode, "threshold" (recommended) or "single" (unsupported). threshold mode requires --cosigner (multiple) and --threshold`, // nolint
 	)
-	f.StringSliceP(flagNode, "n", []string{}, "chain nodes in format tcp://{node-addr}:{privval-port} \n"+
+	f.StringSliceP(flagNode, "n", []string{}, "chain cosigner in format tcp://{node-addr}:{privval-port} \n"+
 		"(e.g. --node tcp://sentry-1:1234 --node tcp://sentry-2:1234 --node tcp://sentry-3:1234 )")
 
 	f.StringSliceP(flagCosigner, "c", []string{},

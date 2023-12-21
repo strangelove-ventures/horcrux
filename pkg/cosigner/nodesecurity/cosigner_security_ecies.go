@@ -1,4 +1,4 @@
-package signer
+package nodesecurity
 
 import (
 	"crypto/ecdsa"
@@ -12,10 +12,11 @@ import (
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
 	"golang.org/x/sync/errgroup"
 )
 
-var _ CosignerSecurity = &CosignerSecurityECIES{}
+var _ cosigner.ICosignerSecurity = &CosignerSecurityECIES{}
 
 // CosignerSecurityECIES is an implementation of CosignerSecurity
 // using ECIES for encryption and ECDSA for digital signature.
@@ -130,21 +131,22 @@ func NewCosignerSecurityECIES(key CosignerECIESKey) *CosignerSecurityECIES {
 	return c
 }
 
-// GetID returns the ID of the cosigner.
+// GetID returns the Index of the cosigner.
 func (c *CosignerSecurityECIES) GetID() int {
 	return c.key.ID
 }
 
 // EncryptAndSign encrypts the nonce and signs it for authentication.
-func (c *CosignerSecurityECIES) EncryptAndSign(id int, noncePub []byte, nonceShare []byte) (CosignerNonce, error) {
-	nonce := CosignerNonce{
+func (c *CosignerSecurityECIES) EncryptAndSign(
+	id int, noncePub []byte, nonceShare []byte) (cosigner.CosignerNonce, error) {
+	nonce := cosigner.CosignerNonce{
 		SourceID: c.key.ID,
 	}
 
-	// grab the cosigner info for the ID being requested
+	// grab the cosigner info for the Index being requested
 	pubKey, ok := c.eciesPubKeys[id]
 	if !ok {
-		return nonce, fmt.Errorf("unknown cosigner ID: %d", id)
+		return nonce, fmt.Errorf("unknown cosigner Index: %d", id)
 	}
 
 	var encryptedPub []byte
@@ -206,7 +208,7 @@ func (c *CosignerSecurityECIES) DecryptAndVerify(
 		return nil, nil, fmt.Errorf("unknown cosigner: %d", id)
 	}
 
-	digestMsg := CosignerNonce{
+	digestMsg := cosigner.CosignerNonce{
 		SourceID: id,
 		PubKey:   encryptedNoncePub,
 		Share:    encryptedNonceShare,

@@ -1,4 +1,4 @@
-package signer
+package cosigner_test
 
 import (
 	"context"
@@ -9,6 +9,12 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/config"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner/nodesecurity"
+	"github.com/strangelove-ventures/horcrux/pkg/tss"
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/libs/log"
@@ -38,7 +44,7 @@ func TestLocalCosignerSignRSA3of5(t *testing.T) {
 func testLocalCosignerSignRSA(t *testing.T, threshold, total uint8) {
 	t.Parallel()
 
-	security := make([]CosignerSecurity, total)
+	security := make([]cosigner.ICosignerSecurity, total)
 
 	keys := make([]*rsa.PrivateKey, total)
 	pubKeys := make([]*rsa.PublicKey, total)
@@ -51,8 +57,8 @@ func testLocalCosignerSignRSA(t *testing.T, threshold, total uint8) {
 	}
 
 	for i, k := range keys {
-		security[i] = NewCosignerSecurityRSA(
-			CosignerRSAKey{
+		security[i] = nodesecurity.NewCosignerSecurityRSA(
+			nodesecurity.CosignerRSAKey{
 				ID:      i + 1,
 				RSAKey:  *k,
 				RSAPubs: pubKeys,
@@ -74,7 +80,7 @@ func TestLocalCosignerSignECIES3of5(t *testing.T) {
 func testLocalCosignerSignECIES(t *testing.T, threshold, total uint8) {
 	t.Parallel()
 
-	security := make([]CosignerSecurity, total)
+	security := make([]cosigner.ICosignerSecurity, total)
 
 	keys := make([]*ecies.PrivateKey, total)
 	pubKeys := make([]*ecies.PublicKey, total)
@@ -87,8 +93,8 @@ func testLocalCosignerSignECIES(t *testing.T, threshold, total uint8) {
 	}
 
 	for i, k := range keys {
-		security[i] = NewCosignerSecurityECIES(
-			CosignerECIESKey{
+		security[i] = nodesecurity.NewCosignerSecurityECIES(
+			nodesecurity.CosignerECIESKey{
 				ID:        i + 1,
 				ECIESKey:  k,
 				ECIESPubs: pubKeys,
@@ -99,7 +105,7 @@ func testLocalCosignerSignECIES(t *testing.T, threshold, total uint8) {
 	testLocalCosignerSign(t, threshold, total, security)
 }
 
-func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []CosignerSecurity) {
+func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []cosigner.ICosignerSecurity) {
 	privateKey := cometcryptoed25519.GenPrivKey()
 
 	privKeyBytes := [64]byte{}
@@ -107,10 +113,10 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
 	pubKey := privateKey.PubKey()
 
-	cfg := Config{
-		ThresholdModeConfig: &ThresholdModeConfig{
+	cfg := config.Config{
+		ThresholdModeConfig: &config.ThresholdModeConfig{
 			Threshold: int(threshold),
-			Cosigners: make(CosignersConfig, total),
+			Cosigners: make(config.CosignersConfig, total),
 		},
 	}
 
@@ -118,12 +124,12 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 
 	tmpDir := t.TempDir()
 
-	thresholdCosigners := make([]*LocalCosigner, threshold)
-	nonces := make([][]CosignerNonce, threshold)
+	thresholdCosigners := make([]*cosigner.LocalCosigner, threshold)
+	nonces := make([][]cosigner.CosignerNonce, threshold)
 
 	now := time.Now()
 
-	hrst := HRSTKey{
+	hrst := types.HRSTKey{
 		Height:    1,
 		Round:     0,
 		Step:      2,
@@ -136,42 +142,42 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 	for i := 0; i < int(total); i++ {
 		id := i + 1
 
-		key := CosignerEd25519Key{
+		key := tss.CosignerEd25519Key{
 			PubKey:       pubKey,
 			PrivateShard: privShards[i],
 			ID:           id,
 		}
 
-		cfg.ThresholdModeConfig.Cosigners[i] = CosignerConfig{
+		cfg.ThresholdModeConfig.Cosigners[i] = config.CosignerConfig{
 			ShardID: id,
 		}
 
 		cosignerDir := filepath.Join(tmpDir, fmt.Sprintf("cosigner%d", id))
 		err := os.Mkdir(cosignerDir, 0700)
 		require.NoError(t, err)
-
-		cosigner := NewLocalCosigner(
+		runtimeconfig := &config.RuntimeConfig{
+			HomeDir:  cosignerDir,
+			StateDir: cosignerDir,
+			Config:   cfg,
+		}
+		cosigner := cosigner.NewLocalCosigner(
 			log.NewNopLogger(),
-			&RuntimeConfig{
-				HomeDir:  cosignerDir,
-				StateDir: cosignerDir,
-				Config:   cfg,
-			},
+			runtimeconfig,
 			security[i],
 			"",
 		)
 
 		keyBz, err := key.MarshalJSON()
 		require.NoError(t, err)
-		err = os.WriteFile(cosigner.config.KeyFilePathCosigner(testChainID), keyBz, 0600)
+		err = os.WriteFile(runtimeconfig.KeyFilePathCosigner(testChainID), keyBz, 0600)
 		require.NoError(t, err)
 
-		defer cosigner.waitForSignStatesToFlushToDisk()
+		defer cosigner.WaitForSignStatesToFlushToDisk()
 
 		err = cosigner.LoadSignStateIfNecessary(testChainID)
 		require.NoError(t, err)
 
-		require.Equal(t, cosigner.GetID(), id)
+		require.Equal(t, cosigner.GetIndex(), id)
 
 		if i < int(threshold) {
 			thresholdCosigners[i] = cosigner
@@ -192,10 +198,10 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 
 	signBytes := comet.VoteSignBytes("chain-id", &vote)
 
-	sigs := make([]PartialSignature, threshold)
+	sigs := make([]types.PartialSignature, threshold)
 
-	for i, cosigner := range thresholdCosigners {
-		cosignerNonces := make([]CosignerNonce, 0, threshold-1)
+	for i, local_cosigner := range thresholdCosigners {
+		cosignerNonces := make([]cosigner.CosignerNonce, 0, threshold-1)
 
 		for j, nonce := range nonces {
 			if i == j {
@@ -203,14 +209,14 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 			}
 
 			for _, n := range nonce {
-				if n.DestinationID == cosigner.GetID() {
+				if n.DestinationID == local_cosigner.GetIndex() {
 					cosignerNonces = append(cosignerNonces, n)
 				}
 			}
 		}
 
-		sigRes, err := cosigner.SetNoncesAndSign(ctx, CosignerSetNoncesAndSignRequest{
-			Nonces: &CosignerUUIDNonces{
+		sigRes, err := local_cosigner.SetNoncesAndSign(ctx, cosigner.CosignerSetNoncesAndSignRequest{
+			Nonces: &cosigner.CosignerUUIDNonces{
 				UUID:   u,
 				Nonces: cosignerNonces,
 			},
@@ -220,8 +226,8 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 		})
 		require.NoError(t, err)
 
-		sigs[i] = PartialSignature{
-			ID:        cosigner.GetID(),
+		sigs[i] = types.PartialSignature{
+			Index:     local_cosigner.GetIndex(),
 			Signature: sigRes.Signature,
 		}
 	}

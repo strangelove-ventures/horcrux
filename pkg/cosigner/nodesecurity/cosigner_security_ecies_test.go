@@ -1,4 +1,4 @@
-package signer
+package nodesecurity_test
 
 import (
 	"crypto/rand"
@@ -7,6 +7,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner/nodesecurity"
+
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 )
@@ -25,20 +27,20 @@ func TestCosignerECIES(t *testing.T) {
 		pubs[i] = &key.PublicKey
 	}
 
-	securities := make([]CosignerSecurity, 3)
+	securities := make([]nodesecurity.CosignerSecurityECIES, 3)
 
 	for i := 0; i < 3; i++ {
-		key := CosignerECIESKey{
+		key := nodesecurity.CosignerECIESKey{
 			ID:        i + 1,
 			ECIESKey:  keys[i],
 			ECIESPubs: pubs,
 		}
-		securities[i] = NewCosignerSecurityECIES(key)
+		securities[i] = *nodesecurity.NewCosignerSecurityECIES(key)
 
 		bz, err := json.Marshal(&key)
 		require.NoError(t, err)
 
-		var key2 CosignerECIESKey
+		var key2 nodesecurity.CosignerECIESKey
 		require.NoError(t, json.Unmarshal(bz, &key2))
 		require.Equal(t, key, key2)
 
@@ -50,12 +52,12 @@ func TestCosignerECIES(t *testing.T) {
 		}
 	}
 
-	err := testCosignerSecurity(t, securities)
+	err := testCosignerSecurityECIES(t, securities)
 	require.ErrorContains(t, err, "ecies: invalid message")
 	require.ErrorContains(t, err, "failed to decrypt")
 }
 
-func testCosignerSecurity(t *testing.T, securities []CosignerSecurity) error {
+func testCosignerSecurityRSA(t *testing.T, securities []*nodesecurity.CosignerSecurityRSA) error {
 	var (
 		mockPub   = []byte("mock_pub")
 		mockShare = []byte("mock_share")
@@ -75,6 +77,25 @@ func testCosignerSecurity(t *testing.T, securities []CosignerSecurity) error {
 	return err
 }
 
+func testCosignerSecurityECIES(t *testing.T, securities []nodesecurity.CosignerSecurityECIES) error {
+	var (
+		mockPub   = []byte("mock_pub")
+		mockShare = []byte("mock_share")
+	)
+
+	nonce, err := securities[0].EncryptAndSign(2, mockPub, mockShare)
+	require.NoError(t, err)
+
+	decryptedPub, decryptedShare, err := securities[1].DecryptAndVerify(1, nonce.PubKey, nonce.Share, nonce.Signature)
+	require.NoError(t, err)
+
+	require.Equal(t, mockPub, decryptedPub)
+	require.Equal(t, mockShare, decryptedShare)
+
+	_, _, err = securities[2].DecryptAndVerify(1, nonce.PubKey, nonce.Share, nonce.Signature)
+
+	return err
+}
 func TestConcurrentIterateCosignerECIES(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping in short mode")
@@ -91,14 +112,15 @@ func TestConcurrentIterateCosignerECIES(t *testing.T) {
 		pubs[i] = &key.PublicKey
 	}
 
-	securities := make([]CosignerSecurity, 3)
+	securities := make([]*nodesecurity.CosignerSecurityECIES, 3)
 
 	for i := 0; i < 3; i++ {
-		securities[i] = NewCosignerSecurityECIES(CosignerECIESKey{
-			ID:        i + 1,
-			ECIESKey:  keys[i],
-			ECIESPubs: pubs,
-		})
+		securities[i] = nodesecurity.NewCosignerSecurityECIES(
+			nodesecurity.CosignerECIESKey{
+				ID:        i + 1,
+				ECIESKey:  keys[i],
+				ECIESPubs: pubs,
+			})
 	}
 
 	for i := 0; i < 5000; i++ {

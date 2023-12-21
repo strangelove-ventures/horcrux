@@ -1,45 +1,27 @@
-package signer
+package cosigner
 
+/*
+Package cosigner:
+Cosinger is responsible for the network communication between the cosigners.
+
+You can thkin of it as:
+- LocalCosigner is the server (we understand that local here is confussing but it is because it is local to the node)
+- RemoteCosigner is the client
+*/
 import (
-	"context"
 	"time"
 
-	cometcrypto "github.com/cometbft/cometbft/crypto"
+	"github.com/strangelove-ventures/horcrux/pkg/types"
+
 	"github.com/google/uuid"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 )
 
-// Cosigner interface is a set of methods for an m-of-n threshold signature.
-// This interface abstracts the underlying key storage and management
-type Cosigner interface {
-	// Get the ID of the cosigner
-	// The ID is the shamir index: 1, 2, etc...
-	GetID() int
-
-	// Get the P2P URL (GRPC and Raft)
-	GetAddress() string
-
-	// Get the combined public key
-	GetPubKey(chainID string) (cometcrypto.PubKey, error)
-
-	VerifySignature(chainID string, payload, signature []byte) bool
-
-	// Get nonces for all cosigner shards
-	GetNonces(ctx context.Context, uuids []uuid.UUID) (CosignerUUIDNoncesMultiple, error)
-
-	// Sign the requested bytes
-	SetNoncesAndSign(ctx context.Context, req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error)
+type Localcosigner interface {
+	// TODO - add methods
 }
-
-type Cosigners []Cosigner
-
-func (cosigners Cosigners) GetByID(id int) Cosigner {
-	for _, cosigner := range cosigners {
-		if cosigner.GetID() == id {
-			return cosigner
-		}
-	}
-	return nil
+type Remotecosigner interface {
+	// TODO - add methods
 }
 
 // CosignerSignRequest is sent to a co-signer to obtain their signature for the SignBytes
@@ -74,6 +56,7 @@ func (secretPart *CosignerNonce) toProto() *proto.Nonce {
 	}
 }
 
+// CosignerNonces are a list of CosignerNonce
 type CosignerNonces []CosignerNonce
 
 func (secretParts CosignerNonces) toProto() (out []*proto.Nonce) {
@@ -103,7 +86,7 @@ func CosignerNoncesFromProto(secretParts []*proto.Nonce) []CosignerNonce {
 
 type CosignerSignBlockRequest struct {
 	ChainID string
-	Block   *Block
+	Block   *types.Block
 }
 
 type CosignerSignBlockResponse struct {
@@ -126,7 +109,7 @@ func (n *CosignerUUIDNonces) For(id int) *CosignerUUIDNonces {
 
 type CosignerUUIDNoncesMultiple []*CosignerUUIDNonces
 
-func (n CosignerUUIDNoncesMultiple) toProto() []*proto.UUIDNonce {
+func (n CosignerUUIDNoncesMultiple) ToProto() []*proto.UUIDNonce {
 	out := make([]*proto.UUIDNonce, len(n))
 	for i, nonces := range n {
 		out[i] = &proto.UUIDNonce{
@@ -140,6 +123,6 @@ func (n CosignerUUIDNoncesMultiple) toProto() []*proto.UUIDNonce {
 type CosignerSetNoncesAndSignRequest struct {
 	ChainID   string
 	Nonces    *CosignerUUIDNonces
-	HRST      HRSTKey
+	HRST      types.HRSTKey
 	SignBytes []byte
 }

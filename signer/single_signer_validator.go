@@ -6,14 +6,19 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/config"
+	"github.com/strangelove-ventures/horcrux/pkg/connector"
+
+	"github.com/strangelove-ventures/horcrux/pkg/types"
 )
 
-var _ PrivValidator = &SingleSignerValidator{}
+var _ connector.IPrivValidator = &SingleSignerValidator{}
 
 // SingleSignerValidator guards access to an underlying PrivValidator by using mutexes
 // for each of the PrivValidator interface functions
 type SingleSignerValidator struct {
-	config     *RuntimeConfig
+	config     *config.RuntimeConfig
 	chainState sync.Map
 }
 
@@ -29,7 +34,7 @@ type SingleSignerChainState struct {
 
 // NewSingleSignerValidator constructs a validator for single-sign mode (not recommended).
 // NewThresholdValidator is recommended, but single-sign mode can be used for convenience.
-func NewSingleSignerValidator(config *RuntimeConfig) *SingleSignerValidator {
+func NewSingleSignerValidator(config *config.RuntimeConfig) *SingleSignerValidator {
 	return &SingleSignerValidator{
 		config: config,
 	}
@@ -49,7 +54,7 @@ func (pv *SingleSignerValidator) GetPubKey(_ context.Context, chainID string) ([
 }
 
 // SignVote implements types.PrivValidator
-func (pv *SingleSignerValidator) Sign(_ context.Context, chainID string, block Block) ([]byte, time.Time, error) {
+func (pv *SingleSignerValidator) Sign(_ context.Context, chainID string, block types.Block) ([]byte, time.Time, error) {
 	chainState, err := pv.loadChainStateIfNecessary(chainID)
 	if err != nil {
 		return nil, block.Timestamp, err

@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner/nodesecurity"
+
 	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/client"
-	"github.com/strangelove-ventures/horcrux/signer"
 	"github.com/strangelove-ventures/horcrux/signer/multiresolver"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"google.golang.org/grpc"
@@ -24,7 +25,7 @@ func leaderElectionCmd() *cobra.Command {
 		Use:   "elect [node_id]",
 		Short: "Elect new raft leader",
 		Long: `To choose the next eligible leader, pass no argument.
-To choose a specific leader, pass that leader's ID as an argument.
+To choose a specific leader, pass that leader's Index as an argument.
 `,
 		Args: cobra.RangeArgs(0, 1),
 		Example: `horcrux elect # elect next eligible leader
@@ -116,14 +117,14 @@ func getLeaderCmd() *cobra.Command {
 					return fmt.Errorf("cosigner encryption keys not found (%s) - (%s): %w", keyFileECIES, keyFileRSA, err)
 				}
 
-				key, err := signer.LoadCosignerRSAKey(keyFileRSA)
+				key, err := nodesecurity.LoadCosignerRSAKey(keyFileRSA)
 				if err != nil {
 					return fmt.Errorf("error reading cosigner key (%s): %w", keyFileRSA, err)
 				}
 
 				id = key.ID
 			} else {
-				key, err := signer.LoadCosignerECIESKey(keyFileECIES)
+				key, err := nodesecurity.LoadCosignerECIESKey(keyFileECIES)
 				if err != nil {
 					return fmt.Errorf("error reading cosigner key (%s): %w", keyFileECIES, err)
 				}
@@ -140,7 +141,7 @@ func getLeaderCmd() *cobra.Command {
 			}
 
 			if p2pListen == "" {
-				return fmt.Errorf("cosigner config does not exist for our shard ID %d", id)
+				return fmt.Errorf("cosigner config does not exist for our shard Index %d", id)
 			}
 
 			retryOpts := []grpcretry.CallOption{

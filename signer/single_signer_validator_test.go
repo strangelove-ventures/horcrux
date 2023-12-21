@@ -1,9 +1,13 @@
-package signer
+package signer_test
 
 import (
 	"context"
 	"path/filepath"
 	"time"
+
+	"github.com/strangelove-ventures/horcrux/pkg/config"
+	"github.com/strangelove-ventures/horcrux/pkg/types"
+	"github.com/strangelove-ventures/horcrux/signer"
 
 	"os"
 	"testing"
@@ -17,6 +21,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	testChainID  = "chain-1"
+	testChainID2 = "chain-2"
+	BitSize      = 4096
+)
+
 func TestSingleSignerValidator(t *testing.T) {
 	t.Skip("TODO: fix this test when run with 'make test'")
 
@@ -26,7 +36,7 @@ func TestSingleSignerValidator(t *testing.T) {
 	err := os.MkdirAll(stateDir, 0700)
 	require.NoError(t, err)
 
-	runtimeConfig := &RuntimeConfig{
+	runtimeConfig := &config.RuntimeConfig{
 		HomeDir:  tmpDir,
 		StateDir: filepath.Join(tmpDir, "state"),
 	}
@@ -46,7 +56,7 @@ func TestSingleSignerValidator(t *testing.T) {
 	err = os.WriteFile(runtimeConfig.KeyFilePathSingleSigner("different"), marshaled, 0600)
 	require.NoError(t, err)
 
-	validator := NewSingleSignerValidator(runtimeConfig)
+	validator := signer.NewSingleSignerValidator(runtimeConfig)
 
 	proposal := cometproto.Proposal{
 		Height: 1,
@@ -54,7 +64,7 @@ func TestSingleSignerValidator(t *testing.T) {
 		Type:   cometproto.ProposalType,
 	}
 
-	block := ProposalToBlock(testChainID, &proposal)
+	block := types.ProposalToBlock(testChainID, &proposal)
 
 	ctx := context.Background()
 
@@ -66,10 +76,10 @@ func TestSingleSignerValidator(t *testing.T) {
 	proposal.Timestamp = time.Now()
 
 	// should be able to sign same proposal with only differing timestamp
-	_, _, err = validator.Sign(ctx, testChainID, ProposalToBlock(testChainID, &proposal))
+	_, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposal))
 	require.NoError(t, err)
 
-	// construct different block ID for proposal at same height as highest signed
+	// construct different block Index for proposal at same height as highest signed
 	randHash := cometrand.Bytes(tmhash.Size)
 	blockID := cometproto.BlockID{Hash: randHash,
 		PartSetHeader: cometproto.PartSetHeader{Total: 5, Hash: randHash}}
@@ -82,28 +92,28 @@ func TestSingleSignerValidator(t *testing.T) {
 	}
 
 	// should not be able to sign same proposal at same height as highest signed with different BlockID
-	_, _, err = validator.Sign(ctx, testChainID, ProposalToBlock(testChainID, &proposal))
+	_, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposal))
 	require.Error(t, err, "double sign!")
 
 	proposal.Round = 19
 
 	// should not be able to sign lower than highest signed
-	_, _, err = validator.Sign(ctx, testChainID, ProposalToBlock(testChainID, &proposal))
+	_, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposal))
 	require.Error(t, err, "double sign!")
 
-	// lower LSS should sign for different chain ID
-	_, _, err = validator.Sign(ctx, "different", ProposalToBlock("different", &proposal))
+	// lower LSS should sign for different chain Index
+	_, _, err = validator.Sign(ctx, "different", types.ProposalToBlock("different", &proposal))
 	require.NoError(t, err)
 
 	// reinitialize validator to make sure new runtime will not allow double sign
-	validator = NewSingleSignerValidator(runtimeConfig)
+	validator = signer.NewSingleSignerValidator(runtimeConfig)
 
-	_, _, err = validator.Sign(ctx, testChainID, ProposalToBlock(testChainID, &proposal))
+	_, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposal))
 	require.Error(t, err, "double sign!")
 
 	proposal.Round = 21
 
 	// signing higher block now should succeed
-	_, _, err = validator.Sign(ctx, testChainID, ProposalToBlock(testChainID, &proposal))
+	_, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposal))
 	require.NoError(t, err)
 }

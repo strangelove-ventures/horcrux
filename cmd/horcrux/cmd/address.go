@@ -10,7 +10,8 @@ import (
 	cometprivval "github.com/cometbft/cometbft/privval"
 	"github.com/cosmos/cosmos-sdk/types/bech32"
 	"github.com/spf13/cobra"
-	"github.com/strangelove-ventures/horcrux/signer"
+	cconfig "github.com/strangelove-ventures/horcrux/pkg/config"
+	"github.com/strangelove-ventures/horcrux/pkg/tss"
 )
 
 type AddressCmdOutput struct {
@@ -34,7 +35,7 @@ func addressCmd() *cobra.Command {
 			chainID := args[0]
 
 			switch config.Config.SignMode {
-			case signer.SignModeThreshold:
+			case cconfig.SignModeThreshold:
 				err := config.Config.ValidateThresholdModeConfig()
 				if err != nil {
 					return err
@@ -45,20 +46,21 @@ func addressCmd() *cobra.Command {
 					return err
 				}
 
-				key, err := signer.LoadCosignerEd25519Key(keyFile)
+				key, err := tss.LoadThresholdSignerEd25519Key(keyFile)
 				if err != nil {
-					return fmt.Errorf("error reading cosigner key: %w, check that key is present for chain ID: %s", err, chainID)
+					return fmt.Errorf("error reading threshold key: %w, check that key is present for chain id: %s", err, chainID)
 				}
 
 				pubKey = key.PubKey
-			case signer.SignModeSingle:
+			case cconfig.SignModeSingle:
 				err := config.Config.ValidateSingleSignerConfig()
 				if err != nil {
 					return err
 				}
 				keyFile, err := config.KeyFileExistsSingleSigner(chainID)
 				if err != nil {
-					return fmt.Errorf("error reading priv-validator key: %w, check that key is present for chain ID: %s", err, chainID)
+					return fmt.Errorf(
+						"error reading priv-validator key: %w, check that key is present for chain Index: %s", err, chainID)
 				}
 
 				filePV := cometprivval.LoadFilePVEmptyState(keyFile, "")
@@ -69,7 +71,7 @@ func addressCmd() *cobra.Command {
 
 			pubKeyAddress := pubKey.Address()
 
-			pubKeyJSON, err := signer.PubKey("", pubKey)
+			pubKeyJSON, err := cconfig.PubKey("", pubKey)
 			if err != nil {
 				return err
 			}
@@ -85,7 +87,7 @@ func addressCmd() *cobra.Command {
 					return err
 				}
 				output.ValConsAddress = bech32ValConsAddress
-				pubKeyBech32, err := signer.PubKey(args[1], pubKey)
+				pubKeyBech32, err := cconfig.PubKey(args[1], pubKey)
 				if err != nil {
 					return err
 				}

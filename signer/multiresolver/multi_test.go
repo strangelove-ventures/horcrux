@@ -39,7 +39,7 @@ func createListener(nodeID string, homedir string) (string, func(), error) {
 	}
 
 	grpcServer := grpc.NewServer()
-	proto.RegisterCosignerServer(grpcServer, signer.NewCosignerGRPCServer(nil, nil, s))
+	proto.RegisterCosignerServer(grpcServer, signer.NewNodeGRPCServer(nil, s))
 	transportManager.Register(grpcServer)
 
 	go func() {

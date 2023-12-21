@@ -1,4 +1,4 @@
-package signer
+package nodesecurity
 
 import (
 	"crypto"
@@ -11,10 +11,11 @@ import (
 	"os"
 
 	cometjson "github.com/cometbft/cometbft/libs/json"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
 	"golang.org/x/sync/errgroup"
 )
 
-var _ CosignerSecurity = &CosignerSecurityRSA{}
+var _ cosigner.ICosignerSecurity = &CosignerSecurityRSA{}
 
 // CosignerSecurityRSA is an implementation of CosignerSecurity using RSA for encryption and P5S for digital signature.
 type CosignerSecurityRSA struct {
@@ -22,7 +23,7 @@ type CosignerSecurityRSA struct {
 	rsaPubKeys map[int]CosignerRSAPubKey
 }
 
-// CosignerRSAKey is a cosigner's RSA public key.
+// CosignerRSAPubKey is a cosigner's RSA public key.
 type CosignerRSAPubKey struct {
 	ID        int
 	PublicKey rsa.PublicKey
@@ -122,21 +123,21 @@ func NewCosignerSecurityRSA(key CosignerRSAKey) *CosignerSecurityRSA {
 	return c
 }
 
-// GetID returns the ID of the cosigner.
+// GetID returns the Index of the cosigner.
 func (c *CosignerSecurityRSA) GetID() int {
 	return c.key.ID
 }
 
 // EncryptAndSign encrypts the nonce and signs it for authentication.
-func (c *CosignerSecurityRSA) EncryptAndSign(id int, noncePub []byte, nonceShare []byte) (CosignerNonce, error) {
-	nonce := CosignerNonce{
+func (c *CosignerSecurityRSA) EncryptAndSign(id int, noncePub []byte, nonceShare []byte) (cosigner.CosignerNonce, error) {
+	nonce := cosigner.CosignerNonce{
 		SourceID: c.key.ID,
 	}
 
-	// grab the cosigner info for the ID being requested
+	// grab the cosigner info for the Index being requested
 	pubKey, ok := c.rsaPubKeys[id]
 	if !ok {
-		return nonce, fmt.Errorf("unknown cosigner ID: %d", id)
+		return nonce, fmt.Errorf("unknown cosigner Index: %d", id)
 	}
 
 	var encryptedPub []byte
@@ -194,7 +195,7 @@ func (c *CosignerSecurityRSA) DecryptAndVerify(
 		return nil, nil, fmt.Errorf("unknown cosigner: %d", id)
 	}
 
-	digestMsg := CosignerNonce{
+	digestMsg := cosigner.CosignerNonce{
 		SourceID: id,
 		PubKey:   encryptedNoncePub,
 		Share:    encryptedNonceShare,

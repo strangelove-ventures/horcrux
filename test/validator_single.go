@@ -10,7 +10,7 @@ import (
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/cometbft/cometbft/privval"
 	"github.com/docker/docker/client"
-	"github.com/strangelove-ventures/horcrux/signer"
+	"github.com/strangelove-ventures/horcrux/pkg/config"
 	interchaintest "github.com/strangelove-ventures/interchaintest/v8"
 	"github.com/strangelove-ventures/interchaintest/v8/chain/cosmos"
 	"github.com/strangelove-ventures/interchaintest/v8/ibc"
@@ -24,7 +24,7 @@ import (
 func testChainSingleNodeAndHorcruxSingle(
 	t *testing.T,
 	totalValidators int, // total number of validators on chain (one horcrux + single node for the rest)
-	totalSentries int, // number of sentry nodes for the single horcrux validator
+	totalSentries int, // number of sentry cosigner for the single horcrux validator
 ) {
 	ctx := context.Background()
 	cw, pubKey := startChainSingleNodeAndHorcruxSingle(ctx, t, totalValidators, totalSentries)
@@ -40,7 +40,7 @@ func startChainSingleNodeAndHorcruxSingle(
 	ctx context.Context,
 	t *testing.T,
 	totalValidators int, // total number of validators on chain (one horcrux + single node for the rest)
-	totalSentries int, // number of sentry nodes for the single horcrux validator
+	totalSentries int, // number of sentry cosigner for the single horcrux validator
 ) (*chainWrapper, crypto.PubKey) {
 	client, network := interchaintest.DockerSetup(t)
 	logger := zaptest.NewLogger(t)
@@ -84,15 +84,15 @@ func preGenesisSingleNodeAndHorcruxSingle(
 				return err
 			}
 
-			chainNodes := make(signer.ChainNodes, len(sentries))
+			chainNodes := make(config.ChainNodes, len(sentries))
 			for i, sentry := range sentries {
-				chainNodes[i] = signer.ChainNode{
+				chainNodes[i] = config.ChainNode{
 					PrivValAddr: fmt.Sprintf("tcp://%s:1234", sentry.HostName()),
 				}
 			}
 
-			config := signer.Config{
-				SignMode:   signer.SignModeSingle,
+			config := config.Config{
+				SignMode:   config.SignModeSingle,
 				ChainNodes: chainNodes,
 			}
 
@@ -118,7 +118,7 @@ func writeConfigAndKeysSingle(
 	ctx context.Context,
 	chainID string,
 	singleSigner *cosmos.SidecarProcess,
-	config signer.Config,
+	config config.Config,
 	pvKey privval.FilePVKey,
 ) error {
 	configBz, err := json.Marshal(config)

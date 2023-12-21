@@ -1,4 +1,4 @@
-package signer_test
+package config_test
 
 import (
 	"fmt"
@@ -8,15 +8,15 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/strangelove-ventures/horcrux/signer"
+	"github.com/strangelove-ventures/horcrux/pkg/config"
 	"github.com/stretchr/testify/require"
 )
 
 const testChainID = "test"
 
 func TestNodes(t *testing.T) {
-	c := signer.Config{
-		ChainNodes: signer.ChainNodes{
+	c := config.Config{
+		ChainNodes: config.ChainNodes{
 			{
 				PrivValAddr: "tcp://0.0.0.0:1234",
 			},
@@ -32,15 +32,15 @@ func TestNodes(t *testing.T) {
 func TestValidateSingleSignerConfig(t *testing.T) {
 	type testCase struct {
 		name      string
-		config    signer.Config
+		config    config.Config
 		expectErr error
 	}
 
 	testCases := []testCase{
 		{
 			name: "valid config",
-			config: signer.Config{
-				ChainNodes: []signer.ChainNode{
+			config: config.Config{
+				ChainNodes: []config.ChainNode{
 					{
 						PrivValAddr: "tcp://127.0.0.1:1234",
 					},
@@ -50,8 +50,8 @@ func TestValidateSingleSignerConfig(t *testing.T) {
 		},
 		{
 			name: "invalid node address",
-			config: signer.Config{
-				ChainNodes: []signer.ChainNode{
+			config: config.Config{
+				ChainNodes: []config.ChainNode{
 					{
 						PrivValAddr: "abc://\\invalid_addr",
 					},
@@ -75,19 +75,19 @@ func TestValidateSingleSignerConfig(t *testing.T) {
 func TestValidateThresholdModeConfig(t *testing.T) {
 	type testCase struct {
 		name      string
-		config    signer.Config
+		config    config.Config
 		expectErr error
 	}
 
 	testCases := []testCase{
 		{
 			name: "valid config",
-			config: signer.Config{
-				ThresholdModeConfig: &signer.ThresholdModeConfig{
+			config: config.Config{
+				ThresholdModeConfig: &config.ThresholdModeConfig{
 					Threshold:   2,
 					RaftTimeout: "1000ms",
 					GRPCTimeout: "1000ms",
-					Cosigners: signer.CosignersConfig{
+					Cosigners: config.CosignersConfig{
 						{
 							ShardID: 1,
 							P2PAddr: "tcp://127.0.0.1:2223",
@@ -102,7 +102,7 @@ func TestValidateThresholdModeConfig(t *testing.T) {
 						},
 					},
 				},
-				ChainNodes: []signer.ChainNode{
+				ChainNodes: []config.ChainNode{
 					{
 						PrivValAddr: "tcp://127.0.0.1:1234",
 					},
@@ -118,8 +118,8 @@ func TestValidateThresholdModeConfig(t *testing.T) {
 		},
 		{
 			name: "no cosigner config",
-			config: signer.Config{
-				ChainNodes: []signer.ChainNode{
+			config: config.Config{
+				ChainNodes: []config.ChainNode{
 					{
 						PrivValAddr: "tcp://127.0.0.1:1234",
 					},
@@ -135,12 +135,12 @@ func TestValidateThresholdModeConfig(t *testing.T) {
 		},
 		{
 			name: "invalid p2p listen",
-			config: signer.Config{
-				ThresholdModeConfig: &signer.ThresholdModeConfig{
+			config: config.Config{
+				ThresholdModeConfig: &config.ThresholdModeConfig{
 					Threshold:   2,
 					RaftTimeout: "1000ms",
 					GRPCTimeout: "1000ms",
-					Cosigners: signer.CosignersConfig{
+					Cosigners: config.CosignersConfig{
 						{
 							ShardID: 1,
 							P2PAddr: ":2222",
@@ -155,7 +155,7 @@ func TestValidateThresholdModeConfig(t *testing.T) {
 						},
 					},
 				},
-				ChainNodes: []signer.ChainNode{
+				ChainNodes: []config.ChainNode{
 					{
 						PrivValAddr: "tcp://127.0.0.1:1234",
 					},
@@ -167,7 +167,7 @@ func TestValidateThresholdModeConfig(t *testing.T) {
 					},
 				},
 			},
-			expectErr: fmt.Errorf("failed to parse cosigner (shard ID: 1) p2p address: %w", &url.Error{
+			expectErr: fmt.Errorf("failed to parse cosigner (shard Index: 1) p2p address: %w", &url.Error{
 				Op:  "parse",
 				URL: ":2222",
 				Err: fmt.Errorf("missing protocol scheme"),
@@ -175,12 +175,12 @@ func TestValidateThresholdModeConfig(t *testing.T) {
 		},
 		{
 			name: "not enough cosigners",
-			config: signer.Config{
-				ThresholdModeConfig: &signer.ThresholdModeConfig{
+			config: config.Config{
+				ThresholdModeConfig: &config.ThresholdModeConfig{
 					Threshold:   3,
 					RaftTimeout: "1000ms",
 					GRPCTimeout: "1000ms",
-					Cosigners: signer.CosignersConfig{
+					Cosigners: config.CosignersConfig{
 						{
 							ShardID: 1,
 							P2PAddr: "tcp://127.0.0.1:2222",
@@ -191,7 +191,7 @@ func TestValidateThresholdModeConfig(t *testing.T) {
 						},
 					},
 				},
-				ChainNodes: []signer.ChainNode{
+				ChainNodes: []config.ChainNode{
 					{
 						PrivValAddr: "tcp://127.0.0.1:1234",
 					},
@@ -207,12 +207,12 @@ func TestValidateThresholdModeConfig(t *testing.T) {
 		},
 		{
 			name: "invalid raft timeout",
-			config: signer.Config{
-				ThresholdModeConfig: &signer.ThresholdModeConfig{
+			config: config.Config{
+				ThresholdModeConfig: &config.ThresholdModeConfig{
 					Threshold:   2,
 					GRPCTimeout: "1000ms",
 					RaftTimeout: "1000",
-					Cosigners: signer.CosignersConfig{
+					Cosigners: config.CosignersConfig{
 						{
 							ShardID: 1,
 							P2PAddr: "tcp://127.0.0.1:2222",
@@ -227,7 +227,7 @@ func TestValidateThresholdModeConfig(t *testing.T) {
 						},
 					},
 				},
-				ChainNodes: []signer.ChainNode{
+				ChainNodes: []config.ChainNode{
 					{
 						PrivValAddr: "tcp://127.0.0.1:1234",
 					},
@@ -243,12 +243,12 @@ func TestValidateThresholdModeConfig(t *testing.T) {
 		},
 		{
 			name: "invalid grpc timeout",
-			config: signer.Config{
-				ThresholdModeConfig: &signer.ThresholdModeConfig{
+			config: config.Config{
+				ThresholdModeConfig: &config.ThresholdModeConfig{
 					Threshold:   2,
 					GRPCTimeout: "1000",
 					RaftTimeout: "1000ms",
-					Cosigners: signer.CosignersConfig{
+					Cosigners: config.CosignersConfig{
 						{
 							ShardID: 1,
 							P2PAddr: "tcp://127.0.0.1:2222",
@@ -263,7 +263,7 @@ func TestValidateThresholdModeConfig(t *testing.T) {
 						},
 					},
 				},
-				ChainNodes: []signer.ChainNode{
+				ChainNodes: []config.ChainNode{
 					{
 						PrivValAddr: "tcp://127.0.0.1:1234",
 					},
@@ -279,12 +279,12 @@ func TestValidateThresholdModeConfig(t *testing.T) {
 		},
 		{
 			name: "invalid node address",
-			config: signer.Config{
-				ThresholdModeConfig: &signer.ThresholdModeConfig{
+			config: config.Config{
+				ThresholdModeConfig: &config.ThresholdModeConfig{
 					Threshold:   2,
 					RaftTimeout: "1000ms",
 					GRPCTimeout: "1000ms",
-					Cosigners: signer.CosignersConfig{
+					Cosigners: config.CosignersConfig{
 						{
 							ShardID: 1,
 							P2PAddr: "tcp://127.0.0.1:2222",
@@ -299,7 +299,7 @@ func TestValidateThresholdModeConfig(t *testing.T) {
 						},
 					},
 				},
-				ChainNodes: []signer.ChainNode{
+				ChainNodes: []config.ChainNode{
 					{
 						PrivValAddr: "abc://\\invalid_addr",
 					},
@@ -322,7 +322,7 @@ func TestValidateThresholdModeConfig(t *testing.T) {
 
 func TestRuntimeConfigKeyFilePath(t *testing.T) {
 	dir := t.TempDir()
-	c := signer.RuntimeConfig{
+	c := config.RuntimeConfig{
 		HomeDir: dir,
 	}
 
@@ -336,7 +336,7 @@ func TestRuntimeConfigKeyFilePath(t *testing.T) {
 
 func TestRuntimeConfigPrivValStateFile(t *testing.T) {
 	dir := t.TempDir()
-	c := signer.RuntimeConfig{
+	c := config.RuntimeConfig{
 		StateDir: dir,
 	}
 
@@ -346,15 +346,15 @@ func TestRuntimeConfigPrivValStateFile(t *testing.T) {
 func TestRuntimeConfigWriteConfigFile(t *testing.T) {
 	dir := t.TempDir()
 	configFile := filepath.Join(dir, "config.yaml")
-	c := signer.RuntimeConfig{
+	c := config.RuntimeConfig{
 		ConfigFile: configFile,
-		Config: signer.Config{
-			SignMode: signer.SignModeThreshold,
-			ThresholdModeConfig: &signer.ThresholdModeConfig{
+		Config: config.Config{
+			SignMode: config.SignModeThreshold,
+			ThresholdModeConfig: &config.ThresholdModeConfig{
 				Threshold:   2,
 				RaftTimeout: "1000ms",
 				GRPCTimeout: "1000ms",
-				Cosigners: signer.CosignersConfig{
+				Cosigners: config.CosignersConfig{
 					{
 						ShardID: 1,
 						P2PAddr: "tcp://127.0.0.1:2222",
@@ -369,7 +369,7 @@ func TestRuntimeConfigWriteConfigFile(t *testing.T) {
 					},
 				},
 			},
-			ChainNodes: []signer.ChainNode{
+			ChainNodes: []config.ChainNode{
 				{
 					PrivValAddr: "tcp://127.0.0.1:1234",
 				},
@@ -409,7 +409,7 @@ grpcAddr: ""
 
 func TestRuntimeConfigKeyFileExists(t *testing.T) {
 	dir := t.TempDir()
-	c := signer.RuntimeConfig{
+	c := config.RuntimeConfig{
 		HomeDir: dir,
 	}
 
@@ -455,11 +455,11 @@ func TestRuntimeConfigKeyFileExists(t *testing.T) {
 }
 
 func TestThresholdModeConfigLeaderElectMultiAddress(t *testing.T) {
-	c := &signer.ThresholdModeConfig{
+	c := &config.ThresholdModeConfig{
 		Threshold:   2,
 		RaftTimeout: "1000ms",
 		GRPCTimeout: "1000ms",
-		Cosigners: signer.CosignersConfig{
+		Cosigners: config.CosignersConfig{
 			{
 				ShardID: 1,
 				P2PAddr: "tcp://127.0.0.1:2222",
@@ -483,13 +483,13 @@ func TestThresholdModeConfigLeaderElectMultiAddress(t *testing.T) {
 func TestCosignerRSAPubKeysConfigValidate(t *testing.T) {
 	type testCase struct {
 		name      string
-		cosigners signer.CosignersConfig
+		cosigners config.CosignersConfig
 		expectErr error
 	}
 	testCases := []testCase{
 		{
 			name: "valid config",
-			cosigners: signer.CosignersConfig{
+			cosigners: config.CosignersConfig{
 				{
 					ShardID: 1,
 					P2PAddr: "tcp://127.0.0.1:2222",
@@ -507,7 +507,7 @@ func TestCosignerRSAPubKeysConfigValidate(t *testing.T) {
 		},
 		{
 			name: "too many cosigners",
-			cosigners: signer.CosignersConfig{
+			cosigners: config.CosignersConfig{
 				{
 					ShardID: 2,
 					P2PAddr: "tcp://127.0.0.1:2223",
@@ -517,11 +517,11 @@ func TestCosignerRSAPubKeysConfigValidate(t *testing.T) {
 					P2PAddr: "tcp://127.0.0.1:2224",
 				},
 			},
-			expectErr: fmt.Errorf("cosigner shard ID 3 in args is out of range, must be between 1 and 2, inclusive"),
+			expectErr: fmt.Errorf("cosigner shard Index 3 in args is out of range, must be between 1 and 2, inclusive"),
 		},
 		{
 			name: "duplicate cosigner",
-			cosigners: signer.CosignersConfig{
+			cosigners: config.CosignersConfig{
 				{
 					ShardID: 2,
 					P2PAddr: "tcp://127.0.0.1:2223",
@@ -532,7 +532,7 @@ func TestCosignerRSAPubKeysConfigValidate(t *testing.T) {
 				},
 			},
 			expectErr: fmt.Errorf(
-				"found duplicate cosigner shard ID(s) in args: map[2:[tcp://127.0.0.1:2223 tcp://127.0.0.1:2223]]",
+				"found duplicate cosigner shard Index(s) in args: map[2:[tcp://127.0.0.1:2223 tcp://127.0.0.1:2223]]",
 			),
 		},
 	}
@@ -564,7 +564,7 @@ func TestCosignersFromFlag(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		_, err := signer.CosignersFromFlag(tc.cosigners)
+		_, err := config.CosignersFromFlag(tc.cosigners)
 		if tc.expectErr == nil {
 			require.NoError(t, err, tc.name)
 		} else {

@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/strangelove-ventures/horcrux/pkg/connector"
+
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/cometbft/cometbft/libs/service"
 	"github.com/spf13/cobra"
+	cconfig "github.com/strangelove-ventures/horcrux/pkg/config"
 	"github.com/strangelove-ventures/horcrux/signer"
 )
 
@@ -42,16 +45,16 @@ func startCmd() *cobra.Command {
 
 			acceptRisk, _ := cmd.Flags().GetBool(flagAcceptRisk)
 
-			var val signer.PrivValidator
-			var services []service.Service
+			var val connector.IPrivValidator
+			var services []service.Service // A list of all services that are running
 
 			switch config.Config.SignMode {
-			case signer.SignModeThreshold:
+			case cconfig.SignModeThreshold:
 				services, val, err = NewThresholdValidator(cmd.Context(), logger)
 				if err != nil {
 					return err
 				}
-			case signer.SignModeSingle:
+			case cconfig.SignModeSingle:
 				val, err = NewSingleSignerValidator(out, acceptRisk)
 				if err != nil {
 					return err
@@ -61,7 +64,7 @@ func startCmd() *cobra.Command {
 			}
 
 			if config.Config.GRPCAddr != "" {
-				grpcServer := signer.NewRemoteSignerGRPCServer(logger, val, config.Config.GRPCAddr)
+				grpcServer := connector.NewSentrySignerGRPCServer(logger, val, config.Config.GRPCAddr)
 				services = append(services, grpcServer)
 
 				if err := grpcServer.Start(); err != nil {
@@ -71,7 +74,7 @@ func startCmd() *cobra.Command {
 
 			go EnableDebugAndMetrics(cmd.Context(), out)
 
-			services, err = signer.StartRemoteSigners(services, logger, val, config.Config.Nodes())
+			services, err = connector.StartRemoteSigners(services, logger, val, config.Config.Nodes())
 			if err != nil {
 				return fmt.Errorf("failed to start remote signer(s): %w", err)
 			}

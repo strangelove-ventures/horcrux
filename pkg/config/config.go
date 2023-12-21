@@ -1,4 +1,4 @@
-package signer
+package config
 
 import (
 	"fmt"
@@ -25,6 +25,13 @@ type SignMode string
 const (
 	SignModeThreshold SignMode = "threshold"
 	SignModeSingle    SignMode = "single"
+
+	// Default values for the nouncecahce
+	// TODO: Is this the best way to do this?
+	DefaultGetNoncesInterval = 3 * time.Second
+	DefaultGetNoncesTimeout  = 4 * time.Second
+	DefaultNonceExpiration   = 10 * time.Second // half of the local cosigner cache expiration
+
 )
 
 // Config maps to the on-disk yaml format
@@ -99,34 +106,6 @@ type RuntimeConfig struct {
 	StateDir   string
 	PidFile    string
 	Config     Config
-}
-
-func (c RuntimeConfig) CosignerSecurityECIES() (*CosignerSecurityECIES, error) {
-	keyFile, err := c.KeyFileExistsCosignerECIES()
-	if err != nil {
-		return nil, err
-	}
-
-	key, err := LoadCosignerECIESKey(keyFile)
-	if err != nil {
-		return nil, fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
-	}
-
-	return NewCosignerSecurityECIES(key), nil
-}
-
-func (c RuntimeConfig) CosignerSecurityRSA() (*CosignerSecurityRSA, error) {
-	keyFile, err := c.KeyFileExistsCosignerRSA()
-	if err != nil {
-		return nil, err
-	}
-
-	key, err := LoadCosignerRSAKey(keyFile)
-	if err != nil {
-		return nil, fmt.Errorf("error reading cosigner key (%s): %w", keyFile, err)
-	}
-
-	return NewCosignerSecurityRSA(key), nil
 }
 
 func (c RuntimeConfig) cachedKeyDirectory() string {
@@ -242,7 +221,7 @@ type CosignersConfig []CosignerConfig
 func (cosigners CosignersConfig) Validate() error {
 	// Check IDs to make sure none are duplicated
 	if dupl := duplicateCosigners(cosigners); len(dupl) != 0 {
-		return fmt.Errorf("found duplicate cosigner shard ID(s) in args: %v", dupl)
+		return fmt.Errorf("found duplicate cosigner shard Index(s) in args: %v", dupl)
 	}
 
 	shards := len(cosigners)
@@ -250,18 +229,18 @@ func (cosigners CosignersConfig) Validate() error {
 	// Make sure that the cosigner IDs match the number of cosigners.
 	for _, cosigner := range cosigners {
 		if cosigner.ShardID < 1 || cosigner.ShardID > shards {
-			return fmt.Errorf("cosigner shard ID %d in args is out of range, must be between 1 and %d, inclusive",
+			return fmt.Errorf("cosigner shard Index %d in args is out of range, must be between 1 and %d, inclusive",
 				cosigner.ShardID, shards)
 		}
 
 		url, err := url.Parse(cosigner.P2PAddr)
 		if err != nil {
-			return fmt.Errorf("failed to parse cosigner (shard ID: %d) p2p address: %w", cosigner.ShardID, err)
+			return fmt.Errorf("failed to parse cosigner (shard Index: %d) p2p address: %w", cosigner.ShardID, err)
 		}
 
 		host, _, err := net.SplitHostPort(url.Host)
 		if err != nil {
-			return fmt.Errorf("failed to parse cosigner (shard ID: %d) host port: %w", cosigner.ShardID, err)
+			return fmt.Errorf("failed to parse cosigner (shard Index: %d) host port: %w", cosigner.ShardID, err)
 		}
 
 		if host == "0.0.0.0" {
@@ -287,7 +266,7 @@ func duplicateCosigners(cosigners []CosignerConfig) (duplicates map[int][]string
 
 	for shardID, cosigners := range idAddrs {
 		if len(cosigners) == 1 {
-			// One address per ID is correct.
+			// One address per Index is correct.
 			delete(idAddrs, shardID)
 		}
 	}

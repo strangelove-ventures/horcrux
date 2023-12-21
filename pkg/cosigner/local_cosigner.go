@@ -1,4 +1,4 @@
-package signer
+package cosigner
 
 import (
 	"context"
@@ -7,6 +7,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/strangelove-ventures/horcrux/pkg/config"
+	"github.com/strangelove-ventures/horcrux/pkg/metrics"
+	"github.com/strangelove-ventures/horcrux/pkg/tss"
+
+	"github.com/strangelove-ventures/horcrux/pkg/types"
+
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	cometlog "github.com/cometbft/cometbft/libs/log"
@@ -14,32 +20,34 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var _ Cosigner = &LocalCosigner{}
+// var _ signer.ICosigner = &LocalCosigner{}
 
 // double the CosignerNonceCache expiration so that sign requests from the leader
 // never reference nonces which have expired here in the LocalCosigner.
 const nonceExpiration = 20 * time.Second
+
+const ErrUnexpectedState = "unexpected state, metadata does not exist for U:"
 
 // LocalCosigner responds to sign requests.
 // It maintains a high watermark to avoid double-signing.
 // Signing is thread safe.
 type LocalCosigner struct {
 	logger        cometlog.Logger
-	config        *RuntimeConfig
-	security      CosignerSecurity
-	chainState    sync.Map
+	config        *config.RuntimeConfig
+	security      ICosignerSecurity
+	chainState    sync.Map // TODO: Add type so its not any?
 	address       string
 	pendingDiskWG sync.WaitGroup
 
-	nonces map[uuid.UUID]*NoncesWithExpiration
+	nonces map[uuid.UUID]*types.NoncesWithExpiration
 	// protects the nonces map
 	noncesMu sync.RWMutex
 }
 
 func NewLocalCosigner(
 	logger cometlog.Logger,
-	config *RuntimeConfig,
-	security CosignerSecurity,
+	config *config.RuntimeConfig,
+	security ICosignerSecurity,
 	address string,
 ) *LocalCosigner {
 	return &LocalCosigner{
@@ -47,16 +55,17 @@ func NewLocalCosigner(
 		config:   config,
 		security: security,
 		address:  address,
-		nonces:   make(map[uuid.UUID]*NoncesWithExpiration),
+		nonces:   make(map[uuid.UUID]*types.NoncesWithExpiration),
 	}
 }
 
+// FIX: Maybe name this something else and move the curve here as well.
 type ChainState struct {
 	// lastSignState stores the last sign state for an HRS we have fully signed
 	// incremented whenever we are asked to sign an HRS
-	lastSignState *SignState
+	lastSignState *types.SignState
 	// signer generates nonces, combines nonces, signs, and verifies signatures.
-	signer ThresholdSigner
+	signer IThresholdSigner
 }
 
 // StartNoncePruner periodically prunes nonces that have expired.
@@ -84,7 +93,7 @@ func (cosigner *LocalCosigner) pruneNonces() {
 	}
 }
 
-func (cosigner *LocalCosigner) combinedNonces(myID int, threshold uint8, uuid uuid.UUID) ([]Nonce, error) {
+func (cosigner *LocalCosigner) combinedNonces(myID int, threshold uint8, uuid uuid.UUID) ([]types.Nonce, error) {
 	cosigner.noncesMu.RLock()
 	defer cosigner.noncesMu.RUnlock()
 
@@ -93,7 +102,7 @@ func (cosigner *LocalCosigner) combinedNonces(myID int, threshold uint8, uuid uu
 		return nil, errors.New("no metadata at HRS")
 	}
 
-	combinedNonces := make([]Nonce, 0, threshold)
+	combinedNonces := make([]types.Nonce, 0, threshold)
 
 	// calculate secret and public keys
 	for _, c := range nonces.Nonces {
@@ -101,7 +110,7 @@ func (cosigner *LocalCosigner) combinedNonces(myID int, threshold uint8, uuid uu
 			continue
 		}
 
-		combinedNonces = append(combinedNonces, Nonce{
+		combinedNonces = append(combinedNonces, types.Nonce{
 			Share:  c.Shares[myID-1],
 			PubKey: c.PubKey,
 		})
@@ -114,7 +123,7 @@ func (cosigner *LocalCosigner) combinedNonces(myID int, threshold uint8, uuid uu
 // than the current high watermark. A mutex is used to avoid concurrent state updates.
 // The disk write is scheduled in a separate goroutine which will perform an atomic write.
 // pendingDiskWG is used upon termination in pendingDiskWG to ensure all writes have completed.
-func (cosigner *LocalCosigner) SaveLastSignedState(chainID string, signState SignStateConsensus) error {
+func (cosigner *LocalCosigner) SaveLastSignedState(chainID string, signState types.SignStateConsensus) error {
 	ccs, err := cosigner.getChainState(chainID)
 	if err != nil {
 		return err
@@ -126,15 +135,15 @@ func (cosigner *LocalCosigner) SaveLastSignedState(chainID string, signState Sig
 	)
 }
 
-// waitForSignStatesToFlushToDisk waits for all state file writes queued
+// WaitForSignStatesToFlushToDisk waits for all state file writes queued
 // in SaveLastSignedState to complete before termination.
-func (cosigner *LocalCosigner) waitForSignStatesToFlushToDisk() {
+func (cosigner *LocalCosigner) WaitForSignStatesToFlushToDisk() {
 	cosigner.pendingDiskWG.Wait()
 }
 
 // GetID returns the id of the cosigner
 // Implements Cosigner interface
-func (cosigner *LocalCosigner) GetID() int {
+func (cosigner *LocalCosigner) GetIndex() int {
 	return cosigner.security.GetID()
 }
 
@@ -170,11 +179,11 @@ func (cosigner *LocalCosigner) GetPubKey(chainID string) (cometcrypto.PubKey, er
 		return nil, err
 	}
 
-	return cometcryptoed25519.PubKey(ccs.signer.PubKey()), nil
+	return cometcryptoed25519.PubKey(ccs.signer.GetPubKey()), nil
 }
 
 // CombineSignatures combines partial signatures into a full signature.
-func (cosigner *LocalCosigner) CombineSignatures(chainID string, signatures []PartialSignature) ([]byte, error) {
+func (cosigner *LocalCosigner) CombineSignatures(chainID string, signatures []types.PartialSignature) ([]byte, error) {
 	ccs, err := cosigner.getChainState(chainID)
 	if err != nil {
 		return nil, err
@@ -198,7 +207,7 @@ func (cosigner *LocalCosigner) VerifySignature(chainID string, payload, signatur
 	sig := make([]byte, len(signature))
 	copy(sig, signature)
 
-	return cometcryptoed25519.PubKey(ccs.signer.PubKey()).VerifySignature(payload, sig)
+	return cometcryptoed25519.PubKey(ccs.signer.GetPubKey()).VerifySignature(payload, sig)
 }
 
 // Sign the sign request using the cosigner's shard
@@ -215,14 +224,14 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	}
 
 	// This function has multiple exit points.  Only start time can be guaranteed
-	metricsTimeKeeper.SetPreviousLocalSignStart(time.Now())
+	metrics.MetricsTimeKeeper.SetPreviousLocalSignStart(time.Now())
 
-	hrst, err := UnpackHRST(req.SignBytes)
+	hrst, err := types.UnpackHRST(req.SignBytes)
 	if err != nil {
 		return res, err
 	}
 
-	existingSignature, err := ccs.lastSignState.existingSignatureOrErrorIfRegression(hrst, req.SignBytes)
+	existingSignature, err := ccs.lastSignState.ExistingSignatureOrErrorIfRegression(hrst, req.SignBytes)
 	if err != nil {
 		return res, err
 	}
@@ -233,7 +242,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	}
 
 	nonces, err := cosigner.combinedNonces(
-		cosigner.GetID(),
+		cosigner.GetIndex(),
 		uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
 		req.UUID,
 	)
@@ -246,7 +255,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		return res, err
 	}
 
-	err = ccs.lastSignState.Save(SignStateConsensus{
+	err = ccs.lastSignState.Save(types.SignStateConsensus{
 		Height:    hrst.Height,
 		Round:     hrst.Round,
 		Step:      hrst.Step,
@@ -255,7 +264,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	}, &cosigner.pendingDiskWG)
 
 	if err != nil {
-		if _, isSameHRSError := err.(*SameHRSError); !isSameHRSError {
+		if _, isSameHRSError := err.(*types.SameHRSError); !isSameHRSError {
 			return res, err
 		}
 	}
@@ -267,16 +276,18 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	res.Signature = sig
 
 	// Note - Function may return before this line so elapsed time for Finish may be multiple block times
-	metricsTimeKeeper.SetPreviousLocalSignFinish(time.Now())
+	metrics.MetricsTimeKeeper.SetPreviousLocalSignFinish(time.Now())
 
 	return res, nil
 }
 
-func (cosigner *LocalCosigner) generateNonces() ([]Nonces, error) {
+func (cosigner *LocalCosigner) generateNonces() ([]types.Nonces, error) {
 	total := len(cosigner.config.Config.ThresholdModeConfig.Cosigners)
-	meta := make([]Nonces, total)
+	meta := make([]types.Nonces, total)
 
-	nonces, err := GenerateNonces(
+	// TODO: This should only geerate nonces for the cosigners that are online
+	// 		 actually
+	nonces, err := tss.GenerateNonces(
 		uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
 		uint8(total),
 	)
@@ -284,7 +295,7 @@ func (cosigner *LocalCosigner) generateNonces() ([]Nonces, error) {
 		return nil, err
 	}
 
-	meta[cosigner.GetID()-1] = nonces
+	meta[cosigner.GetIndex()-1] = nonces
 
 	return meta, nil
 }
@@ -298,14 +309,14 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 		return nil
 	}
 
-	signState, err := LoadOrCreateSignState(cosigner.config.CosignerStateFile(chainID))
+	signState, err := types.LoadOrCreateSignState(cosigner.config.CosignerStateFile(chainID))
 	if err != nil {
 		return err
 	}
 
-	var signer ThresholdSigner
+	var signer IThresholdSigner
 
-	signer, err = NewThresholdSignerSoft(cosigner.config, cosigner.GetID(), chainID)
+	signer, err = tss.NewThresholdSignerSoft(cosigner.config, cosigner.GetIndex(), chainID)
 	if err != nil {
 		return err
 	}
@@ -323,13 +334,13 @@ func (cosigner *LocalCosigner) GetNonces(
 	_ context.Context,
 	uuids []uuid.UUID,
 ) (CosignerUUIDNoncesMultiple, error) {
-	metricsTimeKeeper.SetPreviousLocalNonce(time.Now())
+	metrics.MetricsTimeKeeper.SetPreviousLocalNonce(time.Now())
 
 	total := len(cosigner.config.Config.ThresholdModeConfig.Cosigners)
 
 	res := make(CosignerUUIDNoncesMultiple, len(uuids))
 
-	id := cosigner.GetID()
+	id := cosigner.GetIndex()
 
 	var outerEg errgroup.Group
 	// getting nonces requires encrypting and signing for each cosigner,
@@ -390,7 +401,7 @@ func (cosigner *LocalCosigner) GetNonces(
 	return res, nil
 }
 
-func (cosigner *LocalCosigner) generateNoncesIfNecessary(uuid uuid.UUID) (*NoncesWithExpiration, error) {
+func (cosigner *LocalCosigner) generateNoncesIfNecessary(uuid uuid.UUID) (*types.NoncesWithExpiration, error) {
 	// protects the meta map
 	cosigner.noncesMu.RLock()
 	nonces, ok := cosigner.nonces[uuid]
@@ -404,7 +415,7 @@ func (cosigner *LocalCosigner) generateNoncesIfNecessary(uuid uuid.UUID) (*Nonce
 		return nil, err
 	}
 
-	res := NoncesWithExpiration{
+	res := types.NoncesWithExpiration{
 		Nonces:     newNonces,
 		Expiration: time.Now().Add(nonceExpiration),
 	}
@@ -419,12 +430,12 @@ func (cosigner *LocalCosigner) generateNoncesIfNecessary(uuid uuid.UUID) (*Nonce
 // Get the ephemeral secret part for an ephemeral share
 // The ephemeral secret part is encrypted for the receiver
 func (cosigner *LocalCosigner) getNonce(
-	meta *NoncesWithExpiration,
+	meta *types.NoncesWithExpiration,
 	peerID int,
 ) (CosignerNonce, error) {
 	zero := CosignerNonce{}
 
-	id := cosigner.GetID()
+	id := cosigner.GetIndex()
 
 	ourCosignerMeta := meta.Nonces[id-1]
 	nonce, err := cosigner.security.EncryptAndSign(peerID, ourCosignerMeta.PubKey, ourCosignerMeta.Shares[peerID-1])
@@ -434,8 +445,6 @@ func (cosigner *LocalCosigner) getNonce(
 
 	return nonce, nil
 }
-
-const errUnexpectedState = "unexpected state, metadata does not exist for U:"
 
 // setNonce stores a nonce provided by another cosigner
 func (cosigner *LocalCosigner) setNonce(uuid uuid.UUID, nonce CosignerNonce) error {
@@ -459,7 +468,7 @@ func (cosigner *LocalCosigner) setNonce(uuid uuid.UUID, nonce CosignerNonce) err
 	if !ok {
 		return fmt.Errorf(
 			"%s %s",
-			errUnexpectedState,
+			ErrUnexpectedState,
 			uuid,
 		)
 	}
@@ -468,7 +477,7 @@ func (cosigner *LocalCosigner) setNonce(uuid uuid.UUID, nonce CosignerNonce) err
 	if n.Nonces[nonce.SourceID-1].Shares == nil {
 		n.Nonces[nonce.SourceID-1].Shares = make([][]byte, len(cosigner.config.Config.ThresholdModeConfig.Cosigners))
 	}
-	n.Nonces[nonce.SourceID-1].Shares[cosigner.GetID()-1] = nonceShare
+	n.Nonces[nonce.SourceID-1].Shares[cosigner.GetIndex()-1] = nonceShare
 	n.Nonces[nonce.SourceID-1].PubKey = noncePub
 
 	return nil

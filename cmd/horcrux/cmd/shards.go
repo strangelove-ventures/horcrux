@@ -20,8 +20,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner/nodesecurity"
+	tss "github.com/strangelove-ventures/horcrux/pkg/tss"
+
 	"github.com/spf13/cobra"
-	"github.com/strangelove-ventures/horcrux/signer"
 )
 
 func createCosignerDirectoryIfNecessary(out string, id int) (string, error) {
@@ -112,7 +114,7 @@ func createCosignerEd25519ShardsCmd() *cobra.Command {
 				return nil
 			}
 
-			csKeys, err := signer.CreateCosignerEd25519ShardsFromFile(keyFile, threshold, shards)
+			csKeys, err := tss.CreateEd25519ThresholdSignShardsFromFile(keyFile, threshold, shards)
 			if err != nil {
 				return err
 			}
@@ -133,7 +135,7 @@ func createCosignerEd25519ShardsCmd() *cobra.Command {
 					return err
 				}
 				filename := filepath.Join(dir, fmt.Sprintf("%s_shard.json", chainID))
-				if err = signer.WriteCosignerEd25519ShardFile(c, filename); err != nil {
+				if err = tss.WriteCosignerEd25519ShardFile(c, filename); err != nil {
 					return err
 				}
 				fmt.Fprintf(cmd.OutOrStdout(), "Created Ed25519 Shard %s\n", filename)
@@ -150,7 +152,7 @@ func createCosignerEd25519ShardsCmd() *cobra.Command {
 	_ = cmd.MarkFlagRequired(flagThreshold)
 	f.String(flagKeyFile, "", "priv_validator_key.json file to shard")
 	_ = cmd.MarkFlagRequired(flagKeyFile)
-	f.String(flagChainID, "", "key shards will sign for this chain ID")
+	f.String(flagChainID, "", "key shards will sign for this chain Index")
 	_ = cmd.MarkFlagRequired(flagChainID)
 
 	return cmd
@@ -170,7 +172,7 @@ func createCosignerECIESShardsCmd() *cobra.Command {
 				return fmt.Errorf("shards must be greater than zero (%d): %w", shards, err)
 			}
 
-			csKeys, err := signer.CreateCosignerECIESShards(int(shards))
+			csKeys, err := nodesecurity.CreateCosignerECIESShards(int(shards))
 			if err != nil {
 				return err
 			}
@@ -191,7 +193,7 @@ func createCosignerECIESShardsCmd() *cobra.Command {
 					return err
 				}
 				filename := filepath.Join(dir, "ecies_keys.json")
-				if err = signer.WriteCosignerECIESShardFile(c, filename); err != nil {
+				if err = nodesecurity.WriteCosignerECIESShardFile(c, filename); err != nil {
 					return err
 				}
 				fmt.Fprintf(cmd.OutOrStdout(), "Created ECIES Shard %s\n", filename)
@@ -218,7 +220,7 @@ func createCosignerRSAShardsCmd() *cobra.Command {
 				return fmt.Errorf("shards must be greater than zero (%d): %w", shards, err)
 			}
 
-			csKeys, err := signer.CreateCosignerRSAShards(int(shards))
+			csKeys, err := nodesecurity.CreateCosignerRSAShards(int(shards))
 			if err != nil {
 				return err
 			}
@@ -239,7 +241,7 @@ func createCosignerRSAShardsCmd() *cobra.Command {
 					return err
 				}
 				filename := filepath.Join(dir, "rsa_keys.json")
-				if err = signer.WriteCosignerRSAShardFile(c, filename); err != nil {
+				if err = nodesecurity.WriteCosignerRSAShardFile(c, filename); err != nil {
 					return err
 				}
 				fmt.Fprintf(cmd.OutOrStdout(), "Created RSA Shard %s\n", filename)

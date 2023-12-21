@@ -1,4 +1,4 @@
-package signer
+package types
 
 import (
 	"bytes"
@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	cometbytes "github.com/cometbft/cometbft/libs/bytes"
 	cometjson "github.com/cometbft/cometbft/libs/json"
@@ -19,19 +20,19 @@ import (
 )
 
 const (
-	stepPropose   int8 = 1
-	stepPrevote   int8 = 2
-	stepPrecommit int8 = 3
-	blocksToCache      = 3
+	StepPropose   int8 = 1
+	StepPrevote   int8 = 2
+	StepPrecommit int8 = 3
+	blocksTocache      = 3
 )
 
-func signType(step int8) string {
+func SignType(step int8) string {
 	switch step {
-	case stepPropose:
+	case StepPropose:
 		return "proposal"
-	case stepPrevote:
+	case StepPrevote:
 		return "prevote"
-	case stepPrecommit:
+	case StepPrecommit:
 		return "precommit"
 	default:
 		return "unknown"
@@ -41,9 +42,9 @@ func signType(step int8) string {
 func CanonicalVoteToStep(vote *cometproto.CanonicalVote) int8 {
 	switch vote.Type {
 	case cometproto.PrevoteType:
-		return stepPrevote
+		return StepPrevote
 	case cometproto.PrecommitType:
-		return stepPrecommit
+		return StepPrecommit
 	default:
 		panic("Unknown vote type")
 	}
@@ -52,9 +53,9 @@ func CanonicalVoteToStep(vote *cometproto.CanonicalVote) int8 {
 func VoteToStep(vote *cometproto.Vote) int8 {
 	switch vote.Type {
 	case cometproto.PrevoteType:
-		return stepPrevote
+		return StepPrevote
 	case cometproto.PrecommitType:
-		return stepPrecommit
+		return StepPrecommit
 	default:
 		panic("Unknown vote type")
 	}
@@ -71,7 +72,7 @@ func VoteToBlock(chainID string, vote *cometproto.Vote) Block {
 }
 
 func ProposalToStep(_ *cometproto.Proposal) int8 {
-	return stepPropose
+	return StepPropose
 }
 
 func ProposalToBlock(chainID string, proposal *cometproto.Proposal) Block {
@@ -86,11 +87,11 @@ func ProposalToBlock(chainID string, proposal *cometproto.Proposal) Block {
 
 func StepToType(step int8) cometproto.SignedMsgType {
 	switch step {
-	case stepPropose:
+	case StepPropose:
 		return cometproto.ProposalType
-	case stepPrevote:
+	case StepPrevote:
 		return cometproto.PrevoteType
-	case stepPrecommit:
+	case StepPrecommit:
 		return cometproto.PrecommitType
 	default:
 		panic("Unknown step")
@@ -106,14 +107,57 @@ type SignState struct {
 	Signature   []byte              `json:"signature,omitempty"`
 	SignBytes   cometbytes.HexBytes `json:"signbytes,omitempty"`
 
-	filePath string
+	FilePath string
 
-	// mu protects the cache and is used for signaling with cond.
-	mu    sync.RWMutex
-	cache map[HRSKey]SignStateConsensus
-	cond  *cond.Cond
+	// mu protects the cache and is used for signaling with Cond.
+	mu    sync.RWMutex                  // private to avoid marshall issues
+	cache map[HRSKey]SignStateConsensus // private to avoid marshall issues
+	cond  *cond.Cond                    // private to avoid marshall issues
 }
 
+// GetCache is a get wrapper for [SignState.cache]
+func (signState *SignState) GetCache(hrs HRSKey) (SignStateConsensus, bool) {
+	ssc, err := signState.cache[hrs]
+	return ssc, err
+}
+
+func (signState *SignState) SetCache(hrs HRSKey, signStateConsensus SignStateConsensus) {
+	signState.cache[hrs] = signStateConsensus
+}
+
+// CondWaitWithTimeout is the same as
+// WaitWithTimeout is same as Wait() call, but will only wait up to a given timeout.
+func (signState *SignState) CondWaitWithTimeout(t time.Duration) {
+	signState.cond.WaitWithTimeout(t)
+}
+
+// CondUnlock unlocks the SignState's cond.L field.
+func (signState *SignState) CondUnlock() {
+	signState.cond.L.Unlock()
+}
+
+// CondBroadcast notifies all waiting goroutines that something has changed.
+func (signState *SignState) CondBroadcast() {
+	signState.cond.Broadcast()
+}
+
+// CondLock locks the SignState's cond.sync.locker
+func (signState *SignState) CondLock() {
+	signState.cond.L.Lock()
+}
+
+// Lock locks the SignState's mutex.
+func (signState *SignState) Lock() {
+	signState.mu.Lock()
+}
+
+// Unlock unlocks the SignState's mutex.
+func (signState *SignState) Unlock() {
+	signState.mu.Unlock()
+}
+func (signState *SignState) ExistingSignatureOrErrorIfRegression(hrst HRSTKey, signBytes []byte) ([]byte, error) {
+	return signState.existingSignatureOrErrorIfRegression(hrst, signBytes)
+}
 func (signState *SignState) existingSignatureOrErrorIfRegression(hrst HRSTKey, signBytes []byte) ([]byte, error) {
 	signState.mu.RLock()
 	defer signState.mu.RUnlock()
@@ -220,7 +264,7 @@ func (signState *SignState) cacheAndMarshal(ssc SignStateConsensus) []byte {
 	signState.cache[ssc.HRSKey()] = ssc
 
 	for hrs := range signState.cache {
-		if hrs.Height < ssc.Height-blocksToCache {
+		if hrs.Height < ssc.Height-blocksTocache {
 			delete(signState.cache, hrs)
 		}
 	}
@@ -275,7 +319,7 @@ func (signState *SignState) Save(
 
 // Save persists the FilePvLastSignState to its filePath.
 func (signState *SignState) save(jsonBytes []byte) {
-	outFile := signState.filePath
+	outFile := signState.FilePath
 	if outFile == os.DevNull {
 		return
 	}
@@ -410,7 +454,7 @@ func (signState *SignState) GetErrorIfLessOrEqual(height int64, round int64, ste
 	return nil
 }
 
-// FreshCache returns a clone of a SignState with a new cache
+// Freshcache returns a clone of a SignState with a new cache
 // including the most recent sign state.
 func (signState *SignState) FreshCache() *SignState {
 	newSignState := &SignState{
@@ -422,7 +466,7 @@ func (signState *SignState) FreshCache() *SignState {
 		SignBytes:   signState.SignBytes,
 		cache:       make(map[HRSKey]SignStateConsensus),
 
-		filePath: signState.filePath,
+		FilePath: signState.FilePath,
 	}
 
 	newSignState.cond = cond.New(&newSignState.mu)
@@ -456,7 +500,7 @@ func LoadSignState(filepath string) (*SignState, error) {
 		return nil, err
 	}
 
-	state.filePath = filepath
+	state.FilePath = filepath
 
 	return state.FreshCache(), nil
 }
@@ -472,13 +516,14 @@ func LoadOrCreateSignState(filepath string) (*SignState, error) {
 		// the only scenario where we want to create a new sign state file is when the file does not exist.
 		// Make an empty sign state and save it.
 		state := &SignState{
-			filePath: filepath,
+			FilePath: filepath,
 			cache:    make(map[HRSKey]SignStateConsensus),
 		}
 		state.cond = cond.New(&state.mu)
 
 		jsonBytes, err := cometjson.MarshalIndent(state, "", "  ")
 		if err != nil {
+			err = fmt.Errorf("\n unexpected error reading file existence (%v): %v", state, err)
 			panic(err)
 		}
 
@@ -500,9 +545,9 @@ func (signState *SignStateConsensus) OnlyDifferByTimestamp(signBytes []byte) err
 }
 
 func onlyDifferByTimestamp(step int8, signStateSignBytes, signBytes []byte) error {
-	if step == stepPropose {
+	if step == StepPropose {
 		return checkProposalOnlyDifferByTimestamp(signStateSignBytes, signBytes)
-	} else if step == stepPrevote || step == stepPrecommit {
+	} else if step == StepPrevote || step == StepPrecommit {
 		return checkVoteOnlyDifferByTimestamp(signStateSignBytes, signBytes)
 	}
 
