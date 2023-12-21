@@ -1,4 +1,4 @@
-package nodes_test
+package cosigner_test
 
 import (
 	"context"
@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/strangelove-ventures/horcrux/pkg/config"
-	"github.com/strangelove-ventures/horcrux/pkg/nodes"
-	"github.com/strangelove-ventures/horcrux/pkg/nodes/nodesecurity"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner/nodesecurity"
 	"github.com/strangelove-ventures/horcrux/pkg/thresholdTemP"
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 
@@ -44,7 +44,7 @@ func TestLocalCosignerSignRSA3of5(t *testing.T) {
 func testLocalCosignerSignRSA(t *testing.T, threshold, total uint8) {
 	t.Parallel()
 
-	security := make([]nodes.ICosignerSecurity, total)
+	security := make([]cosigner.ICosignerSecurity, total)
 
 	keys := make([]*rsa.PrivateKey, total)
 	pubKeys := make([]*rsa.PublicKey, total)
@@ -80,7 +80,7 @@ func TestLocalCosignerSignECIES3of5(t *testing.T) {
 func testLocalCosignerSignECIES(t *testing.T, threshold, total uint8) {
 	t.Parallel()
 
-	security := make([]nodes.ICosignerSecurity, total)
+	security := make([]cosigner.ICosignerSecurity, total)
 
 	keys := make([]*ecies.PrivateKey, total)
 	pubKeys := make([]*ecies.PublicKey, total)
@@ -105,7 +105,7 @@ func testLocalCosignerSignECIES(t *testing.T, threshold, total uint8) {
 	testLocalCosignerSign(t, threshold, total, security)
 }
 
-func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []nodes.ICosignerSecurity) {
+func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []cosigner.ICosignerSecurity) {
 	privateKey := cometcryptoed25519.GenPrivKey()
 
 	privKeyBytes := [64]byte{}
@@ -124,8 +124,8 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []node
 
 	tmpDir := t.TempDir()
 
-	thresholdCosigners := make([]*nodes.LocalCosigner, threshold)
-	nonces := make([][]nodes.CosignerNonce, threshold)
+	thresholdCosigners := make([]*cosigner.LocalCosigner, threshold)
+	nonces := make([][]cosigner.CosignerNonce, threshold)
 
 	now := time.Now()
 
@@ -160,7 +160,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []node
 			StateDir: cosignerDir,
 			Config:   cfg,
 		}
-		cosigner := nodes.NewLocalCosigner(
+		cosigner := cosigner.NewLocalCosigner(
 			log.NewNopLogger(),
 			runtimeconfig,
 			security[i],
@@ -200,8 +200,8 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []node
 
 	sigs := make([]types.PartialSignature, threshold)
 
-	for i, cosigner := range thresholdCosigners {
-		cosignerNonces := make([]nodes.CosignerNonce, 0, threshold-1)
+	for i, local_cosigner := range thresholdCosigners {
+		cosignerNonces := make([]cosigner.CosignerNonce, 0, threshold-1)
 
 		for j, nonce := range nonces {
 			if i == j {
@@ -209,14 +209,14 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []node
 			}
 
 			for _, n := range nonce {
-				if n.DestinationID == cosigner.GetIndex() {
+				if n.DestinationID == local_cosigner.GetIndex() {
 					cosignerNonces = append(cosignerNonces, n)
 				}
 			}
 		}
 
-		sigRes, err := cosigner.SetNoncesAndSign(ctx, nodes.CosignerSetNoncesAndSignRequest{
-			Nonces: &nodes.CosignerUUIDNonces{
+		sigRes, err := local_cosigner.SetNoncesAndSign(ctx, cosigner.CosignerSetNoncesAndSignRequest{
+			Nonces: &cosigner.CosignerUUIDNonces{
 				UUID:   u,
 				Nonces: cosignerNonces,
 			},
@@ -227,7 +227,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []node
 		require.NoError(t, err)
 
 		sigs[i] = types.PartialSignature{
-			Index:     cosigner.GetIndex(),
+			Index:     local_cosigner.GetIndex(),
 			Signature: sigRes.Signature,
 		}
 	}

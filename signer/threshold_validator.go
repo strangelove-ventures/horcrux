@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/pkg/nodes"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
 
 	"github.com/strangelove-ventures/horcrux/pkg/config"
 	"github.com/strangelove-ventures/horcrux/pkg/connector"
@@ -53,10 +53,10 @@ type ThresholdValidator struct {
 	chainState sync.Map // map[string]SignState, chainState["chainid"] -> types.SignState
 
 	// our own cosigner
-	myCosigner *nodes.LocalCosigner
+	myCosigner *cosigner.LocalCosigner // TODO Should be an interface as well.
 
 	// peer cosigners
-	peerCosigners nodes.Cosigners
+	peerCosigners ICosigners
 
 	leader Leader
 
@@ -136,11 +136,11 @@ func NewThresholdValidator(
 	threshold int,
 	grpcTimeout time.Duration,
 	maxWaitForSameBlockAttempts int,
-	myCosigner *nodes.LocalCosigner,
-	peerCosigners []nodes.Cosigner,
+	myCosigner *cosigner.LocalCosigner,
+	peerCosigners []ICosigner,
 	leader Leader,
 ) *ThresholdValidator {
-	allCosigners := make([]nodes.Cosigner, len(peerCosigners)+1)
+	allCosigners := make([]ICosigner, len(peerCosigners)+1)
 	allCosigners[0] = myCosigner
 	copy(allCosigners[1:], peerCosigners)
 
@@ -451,8 +451,8 @@ func (pv *ThresholdValidator) compareBlockSignatureAgainstHRS(
 
 func (pv *ThresholdValidator) getNoncesFallback(
 	ctx context.Context,
-) (*nodes.CosignerUUIDNonces, []nodes.Cosigner, error) {
-	nonces := make(map[nodes.Cosigner]nodes.CosignerNonces)
+) (*cosigner.CosignerUUIDNonces, []ICosigner, error) {
+	nonces := make(map[ICosigner]cosigner.CosignerNonces)
 
 	metrics.DrainedNonceCache.Inc()
 	metrics.TotalDrainedNonceCache.Inc()
@@ -464,7 +464,7 @@ func (pv *ThresholdValidator) getNoncesFallback(
 
 	u := uuid.New()
 
-	allCosigners := make([]nodes.Cosigner, len(pv.peerCosigners)+1)
+	allCosigners := make([]ICosigner, len(pv.peerCosigners)+1)
 	allCosigners[0] = pv.myCosigner
 	copy(allCosigners[1:], pv.peerCosigners)
 
@@ -478,8 +478,8 @@ func (pv *ThresholdValidator) getNoncesFallback(
 		return nil, nil, errors.New("timed out waiting for ephemeral shares")
 	}
 
-	var thresholdNonces nodes.CosignerNonces
-	thresholdCosigners := make([]nodes.Cosigner, len(nonces))
+	var thresholdNonces cosigner.CosignerNonces
+	thresholdCosigners := make([]ICosigner, len(nonces))
 	i := 0
 	for c, n := range nonces {
 		thresholdCosigners[i] = c
@@ -488,7 +488,7 @@ func (pv *ThresholdValidator) getNoncesFallback(
 		thresholdNonces = append(thresholdNonces, n...)
 	}
 
-	return &nodes.CosignerUUIDNonces{
+	return &cosigner.CosignerUUIDNonces{
 		UUID:   u,
 		Nonces: thresholdNonces,
 	}, thresholdCosigners, nil
@@ -511,9 +511,9 @@ func waitUntilCompleteOrTimeout(wg *sync.WaitGroup, timeout time.Duration) bool 
 func (pv *ThresholdValidator) waitForPeerNonces(
 	ctx context.Context,
 	u uuid.UUID,
-	peer nodes.Cosigner,
+	peer ICosigner,
 	wg *sync.WaitGroup,
-	nonces map[nodes.Cosigner]nodes.CosignerNonces,
+	nonces map[ICosigner]cosigner.CosignerNonces,
 	mu sync.Locker,
 ) {
 	peerStartTime := time.Now()
@@ -574,12 +574,12 @@ func (pv *ThresholdValidator) proxyIfNecessary(
 	)
 	metrics.TotalNotRaftLeader.Inc()
 
-	cosignerLeader := pv.peerCosigners.GetByID(leader)
+	cosignerLeader := pv.peerCosigners.GetByIndex(leader)
 	if cosignerLeader == nil {
 		return true, nil, stamp, fmt.Errorf("failed to find cosigner with id %d", leader)
 	}
 
-	signRes, err := cosignerLeader.(*nodes.RemoteCosigner).Sign(ctx, nodes.CosignerSignBlockRequest{
+	signRes, err := cosignerLeader.(*cosigner.RemoteCosigner).Sign(ctx, cosigner.CosignerSignBlockRequest{
 		ChainID: chainID,
 		Block:   &block,
 	})
@@ -646,7 +646,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 	peerStartTime := time.Now()
 
 	cosignersOrderedByFastest := pv.cosignerHealth.GetFastest()
-	cosignersForThisBlock := make([]nodes.Cosigner, pv.threshold)
+	cosignersForThisBlock := make([]ICosigner, pv.threshold)
 	cosignersForThisBlock[0] = pv.myCosigner
 	copy(cosignersForThisBlock[1:], cosignersOrderedByFastest[:pv.threshold-1])
 
@@ -668,7 +668,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 
 	nextFastestCosignerIndex := pv.threshold - 1
 	var nextFastestCosignerIndexMu sync.Mutex
-	getNextFastestCosigner := func() nodes.Cosigner {
+	getNextFastestCosigner := func() ICosigner {
 		nextFastestCosignerIndexMu.Lock()
 		defer nextFastestCosignerIndexMu.Unlock()
 		if nextFastestCosignerIndex >= len(cosignersOrderedByFastest) {
@@ -696,57 +696,57 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 	shareSignatures := make([][]byte, total)
 
 	var eg errgroup.Group
-	for _, cosigner := range cosignersForThisBlock {
-		cosigner := cosigner
+	for _, remote_cosigner := range cosignersForThisBlock {
+		remote_cosigner := remote_cosigner
 		eg.Go(func() error {
-			for cosigner != nil {
+			for remote_cosigner != nil {
 				signCtx, cancel := context.WithTimeout(ctx, pv.grpcTimeout)
 				defer cancel()
 
 				peerStartTime := time.Now()
 
 				// set peerNonces and sign in single rpc call.
-				sigRes, err := cosigner.SetNoncesAndSign(signCtx, nodes.CosignerSetNoncesAndSignRequest{
+				sigRes, err := remote_cosigner.SetNoncesAndSign(signCtx, cosigner.CosignerSetNoncesAndSignRequest{
 					ChainID:   chainID,
-					Nonces:    nonces.For(cosigner.GetIndex()),
+					Nonces:    nonces.For(remote_cosigner.GetIndex()),
 					HRST:      hrst,
 					SignBytes: signBytes,
 				})
 				if err != nil {
 					log.Error(
 						"Cosigner failed to set nonces and sign",
-						"cosigner", cosigner.GetIndex(),
+						"cosigner", remote_cosigner.GetIndex(),
 						"err", err.Error(),
 					)
 
-					if strings.Contains(err.Error(), nodes.ErrUnexpectedState) {
-						pv.nonceCache.ClearNonces(cosigner)
+					if strings.Contains(err.Error(), cosigner.ErrUnexpectedState) {
+						pv.nonceCache.ClearNonces(remote_cosigner)
 					}
 
-					if cosigner.GetIndex() == pv.myCosigner.GetIndex() {
+					if remote_cosigner.GetIndex() == pv.myCosigner.GetIndex() {
 						return err
 					}
 
 					if c := status.Code(err); c == codes.DeadlineExceeded || c == codes.NotFound || c == codes.Unavailable {
-						pv.cosignerHealth.MarkUnhealthy(cosigner)
-						pv.nonceCache.ClearNonces(cosigner)
+						pv.cosignerHealth.MarkUnhealthy(remote_cosigner)
+						pv.nonceCache.ClearNonces(remote_cosigner)
 					}
 
 					if dontIterateFastestCosigners {
-						cosigner = nil
+						remote_cosigner = nil
 						continue
 					}
 
 					// this will only work if the next cosigner has the nonces we've already decided to use for this block
 					// otherwise the sign attempt will fail
-					cosigner = getNextFastestCosigner()
+					remote_cosigner = getNextFastestCosigner()
 					continue
 				}
 
-				if cosigner != pv.myCosigner {
-					metrics.TimedCosignerSignLag.WithLabelValues(cosigner.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
+				if remote_cosigner != pv.myCosigner {
+					metrics.TimedCosignerSignLag.WithLabelValues(remote_cosigner.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
 				}
-				shareSignatures[cosigner.GetIndex()-1] = sigRes.Signature
+				shareSignatures[remote_cosigner.GetIndex()-1] = sigRes.Signature
 
 				return nil
 			}

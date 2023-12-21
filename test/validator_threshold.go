@@ -13,7 +13,7 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/strangelove-ventures/horcrux/pkg/config"
-	"github.com/strangelove-ventures/horcrux/pkg/nodes/nodesecurity"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner/nodesecurity"
 	"github.com/strangelove-ventures/horcrux/pkg/thresholdTemP"
 	interchaintest "github.com/strangelove-ventures/interchaintest/v8"
 	"github.com/strangelove-ventures/interchaintest/v8/chain/cosmos"
@@ -32,7 +32,7 @@ func testChainSingleNodeAndHorcruxThreshold(
 	totalValidators int, // total number of validators on chain (one horcrux + single node for the rest)
 	totalSigners int, // total number of signers for the single horcrux validator
 	threshold uint8, // key shard threshold, and therefore how many horcrux signers must participate to sign a block
-	totalSentries int, // number of sentry nodes for the single horcrux validator
+	totalSentries int, // number of sentry cosigner for the single horcrux validator
 	sentriesPerSigner int, // how many sentries should each horcrux signer connect to (min: 1, max: totalSentries)
 ) {
 	ctx := context.Background()
@@ -55,7 +55,7 @@ func startChainSingleNodeAndHorcruxThreshold(
 	totalValidators int, // total number of validators on chain (one horcrux + single node for the rest)
 	totalSigners int, // total number of signers for the single horcrux validator
 	threshold uint8, // key shard threshold, and therefore how many horcrux signers must participate to sign a block
-	totalSentries int, // number of sentry nodes for the single horcrux validator
+	totalSentries int, // number of sentry cosigner for the single horcrux validator
 	sentriesPerSigner int, // how many sentries should each horcrux signer connect to (min: 1, max: totalSentries)
 ) (*chainWrapper, crypto.PubKey) {
 	client, network := interchaintest.DockerSetup(t)
@@ -335,7 +335,7 @@ func getSentriesForCosignerConnection(sentries cosmos.ChainNodes, numSigners int
 			}
 		}
 
-		// Each node in the signer cluster is connected to the number of sentry nodes specified by sentriesPerSigner
+		// Each node in the signer cluster is connected to the number of sentry cosigner specified by sentriesPerSigner
 	} else if sentriesPerSigner > 1 {
 		sentriesIndex := 0
 

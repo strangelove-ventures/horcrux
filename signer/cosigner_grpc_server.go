@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/strangelove-ventures/horcrux/pkg/nodes"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
 
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 
@@ -16,7 +16,7 @@ import (
 var _ proto.CosignerServer = &CosignerGRPCServer{}
 
 type CosignerGRPCServer struct {
-	cosigner           *nodes.LocalCosigner
+	cosigner           *cosigner.LocalCosigner //Change to interface
 	thresholdValidator *ThresholdValidator
 	raftStore          *RaftStore
 	// TODO: add logger and not rely on raftStore.logger
@@ -24,7 +24,7 @@ type CosignerGRPCServer struct {
 }
 
 func NewCosignerGRPCServer(
-	cosigner *nodes.LocalCosigner,
+	cosigner *cosigner.LocalCosigner,
 	thresholdValidator *ThresholdValidator,
 	raftStore *RaftStore,
 ) *CosignerGRPCServer {
@@ -52,11 +52,11 @@ func (rpc *CosignerGRPCServer) SetNoncesAndSign(
 	ctx context.Context,
 	req *proto.SetNoncesAndSignRequest,
 ) (*proto.SetNoncesAndSignResponse, error) {
-	res, err := rpc.cosigner.SetNoncesAndSign(ctx, nodes.CosignerSetNoncesAndSignRequest{
+	res, err := rpc.cosigner.SetNoncesAndSign(ctx, cosigner.CosignerSetNoncesAndSignRequest{
 		ChainID: req.ChainID,
-		Nonces: &nodes.CosignerUUIDNonces{
+		Nonces: &cosigner.CosignerUUIDNonces{
 			UUID:   uuid.UUID(req.Uuid),
-			Nonces: nodes.CosignerNoncesFromProto(req.GetNonces()),
+			Nonces: cosigner.CosignerNoncesFromProto(req.GetNonces()),
 		},
 		HRST:      types.HRSTKeyFromProto(req.GetHrst()),
 		SignBytes: req.GetSignBytes(),

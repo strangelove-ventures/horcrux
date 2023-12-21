@@ -12,11 +12,11 @@ import (
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
-	"github.com/strangelove-ventures/horcrux/pkg/nodes"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
 	"golang.org/x/sync/errgroup"
 )
 
-var _ nodes.ICosignerSecurity = &CosignerSecurityECIES{}
+var _ cosigner.ICosignerSecurity = &CosignerSecurityECIES{}
 
 // CosignerSecurityECIES is an implementation of CosignerSecurity
 // using ECIES for encryption and ECDSA for digital signature.
@@ -138,8 +138,8 @@ func (c *CosignerSecurityECIES) GetID() int {
 
 // EncryptAndSign encrypts the nonce and signs it for authentication.
 func (c *CosignerSecurityECIES) EncryptAndSign(
-	id int, noncePub []byte, nonceShare []byte) (nodes.CosignerNonce, error) {
-	nonce := nodes.CosignerNonce{
+	id int, noncePub []byte, nonceShare []byte) (cosigner.CosignerNonce, error) {
+	nonce := cosigner.CosignerNonce{
 		SourceID: c.key.ID,
 	}
 
@@ -208,7 +208,7 @@ func (c *CosignerSecurityECIES) DecryptAndVerify(
 		return nil, nil, fmt.Errorf("unknown cosigner: %d", id)
 	}
 
-	digestMsg := nodes.CosignerNonce{
+	digestMsg := cosigner.CosignerNonce{
 		SourceID: id,
 		PubKey:   encryptedNoncePub,
 		Share:    encryptedNonceShare,

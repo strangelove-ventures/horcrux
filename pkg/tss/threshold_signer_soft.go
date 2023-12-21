@@ -13,7 +13,7 @@ import (
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
-var _ ThresholdSigner = &ThresholdSignerSoft{}
+// var _ IThresholdSigner = &ThresholdSignerSoft{}
 
 type ThresholdSignerSoft struct {
 	privateKeyShard []byte
@@ -109,6 +109,7 @@ func GenerateNonces(threshold, total uint8) (types.Nonces, error) {
 	return nonces, nil
 }
 
+// Should move to the cosigner package
 func (s *ThresholdSignerSoft) CombineSignatures(signatures []types.PartialSignature) ([]byte, error) {
 	sigIds := make([]int, len(signatures))
 	shareSigs := make([][]byte, len(signatures))

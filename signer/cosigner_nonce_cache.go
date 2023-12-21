@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/pkg/nodes"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
 
 	"github.com/strangelove-ventures/horcrux/pkg/metrics"
 
@@ -26,7 +26,7 @@ const (
 */
 type CosignerNonceCache struct {
 	logger    cometlog.Logger
-	cosigners []nodes.Cosigner
+	cosigners []ICosigner
 
 	leader Leader
 
@@ -144,13 +144,13 @@ func (nc *NonceCache) PruneNonces() int {
 }
 
 type CosignerNoncesRel struct {
-	Cosigner nodes.Cosigner
-	Nonces   nodes.CosignerNonces
+	Cosigner ICosigner
+	Nonces   cosigner.CosignerNonces
 }
 
 type CachedNonceSingle struct {
-	Cosigner nodes.Cosigner
-	Nonces   nodes.CosignerUUIDNoncesMultiple
+	Cosigner ICosigner
+	Nonces   cosigner.CosignerUUIDNoncesMultiple
 }
 
 type CachedNonce struct {
@@ -166,7 +166,7 @@ type CachedNonce struct {
 
 func NewCosignerNonceCache(
 	logger cometlog.Logger,
-	cosigners []nodes.Cosigner,
+	cosigners []ICosigner,
 	leader Leader,
 	getNoncesInterval time.Duration,
 	getNoncesTimeout time.Duration,
@@ -356,12 +356,12 @@ func (cnc *CosignerNonceCache) Start(ctx context.Context) {
 	}
 }
 
-func (cnc *CosignerNonceCache) GetNonces(fastestPeers []nodes.Cosigner) (*nodes.CosignerUUIDNonces, error) {
+func (cnc *CosignerNonceCache) GetNonces(fastestPeers []ICosigner) (*cosigner.CosignerUUIDNonces, error) {
 	cnc.cache.mu.Lock()
 	defer cnc.cache.mu.Unlock()
 CheckNoncesLoop:
 	for i, cn := range cnc.cache.cache {
-		var nonces nodes.CosignerNonces
+		var nonces cosigner.CosignerNonces
 		for _, p := range fastestPeers {
 			found := false
 			for _, n := range cn.Nonces {
@@ -386,7 +386,7 @@ CheckNoncesLoop:
 		}
 
 		// all peers found
-		return &nodes.CosignerUUIDNonces{
+		return &cosigner.CosignerUUIDNonces{
 			UUID:   cn.UUID,
 			Nonces: nonces,
 		}, nil
@@ -403,7 +403,7 @@ CheckNoncesLoop:
 	return nil, fmt.Errorf("no nonces found involving cosigners %+v", cosignerInts)
 }
 
-func (cnc *CosignerNonceCache) ClearNonces(cosigner nodes.Cosigner) {
+func (cnc *CosignerNonceCache) ClearNonces(cosigner ICosigner) {
 	cnc.cache.mu.Lock()
 	defer cnc.cache.mu.Unlock()
 	for i := 0; i < len(cnc.cache.cache); i++ {

@@ -52,7 +52,7 @@ const (
 type chainWrapper struct {
 	chain           *cosmos.CosmosChain
 	totalValidators int // total number of validators on chain at genesis
-	totalSentries   int // number of additional sentry nodes
+	totalSentries   int // number of additional sentry cosigner
 	modifyGenesis   func(cc ibc.ChainConfig, b []byte) ([]byte, error)
 	preGenesis      func(*chainWrapper) func(ibc.ChainConfig) error
 }
@@ -189,7 +189,7 @@ func getPrivvalKey(ctx context.Context, node *cosmos.ChainNode) (privval.FilePVK
 	return pvKey, nil
 }
 
-// enablePrivvalListener enables the privval listener on the given sentry nodes.
+// enablePrivvalListener enables the privval listener on the given sentry cosigner.
 func enablePrivvalListener(
 	ctx context.Context,
 	logger *zap.Logger,

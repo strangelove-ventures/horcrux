@@ -1,7 +1,7 @@
 package connector
 
 /*
-Connector is the conections between the "sentry" (consensus nodes) and the Horcrux nodes.
+Connector is the conections between the "sentry" (consensus cosigner) and the Horcrux cosigner.
 */
 import (
 	"context"

@@ -1,6 +1,6 @@
 // Provides a simple distributed key-value store. The keys and
 // associated values are changed via distributed consensus, meaning that the
-// values are changed only when a majority of nodes in the cluster agree on
+// values are changed only when a majority of cosigner in the cluster agree on
 // the new value.
 //
 // Distributed consensus is provided via the Raft algorithm, specifically the
@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/pkg/nodes"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
 
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 
@@ -56,7 +56,7 @@ type RaftStore struct {
 	RaftDir     string
 	RaftBind    string
 	RaftTimeout time.Duration
-	Cosigners   []nodes.Cosigner
+	Cosigners   []ICosigner
 
 	mu sync.Mutex
 	m  map[string]string // The key-value store for the system.
@@ -64,14 +64,14 @@ type RaftStore struct {
 	raft *raft.Raft // The consensus mechanism
 
 	logger             log.Logger
-	cosigner           *nodes.LocalCosigner
+	cosigner           *cosigner.LocalCosigner
 	thresholdValidator *ThresholdValidator
 }
 
 // New returns a new Store.
 func NewRaftStore(
 	nodeID string, directory string, bindAddress string, timeout time.Duration,
-	logger log.Logger, cosigner *nodes.LocalCosigner, cosigners []nodes.Cosigner) *RaftStore {
+	logger log.Logger, cosigner *cosigner.LocalCosigner, cosigners []ICosigner) *RaftStore {
 	cosignerRaftStore := &RaftStore{
 		NodeID:      nodeID,
 		RaftDir:     directory,

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
-	"github.com/strangelove-ventures/horcrux/pkg/nodes"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 	"github.com/stretchr/testify/require"
 )
@@ -14,7 +14,7 @@ import (
 var _ Leader = (*MockLeader)(nil)
 
 type MockThresholdValidator struct {
-	myCosigner *nodes.LocalCosigner
+	myCosigner *cosigner.LocalCosigner
 }
 
 type MockLeader struct {
@@ -46,12 +46,12 @@ func (m *MockLeader) ShareSigned(_ types.ChainSignStateConsensus) error {
 
 func TestCosignerHealth(t *testing.T) {
 
-	cosigner2 := nodes.InitRemoteCosigner(2, "", nil)
-	cosigner3 := nodes.InitRemoteCosigner(3, "", nil)
-	cosigner4 := nodes.InitRemoteCosigner(4, "", nil)
-	cosigner5 := nodes.InitRemoteCosigner(5, "", nil)
+	cosigner2 := cosigner.InitRemoteCosigner(2, "", nil)
+	cosigner3 := cosigner.InitRemoteCosigner(3, "", nil)
+	cosigner4 := cosigner.InitRemoteCosigner(4, "", nil)
+	cosigner5 := cosigner.InitRemoteCosigner(5, "", nil)
 
-	var cosigners []nodes.Cosigner
+	var cosigners []ICosigner
 	cosigners = append(cosigners, cosigner2, cosigner3, cosigner4, cosigner5)
 
 	ch := NewCosignerHealth(

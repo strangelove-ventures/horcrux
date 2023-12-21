@@ -11,11 +11,11 @@ import (
 	"os"
 
 	cometjson "github.com/cometbft/cometbft/libs/json"
-	"github.com/strangelove-ventures/horcrux/pkg/nodes"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
 	"golang.org/x/sync/errgroup"
 )
 
-var _ nodes.ICosignerSecurity = &CosignerSecurityRSA{}
+var _ cosigner.ICosignerSecurity = &CosignerSecurityRSA{}
 
 // CosignerSecurityRSA is an implementation of CosignerSecurity using RSA for encryption and P5S for digital signature.
 type CosignerSecurityRSA struct {
@@ -129,8 +129,8 @@ func (c *CosignerSecurityRSA) GetID() int {
 }
 
 // EncryptAndSign encrypts the nonce and signs it for authentication.
-func (c *CosignerSecurityRSA) EncryptAndSign(id int, noncePub []byte, nonceShare []byte) (nodes.CosignerNonce, error) {
-	nonce := nodes.CosignerNonce{
+func (c *CosignerSecurityRSA) EncryptAndSign(id int, noncePub []byte, nonceShare []byte) (cosigner.CosignerNonce, error) {
+	nonce := cosigner.CosignerNonce{
 		SourceID: c.key.ID,
 	}
 
@@ -195,7 +195,7 @@ func (c *CosignerSecurityRSA) DecryptAndVerify(
 		return nil, nil, fmt.Errorf("unknown cosigner: %d", id)
 	}
 
-	digestMsg := nodes.CosignerNonce{
+	digestMsg := cosigner.CosignerNonce{
 		SourceID: id,
 		PubKey:   encryptedNoncePub,
 		Share:    encryptedNonceShare,

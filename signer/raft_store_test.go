@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/strangelove-ventures/horcrux/pkg/config"
-	"github.com/strangelove-ventures/horcrux/pkg/nodes"
-	"github.com/strangelove-ventures/horcrux/pkg/nodes/nodesecurity"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner/nodesecurity"
 	"github.com/strangelove-ventures/horcrux/pkg/thresholdTemP"
 	"github.com/strangelove-ventures/horcrux/signer"
 
@@ -36,7 +36,7 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 		ID:           1,
 	}
 
-	cosigner := nodes.NewLocalCosigner(
+	cosigner := cosigner.NewLocalCosigner(
 		log.NewNopLogger(),
 		&config.RuntimeConfig{},
 		nodesecurity.NewCosignerSecurityECIES(

@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
-	"github.com/strangelove-ventures/horcrux/pkg/nodes/nodesecurity"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner/nodesecurity"
 
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"

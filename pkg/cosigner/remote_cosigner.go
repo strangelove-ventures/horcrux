@@ -1,4 +1,4 @@
-package nodes
+package cosigner
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-var _ Cosigner = &RemoteCosigner{}
+// var _ Cosigner = &RemoteCosigner{}
 
 // RemoteCosigner uses CosignerGRPC to request signing from a remote cosigner
 type RemoteCosigner struct {

@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/strangelove-ventures/horcrux/pkg/nodes"
-	"github.com/strangelove-ventures/horcrux/pkg/nodes/nodesecurity"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner/nodesecurity"
 
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
@@ -74,7 +74,7 @@ func TestConcurrentIterateCosignerRSA(t *testing.T) {
 		pubKeys[i] = &key.PublicKey
 	}
 
-	securities := make([]nodes.ICosignerSecurity, 3)
+	securities := make([]cosigner.ICosignerSecurity, 3)
 
 	for i := 0; i < 3; i++ {
 		securities[i] = nodesecurity.NewCosignerSecurityRSA(nodesecurity.CosignerRSAKey{

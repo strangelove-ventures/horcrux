@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 
 	cconfig "github.com/strangelove-ventures/horcrux/pkg/config"
-	"github.com/strangelove-ventures/horcrux/pkg/nodes/nodesecurity"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner/nodesecurity"
 	"github.com/strangelove-ventures/horcrux/pkg/thresholdTemP"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
@@ -45,7 +45,7 @@ type (
 		ChainID        string              `json:"chain-id" yaml:"chain-id"`
 		PrivValKeyFile *string             `json:"key-file,omitempty" yaml:"key-file,omitempty"`
 		Cosigner       *v2CosignerConfig   `json:"cosigner"  yaml:"cosigner"`
-		ChainNodes     []v2ChainNodeConfig `json:"chain-nodes,omitempty" yaml:"chain-nodes,omitempty"`
+		ChainNodes     []v2ChainNodeConfig `json:"chain-cosigner,omitempty" yaml:"chain-cosigner,omitempty"`
 		DebugAddr      string              `json:"debug-addr,omitempty" yaml:"debug-addr,omitempty"`
 	}
 

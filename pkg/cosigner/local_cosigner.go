@@ -1,4 +1,4 @@
-package nodes
+package cosigner
 
 import (
 	"context"
@@ -20,7 +20,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var _ Cosigner = &LocalCosigner{}
+// var _ signer.ICosigner = &LocalCosigner{}
 
 // double the CosignerNonceCache expiration so that sign requests from the leader
 // never reference nonces which have expired here in the LocalCosigner.
@@ -63,7 +63,7 @@ type ChainState struct {
 	// incremented whenever we are asked to sign an HRS
 	lastSignState *types.SignState
 	// signer generates nonces, combines nonces, signs, and verifies signatures.
-	signer thresholdTemP.ThresholdSigner
+	signer IThresholdSigner
 }
 
 // StartNoncePruner periodically prunes nonces that have expired.
@@ -310,7 +310,7 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 		return err
 	}
 
-	var signer thresholdTemP.ThresholdSigner
+	var signer IThresholdSigner
 
 	signer, err = thresholdTemP.NewThresholdSignerSoft(cosigner.config, cosigner.GetIndex(), chainID)
 	if err != nil {

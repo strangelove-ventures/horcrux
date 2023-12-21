@@ -10,8 +10,8 @@ import (
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	cometservice "github.com/cometbft/cometbft/libs/service"
 	cconfig "github.com/strangelove-ventures/horcrux/pkg/config"
-	"github.com/strangelove-ventures/horcrux/pkg/nodes"
-	"github.com/strangelove-ventures/horcrux/pkg/nodes/nodesecurity"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner/nodesecurity"
 	"github.com/strangelove-ventures/horcrux/signer"
 )
 
@@ -54,11 +54,11 @@ func NewThresholdValidator(
 
 	thresholdCfg := config.Config.ThresholdModeConfig
 
-	remoteCosigners := make([]nodes.Cosigner, 0, len(thresholdCfg.Cosigners)-1)
+	remoteCosigners := make([]signer.ICosigner, 0, len(thresholdCfg.Cosigners)-1)
 
 	var p2pListen string
 
-	var security nodes.ICosignerSecurity
+	var security cosigner.ICosignerSecurity
 	var eciesErr error
 	// TODO: This is really ugly and should be refactored
 	security, eciesErr = CosignerSecurityECIES(config)
@@ -72,7 +72,7 @@ func NewThresholdValidator(
 
 	for _, c := range thresholdCfg.Cosigners {
 		if c.ShardID != security.GetID() {
-			rc, err := nodes.NewRemoteCosigner(c.ShardID, c.P2PAddr)
+			rc, err := cosigner.NewRemoteCosigner(c.ShardID, c.P2PAddr)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to initialize remote cosigner: %w", err)
 			}
@@ -89,7 +89,7 @@ func NewThresholdValidator(
 		return nil, nil, fmt.Errorf("cosigner config does not exist for our shard Index %d", security.GetID())
 	}
 
-	localCosigner := nodes.NewLocalCosigner(
+	localCosigner := cosigner.NewLocalCosigner(
 		logger,
 		&config,
 		security,

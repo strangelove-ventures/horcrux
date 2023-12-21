@@ -10,7 +10,7 @@ import (
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/cometbft/cometbft/privval"
 	cometprotocrypto "github.com/cometbft/cometbft/proto/tendermint/crypto"
-	amino "github.com/tendermint/go-amino"
+	"github.com/tendermint/go-amino"
 )
 
 /*
@@ -22,12 +22,19 @@ type ISignerKey interface {
 
 // CosignerEd25519Key is a single Ed255219 key shard for an m-of-n threshold signer.
 // TODO: This should be renamed to SignerEd25519 and tbh Private shard should private.
+type PersistentEd25519Key struct {
+	pubKey       cometcrypto.PubKey // Public key of the persistent shard. Pubkey is the same for all shards.
+	privateShard []byte             //
+	index        int                // Shamir index of this shard
+}
+
 type CosignerEd25519Key struct {
 	PubKey       cometcrypto.PubKey `json:"pubKey"`
 	PrivateShard []byte             `json:"privateShard"`
 	ID           int                `json:"id"`
 }
 
+// TODO: redo to a function.
 func (key *CosignerEd25519Key) MarshalJSON() ([]byte, error) {
 	type Alias CosignerEd25519Key
 
@@ -50,6 +57,7 @@ func (key *CosignerEd25519Key) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// redo to a function
 func (key *CosignerEd25519Key) UnmarshalJSON(data []byte) error {
 	type Alias CosignerEd25519Key
 

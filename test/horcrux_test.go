@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/strangelove-ventures/horcrux/pkg/nodes/nodesecurity"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner/nodesecurity"
 
 	"github.com/cometbft/cometbft/crypto"
 	dockertypes "github.com/docker/docker/api/types"
@@ -27,61 +27,61 @@ const (
 )
 
 // Test2Of3SignerOneSentry will spin up a chain with one single-node validator and one horcrux validator
-// the horcrux validator will have three cosigner nodes with a threshold of two, and one sentry node
+// the horcrux validator will have three cosigner cosigner with a threshold of two, and one sentry node
 func Test2Of3SignerOneSentry(t *testing.T) {
 	testChainSingleNodeAndHorcruxThreshold(t, 2, 3, 2, 1, 1)
 }
 
 // Test2Of3SignerTwoSentries will spin up a chain with one single-node validator and one horcrux validator
-// the horcrux validator will have three cosigner nodes with a threshold of two, and two sentry nodes
+// the horcrux validator will have three cosigner cosigner with a threshold of two, and two sentry cosigner
 // checks that no slashing occurs
 func Test2Of3SignerTwoSentries(t *testing.T) {
 	testChainSingleNodeAndHorcruxThreshold(t, 2, 3, 2, 2, 2)
 }
 
 // Test2Of3SignerThreeSentries will spin up a chain with one single-node validator and one horcrux validator
-// the horcrux validator will have three cosigner nodes with a threshold of two, and three sentry nodes
+// the horcrux validator will have three cosigner cosigner with a threshold of two, and three sentry cosigner
 // where each cosigner connects to all sentries
 func Test2Of3SignerThreeSentries(t *testing.T) {
 	testChainSingleNodeAndHorcruxThreshold(t, 2, 3, 2, 3, 3)
 }
 
 // Test2Of3SignerThreeSentriesUniqueConnection will spin up a chain with one single-node validator and one horcrux validator
-// the horcrux validator will have three cosigner nodes with a threshold of two, and three sentry nodes
+// the horcrux validator will have three cosigner cosigner with a threshold of two, and three sentry cosigner
 // where each cosigner only connects to one sentry
 func Test2Of3SignerThreeSentriesUniqueConnection(t *testing.T) {
 	testChainSingleNodeAndHorcruxThreshold(t, 2, 3, 2, 3, 1)
 }
 
 // Test2Of3SignerOneSentry will spin up a chain with one single-node validator and one horcrux validator
-// the horcrux validator will have three cosigner nodes with a threshold of two, and one sentry node
+// the horcrux validator will have three cosigner cosigner with a threshold of two, and one sentry node
 func Test3Of5SignerOneSentry(t *testing.T) {
 	testChainSingleNodeAndHorcruxThreshold(t, 2, 5, 3, 1, 1)
 }
 
 // Test3Of5SignerTwoSentries will spin up a chain with one single-node validator and one horcrux validator
-// the horcrux validator will have five cosigner nodes with a threshold of three, and two sentry nodes
+// the horcrux validator will have five cosigner cosigner with a threshold of three, and two sentry cosigner
 // where each cosigner connects to all sentries.
 func Test3Of5SignerTwoSentries(t *testing.T) {
 	testChainSingleNodeAndHorcruxThreshold(t, 2, 5, 3, 2, 2)
 }
 
 // Test3Of5SignerFiveSentries will spin up a chain with one single-node validator and one horcrux validator
-// the horcrux validator will have five cosigner nodes with a threshold of three, and five sentry nodes
+// the horcrux validator will have five cosigner cosigner with a threshold of three, and five sentry cosigner
 // where each cosigner connects to all sentries.
 func Test3Of5SignerFiveSentries(t *testing.T) {
 	testChainSingleNodeAndHorcruxThreshold(t, 2, 5, 3, 5, 5)
 }
 
 // Test3Of5SignerFiveSentriesUniqueConnection will spin up a chain with one single-node validator and one horcrux validator
-// the horcrux validator will have three cosigner nodes with a threshold of two, and three sentry nodes
+// the horcrux validator will have three cosigner cosigner with a threshold of two, and three sentry cosigner
 // where each cosigner only connects to one sentry.
 func Test3Of5SignerFiveSentriesUniqueConnection(t *testing.T) {
 	testChainSingleNodeAndHorcruxThreshold(t, 2, 5, 3, 5, 1)
 }
 
 // Test4Of7SignerTwoSentries will spin up a chain with one single-node validator and one horcrux validator
-// the horcrux validator will have seven cosigner nodes with a threshold of four, and two sentry nodes
+// the horcrux validator will have seven cosigner cosigner with a threshold of four, and two sentry cosigner
 // where each cosigner connects to all sentries.
 func Test4Of7SignerTwoSentries(t *testing.T) {
 	testChainSingleNodeAndHorcruxThreshold(t, 2, 7, 4, 2, 2)
@@ -140,7 +140,7 @@ func TestUpgradeValidatorToHorcrux(t *testing.T) {
 	requireHealthyValidator(t, cw.chain.Validators[0], pubKey.Address())
 }
 
-// TestDownedSigners2of3 tests taking down 2 nodes at a time in the 2/3 threshold horcrux cluster for a period of time.
+// TestDownedSigners2of3 tests taking down 2 cosigner at a time in the 2/3 threshold horcrux cluster for a period of time.
 func TestDownedSigners2of3(t *testing.T) {
 	ctx := context.Background()
 
@@ -183,7 +183,7 @@ func TestDownedSigners2of3(t *testing.T) {
 	}
 }
 
-// TestDownedSigners3of5 tests taking down 2 nodes at a time in the 3/5 threshold horcrux cluster for a period of time.
+// TestDownedSigners3of5 tests taking down 2 cosigner at a time in the 3/5 threshold horcrux cluster for a period of time.
 func TestDownedSigners3of5(t *testing.T) {
 	ctx := context.Background()
 
@@ -206,7 +206,7 @@ func TestDownedSigners3of5(t *testing.T) {
 
 	cosigners := ourValidator.Sidecars
 
-	// Test taking down 2 nodes at a time in the signer cluster for a period of time
+	// Test taking down 2 cosigner at a time in the signer cluster for a period of time
 	for i := 0; i < len(cosigners); i++ {
 		cosigner1 := cosigners[i]
 		var cosigner2 *cosmos.SidecarProcess
@@ -282,7 +282,7 @@ func TestLeaderElection2of3(t *testing.T) {
 				break
 			}
 
-			// electing a specific leader can fail, but this is okay as long as all nodes agree on one leader.
+			// electing a specific leader can fail, but this is okay as long as all cosigner agree on one leader.
 			// will retry electing the specific leader in the next iteration.
 			var commonLeader int
 			for i, s := range cosigners {

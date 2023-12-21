@@ -1,15 +1,13 @@
-package nodes
+package cosigner
 
 /*
 Package signer: Cosinger is responsible for the network communication between the cosigners
 */
 import (
-	"context"
 	"time"
 
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 
-	cometcrypto "github.com/cometbft/cometbft/crypto"
 	"github.com/google/uuid"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 )
@@ -19,39 +17,6 @@ type Localcosigner interface {
 }
 type Remotecosigner interface {
 	// TODO - add methods
-}
-
-// Cosigner interface is a set of methods for an m-of-n threshold signature.
-// This interface abstracts the underlying key storage and management
-type Cosigner interface {
-	// GetIndex gets the index of the cosigner
-	// The index is the shamir index: 1, 2, etc...
-	GetIndex() int
-
-	// Get the P2P URL (GRPC and Raft)
-	GetAddress() string
-
-	// Get the combined public key
-	GetPubKey(chainID string) (cometcrypto.PubKey, error)
-
-	VerifySignature(chainID string, payload, signature []byte) bool
-
-	// Get nonces for all cosigner shards
-	GetNonces(ctx context.Context, uuids []uuid.UUID) (CosignerUUIDNoncesMultiple, error)
-
-	// Sign the requested bytes
-	SetNoncesAndSign(ctx context.Context, req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error)
-}
-
-type Cosigners []Cosigner
-
-func (cosigners Cosigners) GetByID(id int) Cosigner {
-	for _, cosigner := range cosigners {
-		if cosigner.GetIndex() == id {
-			return cosigner
-		}
-	}
-	return nil
 }
 
 // CosignerSignRequest is sent to a co-signer to obtain their signature for the SignBytes

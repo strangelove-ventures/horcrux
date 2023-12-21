@@ -24,7 +24,7 @@ import (
 func testChainSingleNodeAndHorcruxSingle(
 	t *testing.T,
 	totalValidators int, // total number of validators on chain (one horcrux + single node for the rest)
-	totalSentries int, // number of sentry nodes for the single horcrux validator
+	totalSentries int, // number of sentry cosigner for the single horcrux validator
 ) {
 	ctx := context.Background()
 	cw, pubKey := startChainSingleNodeAndHorcruxSingle(ctx, t, totalValidators, totalSentries)
@@ -40,7 +40,7 @@ func startChainSingleNodeAndHorcruxSingle(
 	ctx context.Context,
 	t *testing.T,
 	totalValidators int, // total number of validators on chain (one horcrux + single node for the rest)
-	totalSentries int, // number of sentry nodes for the single horcrux validator
+	totalSentries int, // number of sentry cosigner for the single horcrux validator
 ) (*chainWrapper, crypto.PubKey) {
 	client, network := interchaintest.DockerSetup(t)
 	logger := zaptest.NewLogger(t)

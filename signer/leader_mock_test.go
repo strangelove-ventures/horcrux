@@ -3,7 +3,7 @@ package signer_test
 import (
 	"sync"
 
-	"github.com/strangelove-ventures/horcrux/pkg/nodes"
+	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 	"github.com/strangelove-ventures/horcrux/signer"
 )
@@ -11,7 +11,7 @@ import (
 var _ signer.Leader = (*MockLeader)(nil)
 
 type MockThresholdValidator struct {
-	myCosigner *nodes.LocalCosigner
+	myCosigner *cosigner.LocalCosigner
 }
 
 type MockLeader struct {

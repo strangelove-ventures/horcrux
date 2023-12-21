@@ -5,21 +5,8 @@ import (
 	"os"
 
 	"github.com/cometbft/cometbft/privval"
-	"github.com/strangelove-ventures/horcrux/pkg/types"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
-
-// Interface for the local signer whether it's a soft sign or HSM
-type ThresholdSigner interface {
-	// GetPubKey returns the public key bytes for the combination of all cosigners.
-	GetPubKey() []byte
-
-	// Sign signs a byte payload with the provided nonces.
-	Sign(nonces []types.Nonce, payload []byte) ([]byte, error)
-
-	// CombineSignatures combines multiple partial signatures to a full signature.
-	CombineSignatures([]types.PartialSignature) ([]byte, error)
-}
 
 // LoadThresholdSignerEd25519Key loads the persistent ThresholdSignerEd25519Key from file.
 func LoadThresholdSignerEd25519Key(file string) (CosignerEd25519Key, error) {
