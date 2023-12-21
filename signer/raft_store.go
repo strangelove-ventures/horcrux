@@ -64,7 +64,7 @@ type RaftStore struct {
 	raft *raft.Raft // The consensus mechanism
 
 	logger             log.Logger
-	cosigner           *cosigner.LocalCosigner
+	mycosigner         *cosigner.LocalCosigner
 	thresholdValidator *ThresholdValidator
 }
 
@@ -79,7 +79,7 @@ func NewRaftStore(
 		RaftTimeout: timeout,
 		m:           make(map[string]string),
 		logger:      logger,
-		cosigner:    cosigner,
+		mycosigner:  cosigner,
 		Cosigners:   cosigners,
 	}
 
@@ -89,6 +89,7 @@ func NewRaftStore(
 
 func (s *RaftStore) SetThresholdValidator(thresholdValidator *ThresholdValidator) {
 	s.thresholdValidator = thresholdValidator
+	s.thresholdValidator.MyCosigner = s.mycosigner // TODO: Refactor out the use of cosigner.
 }
 
 func (s *RaftStore) init() error {
