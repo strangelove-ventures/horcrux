@@ -26,7 +26,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-var _ connector.PrivValidator = &ThresholdValidator{}
+var _ connector.IPrivValidator = &ThresholdValidator{}
 
 // TODO: Must be a better way to do this?
 type nodecacheconfigs struct {
@@ -43,6 +43,7 @@ func nodecacheconfig() nodecacheconfigs {
 	}
 }
 
+// ThresholdValidator is the server that responds to sign requests from the "sentry"
 type ThresholdValidator struct {
 	config *config.RuntimeConfig
 
@@ -53,10 +54,10 @@ type ThresholdValidator struct {
 	chainState sync.Map // map[string]SignState, chainState["chainid"] -> types.SignState
 
 	// our own cosigner
-	myCosigner *cosigner.LocalCosigner // TODO Should be an interface as well.
+	MyCosigner *cosigner.LocalCosigner // TODO Should be an interface as well.
 
 	// peer cosigners
-	peerCosigners ICosigners
+	peerCosigners ICosigners // "i.e clients to call"
 
 	leader Leader
 
@@ -165,7 +166,7 @@ func NewThresholdValidator(
 		threshold:                   threshold,
 		grpcTimeout:                 grpcTimeout,
 		maxWaitForSameBlockAttempts: maxWaitForSameBlockAttempts,
-		myCosigner:                  myCosigner,
+		MyCosigner:                  myCosigner,
 		peerCosigners:               peerCosigners,
 		leader:                      leader,
 		cosignerHealth:              NewCosignerHealth(logger, peerCosigners, leader),
@@ -181,7 +182,7 @@ func (pv *ThresholdValidator) Start(ctx context.Context) error {
 
 	go pv.nonceCache.Start(ctx)
 
-	go pv.myCosigner.StartNoncePruner(ctx)
+	go pv.MyCosigner.StartNoncePruner(ctx)
 
 	return nil
 }
@@ -199,7 +200,7 @@ func (pv *ThresholdValidator) SaveLastSignedState(chainID string, signState type
 }
 
 func (pv *ThresholdValidator) mustLoadChainState(chainID string) ChainSignState {
-	cs, ok := pv.chainState.Load(chainID)
+	cs, ok := pv.chainState.Load(chainID) //
 	if !ok {
 		panic(fmt.Errorf("failed to load chain state for %s", chainID))
 	}
@@ -338,13 +339,13 @@ func (pv *ThresholdValidator) Stop() {
 func (pv *ThresholdValidator) waitForSignStatesToFlushToDisk() {
 	pv.pendingDiskWG.Wait()
 
-	pv.myCosigner.WaitForSignStatesToFlushToDisk()
+	pv.MyCosigner.WaitForSignStatesToFlushToDisk()
 }
 
 // GetPubKey returns the public key of the validator.
 // Implements PrivValidator.
 func (pv *ThresholdValidator) GetPubKey(_ context.Context, chainID string) ([]byte, error) {
-	pubKey, err := pv.myCosigner.GetPubKey(chainID)
+	pubKey, err := pv.MyCosigner.GetPubKey(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -372,7 +373,7 @@ func (pv *ThresholdValidator) LoadSignStateIfNecessary(chainID string) error {
 		lastSignStateInitiatedMutex: &sync.Mutex{},
 	})
 
-	return pv.myCosigner.LoadSignStateIfNecessary(chainID)
+	return pv.MyCosigner.LoadSignStateIfNecessary(chainID)
 }
 
 // getExistingBlockSignature returns the existing block signature and no error if the signature is valid for the block.
@@ -388,7 +389,7 @@ func (pv *ThresholdValidator) getExistingBlockSignature(chainID string, block *t
 	}
 
 	// signature does not exist in cache, so compare against latest signed block.
-	return nil, block.Timestamp, pv.compareBlockSignatureAgainstHRS(chainID, block, latestBlock)
+	return nil, block.Timestamp, compareBlockSignatureAgainstHRS(pv, chainID, block, latestBlock)
 }
 
 // compareBlockSignatureAgainstSSC compares a block's HRS against a cached signature.
@@ -408,7 +409,7 @@ func (pv *ThresholdValidator) compareBlockSignatureAgainstSSC(
 ) ([]byte, time.Time, error) {
 	stamp, signBytes := block.Timestamp, block.SignBytes
 
-	if err := pv.compareBlockSignatureAgainstHRS(chainID, block, existingSignature.HRSKey()); err != nil {
+	if err := compareBlockSignatureAgainstHRS(pv, chainID, block, existingSignature.HRSKey()); err != nil {
 		if _, ok := err.(*metrics.SameBlockError); !ok {
 			return nil, stamp, err
 		}
@@ -431,7 +432,8 @@ func (pv *ThresholdValidator) compareBlockSignatureAgainstSSC(
 // compareBlockSignatureAgainstHRS returns a BeyondBlockError if the hrs is greater than the
 // block. It returns a StillWaitingForBlockError if the hrs is less than the block. If returns nil if the hrs is
 // equal to the block.
-func (pv *ThresholdValidator) compareBlockSignatureAgainstHRS(
+func compareBlockSignatureAgainstHRS(
+	pv *ThresholdValidator,
 	chainID string,
 	block *types.Block,
 	hrs types.HRSKey,
@@ -465,7 +467,7 @@ func (pv *ThresholdValidator) getNoncesFallback(
 	u := uuid.New()
 
 	allCosigners := make([]ICosigner, len(pv.peerCosigners)+1)
-	allCosigners[0] = pv.myCosigner
+	allCosigners[0] = pv.MyCosigner
 	copy(allCosigners[1:], pv.peerCosigners)
 
 	for _, c := range allCosigners {
@@ -562,7 +564,7 @@ func (pv *ThresholdValidator) proxyIfNecessary(
 		return true, nil, stamp, fmt.Errorf("timed out waiting for raft leader")
 	}
 
-	if leader == pv.myCosigner.GetIndex() {
+	if leader == pv.MyCosigner.GetIndex() {
 		return false, nil, time.Time{}, nil
 	}
 
@@ -647,7 +649,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 
 	cosignersOrderedByFastest := pv.cosignerHealth.GetFastest()
 	cosignersForThisBlock := make([]ICosigner, pv.threshold)
-	cosignersForThisBlock[0] = pv.myCosigner
+	cosignersForThisBlock[0] = pv.MyCosigner
 	copy(cosignersForThisBlock[1:], cosignersOrderedByFastest[:pv.threshold-1])
 
 	nonces, err := pv.nonceCache.GetNonces(cosignersForThisBlock)
@@ -723,7 +725,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 						pv.nonceCache.ClearNonces(remote_cosigner)
 					}
 
-					if remote_cosigner.GetIndex() == pv.myCosigner.GetIndex() {
+					if remote_cosigner.GetIndex() == pv.MyCosigner.GetIndex() {
 						return err
 					}
 
@@ -743,7 +745,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 					continue
 				}
 
-				if remote_cosigner != pv.myCosigner {
+				if remote_cosigner != pv.MyCosigner {
 					metrics.TimedCosignerSignLag.WithLabelValues(remote_cosigner.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
 				}
 				shareSignatures[remote_cosigner.GetIndex()-1] = sigRes.Signature
@@ -786,14 +788,14 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 	}
 
 	// assemble into final signature
-	signature, err := pv.myCosigner.CombineSignatures(chainID, shareSigs)
+	signature, err := pv.MyCosigner.CombineSignatures(chainID, shareSigs)
 	if err != nil {
 		pv.notifyBlockSignError(chainID, block.HRSKey(), signBytes)
 		return nil, stamp, fmt.Errorf("error combining signatures: %w", err)
 	}
 
 	// verify the combined signature before saving to watermark
-	if !pv.myCosigner.VerifySignature(chainID, signBytes, signature) {
+	if !pv.MyCosigner.VerifySignature(chainID, signBytes, signature) {
 		metrics.TotalInvalidSignature.Inc()
 
 		pv.notifyBlockSignError(chainID, block.HRSKey(), signBytes)

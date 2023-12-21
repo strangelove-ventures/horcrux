@@ -26,6 +26,8 @@ import (
 // never reference nonces which have expired here in the LocalCosigner.
 const nonceExpiration = 20 * time.Second
 
+const ErrUnexpectedState = "unexpected state, metadata does not exist for U:"
+
 // LocalCosigner responds to sign requests.
 // It maintains a high watermark to avoid double-signing.
 // Signing is thread safe.
@@ -283,6 +285,8 @@ func (cosigner *LocalCosigner) generateNonces() ([]types.Nonces, error) {
 	total := len(cosigner.config.Config.ThresholdModeConfig.Cosigners)
 	meta := make([]types.Nonces, total)
 
+	// TODO: This should only geerate nonces for the cosigners that are online
+	// 		 actually
 	nonces, err := tss.GenerateNonces(
 		uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
 		uint8(total),
@@ -441,8 +445,6 @@ func (cosigner *LocalCosigner) getNonce(
 
 	return nonce, nil
 }
-
-const ErrUnexpectedState = "unexpected state, metadata does not exist for U:"
 
 // setNonce stores a nonce provided by another cosigner
 func (cosigner *LocalCosigner) setNonce(uuid uuid.UUID, nonce CosignerNonce) error {

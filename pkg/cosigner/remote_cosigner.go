@@ -16,11 +16,12 @@ import (
 // var _ Cosigner = &RemoteCosigner{}
 
 // RemoteCosigner uses CosignerGRPC to request signing from a remote cosigner
+// Remote Cosigner are the CLIENT!
 type RemoteCosigner struct {
 	id      int
 	address string
 
-	Client proto.CosignerClient
+	Client proto.CosignerClient // GRPC Client
 }
 
 // Placeholder function because of testing

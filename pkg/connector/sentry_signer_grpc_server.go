@@ -17,12 +17,14 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-var _ proto.RemoteSignerServer = &RemoteSignerGRPCServer{}
+var _ proto.RemoteSignerServer = &SentrySignerGRPCServer{}
 
-type RemoteSignerGRPCServer struct {
+// SentrySignerGRPCServer is the server that listens for signing requests from the "sentry"
+// Sentry -> SentrySignerGRPCServer -> Sentry
+type SentrySignerGRPCServer struct {
 	cometservice.BaseService
 
-	validator  PrivValidator
+	validator  IPrivValidator
 	logger     cometlog.Logger
 	listenAddr string
 
@@ -31,12 +33,12 @@ type RemoteSignerGRPCServer struct {
 	proto.UnimplementedRemoteSignerServer
 }
 
-func NewRemoteSignerGRPCServer(
+func NewSentrySignerGRPCServer(
 	logger cometlog.Logger,
-	validator PrivValidator,
+	validator IPrivValidator,
 	listenAddr string,
-) *RemoteSignerGRPCServer {
-	s := &RemoteSignerGRPCServer{
+) *SentrySignerGRPCServer {
+	s := &SentrySignerGRPCServer{
 		validator:  validator,
 		logger:     logger,
 		listenAddr: listenAddr,
@@ -45,7 +47,7 @@ func NewRemoteSignerGRPCServer(
 	return s
 }
 
-func (s *RemoteSignerGRPCServer) OnStart() error {
+func (s *SentrySignerGRPCServer) OnStart() error {
 	s.logger.Info("Remote Signer GRPC Listening", "address", s.listenAddr)
 	sock, err := net.Listen("tcp", s.listenAddr)
 	if err != nil {
@@ -57,11 +59,11 @@ func (s *RemoteSignerGRPCServer) OnStart() error {
 	return s.server.Serve(sock)
 }
 
-func (s *RemoteSignerGRPCServer) OnStop() {
+func (s *SentrySignerGRPCServer) OnStop() {
 	s.server.GracefulStop()
 }
 
-func (s *RemoteSignerGRPCServer) PubKey(ctx context.Context, req *proto.PubKeyRequest) (*proto.PubKeyResponse, error) {
+func (s *SentrySignerGRPCServer) PubKey(ctx context.Context, req *proto.PubKeyRequest) (*proto.PubKeyResponse, error) {
 	chainID := req.ChainId
 
 	metrics.TotalPubKeyRequests.WithLabelValues(chainID).Inc()
@@ -81,7 +83,7 @@ func (s *RemoteSignerGRPCServer) PubKey(ctx context.Context, req *proto.PubKeyRe
 	}, nil
 }
 
-func (s *RemoteSignerGRPCServer) Sign(
+func (s *SentrySignerGRPCServer) Sign(
 	ctx context.Context,
 	req *proto.SignBlockRequest,
 ) (*proto.SignBlockResponse, error) {
@@ -101,7 +103,7 @@ func (s *RemoteSignerGRPCServer) Sign(
 func signAndTrack(
 	ctx context.Context,
 	logger cometlog.Logger,
-	validator PrivValidator,
+	validator IPrivValidator,
 	chainID string,
 	block types.Block,
 ) ([]byte, time.Time, error) {
@@ -177,8 +179,8 @@ func signAndTrack(
 		} else {
 			metrics.MissedPrecommits.WithLabelValues(chainID).Set(0)
 		}
-		metrics.PreviousPrecommitHeight = block.Height // remember last PrecommitHeight
 
+		metrics.PreviousPrecommitHeight = block.Height // remember last PrecommitHeight
 		metrics.MetricsTimeKeeper.SetPreviousPrecommit(time.Now())
 
 		metrics.LastPrecommitHeight.WithLabelValues(chainID).Set(float64(block.Height))

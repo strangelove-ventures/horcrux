@@ -1,7 +1,7 @@
 package connector
 
 /*
-Connector is the conections between the "sentry" (consensus cosigner) and the Horcrux cosigner.
+Connector is the conections between the "sentry" (consensus cosigner) and the Horcrux node.
 */
 import (
 	"context"
@@ -26,38 +26,30 @@ import (
 
 const connRetrySec = 2
 
-// PrivValidator is a wrapper for tendermint PrivValidator,
-// with additional Stop method for safe shutdown.
-type PrivValidator interface {
-	Sign(ctx context.Context, chainID string, block types.Block) ([]byte, time.Time, error)
-	GetPubKey(ctx context.Context, chainID string) ([]byte, error)
-	Stop()
-}
-
-// ReconnRemoteSigner dials using its dialer and responds to any
+// ReconnRemoteSentry dials using its dialer and responds to any
 // signature requests using its privVal.
-type ReconnRemoteSigner struct {
+type ReconnRemoteSentry struct {
 	cometservice.BaseService
 
 	address string
 	privKey cometcryptoed25519.PrivKey
-	privVal PrivValidator
+	privVal IPrivValidator // Responds to signature requests from the sentry
 
 	dialer net.Dialer
 }
 
-// NewReconnRemoteSigner return a ReconnRemoteSigner that will dial using the given
+// NewReconnRemoteSentry return a ReconnRemoteSigner that will dial using the given
 // dialer and respond to any signature requests over the connection
 // using the given privVal.
 //
 // If the connection is broken, the ReconnRemoteSigner will attempt to reconnect.
-func NewReconnRemoteSigner(
+func NewReconnRemoteSentry(
 	address string,
 	logger cometlog.Logger,
-	privVal PrivValidator,
+	privVal IPrivValidator,
 	dialer net.Dialer,
-) *ReconnRemoteSigner {
-	rs := &ReconnRemoteSigner{
+) *ReconnRemoteSentry {
+	rs := &ReconnRemoteSentry{
 		address: address,
 		privVal: privVal,
 		dialer:  dialer,
@@ -69,17 +61,17 @@ func NewReconnRemoteSigner(
 }
 
 // OnStart implements cmn.Service.
-func (rs *ReconnRemoteSigner) OnStart() error {
+func (rs *ReconnRemoteSentry) OnStart() error {
 	go rs.loop(context.Background())
 	return nil
 }
 
 // OnStop implements cmn.Service.
-func (rs *ReconnRemoteSigner) OnStop() {
+func (rs *ReconnRemoteSentry) OnStop() {
 	rs.privVal.Stop()
 }
 
-func (rs *ReconnRemoteSigner) establishConnection(ctx context.Context) (net.Conn, error) {
+func (rs *ReconnRemoteSentry) establishConnection(ctx context.Context) (net.Conn, error) {
 	ctx, cancel := context.WithTimeout(ctx, connRetrySec*time.Second)
 	defer cancel()
 
@@ -99,7 +91,7 @@ func (rs *ReconnRemoteSigner) establishConnection(ctx context.Context) (net.Conn
 }
 
 // main loop for ReconnRemoteSigner
-func (rs *ReconnRemoteSigner) loop(ctx context.Context) {
+func (rs *ReconnRemoteSentry) loop(ctx context.Context) {
 	var conn net.Conn
 	for {
 		if !rs.IsRunning() {
@@ -171,7 +163,7 @@ func (rs *ReconnRemoteSigner) loop(ctx context.Context) {
 	}
 }
 
-func (rs *ReconnRemoteSigner) handleRequest(req cometprotoprivval.Message) cometprotoprivval.Message {
+func (rs *ReconnRemoteSentry) handleRequest(req cometprotoprivval.Message) cometprotoprivval.Message {
 	switch typedReq := req.Sum.(type) {
 	case *cometprotoprivval.Message_SignVoteRequest:
 		return rs.handleSignVoteRequest(typedReq.SignVoteRequest.ChainId, typedReq.SignVoteRequest.Vote)
@@ -187,7 +179,7 @@ func (rs *ReconnRemoteSigner) handleRequest(req cometprotoprivval.Message) comet
 	}
 }
 
-func (rs *ReconnRemoteSigner) handleSignVoteRequest(
+func (rs *ReconnRemoteSentry) handleSignVoteRequest(
 	chainID string, vote *cometproto.Vote) cometprotoprivval.Message {
 	msgSum := &cometprotoprivval.Message_SignedVoteResponse{
 		SignedVoteResponse: &cometprotoprivval.SignedVoteResponse{
@@ -207,7 +199,7 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(
 	return cometprotoprivval.Message{Sum: msgSum}
 }
 
-func (rs *ReconnRemoteSigner) handleSignProposalRequest(
+func (rs *ReconnRemoteSentry) handleSignProposalRequest(
 	chainID string,
 	proposal *cometproto.Proposal,
 ) cometprotoprivval.Message {
@@ -235,7 +227,7 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(
 	return cometprotoprivval.Message{Sum: msgSum}
 }
 
-func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) cometprotoprivval.Message {
+func (rs *ReconnRemoteSentry) handlePubKeyRequest(chainID string) cometprotoprivval.Message {
 	metrics.TotalPubKeyRequests.WithLabelValues(chainID).Inc()
 	msgSum := &cometprotoprivval.Message_PubKeyResponse{PubKeyResponse: &cometprotoprivval.PubKeyResponse{
 		PubKey: cometprotocrypto.PublicKey{},
@@ -268,7 +260,7 @@ func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) cometprotopriv
 	return cometprotoprivval.Message{Sum: msgSum}
 }
 
-func (rs *ReconnRemoteSigner) handlePingRequest() cometprotoprivval.Message {
+func (rs *ReconnRemoteSentry) handlePingRequest() cometprotoprivval.Message {
 	return cometprotoprivval.Message{
 		Sum: &cometprotoprivval.Message_PingResponse{
 			PingResponse: &cometprotoprivval.PingResponse{},
@@ -289,7 +281,7 @@ func getRemoteSignerError(err error) *cometprotoprivval.RemoteSignerError {
 func StartRemoteSigners(
 	services []cometservice.Service,
 	logger cometlog.Logger,
-	privVal PrivValidator,
+	privVal IPrivValidator,
 	nodes []string,
 ) ([]cometservice.Service, error) {
 	var err error
@@ -299,7 +291,7 @@ func StartRemoteSigners(
 		// A long timeout such as 30 seconds would cause the sentry to fail in loops
 		// Use a short timeout and dial often to connect within 3 second window
 		dialer := net.Dialer{Timeout: 2 * time.Second}
-		s := NewReconnRemoteSigner(node, logger, privVal, dialer)
+		s := NewReconnRemoteSentry(node, logger, privVal, dialer) // The 'server' that sentry connects to
 
 		err = s.Start()
 		if err != nil {
@@ -311,7 +303,7 @@ func StartRemoteSigners(
 	return services, err
 }
 
-func (rs *ReconnRemoteSigner) closeConn(conn net.Conn) {
+func (rs *ReconnRemoteSentry) closeConn(conn net.Conn) {
 	if conn == nil {
 		return
 	}

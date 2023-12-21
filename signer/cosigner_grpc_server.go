@@ -13,29 +13,29 @@ import (
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 )
 
-var _ proto.CosignerServer = &CosignerGRPCServer{}
+var _ proto.CosignerServer = &NodeGRPCServer{}
 
-type CosignerGRPCServer struct {
-	cosigner           *cosigner.LocalCosigner //Change to interface
+type NodeGRPCServer struct {
+	// cosigner           *cosigner.LocalCosigner //Change to interface
 	thresholdValidator *ThresholdValidator
 	raftStore          *RaftStore
 	// TODO: add logger and not rely on raftStore.logger
 	proto.UnimplementedCosignerServer
 }
 
-func NewCosignerGRPCServer(
-	cosigner *cosigner.LocalCosigner,
+func NewNodeGRPCServer(
+	// cosigner *cosigner.LocalCosigner,
 	thresholdValidator *ThresholdValidator,
 	raftStore *RaftStore,
-) *CosignerGRPCServer {
-	return &CosignerGRPCServer{
-		cosigner:           cosigner,
+) *NodeGRPCServer {
+	return &NodeGRPCServer{
+		//cosigner:           cosigner,
 		thresholdValidator: thresholdValidator,
 		raftStore:          raftStore,
 	}
 }
 
-func (rpc *CosignerGRPCServer) SignBlock(
+func (rpc *NodeGRPCServer) SignBlock(
 	ctx context.Context,
 	req *proto.SignBlockRequest,
 ) (*proto.SignBlockResponse, error) {
@@ -48,11 +48,11 @@ func (rpc *CosignerGRPCServer) SignBlock(
 	}, nil
 }
 
-func (rpc *CosignerGRPCServer) SetNoncesAndSign(
+func (rpc *NodeGRPCServer) SetNoncesAndSign(
 	ctx context.Context,
 	req *proto.SetNoncesAndSignRequest,
 ) (*proto.SetNoncesAndSignResponse, error) {
-	res, err := rpc.cosigner.SetNoncesAndSign(ctx, cosigner.CosignerSetNoncesAndSignRequest{
+	res, err := rpc.thresholdValidator.MyCosigner.SetNoncesAndSign(ctx, cosigner.CosignerSetNoncesAndSignRequest{
 		ChainID: req.ChainID,
 		Nonces: &cosigner.CosignerUUIDNonces{
 			UUID:   uuid.UUID(req.Uuid),
@@ -86,7 +86,7 @@ func (rpc *CosignerGRPCServer) SetNoncesAndSign(
 	}, nil
 }
 
-func (rpc *CosignerGRPCServer) GetNonces(
+func (rpc *NodeGRPCServer) GetNonces(
 	ctx context.Context,
 	req *proto.GetNoncesRequest,
 ) (*proto.GetNoncesResponse, error) {
@@ -94,7 +94,7 @@ func (rpc *CosignerGRPCServer) GetNonces(
 	for i, uuidBytes := range req.Uuids {
 		uuids[i] = uuid.UUID(uuidBytes)
 	}
-	res, err := rpc.cosigner.GetNonces(
+	res, err := rpc.thresholdValidator.MyCosigner.GetNonces(
 		ctx,
 		uuids,
 	)
@@ -108,7 +108,7 @@ func (rpc *CosignerGRPCServer) GetNonces(
 }
 
 // TODO: // TransferLeadership should not be a CosignerGRPCServer method?
-func (rpc *CosignerGRPCServer) TransferLeadership(
+func (rpc *NodeGRPCServer) TransferLeadership(
 	_ context.Context,
 	req *proto.TransferLeadershipRequest,
 ) (*proto.TransferLeadershipResponse, error) {
@@ -132,7 +132,7 @@ func (rpc *CosignerGRPCServer) TransferLeadership(
 	return &proto.TransferLeadershipResponse{}, nil
 }
 
-func (rpc *CosignerGRPCServer) GetLeader(
+func (rpc *NodeGRPCServer) GetLeader(
 	context.Context,
 	*proto.GetLeaderRequest,
 ) (*proto.GetLeaderResponse, error) {
@@ -140,6 +140,6 @@ func (rpc *CosignerGRPCServer) GetLeader(
 	return &proto.GetLeaderResponse{Leader: int32(leader)}, nil
 }
 
-func (rpc *CosignerGRPCServer) Ping(context.Context, *proto.PingRequest) (*proto.PingResponse, error) {
+func (rpc *NodeGRPCServer) Ping(context.Context, *proto.PingRequest) (*proto.PingResponse, error) {
 	return &proto.PingResponse{}, nil
 }

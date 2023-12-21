@@ -11,7 +11,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/bech32"
 	"github.com/spf13/cobra"
 	cconfig "github.com/strangelove-ventures/horcrux/pkg/config"
-	"github.com/strangelove-ventures/horcrux/pkg/thresholdTemP"
+	"github.com/strangelove-ventures/horcrux/pkg/tss"
 )
 
 type AddressCmdOutput struct {
@@ -46,7 +46,7 @@ func addressCmd() *cobra.Command {
 					return err
 				}
 
-				key, err := thresholdTemP.LoadThresholdSignerEd25519Key(keyFile)
+				key, err := tss.LoadThresholdSignerEd25519Key(keyFile)
 				if err != nil {
 					return fmt.Errorf("error reading threshold key: %w, check that key is present for chain id: %s", err, chainID)
 				}

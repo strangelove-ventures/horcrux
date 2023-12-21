@@ -44,6 +44,8 @@ func CosignerSecurityRSA(c cconfig.RuntimeConfig) (*nodesecurity.CosignerSecurit
 
 	return nodesecurity.NewCosignerSecurityRSA(key), nil
 }
+
+// TODO: Single Responsibility Principle :(
 func NewThresholdValidator(
 	ctx context.Context,
 	logger cometlog.Logger,

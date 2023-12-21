@@ -32,7 +32,6 @@ type ICosigner interface {
 }
 
 type ICosigners []ICosigner // ICosigners is a list of ICosigner's
-
 func (cosigners ICosigners) GetByIndex(id int) ICosigner {
 	// TODO: Add error handling
 	for _, cosigner := range cosigners {

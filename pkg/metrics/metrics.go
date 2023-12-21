@@ -1,5 +1,7 @@
 package metrics
 
+// Package metrics provides a set of log metrics and prometheus metrics
+
 import (
 	"sync"
 	"time"
@@ -8,7 +10,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-// Placeholders for ERRORS
+/*
+/Placeholders for ERRORS
+*/
+
 type BeyondBlockError struct {
 	Msg string
 }
@@ -86,7 +91,10 @@ var (
 	PreviousPrevoteHeight   = int64(0)
 	MetricsTimeKeeper       = newMetricsTimer()
 
-	// Prometheus Metrics
+	/*
+		Prometheus Metrics
+	*/
+
 	TotalPubKeyRequests = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "signer_total_pubkey_requests",

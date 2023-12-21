@@ -107,7 +107,8 @@ func (s *RaftStore) init() error {
 		return err
 	}
 	grpcServer := grpc.NewServer()
-	proto.RegisterCosignerServer(grpcServer, NewCosignerGRPCServer(s.cosigner, s.thresholdValidator, s))
+	// proto.RegisterCosignerServer(grpcServer, NewNodeGRPCServer(s.cosigner, s.thresholdValidator, s))
+	proto.RegisterCosignerServer(grpcServer, NewNodeGRPCServer(s.thresholdValidator, s))
 	transportManager.Register(grpcServer)
 	leaderhealth.Setup(s.raft, grpcServer, []string{"Leader"})
 	raftadmin.Register(grpcServer, s.raft)

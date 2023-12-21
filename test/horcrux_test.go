@@ -11,7 +11,7 @@ import (
 	"github.com/cometbft/cometbft/crypto"
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/strangelove-ventures/horcrux/pkg/config"
-	"github.com/strangelove-ventures/horcrux/pkg/thresholdTemP"
+	tss "github.com/strangelove-ventures/horcrux/pkg/tss"
 	interchaintest "github.com/strangelove-ventures/interchaintest/v8"
 	"github.com/strangelove-ventures/interchaintest/v8/chain/cosmos"
 	"github.com/strangelove-ventures/interchaintest/v8/ibc"
@@ -359,7 +359,7 @@ func TestMultipleChainHorcrux(t *testing.T) {
 	for i := 0; i < totalChains; i++ {
 		chainConfigs[i] = &cosignerChainConfig{
 			sentries: make([]cosmos.ChainNodes, sentriesPerSigner),
-			shards:   make([]thresholdTemP.CosignerEd25519Key, totalSigners),
+			shards:   make([]tss.CosignerEd25519Key, totalSigners),
 		}
 	}
 
@@ -453,7 +453,7 @@ func TestMultipleChainHorcrux(t *testing.T) {
 
 type cosignerChainConfig struct {
 	chainID  string
-	shards   []thresholdTemP.CosignerEd25519Key
+	shards   []tss.CosignerEd25519Key
 	sentries []cosmos.ChainNodes
 }
 
@@ -594,7 +594,7 @@ func TestHorcruxProxyGRPC(t *testing.T) {
 	for i := 0; i < totalChains; i++ {
 		chainConfigs[i] = &cosignerChainConfig{
 			sentries: make([]cosmos.ChainNodes, sentriesPerSigner),
-			shards:   make([]thresholdTemP.CosignerEd25519Key, totalSigners),
+			shards:   make([]tss.CosignerEd25519Key, totalSigners),
 		}
 	}
 

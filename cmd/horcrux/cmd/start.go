@@ -45,8 +45,8 @@ func startCmd() *cobra.Command {
 
 			acceptRisk, _ := cmd.Flags().GetBool(flagAcceptRisk)
 
-			var val connector.PrivValidator
-			var services []service.Service
+			var val connector.IPrivValidator
+			var services []service.Service // A list of all services that are running
 
 			switch config.Config.SignMode {
 			case cconfig.SignModeThreshold:
@@ -64,7 +64,7 @@ func startCmd() *cobra.Command {
 			}
 
 			if config.Config.GRPCAddr != "" {
-				grpcServer := connector.NewRemoteSignerGRPCServer(logger, val, config.Config.GRPCAddr)
+				grpcServer := connector.NewSentrySignerGRPCServer(logger, val, config.Config.GRPCAddr)
 				services = append(services, grpcServer)
 
 				if err := grpcServer.Start(); err != nil {

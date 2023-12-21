@@ -13,7 +13,7 @@ import (
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 )
 
-var _ connector.PrivValidator = &SingleSignerValidator{}
+var _ connector.IPrivValidator = &SingleSignerValidator{}
 
 // SingleSignerValidator guards access to an underlying PrivValidator by using mutexes
 // for each of the PrivValidator interface functions

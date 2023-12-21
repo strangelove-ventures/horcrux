@@ -1,7 +1,12 @@
 package cosigner
 
 /*
-Package signer: Cosinger is responsible for the network communication between the cosigners
+Package cosigner:
+Cosinger is responsible for the network communication between the cosigners.
+
+You can thkin of it as:
+- LocalCosigner is the server (we understand that local here is confussing but it is because it is local to the node)
+- RemoteCosigner is the client
 */
 import (
 	"time"

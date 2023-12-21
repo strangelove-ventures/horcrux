@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/strangelove-ventures/horcrux/pkg/nodes"
-	"github.com/strangelove-ventures/horcrux/pkg/thresholdTemP"
+	"github.com/strangelove-ventures/horcrux/pkg/tss"
 
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 
@@ -54,7 +54,7 @@ func loadKeyForLocalCosigner(
 	chainID string,
 	privateShard []byte,
 ) error {
-	key := thresholdTemP.CosignerEd25519Key{
+	key := tss.CosignerEd25519Key{
 		PubKey:       pubKey,
 		PrivateShard: privateShard,
 		ID:           cosigner.GetIndex(),
