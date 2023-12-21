@@ -11,5 +11,5 @@ for dir in $proto_dirs; do
   done
 done
 
-cp -r github.com/strangelove-ventures/horcrux/signer ./
+cp -r github.com/strangelove-ventures/horcrux/v3/signer ./
 rm -rf github.com

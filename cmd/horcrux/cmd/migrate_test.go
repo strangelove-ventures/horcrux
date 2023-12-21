@@ -42,7 +42,7 @@ func TestMigrateV2toV3(t *testing.T) {
 	newKeyShardFileBz, err := os.ReadFile(newKeyShardFile)
 	require.NoError(t, err)
 
-	require.Equal(t, testdata.CosignerEd25519KeyMigrated, string(newKeyShardFileBz))
+	require.Equal(t, testdata.CosignerKeyMigrated, string(newKeyShardFileBz))
 
 	newRSAKeyFileBz, err := os.ReadFile(newRSAKeyFile)
 	require.NoError(t, err)
@@ -104,7 +104,7 @@ func TestMigrateV2toV3DifferentKeyFilePath(t *testing.T) {
 	newKeyShardFileBz, err := os.ReadFile(newKeyShardFile)
 	require.NoError(t, err)
 
-	require.Equal(t, testdata.CosignerEd25519KeyMigrated, string(newKeyShardFileBz))
+	require.Equal(t, testdata.CosignerKeyMigrated, string(newKeyShardFileBz))
 
 	newRSAKeyFileBz, err := os.ReadFile(newRSAKeyFile)
 	require.NoError(t, err)
@@ -144,7 +144,7 @@ func TestMigrateV2toV3KeysOnly(t *testing.T) {
 	newKeyShardFileBz, err := os.ReadFile(newKeyShardFile)
 	require.NoError(t, err)
 
-	require.Equal(t, testdata.CosignerEd25519KeyMigrated, string(newKeyShardFileBz))
+	require.Equal(t, testdata.CosignerKeyMigrated, string(newKeyShardFileBz))
 
 	newRSAKeyFileBz, err := os.ReadFile(newRSAKeyFile)
 	require.NoError(t, err)
@@ -184,7 +184,7 @@ func TestMigrateV2toV3ConfigAlreadyMigrated(t *testing.T) {
 	newKeyShardFileBz, err := os.ReadFile(newKeyShardFile)
 	require.NoError(t, err)
 
-	require.Equal(t, testdata.CosignerEd25519KeyMigrated, string(newKeyShardFileBz))
+	require.Equal(t, testdata.CosignerKeyMigrated, string(newKeyShardFileBz))
 
 	newRSAKeyFileBz, err := os.ReadFile(newRSAKeyFile)
 	require.NoError(t, err)
@@ -208,7 +208,7 @@ func TestMigrateV2toV3AlreadyMigrated(t *testing.T) {
 
 	ed25519KeyShardFile := filepath.Join(tmp, "test_shard.json")
 
-	err = os.WriteFile(ed25519KeyShardFile, []byte(testdata.CosignerEd25519KeyMigrated), 0600)
+	err = os.WriteFile(ed25519KeyShardFile, []byte(testdata.CosignerKeyMigrated), 0600)
 	require.NoError(t, err)
 
 	rsaKeyShardFile := filepath.Join(tmp, "rsa_keys.json")

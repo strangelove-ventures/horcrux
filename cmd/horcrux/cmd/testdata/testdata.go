@@ -11,10 +11,13 @@ var ConfigMigrated string
 var ConfigV2 []byte
 
 //go:embed cosigner-key-migrated-ed25519.json
-var CosignerEd25519KeyMigrated string
+var CosignerKeyMigrated string
 
 //go:embed cosigner-key-migrated-rsa.json
 var CosignerRSAKeyMigrated string
 
 //go:embed cosigner-key-v2.json
 var CosignerKeyV2 []byte
+
+//go:embed priv_validator_key-bn254.json
+var PrivValidatorKeyBn254 []byte

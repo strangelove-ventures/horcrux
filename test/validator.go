@@ -175,18 +175,18 @@ func horcruxProxySidecar(ctx context.Context, node *cosmos.ChainNode, name strin
 }
 
 // getPrivvalKey reads the priv_validator_key.json file from the given node.
-func getPrivvalKey(ctx context.Context, node *cosmos.ChainNode) (privval.FilePVKey, error) {
+func getPrivvalKey(ctx context.Context, node *cosmos.ChainNode) (*privval.FilePVKey, error) {
 	keyBz, err := node.ReadFile(ctx, "config/priv_validator_key.json")
 	if err != nil {
-		return privval.FilePVKey{}, fmt.Errorf("failed to read priv_validator_key.json: %w", err)
+		return nil, fmt.Errorf("failed to read priv_validator_key.json: %w", err)
 	}
 
-	pvKey := privval.FilePVKey{}
+	var pvKey privval.FilePVKey
 	if err := cometjson.Unmarshal(keyBz, &pvKey); err != nil {
-		return privval.FilePVKey{}, fmt.Errorf("failed to unmarshal priv validator key: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal priv validator key: %w", err)
 	}
 
-	return pvKey, nil
+	return &pvKey, nil
 }
 
 // enablePrivvalListener enables the privval listener on the given sentry nodes.

@@ -2,11 +2,11 @@ package test
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"testing"
 
-	"github.com/cometbft/cometbft/crypto"
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/cometbft/cometbft/privval"
 	"github.com/docker/docker/client"
@@ -32,7 +32,8 @@ func testChainSingleNodeAndHorcruxSingle(
 	err := testutil.WaitForBlocks(ctx, 20, cw.chain)
 	require.NoError(t, err)
 
-	requireHealthyValidator(t, cw.chain.Validators[0], pubKey.Address())
+	sha := sha256.Sum256(pubKey)
+	requireHealthyValidator(t, cw.chain.Validators[0], sha[:20])
 }
 
 // startChainSingleNodeAndHorcruxSingle starts a single chain with a single horcrux (single-sign mode) validator and single node validators for the rest.
@@ -41,11 +42,11 @@ func startChainSingleNodeAndHorcruxSingle(
 	t *testing.T,
 	totalValidators int, // total number of validators on chain (one horcrux + single node for the rest)
 	totalSentries int, // number of sentry nodes for the single horcrux validator
-) (*chainWrapper, crypto.PubKey) {
+) (*chainWrapper, []byte) {
 	client, network := interchaintest.DockerSetup(t)
 	logger := zaptest.NewLogger(t)
 
-	var pubKey crypto.PubKey
+	var pubKey []byte
 
 	cw := &chainWrapper{
 		totalValidators: totalValidators,
@@ -65,7 +66,7 @@ func preGenesisSingleNodeAndHorcruxSingle(
 	logger *zap.Logger,
 	client *client.Client,
 	network string,
-	pubKey *crypto.PubKey) func(*chainWrapper) func(ibc.ChainConfig) error {
+	pubKey *[]byte) func(*chainWrapper) func(ibc.ChainConfig) error {
 	return func(cw *chainWrapper) func(ibc.ChainConfig) error {
 		return func(cc ibc.ChainConfig) error {
 			horcruxValidator := cw.chain.Validators[0]
@@ -75,7 +76,7 @@ func preGenesisSingleNodeAndHorcruxSingle(
 				return err
 			}
 
-			*pubKey = pvKey.PubKey
+			*pubKey = pvKey.PubKey.Bytes()
 
 			sentries := append(cosmos.ChainNodes{horcruxValidator}, cw.chain.FullNodes...)
 
@@ -119,7 +120,7 @@ func writeConfigAndKeysSingle(
 	chainID string,
 	singleSigner *cosmos.SidecarProcess,
 	config signer.Config,
-	pvKey privval.FilePVKey,
+	key *privval.FilePVKey,
 ) error {
 	configBz, err := json.Marshal(config)
 	if err != nil {
@@ -130,7 +131,7 @@ func writeConfigAndKeysSingle(
 		return fmt.Errorf("failed to write config.yaml: %w", err)
 	}
 
-	pvKeyBz, err := cometjson.Marshal(pvKey)
+	pvKeyBz, err := cometjson.Marshal(key)
 	if err != nil {
 		return fmt.Errorf("failed to marshal priv validator key: %w", err)
 	}

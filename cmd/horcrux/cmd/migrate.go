@@ -10,10 +10,10 @@ import (
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	cometcryptoencoding "github.com/cometbft/cometbft/crypto/encoding"
-	cometprotocrypto "github.com/cometbft/cometbft/proto/tendermint/crypto"
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/v3/signer"
+	"github.com/strangelove-ventures/horcrux/v3/signer/encoding"
+	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 	amino "github.com/tendermint/go-amino"
 	"gopkg.in/yaml.v2"
 )
@@ -98,12 +98,12 @@ func (key *v2CosignerKey) UnmarshalJSON(data []byte) error {
 	}
 
 	var pubkey cometcrypto.PubKey
-	var protoPubkey cometprotocrypto.PublicKey
+	var protoPubkey proto.PublicKey
 	err = protoPubkey.Unmarshal(aux.PubkeyBytes)
 
 	// Prior to the tendermint protobuf migration, the public key bytes in key files
 	// were encoded using the go-amino libraries via
-	// cdc.MarshalBinaryBare(CosignerEd25519Key.PubKey)
+	// cdc.MarshalBinaryBare(CosignerKey.PubKey)
 	//
 	// To support reading the public key bytes from these key files, we fallback to
 	// amino unmarshalling if the protobuf unmarshalling fails
@@ -118,7 +118,7 @@ func (key *v2CosignerKey) UnmarshalJSON(data []byte) error {
 		}
 		pubkey = pub
 	} else {
-		pubkey, err = cometcryptoencoding.PubKeyFromProto(protoPubkey)
+		pubkey, err = encoding.PubKeyFromProto(protoPubkey)
 		if err != nil {
 			return err
 		}
@@ -218,13 +218,14 @@ func migrateCmd() *cobra.Command {
 				return err
 			}
 
-			newEd25519Key := signer.CosignerEd25519Key{
-				PubKey:       legacyCosignerKey.PubKey,
+			newEd25519Key := &signer.CosignerKey{
+				KeyType:      signer.CosignerKeyTypeEd25519,
+				PubKey:       legacyCosignerKey.PubKey.Bytes(),
 				PrivateShard: legacyCosignerKey.ShareKey,
 				ID:           legacyCosignerKey.ID,
 			}
 
-			newEd25519KeyBz, err := newEd25519Key.MarshalJSON()
+			newEd25519KeyBz, err := json.Marshal(newEd25519Key)
 			if err != nil {
 				return fmt.Errorf("failed to marshal new Ed25519 key to json: %w", err)
 			}
@@ -234,13 +235,13 @@ func migrateCmd() *cobra.Command {
 				return fmt.Errorf("failed to write new Ed25519 key to %s: %w", newEd25519Path, err)
 			}
 
-			newRSAKey := signer.CosignerRSAKey{
+			newRSAKey := &signer.CosignerRSAKey{
 				RSAKey:  legacyCosignerKey.RSAKey,
 				ID:      legacyCosignerKey.ID,
 				RSAPubs: legacyCosignerKey.RSAPubs,
 			}
 
-			newRSAKeyBz, err := newRSAKey.MarshalJSON()
+			newRSAKeyBz, err := json.Marshal(newRSAKey)
 			if err != nil {
 				return fmt.Errorf("failed to marshal new RSA key to json: %w", err)
 			}

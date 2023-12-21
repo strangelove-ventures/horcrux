@@ -56,7 +56,7 @@ func TestMovingAverage(t *testing.T) {
 }
 
 func TestClearNonces(t *testing.T) {
-	lcs, _ := getTestLocalCosigners(t, 2, 3)
+	lcs := getTestLocalCosigners(t, CosignerKeyTypeEd25519, 2, 3)
 	cosigners := make([]Cosigner, len(lcs))
 	for i, lc := range lcs {
 		cosigners[i] = lc
@@ -141,7 +141,7 @@ func (mp *mockPruner) Result() (int, int) {
 }
 
 func TestNonceCacheDemand(t *testing.T) {
-	lcs, _ := getTestLocalCosigners(t, 2, 3)
+	lcs := getTestLocalCosigners(t, CosignerKeyTypeEd25519, 2, 3)
 	cosigners := make([]Cosigner, len(lcs))
 	for i, lc := range lcs {
 		cosigners[i] = lc
@@ -190,7 +190,7 @@ func TestNonceCacheDemand(t *testing.T) {
 }
 
 func TestNonceCacheExpiration(t *testing.T) {
-	lcs, _ := getTestLocalCosigners(t, 2, 3)
+	lcs := getTestLocalCosigners(t, CosignerKeyTypeEd25519, 2, 3)
 	cosigners := make([]Cosigner, len(lcs))
 	for i, lc := range lcs {
 		cosigners[i] = lc
@@ -401,7 +401,7 @@ func TestNonceCachePrune(t *testing.T) {
 }
 
 func TestNonceCacheDemandSlow(t *testing.T) {
-	lcs, _ := getTestLocalCosigners(t, 2, 3)
+	lcs := getTestLocalCosigners(t, CosignerKeyTypeEd25519, 2, 3)
 	cosigners := make([]Cosigner, len(lcs))
 	for i, lc := range lcs {
 		cosigners[i] = lc
@@ -438,7 +438,7 @@ func TestNonceCacheDemandSlowDefault(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
-	lcs, _ := getTestLocalCosigners(t, 2, 3)
+	lcs := getTestLocalCosigners(t, CosignerKeyTypeEd25519, 2, 3)
 	cosigners := make([]Cosigner, len(lcs))
 	for i, lc := range lcs {
 		cosigners[i] = lc
