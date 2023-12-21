@@ -2,99 +2,93 @@ package bn254
 
 import (
 	"bytes"
-	"crypto/sha256"
+	"crypto/hmac"
+	"crypto/rand"
 	"crypto/subtle"
 	"fmt"
-	"io"
+	"math/big"
+
+	"golang.org/x/crypto/sha3"
+
+	"github.com/consensys/gnark-crypto/ecc/bn254"
+	"github.com/consensys/gnark-crypto/ecc/bn254/ecdsa"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr/mimc"
 
 	"github.com/cometbft/cometbft/crypto"
-	"github.com/cometbft/cometbft/crypto/tmhash"
 	cometjson "github.com/cometbft/cometbft/libs/json"
-	ecdsa_bn254 "github.com/consensys/gnark-crypto/ecc/bn254/ecdsa"
-)
-
-//-------------------------------------
-
-var (
-	_ crypto.PrivKey = PrivKey{}
+	"github.com/holiman/uint256"
 )
 
 const (
-	PrivKeyName = "tendermint/PrivKeyBn254"
-	PubKeyName  = "tendermint/PubKeyBn254"
-	// PubKeySize is is the size, in bytes, of public keys as used in this package.
-	PubKeySize = 128
-	// PrivateKeySize is the size, in bytes, of private keys as used in this package.
-	PrivateKeySize = 64
-	// Size of an Bn254 signature. Namely the size of a compressed
-	// Bn254 point, and a field element. Both of which are 32 bytes.
-	SignatureSize = 64
-
-	KeyType = "bn254"
+	PubKeySize               = sizePublicKey
+	PrivKeySize              = sizePrivateKey
+	sizeFr                   = fr.Bytes
+	sizeFp                   = fp.Bytes
+	sizePublicKey            = sizeFp
+	sizePrivateKey           = sizeFr + sizePublicKey
+	XHashToScalarFieldPrefix = 0
+	YHashToScalarFieldPrefix = 1
+	PrivKeyName              = "tendermint/PrivKeyBn254"
+	PubKeyName               = "tendermint/PubKeyBn254"
+	KeyType                  = "bn254"
 )
+
+var G1Gen bn254.G1Affine
+var G2Gen bn254.G2Affine
+var G2Cofactor big.Int
+
+var Hash = sha3.NewLegacyKeccak256
 
 func init() {
 	cometjson.RegisterType(PubKey{}, PubKeyName)
 	cometjson.RegisterType(PrivKey{}, PrivKeyName)
+
+	_, _, G1Gen, G2Gen = bn254.Generators()
+
+	// BN254 cofactor
+	value, err := new(big.Int).SetString("30644e72e131a029b85045b68181585e06ceecda572a2489345f2299c0f9fa8d", 16)
+	if !err {
+		panic("Cannot build cofactor")
+	}
+
+	G2Cofactor.Set(value)
 }
 
-// PrivKey implements crypto.PrivKey.
+var _ crypto.PrivKey = PrivKey{}
+
 type PrivKey []byte
 
-// Bytes returns the privkey byte format.
+func (PrivKey) TypeTag() string { return PrivKeyName }
+
 func (privKey PrivKey) Bytes() []byte {
 	return []byte(privKey)
 }
 
-// Sign produces a signature on the provided message.
-// This assumes the privkey is wellformed in the golang format.
-// The first 32 bytes should be random,
-// corresponding to the normal bn254 private key.
-// The latter 32 bytes should be the compressed public key.
-// If these conditions aren't met, Sign will panic or produce an
-// incorrect signature.
 func (privKey PrivKey) Sign(msg []byte) ([]byte, error) {
-	priv := new(ecdsa_bn254.PrivateKey)
-	_, err := priv.SetBytes(privKey[:])
-	if err != nil {
-		return nil, err
-	}
-
-	hFunc := sha256.New()
-
-	return priv.Sign(msg, hFunc)
+	s := new(big.Int)
+	s = s.SetBytes(privKey)
+	hm := HashToG2(msg)
+	var p bn254.G2Affine
+	p.ScalarMultiplication(&hm, s)
+	compressedSig := p.Bytes()
+	return compressedSig[:], nil
 }
 
-// PubKey gets the corresponding public key from the private key.
-//
-// Panics if the private key is not initialized.
 func (privKey PrivKey) PubKey() crypto.PubKey {
-	// If the latter 32 bytes of the privkey are all zero, privkey is not
-	// initialized.
-	initialized := false
-	for _, v := range privKey[32:] {
-		if v != 0 {
-			initialized = true
-			break
-		}
-	}
-
-	if !initialized {
-		panic("Expected bn254 PrivKey to include concatenated pubkey bytes")
-	}
-
-	pubkeyBytes := make([]byte, PubKeySize)
-	copy(pubkeyBytes, privKey[32:])
-	return PubKey(pubkeyBytes)
+	s := new(big.Int)
+	s.SetBytes(privKey)
+	var pk bn254.G1Affine
+	pk.ScalarMultiplication(&G1Gen, s)
+	pkBytes := pk.Bytes()
+	return PubKey(pkBytes[:])
 }
 
-// Equals - you probably don't need to use this.
-// Runs in constant time based on length of the keys.
 func (privKey PrivKey) Equals(other crypto.PrivKey) bool {
 	if otherEd, ok := other.(PrivKey); ok {
 		return subtle.ConstantTimeCompare(privKey[:], otherEd[:]) == 1
 	}
-
 	return false
 }
 
@@ -102,60 +96,52 @@ func (privKey PrivKey) Type() string {
 	return KeyType
 }
 
-// GenPrivKey generates a new bn254 private key.
-// It uses OS randomness in conjunction with the current global random seed
-// in cometbft/libs/rand to generate the private key.
-func GenPrivKey() PrivKey {
-	return genPrivKey(crypto.CReader())
-}
-
-// genPrivKey generates a new bn254 private key using the provided reader.
-func genPrivKey(rand io.Reader) PrivKey {
-	priv, err := ecdsa_bn254.GenerateKey(rand)
-	if err != nil {
-		panic(err)
-	}
-
-	return PrivKey(priv.Bytes())
-}
-
-//-------------------------------------
-
 var _ crypto.PubKey = PubKey{}
 
-// PubKey implements crypto.PubKey for the Bn254 signature scheme.
 type PubKey []byte
 
-// Address is the SHA256-20 of the raw pubkey bytes.
+func (PubKey) TypeTag() string { return PubKeyName }
+
 func (pubKey PubKey) Address() crypto.Address {
-	if len(pubKey) != PubKeySize {
-		panic("pubkey is incorrect size")
-	}
-	return crypto.Address(tmhash.SumTruncated(pubKey))
+	return crypto.AddressHash(pubKey[:])
 }
 
-// Bytes returns the PubKey byte format.
 func (pubKey PubKey) Bytes() []byte {
-	return []byte(pubKey)
+	return pubKey
 }
 
 func (pubKey PubKey) VerifySignature(msg []byte, sig []byte) bool {
-	// make sure we use the same algorithm to sign
-	if len(sig) != SignatureSize {
+	hashedMessage := HashToG2(msg)
+	var public bn254.G1Affine
+	_, err := public.SetBytes(pubKey)
+	if err != nil {
+		return false
+	}
+	if public.IsInfinity() {
 		return false
 	}
 
-	pub := new(ecdsa_bn254.PublicKey)
-	if _, err := pub.SetBytes(pubKey[:]); err != nil {
+	var signature bn254.G2Affine
+	_, err = signature.SetBytes(sig)
+	if err != nil {
+		return false
+	}
+	if signature.IsInfinity() {
 		return false
 	}
 
-	valid, _ := pub.Verify(msg, sig, sha256.New())
+	var G1BaseNeg bn254.G1Affine
+	G1BaseNeg.Neg(&G1Gen)
+
+	valid, err := bn254.PairingCheck([]bn254.G1Affine{G1BaseNeg, public}, []bn254.G2Affine{signature, hashedMessage})
+	if err != nil {
+		return false
+	}
 	return valid
 }
 
 func (pubKey PubKey) String() string {
-	return fmt.Sprintf("PubKeyBn254{%X}", []byte(pubKey))
+	return fmt.Sprintf("PubKeyBn254{%X}", []byte(pubKey[:]))
 }
 
 func (pubKey PubKey) Type() string {
@@ -166,6 +152,131 @@ func (pubKey PubKey) Equals(other crypto.PubKey) bool {
 	if otherEd, ok := other.(PubKey); ok {
 		return bytes.Equal(pubKey[:], otherEd[:])
 	}
-
 	return false
+}
+
+func GenPrivKey() PrivKey {
+	secret, err := ecdsa.GenerateKey(rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+	return PrivKey(secret.Bytes())
+}
+
+// Naive scalar multiplication used for cofactor clearing, basic double-and-add
+func nativeNaiveScalarMul(p bn254.G2Affine, s *big.Int) bn254.G2Affine {
+	// initialize result point to infinity
+	var result bn254.G2Affine
+	result.X.SetZero()
+	result.Y.SetZero()
+	bits := s.BitLen()
+	// iterate over binary digits of s and double the current result point at each iteration
+	for i := bits - 1; i >= 0; i-- {
+		result.Add(&result, &result)
+		// if current binary digit is 1, add the original point p to the result
+		if s.Bit(i) == 1 {
+			result.Add(&result, &p)
+		}
+	}
+	return result
+}
+
+func HashToField(msg []byte) fr.Element {
+	hmac := hmac.New(Hash, []byte("CometBLS"))
+	hmac.Write(msg)
+	modMinusOne := new(big.Int).Sub(fr.Modulus(), big.NewInt(1))
+	num := new(big.Int).SetBytes(hmac.Sum(nil))
+	num.Mod(num, modMinusOne)
+	num.Add(num, big.NewInt(1))
+	val, overflow := uint256.FromBig(num)
+	if overflow {
+		panic("impossible; qed;")
+	}
+	valBytes := val.Bytes32()
+	var element fr.Element
+	err := element.SetBytesCanonical(valBytes[:])
+	if err != nil {
+		panic("impossible; qed;")
+	}
+	return element
+}
+
+func HashToField2(msg []byte) (fr.Element, fr.Element) {
+	x := HashToField(append([]byte{XHashToScalarFieldPrefix}, msg...))
+	y := HashToField(append([]byte{YHashToScalarFieldPrefix}, msg...))
+	return x, y
+}
+
+func HashToG2(msg []byte) bn254.G2Affine {
+	x, y := HashToField2(msg)
+	point := nativeNaiveScalarMul(bn254.MapToCurve2(&bn254.E2{
+		A0: *new(fp.Element).SetBigInt(x.BigInt(new(big.Int))),
+		A1: *new(fp.Element).SetBigInt(y.BigInt(new(big.Int))),
+	}), &G2Cofactor)
+	// Any of the following case are impossible and should break consensus
+	if !point.IsOnCurve() {
+		panic("Point is not on the curve")
+	}
+	if !point.IsInSubGroup() {
+		panic("Point is not in subgroup")
+	}
+	if point.IsInfinity() {
+		panic("Point is zero")
+	}
+	return point
+}
+
+type MerkleLeaf struct {
+	VotingPower int64
+	ShiftedX    fr.Element
+	ShiftedY    fr.Element
+	MsbX        uint8
+	MsbY        uint8
+}
+
+func NewMerkleLeaf(pubKey bn254.G1Affine, votingPower int64) (MerkleLeaf, error) {
+	x := pubKey.X.BigInt(new(big.Int))
+	y := pubKey.Y.BigInt(new(big.Int))
+	msbX := x.Bit(254)
+	msbY := y.Bit(254)
+	var frX, frY fr.Element
+	x.SetBit(x, 254, 0)
+	var padded [32]byte
+	x.FillBytes(padded[:])
+	err := frX.SetBytesCanonical(padded[:])
+	if err != nil {
+		return MerkleLeaf{}, err
+	}
+	y.SetBit(y, 254, 0)
+	y.FillBytes(padded[:])
+	err = frY.SetBytesCanonical(padded[:])
+	if err != nil {
+		return MerkleLeaf{}, err
+	}
+	return MerkleLeaf{
+		VotingPower: votingPower,
+		ShiftedX:    frX,
+		ShiftedY:    frY,
+		MsbX:        uint8(msbX),
+		MsbY:        uint8(msbY),
+	}, nil
+}
+
+// mimc(X, Xmsb, Y, Ymsb, power)
+func (l MerkleLeaf) Hash() []byte {
+	frXBytes := l.ShiftedX.Bytes()
+	frYBytes := l.ShiftedY.Bytes()
+	mimc := mimc.NewMiMC()
+	mimc.Write(frXBytes[:])
+	mimc.Write(frYBytes[:])
+	var padded [32]byte
+	big.NewInt(int64(l.MsbX)).FillBytes(padded[:])
+	mimc.Write(padded[:])
+	big.NewInt(int64(l.MsbY)).FillBytes(padded[:])
+	mimc.Write(padded[:])
+	var powerBytes big.Int
+	powerBytes.SetUint64(uint64(l.VotingPower))
+	powerBytes.FillBytes(padded[:])
+	mimc.Write(padded[:])
+	return mimc.Sum(nil)
 }

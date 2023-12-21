@@ -259,9 +259,12 @@ func getShardedPrivvalKey(ctx context.Context, node *cosmos.ChainNode, threshold
 		return nil, nil, err
 	}
 
-	ed25519Shards := signer.CreateCosignerEd25519Shards(pvKey, threshold, shards)
+	privShards, err := signer.CreateCosignerShards(pvKey, threshold, shards)
+	if err != nil {
+		return nil, nil, err
+	}
 
-	return ed25519Shards, pvKey.PubKey.Value, nil
+	return privShards, pvKey.PubKey.Bytes(), nil
 }
 
 // chainEd25519Shard is a wrapper for a chain ID and a shard of an ed25519 consensus key.

@@ -127,7 +127,7 @@ func (*PublicKey) XXX_OneofWrappers() []interface{} {
 }
 
 func init() {
-	proto.RegisterType((*PublicKey)(nil), "tendermint.crypto.PublicKey")
+	// proto.RegisterType((*PublicKey)(nil), "tendermint.crypto.PublicKey")
 }
 
 func init() { proto.RegisterFile("tendermint/crypto/keys.proto", fileDescriptor_cb048658b234868c) }
