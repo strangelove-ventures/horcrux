@@ -3,12 +3,10 @@ package test
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"testing"
 
-	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/cometbft/cometbft/privval"
 	"github.com/docker/docker/client"
@@ -78,7 +76,7 @@ func preGenesisSingleNodeAndHorcruxSingle(
 				return err
 			}
 
-			*pubKey = pvKey.PubKey.Value
+			*pubKey = pvKey.PubKey.Bytes()
 
 			sentries := append(cosmos.ChainNodes{horcruxValidator}, cw.chain.FullNodes...)
 
@@ -122,7 +120,7 @@ func writeConfigAndKeysSingle(
 	chainID string,
 	singleSigner *cosmos.SidecarProcess,
 	config signer.Config,
-	key *signer.TMPrivvalFile,
+	key *privval.FilePVKey,
 ) error {
 	configBz, err := json.Marshal(config)
 	if err != nil {
@@ -133,18 +131,7 @@ func writeConfigAndKeysSingle(
 		return fmt.Errorf("failed to write config.yaml: %w", err)
 	}
 
-	address, err := hex.DecodeString(key.Address)
-	if err != nil {
-		return fmt.Errorf("failed to decode address: %w", err)
-	}
-
-	pvKey := privval.FilePVKey{
-		Address: address,
-		PubKey:  cometcryptoed25519.PubKey(key.PubKey.Value),
-		PrivKey: cometcryptoed25519.PrivKey(key.PrivKey.Value),
-	}
-
-	pvKeyBz, err := cometjson.Marshal(pvKey)
+	pvKeyBz, err := cometjson.Marshal(key)
 	if err != nil {
 		return fmt.Errorf("failed to marshal priv validator key: %w", err)
 	}

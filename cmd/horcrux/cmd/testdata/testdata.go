@@ -18,3 +18,6 @@ var CosignerRSAKeyMigrated string
 
 //go:embed cosigner-key-v2.json
 var CosignerKeyV2 []byte
+
+//go:embed priv_validator_key-bn254.json
+var PrivValidatorKeyBn254 []byte

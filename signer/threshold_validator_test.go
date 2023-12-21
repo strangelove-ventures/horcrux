@@ -23,10 +23,9 @@ import (
 	comet "github.com/cometbft/cometbft/types"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
+	horcrux_bn254 "github.com/strangelove-ventures/horcrux/signer/bn254"
 	"github.com/stretchr/testify/require"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
-	"go.dedis.ch/kyber/v3/pairing/bn256"
-	"go.dedis.ch/kyber/v3/share"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -388,19 +387,14 @@ func getTestLocalCosigners(t *testing.T, keyType string, threshold, total uint8)
 		}
 		pubKey = privateKey.PubKey().Bytes()
 	case CosignerKeyTypeBn254:
-		suite := bn256.NewSuite()
-		secret := suite.G1().Scalar().Pick(suite.RandomStream())
-		priPoly := share.NewPriPoly(suite.G2(), int(threshold), secret, suite.RandomStream())
-		pubPoly := priPoly.Commit(suite.G2().Point().Base())
-		var err error
-		pk := pubPoly.Commit()
-		pubKey, err = pk.MarshalBinary()
-		require.NoError(t, err)
+		privateKey := horcrux_bn254.GenPrivKey()
+		_, privShardsBn254 := horcrux_bn254.GenFromSecret(privateKey.Bytes(), threshold, total)
 
-		for i, x := range priPoly.Shares(int(total)) {
-			privShards[i], err = x.V.MarshalBinary()
-			require.NoError(t, err)
+		for i := range privShardsBn254 {
+			privShards[i] = privShardsBn254[i].Bytes()
 		}
+
+		pubKey = privateKey.PubKey().Bytes()
 	}
 
 	tmpDir := t.TempDir()

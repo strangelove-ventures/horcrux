@@ -7,11 +7,14 @@ import (
 	"errors"
 	"os"
 
+	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	cometjson "github.com/cometbft/cometbft/libs/json"
+	"github.com/cometbft/cometbft/privval"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
+	"github.com/strangelove-ventures/horcrux/signer/bn254"
+	horcrux_bn254 "github.com/strangelove-ventures/horcrux/signer/bn254"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
-	"go.dedis.ch/kyber/v3/pairing/bn256"
-	"go.dedis.ch/kyber/v3/share"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -24,10 +27,15 @@ func CreateCosignerShardsFromFile(priv string, threshold, shards uint8) ([]Cosig
 		return nil, err
 	}
 
-	switch pv.PrivKey.Type {
-	case "tendermint/PrivKeyEd25519":
+	return CreateCosignerShards(pv, threshold, shards)
+}
+
+// CreateCosignerShards creates CosignerKey objects from a privval.FilePVKey
+func CreateCosignerShards(pv *privval.FilePVKey, threshold, shards uint8) ([]CosignerKey, error) {
+	switch pv.PrivKey.(type) {
+	case cometcryptoed25519.PrivKey:
 		return CreateCosignerEd25519Shards(pv, threshold, shards), nil
-	case "tendermint/PrivKeyBn254":
+	case bn254.PrivKey:
 		return CreateCosignerBn254Shards(pv, threshold, shards), nil
 	default:
 		return nil, ErrUnsupportedKeyType
@@ -35,13 +43,13 @@ func CreateCosignerShardsFromFile(priv string, threshold, shards uint8) ([]Cosig
 }
 
 // CreateCosignerEd25519Shards creates CosignerKey objects from a privval.FilePVKey
-func CreateCosignerEd25519Shards(pv *TMPrivvalFile, threshold, shards uint8) []CosignerKey {
-	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(pv.PrivKey.Value[:32]), threshold, shards)
+func CreateCosignerEd25519Shards(pv *privval.FilePVKey, threshold, shards uint8) []CosignerKey {
+	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(pv.PrivKey.(cometcryptoed25519.PrivKey).Bytes()[:32]), threshold, shards)
 	out := make([]CosignerKey, shards)
 	for i, shard := range privShards {
 		out[i] = CosignerKey{
 			KeyType:      CosignerKeyTypeEd25519,
-			PubKey:       pv.PubKey.Value,
+			PubKey:       pv.PubKey.Bytes(),
 			PrivateShard: shard,
 			ID:           i + 1,
 		}
@@ -50,22 +58,16 @@ func CreateCosignerEd25519Shards(pv *TMPrivvalFile, threshold, shards uint8) []C
 }
 
 // CreateCosignerEd25519Shards creates CosignerKey objects from a privval.FilePVKey
-func CreateCosignerBn254Shards(pv *TMPrivvalFile, threshold, shards uint8) []CosignerKey {
-	suite := bn256.NewSuite()
-	secret := suite.G1().Scalar().SetBytes(pv.PrivKey.Value)
-	priPoly := share.NewPriPoly(suite.G2(), int(threshold), secret, suite.RandomStream())
-	privShards := priPoly.Shares(int(shards))
+func CreateCosignerBn254Shards(pv *privval.FilePVKey, threshold, shards uint8) []CosignerKey {
+	_, privShards := horcrux_bn254.GenFromSecret(pv.PrivKey.Bytes(), threshold, shards)
+	//pks := horcrux_bn254.CreatePublicKeys(privShards)
 
 	out := make([]CosignerKey, shards)
 	for i, shard := range privShards {
-		v, err := shard.V.MarshalBinary()
-		if err != nil {
-			panic(err)
-		}
 		out[i] = CosignerKey{
 			KeyType:      CosignerKeyTypeBn254,
-			PubKey:       pv.PubKey.Value,
-			PrivateShard: v,
+			PubKey:       pv.PubKey.Bytes(),
+			PrivateShard: shard.Bytes(),
 			ID:           i + 1,
 		}
 	}
@@ -102,15 +104,15 @@ type TMPrivvalFile struct {
 }
 
 // ReadPrivValidatorFile reads in a privval.FilePVKey from a given file.
-func ReadPrivValidatorFile(priv string) (*TMPrivvalFile, error) {
+func ReadPrivValidatorFile(priv string) (*privval.FilePVKey, error) {
 	bz, err := os.ReadFile(priv)
 	if err != nil {
 		return nil, err
 	}
 
-	var out TMPrivvalFile
+	var out privval.FilePVKey
 
-	if err := json.Unmarshal(bz, &out); err != nil {
+	if err := cometjson.Unmarshal(bz, &out); err != nil {
 		return nil, err
 	}
 
