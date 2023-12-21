@@ -4,7 +4,7 @@ import (
 	"math/big"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254"
-	horcrux_bn254 "github.com/strangelove-ventures/horcrux/signer/bn254"
+	horcrux_bn254 "github.com/strangelove-ventures/horcrux/v3/signer/bn254"
 )
 
 var _ ThresholdSigner = &ThresholdSignerSoftBn254{}

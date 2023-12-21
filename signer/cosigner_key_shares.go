@@ -12,7 +12,7 @@ import (
 	"github.com/cometbft/cometbft/privval"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
-	horcrux_bn254 "github.com/strangelove-ventures/horcrux/signer/bn254"
+	horcrux_bn254 "github.com/strangelove-ventures/horcrux/v3/signer/bn254"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 	"golang.org/x/sync/errgroup"
 )
