@@ -167,6 +167,7 @@ func TestPrivValidatorBn254(t *testing.T) {
 	var sigs = make([][]byte, len(shards))
 
 	for i, shard := range shards {
+		shard := shard
 		signers[i], err = signer.NewThresholdSignerSoftBn254(&shard, 2, 3)
 		require.NoError(t, err)
 

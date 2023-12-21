@@ -7,8 +7,8 @@ import (
 	"github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/crypto/secp256k1"
 	"github.com/cometbft/cometbft/libs/json"
-	"github.com/strangelove-ventures/horcrux/signer/bn254"
-	"github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/strangelove-ventures/horcrux/v3/signer/bn254"
+	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 )
 
 func init() {

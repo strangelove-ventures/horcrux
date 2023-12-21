@@ -52,23 +52,23 @@ func TestThresholdBn254(t *testing.T) {
 
 	digest := sha3.NewLegacyKeccak256().Sum(msg)
 
-	var signatures []*bn254.G2Affine
-	for _, shard := range shards {
-		signature, err := horcrux_bn254.SignWithShard(shard, digest[:])
+	signatures := make([]*bn254.G2Affine, len(shards))
+	for i, shard := range shards {
+		signature, err := horcrux_bn254.SignWithShard(shard, digest)
 		require.NoError(t, err)
 
 		var pubKey bn254.G1Affine
 		pubKey.ScalarMultiplication(&horcrux_bn254.G1Gen, shard)
 
-		err = horcrux_bn254.VerifyShardSignature(&pubKey, digest[:], signature)
+		err = horcrux_bn254.VerifyShardSignature(&pubKey, digest, signature)
 		require.NoError(t, err)
 
-		signatures = append(signatures, signature)
+		signatures[i] = signature
 	}
 
 	thresholdSignature := horcrux_bn254.CombineSignatures(signatures[:2], 1, 2)
 	thresholdSignatureBz := thresholdSignature.Bytes()
 
-	valid := pubKey.VerifySignature(digest[:], thresholdSignatureBz[:])
+	valid := pubKey.VerifySignature(digest, thresholdSignatureBz[:])
 	require.True(t, valid)
 }

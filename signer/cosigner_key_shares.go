@@ -12,7 +12,6 @@ import (
 	"github.com/cometbft/cometbft/privval"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
-	"github.com/strangelove-ventures/horcrux/signer/bn254"
 	horcrux_bn254 "github.com/strangelove-ventures/horcrux/signer/bn254"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 	"golang.org/x/sync/errgroup"
@@ -35,7 +34,7 @@ func CreateCosignerShards(pv *privval.FilePVKey, threshold, shards uint8) ([]Cos
 	switch pv.PrivKey.(type) {
 	case cometcryptoed25519.PrivKey:
 		return CreateCosignerEd25519Shards(pv, threshold, shards), nil
-	case bn254.PrivKey:
+	case horcrux_bn254.PrivKey:
 		return CreateCosignerBn254Shards(pv, threshold, shards), nil
 	default:
 		return nil, ErrUnsupportedKeyType
@@ -44,7 +43,10 @@ func CreateCosignerShards(pv *privval.FilePVKey, threshold, shards uint8) ([]Cos
 
 // CreateCosignerEd25519Shards creates CosignerKey objects from a privval.FilePVKey
 func CreateCosignerEd25519Shards(pv *privval.FilePVKey, threshold, shards uint8) []CosignerKey {
-	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(pv.PrivKey.(cometcryptoed25519.PrivKey).Bytes()[:32]), threshold, shards)
+	privShards := tsed25519.DealShares(
+		tsed25519.ExpandSecret(pv.PrivKey.(cometcryptoed25519.PrivKey).Bytes()[:32]),
+		threshold, shards,
+	)
 	out := make([]CosignerKey, shards)
 	for i, shard := range privShards {
 		out[i] = CosignerKey{
@@ -60,7 +62,6 @@ func CreateCosignerEd25519Shards(pv *privval.FilePVKey, threshold, shards uint8)
 // CreateCosignerEd25519Shards creates CosignerKey objects from a privval.FilePVKey
 func CreateCosignerBn254Shards(pv *privval.FilePVKey, threshold, shards uint8) []CosignerKey {
 	_, privShards := horcrux_bn254.GenFromSecret(pv.PrivKey.Bytes(), threshold, shards)
-	//pks := horcrux_bn254.CreatePublicKeys(privShards)
 
 	out := make([]CosignerKey, shards)
 	for i, shard := range privShards {
