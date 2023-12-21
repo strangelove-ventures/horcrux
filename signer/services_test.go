@@ -14,7 +14,7 @@ import (
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	cometservice "github.com/cometbft/cometbft/libs/service"
-	"github.com/strangelove-ventures/horcrux/signer"
+	"github.com/strangelove-ventures/horcrux/v3/signer"
 
 	fork "github.com/kraken-hpc/go-fork"
 	"github.com/stretchr/testify/require"
