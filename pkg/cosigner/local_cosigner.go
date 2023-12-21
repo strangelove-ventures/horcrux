@@ -9,7 +9,7 @@ import (
 
 	"github.com/strangelove-ventures/horcrux/pkg/config"
 	"github.com/strangelove-ventures/horcrux/pkg/metrics"
-	"github.com/strangelove-ventures/horcrux/pkg/thresholdTemP"
+	"github.com/strangelove-ventures/horcrux/pkg/tss"
 
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 
@@ -283,7 +283,7 @@ func (cosigner *LocalCosigner) generateNonces() ([]types.Nonces, error) {
 	total := len(cosigner.config.Config.ThresholdModeConfig.Cosigners)
 	meta := make([]types.Nonces, total)
 
-	nonces, err := thresholdTemP.GenerateNonces(
+	nonces, err := tss.GenerateNonces(
 		uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
 		uint8(total),
 	)
@@ -312,7 +312,7 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 
 	var signer IThresholdSigner
 
-	signer, err = thresholdTemP.NewThresholdSignerSoft(cosigner.config, cosigner.GetIndex(), chainID)
+	signer, err = tss.NewThresholdSignerSoft(cosigner.config, cosigner.GetIndex(), chainID)
 	if err != nil {
 		return err
 	}

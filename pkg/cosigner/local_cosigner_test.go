@@ -13,7 +13,7 @@ import (
 	"github.com/strangelove-ventures/horcrux/pkg/config"
 	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
 	"github.com/strangelove-ventures/horcrux/pkg/cosigner/nodesecurity"
-	"github.com/strangelove-ventures/horcrux/pkg/thresholdTemP"
+	"github.com/strangelove-ventures/horcrux/pkg/tss"
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
@@ -142,7 +142,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []cosi
 	for i := 0; i < int(total); i++ {
 		id := i + 1
 
-		key := thresholdTemP.CosignerEd25519Key{
+		key := tss.CosignerEd25519Key{
 			PubKey:       pubKey,
 			PrivateShard: privShards[i],
 			ID:           id,

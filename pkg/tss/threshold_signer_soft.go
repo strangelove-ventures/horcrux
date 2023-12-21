@@ -1,4 +1,4 @@
-package thresholdTemP
+package tss
 
 import (
 	"bytes"

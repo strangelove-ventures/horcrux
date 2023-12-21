@@ -9,7 +9,7 @@ import (
 	"github.com/strangelove-ventures/horcrux/pkg/config"
 	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
 	"github.com/strangelove-ventures/horcrux/pkg/cosigner/nodesecurity"
-	"github.com/strangelove-ventures/horcrux/pkg/thresholdTemP"
+	tss "github.com/strangelove-ventures/horcrux/pkg/tss"
 	"github.com/strangelove-ventures/horcrux/signer"
 
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
@@ -30,7 +30,7 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 	eciesKey, err := ecies.GenerateKey(rand.Reader, secp256k1.S256(), nil)
 	require.NoError(t, err)
 
-	key := thresholdTemP.CosignerEd25519Key{
+	key := tss.CosignerEd25519Key{
 		PubKey:       dummyPub,
 		PrivateShard: []byte{},
 		ID:           1,

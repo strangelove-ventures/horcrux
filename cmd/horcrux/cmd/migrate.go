@@ -10,7 +10,7 @@ import (
 
 	cconfig "github.com/strangelove-ventures/horcrux/pkg/config"
 	"github.com/strangelove-ventures/horcrux/pkg/cosigner/nodesecurity"
-	"github.com/strangelove-ventures/horcrux/pkg/thresholdTemP"
+	"github.com/strangelove-ventures/horcrux/pkg/tss"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
@@ -221,7 +221,7 @@ func migrateCmd() *cobra.Command {
 				return err
 			}
 
-			newEd25519Key := thresholdTemP.CosignerEd25519Key{
+			newEd25519Key := tss.CosignerEd25519Key{
 				PubKey:       legacyCosignerKey.PubKey,
 				PrivateShard: legacyCosignerKey.ShareKey,
 				ID:           legacyCosignerKey.ID,

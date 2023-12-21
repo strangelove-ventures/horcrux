@@ -14,7 +14,7 @@ import (
 	"github.com/prometheus/common/expfmt"
 	"github.com/strangelove-ventures/horcrux/pkg/config"
 	"github.com/strangelove-ventures/horcrux/pkg/cosigner/nodesecurity"
-	"github.com/strangelove-ventures/horcrux/pkg/thresholdTemP"
+	tss "github.com/strangelove-ventures/horcrux/pkg/tss"
 	interchaintest "github.com/strangelove-ventures/interchaintest/v8"
 	"github.com/strangelove-ventures/interchaintest/v8/chain/cosmos"
 	"github.com/strangelove-ventures/interchaintest/v8/ibc"
@@ -253,13 +253,13 @@ func convertValidatorToHorcrux(
 }
 
 // getPrivvalKey gets the privval key from the validator and creates threshold shards from it.
-func getShardedPrivvalKey(ctx context.Context, node *cosmos.ChainNode, threshold uint8, shards uint8) ([]thresholdTemP.CosignerEd25519Key, crypto.PubKey, error) {
+func getShardedPrivvalKey(ctx context.Context, node *cosmos.ChainNode, threshold uint8, shards uint8) ([]tss.CosignerEd25519Key, crypto.PubKey, error) {
 	pvKey, err := getPrivvalKey(ctx, node)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	ed25519Shards := thresholdTemP.CreateEd25519ThresholdSignShards(pvKey, threshold, shards)
+	ed25519Shards := tss.CreateEd25519ThresholdSignShards(pvKey, threshold, shards)
 
 	return ed25519Shards, pvKey.PubKey, nil
 }
@@ -267,7 +267,7 @@ func getShardedPrivvalKey(ctx context.Context, node *cosmos.ChainNode, threshold
 // chainEd25519Shard is a wrapper for a chain Index and a shard of an ed25519 consensus key.
 type chainEd25519Shard struct {
 	chainID string
-	key     thresholdTemP.CosignerEd25519Key
+	key     tss.CosignerEd25519Key
 }
 
 // writeConfigAndKeysThreshold writes the config and keys for a horcrux cosigner to the sidecar's docker volume.

@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 
 	"github.com/strangelove-ventures/horcrux/pkg/cosigner/nodesecurity"
-	"github.com/strangelove-ventures/horcrux/pkg/thresholdTemP"
+	tss "github.com/strangelove-ventures/horcrux/pkg/tss"
 
 	"github.com/spf13/cobra"
 )
@@ -114,7 +114,7 @@ func createCosignerEd25519ShardsCmd() *cobra.Command {
 				return nil
 			}
 
-			csKeys, err := thresholdTemP.CreateEd25519ThresholdSignShardsFromFile(keyFile, threshold, shards)
+			csKeys, err := tss.CreateEd25519ThresholdSignShardsFromFile(keyFile, threshold, shards)
 			if err != nil {
 				return err
 			}
@@ -135,7 +135,7 @@ func createCosignerEd25519ShardsCmd() *cobra.Command {
 					return err
 				}
 				filename := filepath.Join(dir, fmt.Sprintf("%s_shard.json", chainID))
-				if err = thresholdTemP.WriteCosignerEd25519ShardFile(c, filename); err != nil {
+				if err = tss.WriteCosignerEd25519ShardFile(c, filename); err != nil {
 					return err
 				}
 				fmt.Fprintf(cmd.OutOrStdout(), "Created Ed25519 Shard %s\n", filename)
