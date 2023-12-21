@@ -101,6 +101,8 @@ linters-settings:
         alias: mrand
       - pkg: github.com/consensys/gnark-crypto/ecc/bn254/ecdsa
         alias: ecdsa_bn254
+      - pkg: github.com/strangelove-ventures/horcrux/signer/bn254
+        alias: horcrux_bn254
   maligned:
     suggest-new: true
   govet:

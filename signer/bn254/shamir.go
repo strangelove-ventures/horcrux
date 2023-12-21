@@ -46,7 +46,7 @@ func GenFromSecret(secret []byte, threshold uint8, total uint8) (Polynomial, Sha
 }
 
 func lagrangeCoeff(point int64, points ...int64) *big.Int {
-	var prodElements []*big.Int
+	var prodElements []*big.Int //nolint:prealloc
 
 	for _, j := range points {
 		if point == j {

@@ -29,7 +29,9 @@ func init() {
 func CombinePublicKeys(pks []*bn254.G1Affine, evaluationPoints ...int64) *bn254.G1Affine {
 	var sum = new(bn254.G1Affine)
 	zeroG1Bz := zeroG1.Bytes()
-	sum.SetBytes(zeroG1Bz[:])
+	if _, err := sum.SetBytes(zeroG1Bz[:]); err != nil {
+		panic(err)
+	}
 
 	for i := 0; i < len(evaluationPoints); i++ {
 		var inc = new(bn254.G1Affine)
@@ -44,7 +46,9 @@ func CombinePublicKeys(pks []*bn254.G1Affine, evaluationPoints ...int64) *bn254.
 func CombineSignatures(signatures []*bn254.G2Affine, evaluationPoints ...int64) *bn254.G2Affine {
 	var sum = new(bn254.G2Affine)
 	zeroG2Bz := zeroG2.Bytes()
-	sum.SetBytes(zeroG2Bz[:])
+	if _, err := sum.SetBytes(zeroG2Bz[:]); err != nil {
+		panic(err)
+	}
 
 	var signatureIndex int
 	for _, evaluationPoint := range evaluationPoints {
