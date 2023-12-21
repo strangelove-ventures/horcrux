@@ -15,19 +15,18 @@ type MockThresholdValidator struct {
 }
 
 type MockLeader struct {
-	id int
-
+	id     int
 	mu     sync.Mutex
-	leader *MockThresholdValidator
+	leader *signer.ThresholdValidator
 }
 
 func (m *MockLeader) IsLeader() bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.leader != nil && m.leader.myCosigner.GetIndex() == m.id
+	return m.leader != nil && m.leader.MyCosigner.GetIndex() == m.id
 }
 
-func (m *MockLeader) SetLeader(tv *MockThresholdValidator) {
+func (m *MockLeader) SetLeader(tv *signer.ThresholdValidator) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.leader = tv
