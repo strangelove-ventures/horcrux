@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var _ Leader = (*MockLeader)(nil)
+var _ ILeader = (*MockLeader)(nil)
 
 type MockThresholdValidator struct {
 	myCosigner *cosigner.LocalCosigner

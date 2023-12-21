@@ -2,8 +2,8 @@ package signer
 
 import "github.com/strangelove-ventures/horcrux/pkg/types"
 
-// Leader is an interface for the detecting if the current cosigner is the leader and performing leader actions.
-type Leader interface {
+// ILeader is an interface for the detecting if the current cosigner is the leader and performing leader actions.
+type ILeader interface {
 	// IsLeader returns true if the cosigner is the leader.
 	IsLeader() bool
 

@@ -25,20 +25,20 @@ func WriteMsg(writer io.Writer, msg cometprotoprivval.Message) (err error) {
 }
 
 // UnpackHRS deserializes sign bytes and gets the height, round, and step
-func UnpackHRST(signBytes []byte) (HRSTKey, error) {
+func UnpackHRST(signBytes []byte) (HRST, error) {
 	{
 		var proposal cometproto.CanonicalProposal
 		if err := protoio.UnmarshalDelimited(signBytes, &proposal); err == nil {
-			return HRSTKey{proposal.Height, proposal.Round, StepPropose, proposal.Timestamp.UnixNano()}, nil
+			return HRST{proposal.Height, proposal.Round, StepPropose, proposal.Timestamp.UnixNano()}, nil
 		}
 	}
 
 	{
 		var vote cometproto.CanonicalVote
 		if err := protoio.UnmarshalDelimited(signBytes, &vote); err == nil {
-			return HRSTKey{vote.Height, vote.Round, CanonicalVoteToStep(&vote), vote.Timestamp.UnixNano()}, nil
+			return HRST{vote.Height, vote.Round, CanonicalVoteToStep(&vote), vote.Timestamp.UnixNano()}, nil
 		}
 	}
 
-	return HRSTKey{0, 0, 0, 0}, errors.New("could not UnpackHRS from sign bytes")
+	return HRST{0, 0, 0, 0}, errors.New("could not UnpackHRS from sign bytes")
 }

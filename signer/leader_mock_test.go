@@ -8,7 +8,7 @@ import (
 	"github.com/strangelove-ventures/horcrux/signer"
 )
 
-var _ signer.Leader = (*MockLeader)(nil)
+var _ signer.ILeader = (*MockLeader)(nil)
 
 type MockThresholdValidator struct {
 	myCosigner *cosigner.LocalCosigner

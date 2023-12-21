@@ -4,15 +4,15 @@ import (
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 )
 
-// HRSKey represents the key for the HRS metadata map.
-type HRSKey struct {
+// HRS represents the HRS (Height, Round Step) metadata map.
+type HRS struct {
 	Height int64
 	Round  int64
 	Step   int8
 }
 
-// GreaterThan returns true if the HRSKey is greater than the other HRSKey.
-func (hrs HRSKey) GreaterThan(other HRSKey) bool {
+// GreaterThan returns true if the HRS struct is greater than the other HRS struct.
+func (hrs HRS) GreaterThan(other HRS) bool {
 	if hrs.Height > other.Height {
 		return true
 	}
@@ -28,39 +28,39 @@ func (hrs HRSKey) GreaterThan(other HRSKey) bool {
 	return hrs.Step > other.Step
 }
 
-// LessThan returns true if the HRSKey is less than the other HRSKey.
-func (hrs HRSKey) LessThan(other HRSKey) bool {
+// LessThan returns true if the HRS is less than the other HRS.
+func (hrs HRS) LessThan(other HRS) bool {
 	return hrs != other && !hrs.GreaterThan(other)
 }
 
-// HRSTKey represents the HRS metadata key with a timestamp.
-type HRSTKey struct {
+// HRST represents the HRS metadata key with a timestamp.
+type HRST struct {
 	Height    int64
 	Round     int64
 	Step      int8
 	Timestamp int64
 }
 
-// HRSKey returns the HRSKey portion of the HRSTKey.
-func (hrst HRSTKey) HRSKey() HRSKey {
-	return HRSKey{
+// HRS returns the HRS portion of the HRSTKey.
+func (hrst HRST) HRS() HRS {
+	return HRS{
 		Height: hrst.Height,
 		Round:  hrst.Round,
 		Step:   hrst.Step,
 	}
 }
 
-// HRSTKeyFromProto returns a HRSTKey from a proto.HRST.
-func HRSTKeyFromProto(hrs *proto.HRST) HRSTKey {
-	return HRSTKey{
-		Height:    hrs.GetHeight(),
-		Round:     hrs.GetRound(),
-		Step:      int8(hrs.GetStep()),
-		Timestamp: hrs.GetTimestamp(),
+// HRSTFromProto returns a HRSTKey from a proto.HRST.
+func HRSTFromProto(hrst *proto.HRST) HRST {
+	return HRST{
+		Height:    hrst.GetHeight(),
+		Round:     hrst.GetRound(),
+		Step:      int8(hrst.GetStep()),
+		Timestamp: hrst.GetTimestamp(),
 	}
 }
 
-func (hrst HRSTKey) ToProto() *proto.HRST {
+func (hrst HRST) ToProto() *proto.HRST {
 	return &proto.HRST{
 		Height:    hrst.Height,
 		Round:     hrst.Round,

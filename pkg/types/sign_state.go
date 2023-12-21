@@ -14,89 +14,9 @@ import (
 	"github.com/cometbft/cometbft/libs/protoio"
 	"github.com/cometbft/cometbft/libs/tempfile"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	comet "github.com/cometbft/cometbft/types"
 	"github.com/gogo/protobuf/proto"
 	"github.com/strangelove-ventures/horcrux/signer/cond"
 )
-
-const (
-	StepPropose   int8 = 1
-	StepPrevote   int8 = 2
-	StepPrecommit int8 = 3
-	blocksTocache      = 3
-)
-
-func SignType(step int8) string {
-	switch step {
-	case StepPropose:
-		return "proposal"
-	case StepPrevote:
-		return "prevote"
-	case StepPrecommit:
-		return "precommit"
-	default:
-		return "unknown"
-	}
-}
-
-func CanonicalVoteToStep(vote *cometproto.CanonicalVote) int8 {
-	switch vote.Type {
-	case cometproto.PrevoteType:
-		return StepPrevote
-	case cometproto.PrecommitType:
-		return StepPrecommit
-	default:
-		panic("Unknown vote type")
-	}
-}
-
-func VoteToStep(vote *cometproto.Vote) int8 {
-	switch vote.Type {
-	case cometproto.PrevoteType:
-		return StepPrevote
-	case cometproto.PrecommitType:
-		return StepPrecommit
-	default:
-		panic("Unknown vote type")
-	}
-}
-
-func VoteToBlock(chainID string, vote *cometproto.Vote) Block {
-	return Block{
-		Height:    vote.Height,
-		Round:     int64(vote.Round),
-		Step:      VoteToStep(vote),
-		SignBytes: comet.VoteSignBytes(chainID, vote),
-		Timestamp: vote.Timestamp,
-	}
-}
-
-func ProposalToStep(_ *cometproto.Proposal) int8 {
-	return StepPropose
-}
-
-func ProposalToBlock(chainID string, proposal *cometproto.Proposal) Block {
-	return Block{
-		Height:    proposal.Height,
-		Round:     int64(proposal.Round),
-		Step:      ProposalToStep(proposal),
-		SignBytes: comet.ProposalSignBytes(chainID, proposal),
-		Timestamp: proposal.Timestamp,
-	}
-}
-
-func StepToType(step int8) cometproto.SignedMsgType {
-	switch step {
-	case StepPropose:
-		return cometproto.ProposalType
-	case StepPrevote:
-		return cometproto.PrevoteType
-	case StepPrecommit:
-		return cometproto.PrecommitType
-	default:
-		panic("Unknown step")
-	}
-}
 
 // SignState stores signing information for high level watermark management.
 type SignState struct {
@@ -110,18 +30,18 @@ type SignState struct {
 	FilePath string
 
 	// mu protects the cache and is used for signaling with Cond.
-	mu    sync.RWMutex                  // private to avoid marshall issues
-	cache map[HRSKey]SignStateConsensus // private to avoid marshall issues
-	cond  *cond.Cond                    // private to avoid marshall issues
+	mu    sync.RWMutex               // private to avoid marshall issues
+	cache map[HRS]SignStateConsensus // private to avoid marshall issues
+	cond  *cond.Cond                 // private to avoid marshall issues
 }
 
 // GetCache is a get wrapper for [SignState.cache]
-func (signState *SignState) GetCache(hrs HRSKey) (SignStateConsensus, bool) {
+func (signState *SignState) GetCache(hrs HRS) (SignStateConsensus, bool) {
 	ssc, err := signState.cache[hrs]
 	return ssc, err
 }
 
-func (signState *SignState) SetCache(hrs HRSKey, signStateConsensus SignStateConsensus) {
+func (signState *SignState) SetCache(hrs HRS, signStateConsensus SignStateConsensus) {
 	signState.cache[hrs] = signStateConsensus
 }
 
@@ -155,10 +75,10 @@ func (signState *SignState) Lock() {
 func (signState *SignState) Unlock() {
 	signState.mu.Unlock()
 }
-func (signState *SignState) ExistingSignatureOrErrorIfRegression(hrst HRSTKey, signBytes []byte) ([]byte, error) {
+func (signState *SignState) ExistingSignatureOrErrorIfRegression(hrst HRST, signBytes []byte) ([]byte, error) {
 	return signState.existingSignatureOrErrorIfRegression(hrst, signBytes)
 }
-func (signState *SignState) existingSignatureOrErrorIfRegression(hrst HRSTKey, signBytes []byte) ([]byte, error) {
+func (signState *SignState) existingSignatureOrErrorIfRegression(hrst HRST, signBytes []byte) ([]byte, error) {
 	signState.mu.RLock()
 	defer signState.mu.RUnlock()
 
@@ -184,18 +104,18 @@ func (signState *SignState) existingSignatureOrErrorIfRegression(hrst HRSTKey, s
 	return nil, nil
 }
 
-func (signState *SignState) HRSKey() HRSKey {
+func (signState *SignState) hrs() HRS {
 	signState.mu.RLock()
 	defer signState.mu.RUnlock()
-	return HRSKey{
+	return HRS{
 		Height: signState.Height,
 		Round:  signState.Round,
 		Step:   signState.Step,
 	}
 }
 
-func (signState *SignState) hrsKeyLocked() HRSKey {
-	return HRSKey{
+func (signState *SignState) hrsKeyLocked() HRS {
+	return HRS{
 		Height: signState.Height,
 		Round:  signState.Round,
 		Step:   signState.Step,
@@ -210,8 +130,8 @@ type SignStateConsensus struct {
 	SignBytes cometbytes.HexBytes
 }
 
-func (signState SignStateConsensus) HRSKey() HRSKey {
-	return HRSKey{
+func (signState SignStateConsensus) HRSKey() HRS {
+	return HRS{
 		Height: signState.Height,
 		Round:  signState.Round,
 		Step:   signState.Step,
@@ -246,7 +166,7 @@ func newConflictingDataError(existingSignBytes, newSignBytes []byte) *Conflictin
 
 // GetFromCache will return the latest signed block within the SignState
 // and the relevant SignStateConsensus from the cache, if present.
-func (signState *SignState) GetFromCache(hrs HRSKey) (HRSKey, *SignStateConsensus) {
+func (signState *SignState) GetFromCache(hrs HRS) (HRS, *SignStateConsensus) {
 	signState.mu.RLock()
 	defer signState.mu.RUnlock()
 	latestBlock := signState.hrsKeyLocked()
@@ -400,7 +320,7 @@ var ErrEmptySignBytes = errors.New("no SignBytes found")
 // Returns true if the HRS matches the arguments and the SignBytes are not empty (indicating
 // we have already signed for this HRS, and can reuse the existing signature).
 // It panics if the HRS matches the arguments, there's a SignBytes, but no Signature.
-func (signState *SignState) CheckHRS(hrst HRSTKey) (bool, error) {
+func (signState *SignState) CheckHRS(hrst HRST) (bool, error) {
 	if signState.Height > hrst.Height {
 		return false, newHeightRegressionError(hrst.Height, signState.Height)
 	}
@@ -433,22 +353,22 @@ type SameHRSError struct {
 
 func (e *SameHRSError) Error() string { return e.msg }
 
-func newSameHRSError(hrs HRSKey) *SameHRSError {
+func newSameHRSError(hrs HRS) *SameHRSError {
 	return &SameHRSError{
 		msg: fmt.Sprintf("HRS is the same as current: %d:%d:%d", hrs.Height, hrs.Round, hrs.Step),
 	}
 }
 
 func (signState *SignState) GetErrorIfLessOrEqual(height int64, round int64, step int8) error {
-	hrs := HRSKey{Height: height, Round: round, Step: step}
-	signStateHRS := signState.HRSKey()
+	hrs := HRS{Height: height, Round: round, Step: step}
+	signStateHRS := signState.hrs()
 	if signStateHRS.GreaterThan(hrs) {
 		return errors.New("regression not allowed")
 	}
 
 	if hrs == signStateHRS {
 		// same HRS as current
-		return newSameHRSError(HRSKey{Height: height, Round: round, Step: step})
+		return newSameHRSError(HRS{Height: height, Round: round, Step: step})
 	}
 	// Step is greater, so all good
 	return nil
@@ -464,14 +384,14 @@ func (signState *SignState) FreshCache() *SignState {
 		NoncePublic: signState.NoncePublic,
 		Signature:   signState.Signature,
 		SignBytes:   signState.SignBytes,
-		cache:       make(map[HRSKey]SignStateConsensus),
+		cache:       make(map[HRS]SignStateConsensus),
 
 		FilePath: signState.FilePath,
 	}
 
 	newSignState.cond = cond.New(&newSignState.mu)
 
-	newSignState.cache[HRSKey{
+	newSignState.cache[HRS{
 		Height: signState.Height,
 		Round:  signState.Round,
 		Step:   signState.Step,
@@ -517,7 +437,7 @@ func LoadOrCreateSignState(filepath string) (*SignState, error) {
 		// Make an empty sign state and save it.
 		state := &SignState{
 			FilePath: filepath,
-			cache:    make(map[HRSKey]SignStateConsensus),
+			cache:    make(map[HRS]SignStateConsensus),
 		}
 		state.cond = cond.New(&state.mu)
 

@@ -28,7 +28,7 @@ type CosignerNonceCache struct {
 	logger    cometlog.Logger
 	cosigners []ICosigner
 
-	leader Leader
+	leader ILeader
 
 	lastReconcileNonces atomic.Uint64
 	lastReconcileTime   time.Time
@@ -167,7 +167,7 @@ type CachedNonce struct {
 func NewCosignerNonceCache(
 	logger cometlog.Logger,
 	cosigners []ICosigner,
-	leader Leader,
+	leader ILeader,
 	getNoncesInterval time.Duration,
 	getNoncesTimeout time.Duration,
 	nonceExpiration time.Duration,

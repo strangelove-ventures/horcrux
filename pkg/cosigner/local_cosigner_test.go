@@ -129,7 +129,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []cosi
 
 	now := time.Now()
 
-	hrst := types.HRSTKey{
+	hrst := types.HRST{
 		Height:    1,
 		Round:     0,
 		Step:      2,

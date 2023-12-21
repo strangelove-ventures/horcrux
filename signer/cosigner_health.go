@@ -22,10 +22,10 @@ type CosignerHealth struct {
 	rtt       map[int]int64
 	mu        sync.RWMutex
 
-	leader Leader
+	leader ILeader
 }
 
-func NewCosignerHealth(logger cometlog.Logger, cosigners []ICosigner, leader Leader) *CosignerHealth {
+func NewCosignerHealth(logger cometlog.Logger, cosigners []ICosigner, leader ILeader) *CosignerHealth {
 	return &CosignerHealth{
 		logger:    logger,
 		cosigners: cosigners,

@@ -36,7 +36,7 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-var _ Leader = (*RaftStore)(nil)
+var _ ILeader = (*RaftStore)(nil)
 
 const (
 	retainSnapshotCount = 2

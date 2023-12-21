@@ -123,6 +123,6 @@ func (n CosignerUUIDNoncesMultiple) ToProto() []*proto.UUIDNonce {
 type CosignerSetNoncesAndSignRequest struct {
 	ChainID   string
 	Nonces    *CosignerUUIDNonces
-	HRST      types.HRSTKey
+	HRST      types.HRST
 	SignBytes []byte
 }
