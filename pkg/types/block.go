@@ -32,7 +32,7 @@ func (block Block) GetHRS() HRS {
 	}
 }
 
-func (block Block) HRST() HRST {
+func (block Block) ToHRST() HRST {
 	return HRST{
 		Height:    block.Height,
 		Round:     block.Round,

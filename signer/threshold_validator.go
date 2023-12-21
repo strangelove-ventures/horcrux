@@ -625,12 +625,15 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 
 	timeStartSignBlock := time.Now()
 
-	hrst := types.HRST{
-		Height:    height,
-		Round:     round,
-		Step:      step,
-		Timestamp: stamp.UnixNano(),
-	}
+	hrst := block.ToHRST()
+	/*
+		types.HRST{
+			Height:    height,
+			Round:     round,
+			Step:      step,
+			Timestamp: stamp.UnixNano(),
+		}
+	*/
 
 	// Keep track of the last block that we began the signing process for. Only allow one attempt per block
 	existingSignature, existingTimestamp, err := pv.SaveLastSignedStateInitiated(chainID, &block)
