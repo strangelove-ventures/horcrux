@@ -23,7 +23,7 @@ func rootCmd() *cobra.Command {
 	cmd.AddCommand(configCmd())
 	cmd.AddCommand(startCmd())
 	cmd.AddCommand(addressCmd())
-	cmd.AddCommand(createCosignerEd25519ShardsCmd())
+	cmd.AddCommand(createCosignerShardsCmd())
 	cmd.AddCommand(createCosignerECIESShardsCmd())
 
 	rsaCmd := createCosignerRSAShardsCmd()

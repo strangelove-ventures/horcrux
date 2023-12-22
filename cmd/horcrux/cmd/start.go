@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
+	"net"
 	"os"
+	"time"
 
-	cometlog "github.com/cometbft/cometbft/libs/log"
-	"github.com/cometbft/cometbft/libs/service"
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/v3/signer"
 )
@@ -18,7 +20,7 @@ func startCmd() *cobra.Command {
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			out := cmd.OutOrStdout()
-			logger := cometlog.NewTMLogger(cometlog.NewSyncWriter(out))
+			logger := slog.New(slog.NewTextHandler(out, nil))
 
 			err := signer.RequireNotRunning(logger, config.PidFile)
 			if err != nil {
@@ -42,12 +44,14 @@ func startCmd() *cobra.Command {
 
 			acceptRisk, _ := cmd.Flags().GetBool(flagAcceptRisk)
 
+			ctx, cancel := context.WithCancel(cmd.Context())
+			defer cancel()
+
 			var val signer.PrivValidator
-			var services []service.Service
 
 			switch config.Config.SignMode {
 			case signer.SignModeThreshold:
-				services, val, err = NewThresholdValidator(cmd.Context(), logger)
+				val, err = NewThresholdValidator(ctx, logger)
 				if err != nil {
 					return err
 				}
@@ -62,21 +66,23 @@ func startCmd() *cobra.Command {
 
 			if config.Config.GRPCAddr != "" {
 				grpcServer := signer.NewRemoteSignerGRPCServer(logger, val, config.Config.GRPCAddr)
-				services = append(services, grpcServer)
 
-				if err := grpcServer.Start(); err != nil {
-					return fmt.Errorf("failed to start grpc server: %w", err)
-				}
+				grpcServer.Start()
 			}
 
-			go EnableDebugAndMetrics(cmd.Context(), out)
+			go EnableDebugAndMetrics(ctx, out)
 
-			services, err = signer.StartRemoteSigners(services, logger, val, config.Config.Nodes())
-			if err != nil {
-				return fmt.Errorf("failed to start remote signer(s): %w", err)
+			for _, node := range config.Config.Nodes() {
+				// CometBFT requires a connection within 3 seconds of start or crashes
+				// A long timeout such as 30 seconds would cause the sentry to fail in loops
+				// Use a short timeout and dial often to connect within 3 second window
+				dialer := net.Dialer{Timeout: 2 * time.Second}
+				s := signer.NewReconnRemoteSigner(node, logger, val, dialer)
+
+				s.Start(ctx)
 			}
 
-			signer.WaitAndTerminate(logger, services, config.PidFile)
+			signer.WaitAndTerminate(logger, cancel, config.PidFile)
 
 			return nil
 		},

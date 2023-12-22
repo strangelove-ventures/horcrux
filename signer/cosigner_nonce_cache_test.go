@@ -2,12 +2,12 @@ package signer
 
 import (
 	"context"
+	"log/slog"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
-	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
@@ -56,7 +56,7 @@ func TestMovingAverage(t *testing.T) {
 }
 
 func TestClearNonces(t *testing.T) {
-	lcs, _ := getTestLocalCosigners(t, 2, 3)
+	lcs := getTestLocalCosigners(t, CosignerKeyTypeEd25519, 2, 3)
 	cosigners := make([]Cosigner, len(lcs))
 	for i, lc := range lcs {
 		cosigners[i] = lc
@@ -141,7 +141,7 @@ func (mp *mockPruner) Result() (int, int) {
 }
 
 func TestNonceCacheDemand(t *testing.T) {
-	lcs, _ := getTestLocalCosigners(t, 2, 3)
+	lcs := getTestLocalCosigners(t, CosignerKeyTypeEd25519, 2, 3)
 	cosigners := make([]Cosigner, len(lcs))
 	for i, lc := range lcs {
 		cosigners[i] = lc
@@ -150,7 +150,7 @@ func TestNonceCacheDemand(t *testing.T) {
 	mp := &mockPruner{}
 
 	nonceCache := NewCosignerNonceCache(
-		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)),
+		slog.New(slog.NewTextHandler(os.Stdout, nil)),
 		cosigners,
 		&MockLeader{id: 1, leader: &ThresholdValidator{myCosigner: lcs[0]}},
 		500*time.Millisecond,
@@ -190,7 +190,7 @@ func TestNonceCacheDemand(t *testing.T) {
 }
 
 func TestNonceCacheExpiration(t *testing.T) {
-	lcs, _ := getTestLocalCosigners(t, 2, 3)
+	lcs := getTestLocalCosigners(t, CosignerKeyTypeEd25519, 2, 3)
 	cosigners := make([]Cosigner, len(lcs))
 	for i, lc := range lcs {
 		cosigners[i] = lc
@@ -202,7 +202,7 @@ func TestNonceCacheExpiration(t *testing.T) {
 	getNoncesInterval := noncesExpiration / 5
 	getNoncesTimeout := 10 * time.Millisecond
 	nonceCache := NewCosignerNonceCache(
-		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)),
+		slog.New(slog.NewTextHandler(os.Stdout, nil)),
 		cosigners,
 		&MockLeader{id: 1, leader: &ThresholdValidator{myCosigner: lcs[0]}},
 		getNoncesInterval,
@@ -401,14 +401,14 @@ func TestNonceCachePrune(t *testing.T) {
 }
 
 func TestNonceCacheDemandSlow(t *testing.T) {
-	lcs, _ := getTestLocalCosigners(t, 2, 3)
+	lcs := getTestLocalCosigners(t, CosignerKeyTypeEd25519, 2, 3)
 	cosigners := make([]Cosigner, len(lcs))
 	for i, lc := range lcs {
 		cosigners[i] = lc
 	}
 
 	nonceCache := NewCosignerNonceCache(
-		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)),
+		slog.New(slog.NewTextHandler(os.Stdout, nil)),
 		cosigners,
 		&MockLeader{id: 1, leader: &ThresholdValidator{myCosigner: lcs[0]}},
 		90*time.Millisecond,
@@ -438,14 +438,14 @@ func TestNonceCacheDemandSlowDefault(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
-	lcs, _ := getTestLocalCosigners(t, 2, 3)
+	lcs := getTestLocalCosigners(t, CosignerKeyTypeEd25519, 2, 3)
 	cosigners := make([]Cosigner, len(lcs))
 	for i, lc := range lcs {
 		cosigners[i] = lc
 	}
 
 	nonceCache := NewCosignerNonceCache(
-		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)),
+		slog.New(slog.NewTextHandler(os.Stdout, nil)),
 		cosigners,
 		&MockLeader{id: 1, leader: &ThresholdValidator{myCosigner: lcs[0]}},
 		defaultGetNoncesInterval,

@@ -1,16 +1,16 @@
 package signer
 
 import (
+	"log/slog"
 	"os"
 	"testing"
 
-	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCosignerHealth(t *testing.T) {
 	ch := NewCosignerHealth(
-		cometlog.NewTMLogger(cometlog.NewSyncWriter(os.Stdout)),
+		slog.New(slog.NewTextHandler(os.Stdout, nil)),
 		[]Cosigner{
 			&RemoteCosigner{id: 2},
 			&RemoteCosigner{id: 3},

@@ -5,8 +5,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cometbft/cometbft/crypto/ed25519"
-	"github.com/cometbft/cometbft/privval"
+	"github.com/strangelove-ventures/horcrux/v3/cmd/horcrux/cmd/testdata"
+	"github.com/strangelove-ventures/horcrux/v3/comet/crypto/ed25519"
+	cometjson "github.com/strangelove-ventures/horcrux/v3/comet/libs/json"
+	"github.com/strangelove-ventures/horcrux/v3/comet/privval"
+	"github.com/strangelove-ventures/horcrux/v3/signer"
 	"github.com/stretchr/testify/require"
 )
 
@@ -138,4 +141,59 @@ func TestRSAShards(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPrivValidatorBn254(t *testing.T) {
+	bz := testdata.PrivValidatorKeyBn254
+	var privvalKey privval.FilePVKey
+	err := cometjson.Unmarshal(bz, &privvalKey)
+	require.NoError(t, err)
+
+	msg := []byte("hello")
+
+	sig, err := privvalKey.PrivKey.Sign(msg)
+	require.NoError(t, err)
+
+	valid := privvalKey.PrivKey.PubKey().VerifySignature(msg, sig)
+	require.True(t, valid)
+
+	valid = privvalKey.PubKey.VerifySignature(msg, sig)
+	require.True(t, valid)
+
+	shards, err := signer.CreateCosignerShards(&privvalKey, 2, 3)
+	require.NoError(t, err)
+
+	var signers = make([]*signer.ThresholdSignerSoftBn254, len(shards))
+	var sigs = make([][]byte, len(shards))
+
+	for i, shard := range shards {
+		shard := shard
+		signers[i], err = signer.NewThresholdSignerSoftBn254(&shard, 2, 3)
+		require.NoError(t, err)
+
+		sig, err = signers[i].Sign(nil, msg)
+		require.NoError(t, err)
+
+		sigs[i] = sig
+	}
+
+	var partialSigs = make([]signer.PartialSignature, 0, 2)
+	for i, sig := range sigs {
+		if i == 0 {
+			continue
+		}
+		partialSigs = append(partialSigs, signer.PartialSignature{
+			ID:        i + 1,
+			Signature: sig,
+		})
+	}
+
+	combinedSig, err := signers[0].CombineSignatures(partialSigs)
+	require.NoError(t, err)
+
+	valid = privvalKey.PrivKey.PubKey().VerifySignature(msg, combinedSig)
+	require.True(t, valid)
+
+	valid = privvalKey.PubKey.VerifySignature(msg, combinedSig)
+	require.True(t, valid)
 }

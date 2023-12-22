@@ -1,10 +1,10 @@
-package signer
+package types
 
 import (
 	"testing"
 
-	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	comet "github.com/cometbft/cometbft/types"
+	cometproto "github.com/strangelove-ventures/horcrux/v3/comet/proto/types"
+	comet "github.com/strangelove-ventures/horcrux/v3/comet/types"
 	"github.com/stretchr/testify/require"
 )
 

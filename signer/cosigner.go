@@ -4,9 +4,11 @@ import (
 	"context"
 	"time"
 
-	cometcrypto "github.com/cometbft/cometbft/crypto"
+	cometcrypto "github.com/strangelove-ventures/horcrux/v3/comet/crypto"
+	grpccosigner "github.com/strangelove-ventures/horcrux/v3/grpc/cosigner"
+	"github.com/strangelove-ventures/horcrux/v3/types"
+
 	"github.com/google/uuid"
-	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 )
 
 // Cosigner interface is a set of methods for an m-of-n threshold signature.
@@ -64,8 +66,8 @@ type CosignerNonce struct {
 	Signature     []byte
 }
 
-func (secretPart *CosignerNonce) toProto() *proto.Nonce {
-	return &proto.Nonce{
+func (secretPart *CosignerNonce) toProto() *grpccosigner.Nonce {
+	return &grpccosigner.Nonce{
 		SourceID:      int32(secretPart.SourceID),
 		DestinationID: int32(secretPart.DestinationID),
 		PubKey:        secretPart.PubKey,
@@ -76,14 +78,14 @@ func (secretPart *CosignerNonce) toProto() *proto.Nonce {
 
 type CosignerNonces []CosignerNonce
 
-func (secretParts CosignerNonces) toProto() (out []*proto.Nonce) {
+func (secretParts CosignerNonces) toProto() (out []*grpccosigner.Nonce) {
 	for _, secretPart := range secretParts {
 		out = append(out, secretPart.toProto())
 	}
 	return
 }
 
-func CosignerNonceFromProto(secretPart *proto.Nonce) CosignerNonce {
+func CosignerNonceFromProto(secretPart *grpccosigner.Nonce) CosignerNonce {
 	return CosignerNonce{
 		SourceID:      int(secretPart.SourceID),
 		DestinationID: int(secretPart.DestinationID),
@@ -93,7 +95,7 @@ func CosignerNonceFromProto(secretPart *proto.Nonce) CosignerNonce {
 	}
 }
 
-func CosignerNoncesFromProto(secretParts []*proto.Nonce) []CosignerNonce {
+func CosignerNoncesFromProto(secretParts []*grpccosigner.Nonce) []CosignerNonce {
 	out := make([]CosignerNonce, len(secretParts))
 	for i, secretPart := range secretParts {
 		out[i] = CosignerNonceFromProto(secretPart)
@@ -103,7 +105,7 @@ func CosignerNoncesFromProto(secretParts []*proto.Nonce) []CosignerNonce {
 
 type CosignerSignBlockRequest struct {
 	ChainID string
-	Block   *Block
+	Block   *types.Block
 }
 
 type CosignerSignBlockResponse struct {
@@ -126,10 +128,10 @@ func (n *CosignerUUIDNonces) For(id int) *CosignerUUIDNonces {
 
 type CosignerUUIDNoncesMultiple []*CosignerUUIDNonces
 
-func (n CosignerUUIDNoncesMultiple) toProto() []*proto.UUIDNonce {
-	out := make([]*proto.UUIDNonce, len(n))
+func (n CosignerUUIDNoncesMultiple) toProto() []*grpccosigner.UUIDNonce {
+	out := make([]*grpccosigner.UUIDNonce, len(n))
 	for i, nonces := range n {
-		out[i] = &proto.UUIDNonce{
+		out[i] = &grpccosigner.UUIDNonce{
 			Uuid:   nonces.UUID[:],
 			Nonces: nonces.Nonces.toProto(),
 		}
@@ -140,6 +142,6 @@ func (n CosignerUUIDNoncesMultiple) toProto() []*proto.UUIDNonce {
 type CosignerSetNoncesAndSignRequest struct {
 	ChainID   string
 	Nonces    *CosignerUUIDNonces
-	HRST      HRSTKey
+	HRST      types.HRSTKey
 	SignBytes []byte
 }

@@ -61,11 +61,12 @@ func addTotalShardsFlag(cmd *cobra.Command) {
 
 // createCosignerEd25519ShardsCmd is a cobra command for creating
 // cosigner shards from a full priv validator key.
-func createCosignerEd25519ShardsCmd() *cobra.Command {
+func createCosignerShardsCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "create-ed25519-shards",
-		Args:  cobra.NoArgs,
-		Short: "Create cosigner Ed25519 shards",
+		Use:     "create-shards",
+		Aliases: []string{"create-ed25519-shards", "create-bn254-shards"},
+		Args:    cobra.NoArgs,
+		Short:   "Create cosigner consensus key shards",
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			flags := cmd.Flags()
 
@@ -112,7 +113,7 @@ func createCosignerEd25519ShardsCmd() *cobra.Command {
 				return nil
 			}
 
-			csKeys, err := signer.CreateCosignerEd25519ShardsFromFile(keyFile, threshold, shards)
+			csKeys, err := signer.CreateCosignerShardsFromFile(keyFile, threshold, shards)
 			if err != nil {
 				return err
 			}
@@ -133,10 +134,10 @@ func createCosignerEd25519ShardsCmd() *cobra.Command {
 					return err
 				}
 				filename := filepath.Join(dir, fmt.Sprintf("%s_shard.json", chainID))
-				if err = signer.WriteCosignerEd25519ShardFile(c, filename); err != nil {
+				if err = signer.WriteCosignerShardFile(c, filename); err != nil {
 					return err
 				}
-				fmt.Fprintf(cmd.OutOrStdout(), "Created Ed25519 Shard %s\n", filename)
+				fmt.Fprintf(cmd.OutOrStdout(), "Created %s Shard %s\n", c.KeyType, filename)
 			}
 			return nil
 		},

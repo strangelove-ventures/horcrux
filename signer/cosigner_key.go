@@ -2,26 +2,41 @@ package signer
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 
-	cometcrypto "github.com/cometbft/cometbft/crypto"
-	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	cometcryptoencoding "github.com/cometbft/cometbft/crypto/encoding"
-	cometprotocrypto "github.com/cometbft/cometbft/proto/tendermint/crypto"
-	amino "github.com/tendermint/go-amino"
+	cometcrypto "github.com/strangelove-ventures/horcrux/v3/comet/crypto"
+	cometcryptobn254 "github.com/strangelove-ventures/horcrux/v3/comet/crypto/bn254"
+	cometcryptoed25519 "github.com/strangelove-ventures/horcrux/v3/comet/crypto/ed25519"
+	"github.com/strangelove-ventures/horcrux/v3/comet/encoding"
+	cometprotocrypto "github.com/strangelove-ventures/horcrux/v3/comet/proto/crypto"
+
+	"github.com/tendermint/go-amino"
 )
 
-// CosignerEd25519Key is a single Ed255219 key shard for an m-of-n threshold signer.
-type CosignerEd25519Key struct {
-	PubKey       cometcrypto.PubKey `json:"pubKey"`
-	PrivateShard []byte             `json:"privateShard"`
-	ID           int                `json:"id"`
+// CosignerKey is a single key shard for an m-of-n threshold signer.
+type CosignerKey struct {
+	KeyType      string `json:"keyType"`
+	PubKey       []byte `json:"pubKey"`
+	PrivateShard []byte `json:"privateShard"`
+	ID           int    `json:"id"`
 }
 
-func (key *CosignerEd25519Key) MarshalJSON() ([]byte, error) {
-	type Alias CosignerEd25519Key
+func (key *CosignerKey) MarshalJSON() ([]byte, error) {
+	type Alias CosignerKey
 
-	protoPubkey, err := cometcryptoencoding.PubKeyToProto(key.PubKey)
+	var pub cometcrypto.PubKey
+	switch key.KeyType {
+	case CosignerKeyTypeBn254:
+		pub = cometcryptobn254.PubKey(key.PubKey)
+	case CosignerKeyTypeEd25519:
+		fallthrough
+	default:
+		pub = cometcryptoed25519.PubKey(key.PubKey)
+	}
+
+	protoPubkey, err := encoding.PubKeyToProto(pub)
 	if err != nil {
 		return nil, err
 	}
@@ -40,8 +55,8 @@ func (key *CosignerEd25519Key) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func (key *CosignerEd25519Key) UnmarshalJSON(data []byte) error {
-	type Alias CosignerEd25519Key
+func (key *CosignerKey) UnmarshalJSON(data []byte) error {
+	type Alias CosignerKey
 
 	aux := &struct {
 		PubkeyBytes []byte `json:"pubKey"`
@@ -64,29 +79,29 @@ func (key *CosignerEd25519Key) UnmarshalJSON(data []byte) error {
 	// To support reading the public key bytes from these key files, we fallback to
 	// amino unmarshalling if the protobuf unmarshalling fails
 	if err != nil {
-		var pub cometcryptoed25519.PubKey
 		codec := amino.NewCodec()
 		codec.RegisterInterface((*cometcrypto.PubKey)(nil), nil)
 		codec.RegisterConcrete(cometcryptoed25519.PubKey{}, "tendermint/PubKeyEd25519", nil)
-		errInner := codec.UnmarshalBinaryBare(aux.PubkeyBytes, &pub)
-		if errInner != nil {
-			return err
+
+		var pub cometcryptoed25519.PubKey
+		if errInner := codec.UnmarshalBinaryBare(aux.PubkeyBytes, &pub); errInner != nil {
+			return fmt.Errorf("error in unmarshal ed25519: %w", errors.Join(err, errInner))
 		}
 		pubkey = pub
 	} else {
-		pubkey, err = cometcryptoencoding.PubKeyFromProto(protoPubkey)
+		pubkey, err = encoding.PubKeyFromProto(protoPubkey)
 		if err != nil {
 			return err
 		}
 	}
 
-	key.PubKey = pubkey
+	key.PubKey = pubkey.Bytes()
 	return nil
 }
 
-// LoadCosignerEd25519Key loads a CosignerEd25519Key from file.
-func LoadCosignerEd25519Key(file string) (CosignerEd25519Key, error) {
-	pvKey := CosignerEd25519Key{}
+// LoadCosignerKey loads a CosignerKey from file.
+func LoadCosignerKey(file string) (*CosignerKey, error) {
+	pvKey := new(CosignerKey)
 	keyJSONBytes, err := os.ReadFile(file)
 	if err != nil {
 		return pvKey, err
@@ -94,7 +109,7 @@ func LoadCosignerEd25519Key(file string) (CosignerEd25519Key, error) {
 
 	err = json.Unmarshal(keyJSONBytes, &pvKey)
 	if err != nil {
-		return pvKey, err
+		return pvKey, fmt.Errorf("error in unmarshal: %w", err)
 	}
 
 	return pvKey, nil

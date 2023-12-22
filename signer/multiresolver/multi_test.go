@@ -10,9 +10,9 @@ import (
 	"time"
 
 	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
+	grpccosigner "github.com/strangelove-ventures/horcrux/v3/grpc/cosigner"
 	"github.com/strangelove-ventures/horcrux/v3/signer"
 	"github.com/strangelove-ventures/horcrux/v3/signer/multiresolver"
-	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -39,7 +39,7 @@ func createListener(nodeID string, homedir string) (string, func(), error) {
 	}
 
 	grpcServer := grpc.NewServer()
-	proto.RegisterCosignerServer(grpcServer, signer.NewCosignerGRPCServer(nil, nil, s))
+	grpccosigner.RegisterCosignerServer(grpcServer, signer.NewCosignerGRPCServer(nil, nil, s))
 	transportManager.Register(grpcServer)
 
 	go func() {
@@ -90,8 +90,8 @@ func TestMultiResolver(t *testing.T) {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancelFunc()
 
-	grpcClient := proto.NewCosignerClient(connDNS)
-	_, err = grpcClient.GetLeader(ctx, &proto.GetLeaderRequest{})
+	grpcClient := grpccosigner.NewCosignerClient(connDNS)
+	_, err = grpcClient.GetLeader(ctx, &grpccosigner.GetLeaderRequest{})
 	require.NoError(t, err)
 
 	connIP, err := grpc.Dial(targetIP,
@@ -103,7 +103,7 @@ func TestMultiResolver(t *testing.T) {
 	require.NoError(t, err)
 	defer connIP.Close()
 
-	grpcClient = proto.NewCosignerClient(connIP)
-	_, err = grpcClient.GetLeader(ctx, &proto.GetLeaderRequest{})
+	grpcClient = grpccosigner.NewCosignerClient(connIP)
+	_, err = grpcClient.GetLeader(ctx, &grpccosigner.GetLeaderRequest{})
 	require.NoError(t, err)
 }

@@ -3,18 +3,19 @@ package signer
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 	"time"
 
-	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	cometcryptoencoding "github.com/cometbft/cometbft/crypto/encoding"
-	cometlog "github.com/cometbft/cometbft/libs/log"
-	cometnet "github.com/cometbft/cometbft/libs/net"
-	cometservice "github.com/cometbft/cometbft/libs/service"
-	cometp2pconn "github.com/cometbft/cometbft/p2p/conn"
-	cometprotocrypto "github.com/cometbft/cometbft/proto/tendermint/crypto"
-	cometprotoprivval "github.com/cometbft/cometbft/proto/tendermint/privval"
-	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	cometcrypto "github.com/strangelove-ventures/horcrux/v3/comet/crypto"
+	cometcryptoed25519 "github.com/strangelove-ventures/horcrux/v3/comet/crypto/ed25519"
+	"github.com/strangelove-ventures/horcrux/v3/comet/encoding"
+	cometnet "github.com/strangelove-ventures/horcrux/v3/comet/libs/net"
+	cometp2pconn "github.com/strangelove-ventures/horcrux/v3/comet/p2p/conn"
+	cometprotocrypto "github.com/strangelove-ventures/horcrux/v3/comet/proto/crypto"
+	cometprotoprivval "github.com/strangelove-ventures/horcrux/v3/comet/proto/privval"
+	cometproto "github.com/strangelove-ventures/horcrux/v3/comet/proto/types"
+	"github.com/strangelove-ventures/horcrux/v3/types"
 )
 
 const connRetrySec = 2
@@ -22,16 +23,15 @@ const connRetrySec = 2
 // PrivValidator is a wrapper for tendermint PrivValidator,
 // with additional Stop method for safe shutdown.
 type PrivValidator interface {
-	Sign(ctx context.Context, chainID string, block Block) ([]byte, time.Time, error)
-	GetPubKey(ctx context.Context, chainID string) ([]byte, error)
+	Sign(ctx context.Context, chainID string, block types.Block) ([]byte, time.Time, error)
+	GetPubKey(ctx context.Context, chainID string) (cometcrypto.PubKey, error)
 	Stop()
 }
 
 // ReconnRemoteSigner dials using its dialer and responds to any
 // signature requests using its privVal.
 type ReconnRemoteSigner struct {
-	cometservice.BaseService
-
+	logger  *slog.Logger
 	address string
 	privKey cometcryptoed25519.PrivKey
 	privVal PrivValidator
@@ -46,30 +46,90 @@ type ReconnRemoteSigner struct {
 // If the connection is broken, the ReconnRemoteSigner will attempt to reconnect.
 func NewReconnRemoteSigner(
 	address string,
-	logger cometlog.Logger,
+	logger *slog.Logger,
 	privVal PrivValidator,
 	dialer net.Dialer,
 ) *ReconnRemoteSigner {
-	rs := &ReconnRemoteSigner{
+	return &ReconnRemoteSigner{
+		logger:  logger,
 		address: address,
 		privVal: privVal,
 		dialer:  dialer,
 		privKey: cometcryptoed25519.GenPrivKey(),
 	}
-
-	rs.BaseService = *cometservice.NewBaseService(logger, "RemoteSigner", rs)
-	return rs
 }
 
-// OnStart implements cmn.Service.
-func (rs *ReconnRemoteSigner) OnStart() error {
-	go rs.loop(context.Background())
-	return nil
-}
+// Start starts the auto-reconnecting remote signer.
+func (rs *ReconnRemoteSigner) Start(ctx context.Context) {
+	var conn net.Conn
+	for {
+		if ctx.Err() != nil {
+			rs.closeConn(conn)
+			return
+		}
 
-// OnStop implements cmn.Service.
-func (rs *ReconnRemoteSigner) OnStop() {
-	rs.privVal.Stop()
+		retries := 0
+		for conn == nil {
+			var err error
+			timer := time.NewTimer(connRetrySec * time.Second)
+			conn, err = rs.establishConnection(ctx)
+			if err == nil {
+				sentryConnectTries.WithLabelValues(rs.address).Set(0)
+				timer.Stop()
+				rs.logger.Info("Connected to Sentry", "address", rs.address)
+				break
+			}
+
+			sentryConnectTries.WithLabelValues(rs.address).Add(1)
+			totalSentryConnectTries.WithLabelValues(rs.address).Inc()
+			retries++
+			rs.logger.Error(
+				"Error establishing connection, will retry",
+				"sleep (s)", connRetrySec,
+				"address", rs.address,
+				"attempt", retries,
+				"err", err,
+			)
+			select {
+			case <-ctx.Done():
+				return
+			case <-timer.C:
+				continue
+			}
+		}
+
+		// since dialing can take time, we check running again
+		if ctx.Err() != nil {
+			rs.closeConn(conn)
+			return
+		}
+
+		req, err := types.ReadMsg(conn)
+		if err != nil {
+			rs.logger.Error(
+				"Failed to read message from connection",
+				"address", rs.address,
+				"err", err,
+			)
+			rs.closeConn(conn)
+			conn = nil
+			continue
+		}
+
+		// handleRequest handles request errors. We always send back a response
+		res := rs.handleRequest(req)
+
+		err = types.WriteMsg(conn, res)
+		if err != nil {
+			rs.logger.Error(
+				"Failed to write message to connection",
+				"address", rs.address,
+				"err", err,
+			)
+			rs.closeConn(conn)
+			conn = nil
+		}
+	}
 }
 
 func (rs *ReconnRemoteSigner) establishConnection(ctx context.Context) (net.Conn, error) {
@@ -91,79 +151,6 @@ func (rs *ReconnRemoteSigner) establishConnection(ctx context.Context) (net.Conn
 	return conn, nil
 }
 
-// main loop for ReconnRemoteSigner
-func (rs *ReconnRemoteSigner) loop(ctx context.Context) {
-	var conn net.Conn
-	for {
-		if !rs.IsRunning() {
-			rs.closeConn(conn)
-			return
-		}
-
-		retries := 0
-		for conn == nil {
-			var err error
-			timer := time.NewTimer(connRetrySec * time.Second)
-			conn, err = rs.establishConnection(ctx)
-			if err == nil {
-				sentryConnectTries.WithLabelValues(rs.address).Set(0)
-				timer.Stop()
-				rs.Logger.Info("Connected to Sentry", "address", rs.address)
-				break
-			}
-
-			sentryConnectTries.WithLabelValues(rs.address).Add(1)
-			totalSentryConnectTries.WithLabelValues(rs.address).Inc()
-			retries++
-			rs.Logger.Error(
-				"Error establishing connection, will retry",
-				"sleep (s)", connRetrySec,
-				"address", rs.address,
-				"attempt", retries,
-				"err", err,
-			)
-			select {
-			case <-ctx.Done():
-				return
-			case <-timer.C:
-				continue
-			}
-		}
-
-		// since dialing can take time, we check running again
-		if !rs.IsRunning() {
-			rs.closeConn(conn)
-			return
-		}
-
-		req, err := ReadMsg(conn)
-		if err != nil {
-			rs.Logger.Error(
-				"Failed to read message from connection",
-				"address", rs.address,
-				"err", err,
-			)
-			rs.closeConn(conn)
-			conn = nil
-			continue
-		}
-
-		// handleRequest handles request errors. We always send back a response
-		res := rs.handleRequest(req)
-
-		err = WriteMsg(conn, res)
-		if err != nil {
-			rs.Logger.Error(
-				"Failed to write message to connection",
-				"address", rs.address,
-				"err", err,
-			)
-			rs.closeConn(conn)
-			conn = nil
-		}
-	}
-}
-
 func (rs *ReconnRemoteSigner) handleRequest(req cometprotoprivval.Message) cometprotoprivval.Message {
 	switch typedReq := req.Sum.(type) {
 	case *cometprotoprivval.Message_SignVoteRequest:
@@ -175,7 +162,7 @@ func (rs *ReconnRemoteSigner) handleRequest(req cometprotoprivval.Message) comet
 	case *cometprotoprivval.Message_PingRequest:
 		return rs.handlePingRequest()
 	default:
-		rs.Logger.Error("Unknown request", "err", fmt.Errorf("%v", typedReq))
+		rs.logger.Error("Unknown request", "err", fmt.Errorf("%v", typedReq))
 		return cometprotoprivval.Message{}
 	}
 }
@@ -186,7 +173,13 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *cometp
 		Error: nil,
 	}}
 
-	signature, timestamp, err := signAndTrack(context.TODO(), rs.Logger, rs.privVal, chainID, VoteToBlock(chainID, vote))
+	signature, timestamp, err := signAndTrack(
+		context.TODO(),
+		rs.logger,
+		rs.privVal,
+		chainID,
+		types.VoteToBlock(chainID, vote),
+	)
 	if err != nil {
 		msgSum.SignedVoteResponse.Error = getRemoteSignerError(err)
 		return cometprotoprivval.Message{Sum: msgSum}
@@ -210,10 +203,10 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(
 
 	signature, timestamp, err := signAndTrack(
 		context.TODO(),
-		rs.Logger,
+		rs.logger,
 		rs.privVal,
 		chainID,
-		ProposalToBlock(chainID, proposal),
+		types.ProposalToBlock(chainID, proposal),
 	)
 	if err != nil {
 		msgSum.SignedProposalResponse.Error = getRemoteSignerError(err)
@@ -234,7 +227,7 @@ func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) cometprotopriv
 
 	pubKey, err := rs.privVal.GetPubKey(context.TODO(), chainID)
 	if err != nil {
-		rs.Logger.Error(
+		rs.logger.Error(
 			"Failed to get Pub Key",
 			"chain_id", chainID,
 			"node", rs.address,
@@ -243,9 +236,9 @@ func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) cometprotopriv
 		msgSum.PubKeyResponse.Error = getRemoteSignerError(err)
 		return cometprotoprivval.Message{Sum: msgSum}
 	}
-	pk, err := cometcryptoencoding.PubKeyToProto(cometcryptoed25519.PubKey(pubKey))
+	pk, err := encoding.PubKeyToProto(pubKey)
 	if err != nil {
-		rs.Logger.Error(
+		rs.logger.Error(
 			"Failed to get Pub Key",
 			"chain_id", chainID,
 			"node", rs.address,
@@ -276,37 +269,37 @@ func getRemoteSignerError(err error) *cometprotoprivval.RemoteSignerError {
 	}
 }
 
-func StartRemoteSigners(
-	services []cometservice.Service,
-	logger cometlog.Logger,
-	privVal PrivValidator,
-	nodes []string,
-) ([]cometservice.Service, error) {
-	var err error
-	go StartMetrics()
-	for _, node := range nodes {
-		// CometBFT requires a connection within 3 seconds of start or crashes
-		// A long timeout such as 30 seconds would cause the sentry to fail in loops
-		// Use a short timeout and dial often to connect within 3 second window
-		dialer := net.Dialer{Timeout: 2 * time.Second}
-		s := NewReconnRemoteSigner(node, logger, privVal, dialer)
+// func StartRemoteSigners(
+// 	services []cometservice.Service,
+// 	logger *slog.Logger,
+// 	privVal PrivValidator,
+// 	nodes []string,
+// ) ([]cometservice.Service, error) {
+// 	var err error
+// 	go StartMetrics()
+// 	for _, node := range nodes {
+// 		// CometBFT requires a connection within 3 seconds of start or crashes
+// 		// A long timeout such as 30 seconds would cause the sentry to fail in loops
+// 		// Use a short timeout and dial often to connect within 3 second window
+// 		dialer := net.Dialer{Timeout: 2 * time.Second}
+// 		s := NewReconnRemoteSigner(node, logger, privVal, dialer)
 
-		err = s.Start()
-		if err != nil {
-			return nil, err
-		}
+// 		err = s.Start()
+// 		if err != nil {
+// 			return nil, err
+// 		}
 
-		services = append(services, s)
-	}
-	return services, err
-}
+// 		services = append(services, s)
+// 	}
+// 	return services, err
+// }
 
 func (rs *ReconnRemoteSigner) closeConn(conn net.Conn) {
 	if conn == nil {
 		return
 	}
 	if err := conn.Close(); err != nil {
-		rs.Logger.Error("Failed to close connection to chain node",
+		rs.logger.Error("Failed to close connection to chain node",
 			"address", rs.address,
 			"err", err,
 		)

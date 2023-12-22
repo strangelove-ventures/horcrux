@@ -35,52 +35,36 @@ linters-settings:
         alias: cryptotypes
       - pkg: github.com/cosmos/cosmos-sdk/x/slashing/types
         alias: slashingtypes
-      - pkg: github.com/cometbft/cometbft/types
+      - pkg: github.com/strangelove-ventures/horcrux/v3/comet/types
         alias: comet
-      - pkg: github.com/cometbft/cometbft/config
+      - pkg: github.com/strangelove-ventures/horcrux/v3/comet/config
         alias: cometconfig
-      - pkg: github.com/cometbft/cometbft/crypto
+      - pkg: github.com/strangelove-ventures/horcrux/v3/comet/crypto
         alias: cometcrypto
-      - pkg: github.com/cometbft/cometbft/crypto/ed25519
+      - pkg: github.com/strangelove-ventures/horcrux/v3/comet/crypto/ed25519
         alias: cometcryptoed25519
-      - pkg: github.com/cometbft/cometbft/crypto/encoding
+      - pkg: github.com/strangelove-ventures/horcrux/v3/comet/crypto/bn254
+        alias: cometcryptobn254
+      - pkg: github.com/strangelove-ventures/horcrux/v3/comet/crypto/encoding
         alias: cometcryptoencoding
       - pkg: github.com/tendermint/go-amino
         alias: amino
-      - pkg: github.com/cometbft/cometbft/libs/bytes
+      - pkg: github.com/strangelove-ventures/horcrux/v3/comet/libs/bytes
         alias: cometbytes
-      - pkg: github.com/cometbft/cometbft/libs/json
+      - pkg: github.com/strangelove-ventures/horcrux/v3/comet/libs/json
         alias: cometjson
-      - pkg: github.com/cometbft/cometbft/libs/log
-        alias: cometlog
-      - pkg: github.com/cometbft/cometbft/libs/net
+      - pkg: github.com/strangelove-ventures/horcrux/v3/comet/libs/net
         alias: cometnet
-      - pkg: github.com/cometbft/cometbft/libs/os
-        alias: cometos
-      - pkg: github.com/cometbft/cometbft/libs/rand
-        alias: cometrand
-      - pkg: github.com/cometbft/cometbft/libs/service
-        alias: cometservice
-      - pkg: github.com/cometbft/cometbft/p2p/conn
+      - pkg: github.com/strangelove-ventures/horcrux/v3/comet/p2p/conn
         alias: cometp2pconn
-      - pkg: github.com/cometbft/cometbft/privval
+      - pkg: github.com/strangelove-ventures/horcrux/v3/comet/privval
         alias: cometprivval
-      - pkg: github.com/cometbft/cometbft/proto/tendermint/types
+      - pkg: github.com/strangelove-ventures/horcrux/v3/comet/proto/types
         alias: cometproto
-      - pkg: github.com/cometbft/cometbft/proto/tendermint/crypto
+      - pkg: github.com/strangelove-ventures/horcrux/v3/comet/proto/crypto
         alias: cometprotocrypto
-      - pkg: github.com/cometbft/cometbft/proto/tendermint/privval
+      - pkg: github.com/strangelove-ventures/horcrux/v3/comet/proto/privval
         alias: cometprotoprivval
-      - pkg: github.com/cometbft/cometbft/rpc/client
-        alias: cometrpcclient
-      - pkg: github.com/cometbft/cometbft/rpc/client/http
-        alias: cometrpchttp
-      - pkg: github.com/cometbft/cometbft/rpc/jsonrpc/client
-        alias: cometrpcjsonclient
-      - pkg: github.com/cometbft/cometbft/rpc/jsonrpc/types
-        alias: cometrpcjsontypes
-      - pkg: github.com/cometbft/cometbft/rpc/core/types
-        alias: cometrpctypes
       - pkg: github.com/ecies/go/v2
         alias: ecies
       - pkg: github.com/grpc-ecosystem/go-grpc-middleware/retry
@@ -99,8 +83,19 @@ linters-settings:
         alias: boltdb
       - pkg: math/rand
         alias: mrand
+      - pkg: github.com/consensys/gnark-crypto/ecc/bn254/ecdsa
+        alias: ecdsa_bn254
+      - pkg: github.com/strangelove-ventures/horcrux/v3/signer/bn254
+        alias: horcruxbn254
+      - pkg: github.com/strangelove-ventures/horcrux/v3/grpc/cosigner
+        alias: grpccosigner
+      - pkg: github.com/strangelove-ventures/horcrux/v3/grpc/horcrux
+        alias: grpchorcrux
   maligned:
     suggest-new: true
   govet:
     misspell:
       locale: US
+run:
+  skip-dirs:
+    - comet

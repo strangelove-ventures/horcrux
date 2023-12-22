@@ -2,12 +2,12 @@ package signer
 
 import (
 	"context"
+	"log/slog"
 	"sort"
 	"sync"
 	"time"
 
-	cometlog "github.com/cometbft/cometbft/libs/log"
-	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
+	grpccosigner "github.com/strangelove-ventures/horcrux/v3/grpc/cosigner"
 )
 
 const (
@@ -15,7 +15,7 @@ const (
 )
 
 type CosignerHealth struct {
-	logger    cometlog.Logger
+	logger    *slog.Logger
 	cosigners []Cosigner
 	rtt       map[int]int64
 	mu        sync.RWMutex
@@ -23,7 +23,7 @@ type CosignerHealth struct {
 	leader Leader
 }
 
-func NewCosignerHealth(logger cometlog.Logger, cosigners []Cosigner, leader Leader) *CosignerHealth {
+func NewCosignerHealth(logger *slog.Logger, cosigners []Cosigner, leader Leader) *CosignerHealth {
 	return &CosignerHealth{
 		logger:    logger,
 		cosigners: cosigners,
@@ -78,7 +78,7 @@ func (ch *CosignerHealth) updateRTT(ctx context.Context, cosigner *RemoteCosigne
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
 
-	_, err := cosigner.client.Ping(ctx, &proto.PingRequest{})
+	_, err := cosigner.client.Ping(ctx, &grpccosigner.PingRequest{})
 	if err != nil {
 		ch.logger.Error("Failed to ping", "cosigner", cosigner.GetID(), "error", err)
 		return

@@ -1,14 +1,13 @@
-module github.com/strangelove-ventures/horcrux/test
+module github.com/strangelove-ventures/horcrux/v3/test
 
 go 1.21
 
 require (
-	github.com/cometbft/cometbft v0.38.0
 	github.com/cosmos/cosmos-sdk v0.50.1
 	github.com/docker/docker v24.0.7+incompatible
 	github.com/prometheus/client_model v0.5.0
 	github.com/prometheus/common v0.45.0
-	github.com/strangelove-ventures/horcrux v0.0.0
+	github.com/strangelove-ventures/horcrux/v3 v3.0.0
 	github.com/strangelove-ventures/interchaintest/v8 v8.0.0
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/zap v1.26.0
@@ -66,7 +65,10 @@ require (
 	github.com/cockroachdb/pebble v0.0.0-20231116191551-bfb2e6a97fdd // indirect
 	github.com/cockroachdb/redact v1.1.5 // indirect
 	github.com/cockroachdb/tokenbucket v0.0.0-20230807174530-cc333fc44b06 // indirect
+	github.com/cometbft/cometbft v0.38.0 // indirect
 	github.com/cometbft/cometbft-db v0.8.0 // indirect
+	github.com/consensys/bavard v0.1.13 // indirect
+	github.com/consensys/gnark-crypto v0.12.1 // indirect
 	github.com/containerd/containerd v1.6.24 // indirect
 	github.com/cosmos/btcutil v1.0.5 // indirect
 	github.com/cosmos/cosmos-db v1.0.0 // indirect
@@ -177,6 +179,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
+	github.com/mmcloughlin/addchain v0.4.0 // indirect
 	github.com/moby/patternmatcher v0.5.0 // indirect
 	github.com/moby/sys/sequential v0.5.0 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
@@ -262,6 +265,7 @@ require (
 	modernc.org/token v1.1.0 // indirect
 	nhooyr.io/websocket v1.8.10 // indirect
 	pgregory.net/rapid v1.1.0 // indirect
+	rsc.io/tmplfunc v0.0.3 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
@@ -270,6 +274,6 @@ replace (
 	github.com/ChainSafe/go-schnorrkel/1 => github.com/ChainSafe/go-schnorrkel v1.0.0
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 	github.com/keybase/go-keychain => github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4
-	github.com/strangelove-ventures/horcrux => ../
+	github.com/strangelove-ventures/horcrux/v3 => ../
 	github.com/vedhavyas/go-subkey => github.com/strangelove-ventures/go-subkey v1.0.7
 )
