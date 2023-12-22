@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"os"
 
-	cometcrypto "github.com/cometbft/cometbft/crypto"
-	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	"github.com/strangelove-ventures/horcrux/v3/signer/bn254"
-	"github.com/strangelove-ventures/horcrux/v3/signer/encoding"
-	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
+	cometcrypto "github.com/strangelove-ventures/horcrux/v3/comet/crypto"
+	cometcryptobn254 "github.com/strangelove-ventures/horcrux/v3/comet/crypto/bn254"
+	cometcryptoed25519 "github.com/strangelove-ventures/horcrux/v3/comet/crypto/ed25519"
+	"github.com/strangelove-ventures/horcrux/v3/comet/encoding"
+	cometprotocrypto "github.com/strangelove-ventures/horcrux/v3/comet/proto/crypto"
+
 	"github.com/tendermint/go-amino"
 )
 
@@ -28,7 +29,7 @@ func (key *CosignerKey) MarshalJSON() ([]byte, error) {
 	var pub cometcrypto.PubKey
 	switch key.KeyType {
 	case CosignerKeyTypeBn254:
-		pub = bn254.PubKey(key.PubKey)
+		pub = cometcryptobn254.PubKey(key.PubKey)
 	case CosignerKeyTypeEd25519:
 		fallthrough
 	default:
@@ -68,7 +69,7 @@ func (key *CosignerKey) UnmarshalJSON(data []byte) error {
 	}
 
 	var pubkey cometcrypto.PubKey
-	var protoPubkey proto.PublicKey
+	var protoPubkey cometprotocrypto.PublicKey
 	err := protoPubkey.Unmarshal(aux.PubkeyBytes)
 
 	// Prior to the tendermint protobuf migration, the public key bytes in key files

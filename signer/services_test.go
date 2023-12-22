@@ -3,6 +3,7 @@ package signer_test
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -12,8 +13,6 @@ import (
 	"testing"
 	"time"
 
-	cometlog "github.com/cometbft/cometbft/libs/log"
-	cometservice "github.com/cometbft/cometbft/libs/service"
 	"github.com/strangelove-ventures/horcrux/v3/signer"
 
 	fork "github.com/kraken-hpc/go-fork"
@@ -71,7 +70,7 @@ func TestIsRunning(t *testing.T) {
 	pidBz, err := os.ReadFile(pidFilePath)
 	require.NoError(t, err)
 
-	err = signer.RequireNotRunning(cometlog.NewNopLogger(), pidFilePath)
+	err = signer.RequireNotRunning(slog.New(slog.NewTextHandler(os.Stdout, nil)), pidFilePath)
 	expectedErrorMsg := fmt.Sprintf("horcrux is already running on PID: %s", strings.TrimSpace(string(pidBz)))
 	require.EqualError(t, err, expectedErrorMsg)
 }
@@ -80,7 +79,7 @@ func TestIsNotRunning(t *testing.T) {
 	homeDir := t.TempDir()
 	pidFilePath := filepath.Join(homeDir, "horcrux.pid")
 
-	err := signer.RequireNotRunning(cometlog.NewNopLogger(), pidFilePath)
+	err := signer.RequireNotRunning(slog.New(slog.NewTextHandler(os.Stdout, nil)), pidFilePath)
 	require.NoError(t, err)
 }
 
@@ -129,7 +128,7 @@ func TestIsRunningNonExistentPid(t *testing.T) {
 	)
 	require.NoError(t, err, "error writing pid file")
 
-	err = signer.RequireNotRunning(cometlog.NewNopLogger(), pidFilePath)
+	err = signer.RequireNotRunning(slog.New(slog.NewTextHandler(os.Stdout, nil)), pidFilePath)
 	require.Nil(t, err)
 
 	_, err = os.Stat(pidFilePath)
@@ -142,8 +141,7 @@ func TestConcurrentStart(t *testing.T) {
 	homeDir := t.TempDir()
 	pidFilePath := filepath.Join(homeDir, "horcrux.pid")
 
-	var logger cometlog.Logger
-	var services []cometservice.Service
+	var logger *slog.Logger
 
 	var wg sync.WaitGroup
 	wg.Add(concurrentAttempts)
@@ -167,7 +165,7 @@ func TestConcurrentStart(t *testing.T) {
 	for i := 0; i < concurrentAttempts; i++ {
 		go func() {
 			defer recoverFromPanic()
-			signer.WaitAndTerminate(logger, services, pidFilePath)
+			signer.WaitAndTerminate(logger, func() {}, pidFilePath)
 			doneCount++
 			wg.Done()
 		}()
@@ -184,9 +182,8 @@ func TestIsRunningAndWaitForService(t *testing.T) {
 	homeDir := t.TempDir()
 	pidFilePath := filepath.Join(homeDir, "horcrux.pid")
 
-	var logger cometlog.Logger
-	var services []cometservice.Service
-	go func() { signer.WaitAndTerminate(logger, services, pidFilePath) }()
+	var logger = slog.New(slog.NewTextHandler(os.Stdout, nil))
+	go func() { signer.WaitAndTerminate(logger, func() {}, pidFilePath) }()
 
 	// Wait for signer.WaitAndTerminate to create pidFile
 	var err error
@@ -211,7 +208,7 @@ func TestIsRunningAndWaitForService(t *testing.T) {
 	}
 	panicFunction := func() {
 		defer recoverFromPanic()
-		err = signer.RequireNotRunning(cometlog.NewNopLogger(), pidFilePath)
+		err = signer.RequireNotRunning(slog.New(slog.NewTextHandler(os.Stdout, nil)), pidFilePath)
 	}
 	go panicFunction()
 	wg.Wait()

@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"strings"
 
-	cometprivval "github.com/cometbft/cometbft/privval"
 	"github.com/cosmos/cosmos-sdk/types/bech32"
 	"github.com/spf13/cobra"
+	cometprivval "github.com/strangelove-ventures/horcrux/v3/comet/privval"
 	"github.com/strangelove-ventures/horcrux/v3/signer"
 )
 
@@ -61,7 +61,10 @@ func addressCmd() *cobra.Command {
 					return fmt.Errorf("error reading priv-validator key: %w, check that key is present for chain ID: %s", err, chainID)
 				}
 
-				filePV := cometprivval.LoadFilePVEmptyState(keyFile, "")
+				filePV, err := cometprivval.LoadFilePV(keyFile, "", false)
+				if err != nil {
+					return err
+				}
 				pubKey = filePV.Key.PubKey.Bytes()
 			default:
 				panic(fmt.Errorf("unexpected sign mode: %s", config.Config.SignMode))

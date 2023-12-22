@@ -8,13 +8,12 @@ import (
 	"testing"
 	"time"
 
-	cometbytes "github.com/cometbft/cometbft/libs/bytes"
-	cometjson "github.com/cometbft/cometbft/libs/json"
-	"github.com/cometbft/cometbft/privval"
 	"github.com/cosmos/cosmos-sdk/types/bech32"
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	"github.com/docker/docker/client"
-	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
+	cometjson "github.com/strangelove-ventures/horcrux/v3/comet/libs/json"
+	"github.com/strangelove-ventures/horcrux/v3/comet/privval"
+	grpccosigner "github.com/strangelove-ventures/horcrux/v3/grpc/cosigner"
 	interchaintest "github.com/strangelove-ventures/interchaintest/v8"
 	"github.com/strangelove-ventures/interchaintest/v8/chain/cosmos"
 	"github.com/strangelove-ventures/interchaintest/v8/ibc"
@@ -220,7 +219,7 @@ func enablePrivvalListener(
 }
 
 // getValSigningInfo returns the signing info for the given validator from the reference node.
-func getValSigningInfo(tn *cosmos.ChainNode, address cometbytes.HexBytes) (*slashingtypes.ValidatorSigningInfo, error) {
+func getValSigningInfo(tn *cosmos.ChainNode, address []byte) (*slashingtypes.ValidatorSigningInfo, error) {
 	valConsPrefix := fmt.Sprintf("%svalcons", tn.Chain.Config().Bech32Prefix)
 
 	bech32ValConsAddress, err := bech32.ConvertAndEncode(valConsPrefix, address)
@@ -238,7 +237,7 @@ func getValSigningInfo(tn *cosmos.ChainNode, address cometbytes.HexBytes) (*slas
 }
 
 // requireHealthyValidator asserts that the given validator is not tombstoned, not jailed, and has not missed any blocks in the slashing window.
-func requireHealthyValidator(t *testing.T, referenceNode *cosmos.ChainNode, validatorAddress cometbytes.HexBytes) {
+func requireHealthyValidator(t *testing.T, referenceNode *cosmos.ChainNode, validatorAddress []byte) {
 	signingInfo, err := getValSigningInfo(referenceNode, validatorAddress)
 	require.NoError(t, err)
 
@@ -297,9 +296,9 @@ func getLeader(ctx context.Context, cosigner *cosmos.SidecarProcess) (int, error
 	ctx, cancelFunc := context.WithTimeout(ctx, 10*time.Second)
 	defer cancelFunc()
 
-	grpcClient := proto.NewCosignerClient(conn)
+	grpcClient := grpccosigner.NewCosignerClient(conn)
 
-	res, err := grpcClient.GetLeader(ctx, &proto.GetLeaderRequest{})
+	res, err := grpcClient.GetLeader(ctx, &grpccosigner.GetLeaderRequest{})
 	if err != nil {
 		return -1, err
 	}

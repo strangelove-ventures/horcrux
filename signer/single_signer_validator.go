@@ -8,7 +8,9 @@ import (
 	"time"
 
 	// required to register bn254 types for signing
-	_ "github.com/strangelove-ventures/horcrux/v3/signer/bn254"
+	cometcrypto "github.com/strangelove-ventures/horcrux/v3/comet/crypto"
+	"github.com/strangelove-ventures/horcrux/v3/comet/privval"
+	"github.com/strangelove-ventures/horcrux/v3/types"
 )
 
 var _ PrivValidator = &SingleSignerValidator{}
@@ -22,7 +24,7 @@ type SingleSignerValidator struct {
 
 // SingleSignerChainState holds the priv validator and associated mutex for a single chain.
 type SingleSignerChainState struct {
-	filePV *FilePV
+	filePV *privval.FilePV
 
 	// The filePV does not have any locking internally for signing operations.
 	// The high-watermark/last-signed-state within the FilePV prevents double sign
@@ -39,7 +41,7 @@ func NewSingleSignerValidator(config *RuntimeConfig) *SingleSignerValidator {
 }
 
 // GetPubKey implements types.PrivValidator
-func (pv *SingleSignerValidator) GetPubKey(_ context.Context, chainID string) ([]byte, error) {
+func (pv *SingleSignerValidator) GetPubKey(_ context.Context, chainID string) (cometcrypto.PubKey, error) {
 	chainState, err := pv.loadChainStateIfNecessary(chainID)
 	if err != nil {
 		return nil, err
@@ -48,11 +50,11 @@ func (pv *SingleSignerValidator) GetPubKey(_ context.Context, chainID string) ([
 	if err != nil {
 		return nil, err
 	}
-	return pubKey.Bytes(), nil
+	return pubKey, nil
 }
 
 // SignVote implements types.PrivValidator
-func (pv *SingleSignerValidator) Sign(_ context.Context, chainID string, block Block) ([]byte, time.Time, error) {
+func (pv *SingleSignerValidator) Sign(_ context.Context, chainID string, block types.Block) ([]byte, time.Time, error) {
 	chainState, err := pv.loadChainStateIfNecessary(chainID)
 	if err != nil {
 		return nil, block.Timestamp, err
@@ -75,19 +77,19 @@ func (pv *SingleSignerValidator) loadChainStateIfNecessary(chainID string) (*Sin
 	}
 
 	stateFile := pv.config.PrivValStateFile(chainID)
-	var filePV *FilePV
+	var filePV *privval.FilePV
 	if _, err := os.Stat(stateFile); err != nil {
 		if !os.IsNotExist(err) {
 			panic(fmt.Errorf("failed to load state file (%s) - %w", stateFile, err))
 		}
 		// The only scenario in which we want to create a new state file
 		// on disk is when the state file does not exist.
-		filePV, err = LoadFilePV(keyFile, stateFile, false)
+		filePV, err = privval.LoadFilePV(keyFile, stateFile, false)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		filePV, err = LoadFilePV(keyFile, stateFile, true)
+		filePV, err = privval.LoadFilePV(keyFile, stateFile, true)
 		if err != nil {
 			return nil, err
 		}

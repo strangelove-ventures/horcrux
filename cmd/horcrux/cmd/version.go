@@ -41,7 +41,6 @@ type Info struct {
 	GitCommit        string `json:"commit" yaml:"commit"`
 	GoVersion        string `json:"go_version" yaml:"go_version"`
 	CosmosSdkVersion string `json:"cosmos_sdk_version" yaml:"cosmos_sdk_version"`
-	CometBFTVersion  string `json:"cometbft_version" yaml:"cometbft_version"`
 }
 
 func NewInfo() Info {
@@ -58,7 +57,6 @@ func NewInfo() Info {
 		GitCommit:        Commit,
 		GoVersion:        fmt.Sprintf("%s %s/%s", runtime.Version(), runtime.GOOS, runtime.GOARCH),
 		CosmosSdkVersion: dependencyVersions["github.com/cosmos/cosmos-sdk"],
-		CometBFTVersion:  dependencyVersions["github.com/cometbft/cometbft"],
 	}
 }
 

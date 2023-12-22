@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"os"
 
-	cometjson "github.com/cometbft/cometbft/libs/json"
+	cometjson "github.com/strangelove-ventures/horcrux/v3/comet/libs/json"
 	"golang.org/x/sync/errgroup"
 )
 

@@ -6,18 +6,19 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	"github.com/cometbft/cometbft/libs/log"
-	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	comet "github.com/cometbft/cometbft/types"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/google/uuid"
+	cometcryptoed25519 "github.com/strangelove-ventures/horcrux/v3/comet/crypto/ed25519"
+	cometproto "github.com/strangelove-ventures/horcrux/v3/comet/proto/types"
+	comet "github.com/strangelove-ventures/horcrux/v3/comet/types"
+	"github.com/strangelove-ventures/horcrux/v3/types"
 	"github.com/stretchr/testify/require"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
@@ -124,7 +125,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 
 	now := time.Now()
 
-	hrst := HRSTKey{
+	hrst := types.HRSTKey{
 		Height:    1,
 		Round:     0,
 		Step:      2,
@@ -152,7 +153,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 		require.NoError(t, err)
 
 		cosigner := NewLocalCosigner(
-			log.NewNopLogger(),
+			slog.New(slog.NewTextHandler(os.Stdout, nil)),
 			&RuntimeConfig{
 				HomeDir:  cosignerDir,
 				StateDir: cosignerDir,

@@ -6,9 +6,9 @@ import (
 	"net/url"
 	"time"
 
-	cometcrypto "github.com/cometbft/cometbft/crypto"
 	"github.com/google/uuid"
-	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
+	cometcrypto "github.com/strangelove-ventures/horcrux/v3/comet/crypto"
+	grpccosigner "github.com/strangelove-ventures/horcrux/v3/grpc/cosigner"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -20,7 +20,7 @@ type RemoteCosigner struct {
 	id      int
 	address string
 
-	client proto.CosignerClient
+	client grpccosigner.CosignerClient
 }
 
 // NewRemoteCosigner returns a newly initialized RemoteCosigner
@@ -63,7 +63,7 @@ func (cosigner *RemoteCosigner) VerifySignature(_ string, _, _ []byte) bool {
 	return false
 }
 
-func getGRPCClient(address string) (proto.CosignerClient, error) {
+func getGRPCClient(address string) (grpccosigner.CosignerClient, error) {
 	var grpcAddress string
 	url, err := url.Parse(address)
 	if err != nil {
@@ -75,7 +75,7 @@ func getGRPCClient(address string) (proto.CosignerClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return proto.NewCosignerClient(conn), nil
+	return grpccosigner.NewCosignerClient(conn), nil
 }
 
 // Implements the cosigner interface
@@ -88,7 +88,7 @@ func (cosigner *RemoteCosigner) GetNonces(
 		us[i] = make([]byte, 16)
 		copy(us[i], u[:])
 	}
-	res, err := cosigner.client.GetNonces(ctx, &proto.GetNoncesRequest{
+	res, err := cosigner.client.GetNonces(ctx, &grpccosigner.GetNoncesRequest{
 		Uuids: us,
 	})
 	if err != nil {
@@ -108,11 +108,11 @@ func (cosigner *RemoteCosigner) GetNonces(
 func (cosigner *RemoteCosigner) SetNoncesAndSign(
 	ctx context.Context,
 	req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error) {
-	res, err := cosigner.client.SetNoncesAndSign(ctx, &proto.SetNoncesAndSignRequest{
+	res, err := cosigner.client.SetNoncesAndSign(ctx, &grpccosigner.SetNoncesAndSignRequest{
 		Uuid:      req.Nonces.UUID[:],
 		ChainID:   req.ChainID,
 		Nonces:    req.Nonces.Nonces.toProto(),
-		Hrst:      req.HRST.toProto(),
+		Hrst:      req.HRST.ToProto(),
 		SignBytes: req.SignBytes,
 	})
 	if err != nil {
@@ -129,7 +129,7 @@ func (cosigner *RemoteCosigner) Sign(
 	ctx context.Context,
 	req CosignerSignBlockRequest,
 ) (*CosignerSignBlockResponse, error) {
-	res, err := cosigner.client.SignBlock(ctx, &proto.SignBlockRequest{
+	res, err := cosigner.client.SignBlock(ctx, &grpccosigner.SignBlockRequest{
 		ChainID: req.ChainID,
 		Block:   req.Block.ToProto(),
 	})

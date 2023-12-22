@@ -1,7 +1,7 @@
 syntax = "proto3";
 package strangelove.horcrux;
 
-option go_package = "github.com/strangelove-ventures/horcrux/v3/signer/proto";
+option go_package = "github.com/strangelove-ventures/horcrux/v3/grpc/cosigner";
 
 service Cosigner {
 	rpc SignBlock (SignBlockRequest) returns (SignBlockResponse) {}
