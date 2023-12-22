@@ -16,9 +16,9 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr/mimc"
 
-	"github.com/cometbft/cometbft/crypto"
-	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/holiman/uint256"
+	"github.com/strangelove-ventures/horcrux/v3/comet/crypto"
+	cometjson "github.com/strangelove-ventures/horcrux/v3/comet/libs/json"
 )
 
 const (
@@ -103,7 +103,7 @@ type PubKey []byte
 func (PubKey) TypeTag() string { return PubKeyName }
 
 func (pubKey PubKey) Address() crypto.Address {
-	return crypto.AddressHash(pubKey[:])
+	return crypto.AddressHash(pubKey)
 }
 
 func (pubKey PubKey) Bytes() []byte {

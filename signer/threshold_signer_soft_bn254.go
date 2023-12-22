@@ -4,7 +4,8 @@ import (
 	"math/big"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254"
-	horcrux_bn254 "github.com/strangelove-ventures/horcrux/v3/signer/bn254"
+	cometcryptobn254 "github.com/strangelove-ventures/horcrux/v3/comet/crypto/bn254"
+	horcruxbn254 "github.com/strangelove-ventures/horcrux/v3/signer/bn254"
 )
 
 var _ ThresholdSigner = &ThresholdSignerSoftBn254{}
@@ -32,7 +33,7 @@ func (s *ThresholdSignerSoftBn254) PubKey() []byte {
 }
 
 func (s *ThresholdSignerSoftBn254) Sign(_ []Nonce, msg []byte) ([]byte, error) {
-	sig, err := horcrux_bn254.SignWithShard(s.privateKey, msg)
+	sig, err := horcruxbn254.SignWithShard(s.privateKey, msg)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +57,7 @@ func (s *ThresholdSignerSoftBn254) CombineSignatures(signatures []PartialSignatu
 		points[i] = int64(s.ID)
 	}
 
-	combinedSig := horcrux_bn254.CombineSignatures(sigs, points...)
+	combinedSig := horcruxbn254.CombineSignatures(sigs, points...)
 
 	compressed := combinedSig.Bytes()
 
@@ -64,5 +65,5 @@ func (s *ThresholdSignerSoftBn254) CombineSignatures(signatures []PartialSignatu
 }
 
 func (s *ThresholdSignerSoftBn254) VerifySignature(msg, signature []byte) bool {
-	return horcrux_bn254.PubKey(s.pubKey).VerifySignature(msg, signature)
+	return cometcryptobn254.PubKey(s.pubKey).VerifySignature(msg, signature)
 }

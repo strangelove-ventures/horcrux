@@ -5,10 +5,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cometbft/cometbft/crypto/ed25519"
-	cometjson "github.com/cometbft/cometbft/libs/json"
-	"github.com/cometbft/cometbft/privval"
-	"github.com/strangelove-ventures/horcrux/cmd/horcrux/cmd/testdata"
+	"github.com/strangelove-ventures/horcrux/v3/cmd/horcrux/cmd/testdata"
+	"github.com/strangelove-ventures/horcrux/v3/comet/crypto/ed25519"
+	cometjson "github.com/strangelove-ventures/horcrux/v3/comet/libs/json"
+	"github.com/strangelove-ventures/horcrux/v3/comet/privval"
 	"github.com/strangelove-ventures/horcrux/v3/signer"
 	"github.com/stretchr/testify/require"
 )

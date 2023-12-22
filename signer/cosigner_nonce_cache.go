@@ -3,11 +3,11 @@ package signer
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/google/uuid"
 )
 
@@ -19,7 +19,7 @@ const (
 )
 
 type CosignerNonceCache struct {
-	logger    cometlog.Logger
+	logger    *slog.Logger
 	cosigners []Cosigner
 
 	leader Leader
@@ -159,7 +159,7 @@ type CachedNonce struct {
 }
 
 func NewCosignerNonceCache(
-	logger cometlog.Logger,
+	logger *slog.Logger,
 	cosigners []Cosigner,
 	leader Leader,
 	getNoncesInterval time.Duration,

@@ -2,62 +2,63 @@ package signer
 
 import (
 	"context"
+	"log/slog"
 	"net"
 	"time"
 
-	cometlog "github.com/cometbft/cometbft/libs/log"
-	cometservice "github.com/cometbft/cometbft/libs/service"
-
-	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
+	grpccosigner "github.com/strangelove-ventures/horcrux/v3/grpc/cosigner"
+	grpchorcrux "github.com/strangelove-ventures/horcrux/v3/grpc/horcrux"
+	"github.com/strangelove-ventures/horcrux/v3/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
 
-var _ proto.RemoteSignerServer = &RemoteSignerGRPCServer{}
+var _ grpchorcrux.RemoteSignerServer = &RemoteSignerGRPCServer{}
 
 type RemoteSignerGRPCServer struct {
-	cometservice.BaseService
-
 	validator  PrivValidator
-	logger     cometlog.Logger
+	logger     *slog.Logger
 	listenAddr string
 
 	server *grpc.Server
 
-	proto.UnimplementedRemoteSignerServer
+	grpchorcrux.UnimplementedRemoteSignerServer
 }
 
 func NewRemoteSignerGRPCServer(
-	logger cometlog.Logger,
+	logger *slog.Logger,
 	validator PrivValidator,
 	listenAddr string,
 ) *RemoteSignerGRPCServer {
-	s := &RemoteSignerGRPCServer{
+	return &RemoteSignerGRPCServer{
 		validator:  validator,
 		logger:     logger,
 		listenAddr: listenAddr,
 	}
-	s.BaseService = *cometservice.NewBaseService(logger, "RemoteSignerGRPCServer", s)
-	return s
 }
 
-func (s *RemoteSignerGRPCServer) OnStart() error {
+func (s *RemoteSignerGRPCServer) Start() {
 	s.logger.Info("Remote Signer GRPC Listening", "address", s.listenAddr)
 	sock, err := net.Listen("tcp", s.listenAddr)
 	if err != nil {
-		return err
+		panic(err)
 	}
 	s.server = grpc.NewServer()
-	proto.RegisterRemoteSignerServer(s.server, s)
+	grpchorcrux.RegisterRemoteSignerServer(s.server, s)
 	reflection.Register(s.server)
-	return s.server.Serve(sock)
+	if err := s.server.Serve(sock); err != nil {
+		panic(err)
+	}
 }
 
 func (s *RemoteSignerGRPCServer) OnStop() {
 	s.server.GracefulStop()
 }
 
-func (s *RemoteSignerGRPCServer) PubKey(ctx context.Context, req *proto.PubKeyRequest) (*proto.PubKeyResponse, error) {
+func (s *RemoteSignerGRPCServer) PubKey(
+	ctx context.Context,
+	req *grpchorcrux.PubKeyRequest,
+) (*grpchorcrux.PubKeyResponse, error) {
 	chainID := req.ChainId
 
 	totalPubKeyRequests.WithLabelValues(chainID).Inc()
@@ -72,23 +73,23 @@ func (s *RemoteSignerGRPCServer) PubKey(ctx context.Context, req *proto.PubKeyRe
 		return nil, err
 	}
 
-	return &proto.PubKeyResponse{
-		PubKey: pubKey,
+	return &grpchorcrux.PubKeyResponse{
+		PubKey: pubKey.Bytes(),
 	}, nil
 }
 
 func (s *RemoteSignerGRPCServer) Sign(
 	ctx context.Context,
-	req *proto.SignBlockRequest,
-) (*proto.SignBlockResponse, error) {
-	chainID, block := req.ChainID, BlockFromProto(req.Block)
+	req *grpccosigner.SignBlockRequest,
+) (*grpccosigner.SignBlockResponse, error) {
+	chainID, block := req.ChainID, types.BlockFromProto(req.Block)
 
 	sig, voteExtSig, timestamp, err := signAndTrack(ctx, s.logger, s.validator, chainID, block)
 	if err != nil {
 		return nil, err
 	}
 
-	return &proto.SignBlockResponse{
+	return &grpccosigner.SignBlockResponse{
 		Signature:        sig,
 		VoteExtSignature: voteExtSig,
 		Timestamp:        timestamp.UnixNano(),
@@ -97,7 +98,7 @@ func (s *RemoteSignerGRPCServer) Sign(
 
 func signAndTrack(
 	ctx context.Context,
-	logger cometlog.Logger,
+	logger *slog.Logger,
 	validator PrivValidator,
 	chainID string,
 	block Block,
@@ -108,7 +109,7 @@ func signAndTrack(
 		case *BeyondBlockError:
 			logger.Debug(
 				"Rejecting sign request",
-				"type", signType(block.Step),
+				"type", types.SignType(block.Step),
 				"chain_id", chainID,
 				"height", block.Height,
 				"round", block.Round,
@@ -118,7 +119,7 @@ func signAndTrack(
 		default:
 			logger.Error(
 				"Failed to sign",
-				"type", signType(block.Step),
+				"type", types.SignType(block.Step),
 				"chain_id", chainID,
 				"height", block.Height,
 				"round", block.Round,
@@ -140,7 +141,7 @@ func signAndTrack(
 	}
 	logger.Info(
 		"Signed",
-		"type", signType(block.Step),
+		"type", types.SignType(block.Step),
 		"chain_id", chainID,
 		"height", block.Height,
 		"round", block.Round,
@@ -150,11 +151,11 @@ func signAndTrack(
 	)
 
 	switch block.Step {
-	case stepPropose:
+	case types.StepPropose:
 		lastProposalHeight.WithLabelValues(chainID).Set(float64(block.Height))
 		lastProposalRound.WithLabelValues(chainID).Set(float64(block.Round))
 		totalProposalsSigned.WithLabelValues(chainID).Inc()
-	case stepPrevote:
+	case types.StepPrevote:
 		// Determine number of heights since the last Prevote
 		stepSize := block.Height - previousPrevoteHeight
 		if previousPrevoteHeight != 0 && stepSize > 1 {
@@ -171,7 +172,7 @@ func signAndTrack(
 		lastPrevoteHeight.WithLabelValues(chainID).Set(float64(block.Height))
 		lastPrevoteRound.WithLabelValues(chainID).Set(float64(block.Round))
 		totalPrevotesSigned.WithLabelValues(chainID).Inc()
-	case stepPrecommit:
+	case types.StepPrecommit:
 		stepSize := block.Height - previousPrecommitHeight
 		if previousPrecommitHeight != 0 && stepSize > 1 {
 			missedPrecommits.WithLabelValues(chainID).Add(float64(stepSize))

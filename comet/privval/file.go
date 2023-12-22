@@ -1,4 +1,4 @@
-package signer
+package privval
 
 import (
 	"bytes"
@@ -8,23 +8,29 @@ import (
 	"time"
 
 	"github.com/cosmos/gogoproto/proto"
+	"github.com/strangelove-ventures/horcrux/v3/comet/crypto"
+	"github.com/strangelove-ventures/horcrux/v3/comet/crypto/ed25519"
+	cometjson "github.com/strangelove-ventures/horcrux/v3/comet/libs/json"
+	"github.com/strangelove-ventures/horcrux/v3/comet/libs/protoio"
+	"github.com/strangelove-ventures/horcrux/v3/comet/libs/tempfile"
+	cometproto "github.com/strangelove-ventures/horcrux/v3/comet/proto/types"
+	comettypes "github.com/strangelove-ventures/horcrux/v3/comet/types"
+	"github.com/strangelove-ventures/horcrux/v3/types"
+)
 
-	"github.com/cometbft/cometbft/crypto"
-	"github.com/cometbft/cometbft/crypto/ed25519"
-	cometjson "github.com/cometbft/cometbft/libs/json"
-	"github.com/cometbft/cometbft/libs/protoio"
-	"github.com/cometbft/cometbft/libs/tempfile"
-	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	"github.com/cometbft/cometbft/types"
+const (
+	stepPropose   int8 = 1
+	stepPrevote   int8 = 2
+	stepPrecommit int8 = 3
 )
 
 //-------------------------------------------------------------------------------
 
 // FilePVKey stores the immutable part of PrivValidator.
 type FilePVKey struct {
-	Address types.Address  `json:"address"`
-	PubKey  crypto.PubKey  `json:"pub_key"`
-	PrivKey crypto.PrivKey `json:"priv_key"`
+	Address comettypes.Address `json:"address"`
+	PubKey  crypto.PubKey      `json:"pub_key"`
+	PrivKey crypto.PrivKey     `json:"priv_key"`
 
 	filePath string
 }
@@ -190,7 +196,7 @@ func LoadFilePV(keyFilePath, stateFilePath string, loadState bool) (*FilePV, err
 
 // GetAddress returns the address of the validator.
 // Implements PrivValidator.
-func (pv *FilePV) GetAddress() types.Address {
+func (pv *FilePV) GetAddress() comettypes.Address {
 	return pv.Key.Address
 }
 

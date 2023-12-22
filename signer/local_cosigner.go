@@ -4,13 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
-	cometcrypto "github.com/cometbft/cometbft/crypto"
-	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/google/uuid"
+	cometcrypto "github.com/strangelove-ventures/horcrux/v3/comet/crypto"
+	cometcryptobn254 "github.com/strangelove-ventures/horcrux/v3/comet/crypto/bn254"
+	cometcryptoed25519 "github.com/strangelove-ventures/horcrux/v3/comet/crypto/ed25519"
+	"github.com/strangelove-ventures/horcrux/v3/types"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -24,7 +26,7 @@ const nonceExpiration = 20 * time.Second
 // It maintains a high watermark to avoid double-signing.
 // Signing is thread safe.
 type LocalCosigner struct {
-	logger        cometlog.Logger
+	logger        *slog.Logger
 	config        *RuntimeConfig
 	security      CosignerSecurity
 	chainState    sync.Map
@@ -37,7 +39,7 @@ type LocalCosigner struct {
 }
 
 func NewLocalCosigner(
-	logger cometlog.Logger,
+	logger *slog.Logger,
 	config *RuntimeConfig,
 	security CosignerSecurity,
 	address string,
@@ -54,7 +56,7 @@ func NewLocalCosigner(
 type ChainState struct {
 	// lastSignState stores the last sign state for an HRS we have fully signed
 	// incremented whenever we are asked to sign an HRS
-	lastSignState *SignState
+	lastSignState *types.SignState
 	// signer generates nonces, combines nonces, signs, and verifies signatures.
 	signer ThresholdSigner
 }
@@ -114,7 +116,7 @@ func (cosigner *LocalCosigner) combinedNonces(myID int, threshold uint8, uuid uu
 // than the current high watermark. A mutex is used to avoid concurrent state updates.
 // The disk write is scheduled in a separate goroutine which will perform an atomic write.
 // pendingDiskWG is used upon termination in pendingDiskWG to ensure all writes have completed.
-func (cosigner *LocalCosigner) SaveLastSignedState(chainID string, signState SignStateConsensus) error {
+func (cosigner *LocalCosigner) SaveLastSignedState(chainID string, signState types.SignStateConsensus) error {
 	ccs, err := cosigner.getChainState(chainID)
 	if err != nil {
 		return err
@@ -170,7 +172,14 @@ func (cosigner *LocalCosigner) GetPubKey(chainID string) (cometcrypto.PubKey, er
 		return nil, err
 	}
 
-	return cometcryptoed25519.PubKey(ccs.signer.PubKey()), nil
+	switch ccs.signer.(type) {
+	case *ThresholdSignerSoftBn254:
+		return cometcryptobn254.PubKey(ccs.signer.PubKey()), nil
+	case *ThresholdSignerSoftEd25519:
+		return cometcryptoed25519.PubKey(ccs.signer.PubKey()), nil
+	default:
+		return nil, fmt.Errorf("unknown signer type: %T", ccs.signer)
+	}
 }
 
 // CombineSignatures combines partial signatures into a full signature.
@@ -282,7 +291,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		return res, err
 	}
 
-	err = ccs.lastSignState.Save(SignStateConsensus{
+	err = ccs.lastSignState.Save(types.SignStateConsensus{
 		Height:                 hrst.Height,
 		Round:                  hrst.Round,
 		Step:                   hrst.Step,
@@ -292,7 +301,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	}, &cosigner.pendingDiskWG)
 
 	if err != nil {
-		if _, isSameHRSError := err.(*SameHRSError); !isSameHRSError {
+		if _, isSameHRSError := err.(*types.SameHRSError); !isSameHRSError {
 			return res, err
 		}
 	}
@@ -332,7 +341,7 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 		return nil
 	}
 
-	signState, err := LoadOrCreateSignState(cosigner.config.CosignerStateFile(chainID))
+	signState, err := types.LoadOrCreateSignState(cosigner.config.CosignerStateFile(chainID))
 	if err != nil {
 		return err
 	}

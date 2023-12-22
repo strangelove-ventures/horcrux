@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	cometcryptoed25519 "github.com/strangelove-ventures/horcrux/v3/comet/crypto/ed25519"
 	"gitlab.com/unit410/edwards25519"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )

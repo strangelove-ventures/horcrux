@@ -1,6 +1,7 @@
 package signer
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -315,14 +316,18 @@ var (
 	)
 )
 
-func StartMetrics() {
+func StartMetrics(ctx context.Context) {
 	// Update elapsed times on an interval basis
 	for {
-		metricsTimeKeeper.UpdatePrometheusMetrics()
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(100 * time.Millisecond):
+			// Prometheus often only polls every 1 to every few seconds
+			// Frequent updates minimize reporting error.
+			// Accuracy of 100ms is probably sufficient
 
-		// Prometheus often only polls every 1 to every few seconds
-		// Frequent updates minimize reporting error.
-		// Accuracy of 100ms is probably sufficient
-		<-time.After(100 * time.Millisecond)
+			metricsTimeKeeper.UpdatePrometheusMetrics()
+		}
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -12,9 +13,9 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/v3/signer"
+	"github.com/strangelove-ventures/horcrux/v3/types"
 
-	cometjson "github.com/cometbft/cometbft/libs/json"
-	cometlog "github.com/cometbft/cometbft/libs/log"
+	cometjson "github.com/strangelove-ventures/horcrux/v3/comet/libs/json"
 )
 
 // Snippet Taken from https://raw.githubusercontent.com/cometbft/cometbft/main/privval/file.go
@@ -53,12 +54,12 @@ func showStateCmd() *cobra.Command {
 				return fmt.Errorf("%s does not exist, initialize config with horcrux config init and try again", config.HomeDir)
 			}
 
-			pv, err := signer.LoadSignState(config.PrivValStateFile(chainID))
+			pv, err := types.LoadSignState(config.PrivValStateFile(chainID))
 			if err != nil {
 				return err
 			}
 
-			cs, err := signer.LoadSignState(config.CosignerStateFile(chainID))
+			cs, err := types.LoadSignState(config.CosignerStateFile(chainID))
 			if err != nil {
 				return err
 			}
@@ -84,7 +85,7 @@ func setStateCmd() *cobra.Command {
 			chainID := args[0]
 
 			out := cmd.OutOrStdout()
-			logger := cometlog.NewTMLogger(cometlog.NewSyncWriter(out))
+			logger := slog.New(slog.NewTextHandler(out, nil))
 
 			if _, err := os.Stat(config.HomeDir); os.IsNotExist(err) {
 				cmd.SilenceUsage = false
@@ -97,12 +98,12 @@ func setStateCmd() *cobra.Command {
 				return err
 			}
 
-			pv, err := signer.LoadOrCreateSignState(config.PrivValStateFile(chainID))
+			pv, err := types.LoadOrCreateSignState(config.PrivValStateFile(chainID))
 			if err != nil {
 				return err
 			}
 
-			cs, err := signer.LoadOrCreateSignState(config.CosignerStateFile(chainID))
+			cs, err := types.LoadOrCreateSignState(config.CosignerStateFile(chainID))
 			if err != nil {
 				return err
 			}
@@ -116,7 +117,7 @@ func setStateCmd() *cobra.Command {
 			fmt.Fprintf(out, "Setting height %d\n", height)
 
 			pv.NoncePublic, cs.NoncePublic = nil, nil
-			signState := signer.SignStateConsensus{
+			signState := types.SignStateConsensus{
 				Height:    height,
 				Round:     0,
 				Step:      0,
@@ -155,7 +156,7 @@ func importStateCmd() *cobra.Command {
 			}
 
 			out := cmd.OutOrStdout()
-			logger := cometlog.NewTMLogger(cometlog.NewSyncWriter(out))
+			logger := slog.New(slog.NewTextHandler(out, nil))
 
 			// Resetting the priv_validator_state.json should only be allowed if the
 			// signer is not running.
@@ -164,13 +165,13 @@ func importStateCmd() *cobra.Command {
 			}
 
 			// Recreate privValStateFile if necessary
-			pv, err := signer.LoadOrCreateSignState(config.PrivValStateFile(chainID))
+			pv, err := types.LoadOrCreateSignState(config.PrivValStateFile(chainID))
 			if err != nil {
 				return err
 			}
 
 			// shareStateFile does not exist during default config init, so create if necessary
-			cs, err := signer.LoadOrCreateSignState(config.CosignerStateFile(chainID))
+			cs, err := types.LoadOrCreateSignState(config.CosignerStateFile(chainID))
 			if err != nil {
 				return err
 			}
@@ -203,7 +204,7 @@ func importStateCmd() *cobra.Command {
 			}
 
 			pv.NoncePublic = nil
-			signState := signer.SignStateConsensus{
+			signState := types.SignStateConsensus{
 				Height:    pvState.Height,
 				Round:     int64(pvState.Round),
 				Step:      pvState.Step,
@@ -232,7 +233,7 @@ func importStateCmd() *cobra.Command {
 	}
 }
 
-func printSignState(out io.Writer, ss *signer.SignState) {
+func printSignState(out io.Writer, ss *types.SignState) {
 	fmt.Fprintf(out, "  Height:    %v\n"+
 		"  Round:     %v\n"+
 		"  Step:      %v\n",

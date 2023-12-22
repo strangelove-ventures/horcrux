@@ -2,14 +2,14 @@ package signer
 
 import (
 	"crypto/rand"
+	"log/slog"
 	"os"
 	"testing"
 	"time"
 
-	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	"github.com/cometbft/cometbft/libs/log"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
+	cometcryptoed25519 "github.com/strangelove-ventures/horcrux/v3/comet/crypto/ed25519"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,7 +31,7 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 	}
 
 	cosigner := NewLocalCosigner(
-		log.NewNopLogger(),
+		slog.New(slog.NewTextHandler(os.Stdout, nil)),
 		&RuntimeConfig{},
 		NewCosignerSecurityECIES(
 			CosignerECIESKey{

@@ -1,4 +1,4 @@
-package signer
+package types
 
 import (
 	"bytes"
@@ -7,31 +7,31 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
-	cometbytes "github.com/cometbft/cometbft/libs/bytes"
-	cometjson "github.com/cometbft/cometbft/libs/json"
-	"github.com/cometbft/cometbft/libs/protoio"
-	"github.com/cometbft/cometbft/libs/tempfile"
-	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	comet "github.com/cometbft/cometbft/types"
-	"github.com/gogo/protobuf/proto"
+	"github.com/cosmos/gogoproto/proto"
+	cometjson "github.com/strangelove-ventures/horcrux/v3/comet/libs/json"
+	"github.com/strangelove-ventures/horcrux/v3/comet/libs/protoio"
+	"github.com/strangelove-ventures/horcrux/v3/comet/libs/tempfile"
+	cometproto "github.com/strangelove-ventures/horcrux/v3/comet/proto/types"
+	comet "github.com/strangelove-ventures/horcrux/v3/comet/types"
 	"github.com/strangelove-ventures/horcrux/v3/signer/cond"
 )
 
 const (
-	stepPropose   int8 = 1
-	stepPrevote   int8 = 2
-	stepPrecommit int8 = 3
+	StepPropose   int8 = 1
+	StepPrevote   int8 = 2
+	StepPrecommit int8 = 3
 	blocksToCache      = 3
 )
 
-func signType(step int8) string {
+func SignType(step int8) string {
 	switch step {
-	case stepPropose:
+	case StepPropose:
 		return "proposal"
-	case stepPrevote:
+	case StepPrevote:
 		return "prevote"
-	case stepPrecommit:
+	case StepPrecommit:
 		return "precommit"
 	default:
 		return "unknown"
@@ -41,9 +41,9 @@ func signType(step int8) string {
 func CanonicalVoteToStep(vote *cometproto.CanonicalVote) int8 {
 	switch vote.Type {
 	case cometproto.PrevoteType:
-		return stepPrevote
+		return StepPrevote
 	case cometproto.PrecommitType:
-		return stepPrecommit
+		return StepPrecommit
 	default:
 		panic("Unknown vote type")
 	}
@@ -52,9 +52,9 @@ func CanonicalVoteToStep(vote *cometproto.CanonicalVote) int8 {
 func VoteToStep(vote *cometproto.Vote) int8 {
 	switch vote.Type {
 	case cometproto.PrevoteType:
-		return stepPrevote
+		return StepPrevote
 	case cometproto.PrecommitType:
-		return stepPrecommit
+		return StepPrecommit
 	default:
 		panic("Unknown vote type")
 	}
@@ -72,7 +72,7 @@ func VoteToBlock(chainID string, vote *cometproto.Vote) Block {
 }
 
 func ProposalToStep(_ *cometproto.Proposal) int8 {
-	return stepPropose
+	return StepPropose
 }
 
 func ProposalToBlock(chainID string, proposal *cometproto.Proposal) Block {
@@ -87,11 +87,11 @@ func ProposalToBlock(chainID string, proposal *cometproto.Proposal) Block {
 
 func StepToType(step int8) cometproto.SignedMsgType {
 	switch step {
-	case stepPropose:
+	case StepPropose:
 		return cometproto.ProposalType
-	case stepPrevote:
+	case StepPrevote:
 		return cometproto.PrevoteType
-	case stepPrecommit:
+	case StepPrecommit:
 		return cometproto.PrecommitType
 	default:
 		panic("Unknown step")
@@ -100,12 +100,12 @@ func StepToType(step int8) cometproto.SignedMsgType {
 
 // SignState stores signing information for high level watermark management.
 type SignState struct {
-	Height                 int64               `json:"height"`
-	Round                  int64               `json:"round"`
-	Step                   int8                `json:"step"`
-	NoncePublic            []byte              `json:"nonce_public"`
-	Signature              []byte              `json:"signature,omitempty"`
-	SignBytes              cometbytes.HexBytes `json:"signbytes,omitempty"`
+	Height      int64  `json:"height"`
+	Round       int64  `json:"round"`
+	Step        int8   `json:"step"`
+	NoncePublic []byte `json:"nonce_public"`
+	Signature   []byte `json:"signature,omitempty"`
+	SignBytes   []byte `json:"signbytes,omitempty"`
 	VoteExtensionSignature []byte              `json:"vote_ext_signature,omitempty"`
 
 	filePath string
@@ -116,7 +116,36 @@ type SignState struct {
 	cond  *cond.Cond
 }
 
-func (signState *SignState) existingSignatureOrErrorIfRegression(hrst HRSTKey, signBytes []byte) ([]byte, error) {
+func (signState *SignState) CondLock() {
+	signState.cond.L.Lock()
+}
+
+func (signState *SignState) CondUnlock() {
+	signState.cond.L.Unlock()
+}
+
+func (signState *SignState) CondWaitWithTimeout(timeout time.Duration) {
+	signState.cond.WaitWithTimeout(timeout)
+}
+
+func (signState *SignState) CondBroadcast() {
+	signState.cond.Broadcast()
+}
+
+func (signState *SignState) Cached(hrs HRSKey) (SignStateConsensus, bool) {
+	val, ok := signState.cache[hrs]
+	return val, ok
+}
+
+func (signState *SignState) Cache(hrs HRSKey, ssc SignStateConsensus) {
+	signState.cache[hrs] = ssc
+}
+
+func (signState *SignState) ClearFile() {
+	signState.filePath = os.DevNull
+}
+
+func (signState *SignState) ExistingSignatureOrErrorIfRegression(hrst HRSTKey, signBytes []byte) ([]byte, error) {
 	signState.mu.RLock()
 	defer signState.mu.RUnlock()
 
@@ -161,12 +190,12 @@ func (signState *SignState) hrsKeyLocked() HRSKey {
 }
 
 type SignStateConsensus struct {
-	Height                 int64
-	Round                  int64
-	Step                   int8
-	Signature              []byte
+	Height    int64
+	Round     int64
+	Step      int8
+	Signature []byte
 	VoteExtensionSignature []byte
-	SignBytes              cometbytes.HexBytes
+	SignBytes []byte
 }
 
 func (signState SignStateConsensus) HRSKey() HRSKey {
@@ -506,9 +535,9 @@ func (signState *SignStateConsensus) OnlyDifferByTimestamp(signBytes []byte) err
 }
 
 func onlyDifferByTimestamp(step int8, signStateSignBytes, signBytes []byte) error {
-	if step == stepPropose {
+	if step == StepPropose {
 		return checkProposalOnlyDifferByTimestamp(signStateSignBytes, signBytes)
-	} else if step == stepPrevote || step == stepPrecommit {
+	} else if step == StepPrevote || step == StepPrecommit {
 		return checkVoteOnlyDifferByTimestamp(signStateSignBytes, signBytes)
 	}
 
