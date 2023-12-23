@@ -253,7 +253,7 @@ func convertValidatorToHorcrux(
 }
 
 // getPrivvalKey gets the privval key from the validator and creates threshold shards from it.
-func getShardedPrivvalKey(ctx context.Context, node *cosmos.ChainNode, threshold uint8, shards uint8) ([]tss.CosignerEd25519Key, crypto.PubKey, error) {
+func getShardedPrivvalKey(ctx context.Context, node *cosmos.ChainNode, threshold uint8, shards uint8) ([]tss.Ed25519Key, crypto.PubKey, error) {
 	pvKey, err := getPrivvalKey(ctx, node)
 	if err != nil {
 		return nil, nil, err
@@ -267,7 +267,7 @@ func getShardedPrivvalKey(ctx context.Context, node *cosmos.ChainNode, threshold
 // chainEd25519Shard is a wrapper for a chain Index and a shard of an ed25519 consensus key.
 type chainEd25519Shard struct {
 	chainID string
-	key     tss.CosignerEd25519Key
+	key     tss.Ed25519Key
 }
 
 // writeConfigAndKeysThreshold writes the config and keys for a horcrux cosigner to the sidecar's docker volume.

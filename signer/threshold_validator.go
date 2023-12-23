@@ -44,6 +44,7 @@ func nodecacheconfig() nodecacheconfigs {
 }
 
 // ThresholdValidator is the server that responds to sign requests from the "sentry"
+// Implements the [connector.PrivValidator] interface.
 type ThresholdValidator struct {
 	config *config.RuntimeConfig
 
@@ -51,8 +52,9 @@ type ThresholdValidator struct {
 
 	grpcTimeout time.Duration
 
-	chainState sync.Map // map[string]SignState, chainState["chainid"] -> types.SignState
-
+	// chainSignState is the watermark for sent blocks we have started to process
+	chainSignState sync.Map // - chainSignState["chainid"] -> types.chainSignState
+	// MPC 		*MPC // This is our multi party computation/communucatibn
 	// our own cosigner
 	MyCosigner *cosigner.LocalCosigner // TODO Should be an interface as well.
 
@@ -107,7 +109,7 @@ type ChainSignState struct {
 	lastSignStateMutex *sync.Mutex
 
 	// stores the last sign state that we've started progress on
-	lastSignStateInitiated      *types.SignState
+	lastInitiatedSignState      *types.SignState
 	lastSignStateInitiatedMutex *sync.Mutex
 }
 
@@ -120,7 +122,7 @@ func (e *BeyondBlockError) Error() string { return e.msg }
 func (pv *ThresholdValidator) newBeyondBlockError(chainID string, hrs types.HRS) *BeyondBlockError {
 	css := pv.mustLoadChainState(chainID)
 
-	lss := css.lastSignStateInitiated
+	lss := css.lastInitiatedSignState
 	return &BeyondBlockError{
 		msg: fmt.Sprintf("[%s] Progress already started on block %d.%d.%d, skipping %d.%d.%d",
 			chainID,
@@ -145,8 +147,8 @@ func NewThresholdValidator(
 	allCosigners[0] = myCosigner
 	copy(allCosigners[1:], peerCosigners)
 
-	for _, cosigner := range peerCosigners {
-		logger.Debug("Peer cosigner", "id", cosigner.GetIndex())
+	for _, peer := range peerCosigners {
+		logger.Debug("Peer peer", "id", peer.GetIndex())
 	}
 
 	nodecacheconfig := nodecacheconfig()
@@ -166,11 +168,12 @@ func NewThresholdValidator(
 		threshold:                   threshold,
 		grpcTimeout:                 grpcTimeout,
 		maxWaitForSameBlockAttempts: maxWaitForSameBlockAttempts,
-		MyCosigner:                  myCosigner,
-		peerCosigners:               peerCosigners,
-		leader:                      leader,
-		cosignerHealth:              NewCosignerHealth(logger, peerCosigners, leader),
-		nonceCache:                  nc,
+		// MPC:                         mpc,
+		MyCosigner:     myCosigner,
+		peerCosigners:  peerCosigners,
+		leader:         leader,
+		cosignerHealth: NewCosignerHealth(logger, peerCosigners, leader),
+		nonceCache:     nc,
 	}
 }
 
@@ -200,7 +203,7 @@ func (pv *ThresholdValidator) SaveLastSignedState(chainID string, signState type
 }
 
 func (pv *ThresholdValidator) mustLoadChainState(chainID string) ChainSignState {
-	cs, ok := pv.chainState.Load(chainID) //
+	cs, ok := pv.chainSignState.Load(chainID) //
 	if !ok {
 		panic(fmt.Errorf("failed to load chain state for %s", chainID))
 	}
@@ -223,7 +226,7 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(
 
 	height, round, step := block.Height, block.Round, block.Step
 
-	err := css.lastSignStateInitiated.Save(types.NewSignStateConsensus(height, round, step), &pv.pendingDiskWG)
+	err := css.lastInitiatedSignState.Save(types.NewSignStateConsensus(height, round, step), &pv.pendingDiskWG)
 	if err == nil {
 		// good to sign
 		return nil, time.Time{}, nil
@@ -353,7 +356,7 @@ func (pv *ThresholdValidator) GetPubKey(_ context.Context, chainID string) ([]by
 }
 
 func (pv *ThresholdValidator) LoadSignStateIfNecessary(chainID string) error {
-	if _, ok := pv.chainState.Load(chainID); ok {
+	if _, ok := pv.chainSignState.Load(chainID); ok {
 		return nil
 	}
 
@@ -362,12 +365,12 @@ func (pv *ThresholdValidator) LoadSignStateIfNecessary(chainID string) error {
 		return err
 	}
 
-	lastSignStateInitiated := signState.FreshCache()
-	lastSignStateInitiated.FilePath = os.DevNull
+	lastInitiatedSignState := signState.FreshCache()
+	lastInitiatedSignState.FilePath = os.DevNull
 
-	pv.chainState.Store(chainID, ChainSignState{
+	pv.chainSignState.Store(chainID, ChainSignState{
 		lastSignState:          signState,
-		lastSignStateInitiated: lastSignStateInitiated,
+		lastInitiatedSignState: lastInitiatedSignState,
 
 		lastSignStateMutex:          &sync.Mutex{},
 		lastSignStateInitiatedMutex: &sync.Mutex{},

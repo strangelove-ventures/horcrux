@@ -114,7 +114,7 @@ func createCosignerEd25519ShardsCmd() *cobra.Command {
 				return nil
 			}
 
-			csKeys, err := tss.CreateEd25519ThresholdSignShardsFromFile(keyFile, threshold, shards)
+			csKeys, err := tss.CreatePersistentEd25519ThresholdSignShardsFromFile(keyFile, threshold, shards)
 			if err != nil {
 				return err
 			}
@@ -130,12 +130,12 @@ func createCosignerEd25519ShardsCmd() *cobra.Command {
 			cmd.SilenceUsage = true
 
 			for _, c := range csKeys {
-				dir, err := createCosignerDirectoryIfNecessary(out, c.ID)
+				dir, err := createCosignerDirectoryIfNecessary(out, c.ID())
 				if err != nil {
 					return err
 				}
 				filename := filepath.Join(dir, fmt.Sprintf("%s_shard.json", chainID))
-				if err = tss.WriteCosignerEd25519ShardFile(c, filename); err != nil {
+				if err = tss.WriteToFile(c, filename); err != nil {
 					return err
 				}
 				fmt.Fprintf(cmd.OutOrStdout(), "Created Ed25519 Shard %s\n", filename)

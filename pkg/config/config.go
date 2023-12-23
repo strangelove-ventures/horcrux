@@ -26,7 +26,9 @@ const (
 	SignModeThreshold SignMode = "threshold"
 	SignModeSingle    SignMode = "single"
 
-	// Default values for the nouncecahce
+	/*
+		Default values for the nouncecahce
+	*/
 	// TODO: Is this the best way to do this?
 	DefaultGetNoncesInterval = 3 * time.Second
 	DefaultGetNoncesTimeout  = 4 * time.Second

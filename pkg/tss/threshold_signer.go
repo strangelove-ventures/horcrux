@@ -2,15 +2,15 @@ package tss
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 
 	"github.com/cometbft/cometbft/privval"
-	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
-// LoadThresholdSignerEd25519Key loads the persistent ThresholdSignerEd25519Key from file.
-func LoadThresholdSignerEd25519Key(file string) (CosignerEd25519Key, error) {
-	pvKey := CosignerEd25519Key{}
+// LoadVaultKeyFromFile loads the persistent ThresholdSignerEd25519Key from file.
+func LoadVaultKeyFromFile(file string) (VaultKey, error) {
+	pvKey := VaultKey{}
 	keyJSONBytes, err := os.ReadFile(file)
 	if err != nil {
 		return pvKey, err
@@ -24,25 +24,39 @@ func LoadThresholdSignerEd25519Key(file string) (CosignerEd25519Key, error) {
 	return pvKey, nil
 }
 
-// CreateEd25519ThresholdSignShardsFromFile creates CosignerEd25519Key objects from a priv_validator_key.json file
-func CreateEd25519ThresholdSignShardsFromFile(priv string, threshold, shards uint8) ([]CosignerEd25519Key, error) {
-	pv, err := ReadPrivValidatorFile(priv)
-	if err != nil {
-		return nil, err
-	}
-	return CreateEd25519ThresholdSignShards(pv, threshold, shards), nil
+type ChainPrivate interface {
+	privval.FilePVKey
 }
 
-// CreateEd25519ThresholdSignShards creates CosignerEd25519Key objects from a privval.FilePVKey
-func CreateEd25519ThresholdSignShards(pv privval.FilePVKey, threshold, shards uint8) []CosignerEd25519Key {
-	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(pv.PrivKey.Bytes()[:32]), threshold, shards)
-	out := make([]CosignerEd25519Key, shards)
-	for i, shard := range privShards {
-		out[i] = CosignerEd25519Key{
-			PubKey:       pv.PubKey,
-			PrivateShard: shard,
-			ID:           i + 1,
+// type Handler[VPK VaultPrivateKey, CP ChainPrivate] func(CP, uint8, uint8) []VPK
+// type ChainHandler[CP ChainPrivate] func(string) (CP, error)
+
+type fn func(privval.FilePVKey, uint8, uint8) []Ed25519Key
+
+// CreatePersistentEd25519ThresholdSignShardsFromFile creates Ed25519Key objects from a priv_validator_key.json file
+func CreatePersistentEd25519ThresholdSignShardsFromFile(filename string, threshold, shards uint8) ([]VaultKey, error) {
+	pv, err := ReadCometBFTPrivValidatorFile(filename)
+	if err != nil {
+		fmt.Printf("Could not create shard from file %s", filename)
+		return nil, err
+	}
+
+	persistentKeys, err := generatePersistentThresholdSignShards(pv, CreateEd25519ThresholdSignShards, threshold, shards)
+	return persistentKeys, err
+
+}
+
+// CreatePersistentThresholdSignShardsFromFile creates   objects from a priv_validator_key.json file
+func generatePersistentThresholdSignShards(filePVKey privval.FilePVKey, function fn, threshold uint8, shards uint8) ([]VaultKey, error) {
+	keys := function(filePVKey, threshold, shards)
+	// Transform ed25519Keys to VaultKey type
+	vaultKeys := make([]VaultKey, len(keys))
+	for i, key := range keys {
+		vaultKeys[i] = VaultKey{
+			PubKey:       key.PubKey,
+			privateShard: key.PrivateShard,
+			id:           key.ID,
 		}
 	}
-	return out
+	return vaultKeys, nil
 }

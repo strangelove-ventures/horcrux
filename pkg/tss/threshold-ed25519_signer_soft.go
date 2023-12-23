@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/cometbft/cometbft/privval"
+
 	"github.com/strangelove-ventures/horcrux/pkg/config"
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 
@@ -15,33 +17,49 @@ import (
 
 // var _ IThresholdSigner = &ThresholdSignerSoft{}
 
+// CreateEd25519ThresholdSignShards creates Ed25519Key objects from a privval.FilePVKey
+func CreateEd25519ThresholdSignShards(pv privval.FilePVKey, threshold, shards uint8) []Ed25519Key {
+	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(pv.PrivKey.Bytes()[:32]), threshold, shards)
+	out := make([]Ed25519Key, shards)
+	for i, shard := range privShards {
+		out[i] = Ed25519Key{
+			PubKey:       pv.PubKey,
+			PrivateShard: shard,
+			ID:           i + 1,
+		}
+	}
+	return out
+}
+
 type ThresholdSignerSoft struct {
 	privateKeyShard []byte
 	pubKey          []byte
 	threshold       uint8
 	total           uint8
+	id              uint8
 }
 
-func NewThresholdSignerSoft(config *config.RuntimeConfig, id int, chainID string) (*ThresholdSignerSoft, error) {
+func NewThresholdEd25519SignerSoft(config *config.RuntimeConfig, id int, chainID string) (*ThresholdSignerSoft, error) {
 	keyFile, err := config.KeyFileExistsCosigner(chainID)
 	if err != nil {
 		return nil, err
 	}
 
-	key, err := LoadThresholdSignerEd25519Key(keyFile)
+	key, err := LoadVaultKeyFromFile(keyFile)
 	if err != nil {
 		return nil, fmt.Errorf("error reading cosigner key: %s", err)
 	}
 
-	if key.ID != id {
-		return nil, fmt.Errorf("key shard Index (%d) in (%s) does not match cosigner Index (%d)", key.ID, keyFile, id)
+	if key.id != id {
+		return nil, fmt.Errorf("key shard Index (%d) in (%s) does not match cosigner Index (%d)", key.id, keyFile, id)
 	}
 
 	s := ThresholdSignerSoft{
-		privateKeyShard: key.PrivateShard,
+		privateKeyShard: key.privateShard,
 		pubKey:          key.PubKey.Bytes(),
 		threshold:       uint8(config.Config.ThresholdModeConfig.Threshold),
 		total:           uint8(len(config.Config.ThresholdModeConfig.Cosigners)),
+		id:              uint8(key.id),
 	}
 
 	return &s, nil
@@ -88,8 +106,11 @@ func (s *ThresholdSignerSoft) sumNonces(nonces []types.Nonce) (tsed25519.Scalar,
 	return nonceShare, noncePub, nil
 }
 
-// GenerateNonces is a function that generates Nonces to be used in the MPC
-func GenerateNonces(threshold, total uint8) (types.Nonces, error) {
+type NonceGenerator struct {
+}
+
+// GenerateNonces is a function (methods) that generates Nonces to be used in the MPC signature
+func (ng NonceGenerator) GenerateNonces(threshold, total uint8) (types.Nonces, error) {
 	secret := make([]byte, 32)
 	if _, err := rand.Read(secret); err != nil {
 		return types.Nonces{}, err
@@ -100,6 +121,7 @@ func GenerateNonces(threshold, total uint8) (types.Nonces, error) {
 		Shares: make([][]byte, total),
 	}
 
+	// The lenght of shares is equal to total
 	shares := tsed25519.DealShares(secret, threshold, total)
 
 	for i, sh := range shares {
@@ -109,7 +131,7 @@ func GenerateNonces(threshold, total uint8) (types.Nonces, error) {
 	return nonces, nil
 }
 
-// Should move to the cosigner package
+// CombineSignatures combines partial signatures into a full signature
 func (s *ThresholdSignerSoft) CombineSignatures(signatures []types.PartialSignature) ([]byte, error) {
 	sigIds := make([]int, len(signatures))
 	shareSigs := make([][]byte, len(signatures))

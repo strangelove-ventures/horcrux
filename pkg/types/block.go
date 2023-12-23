@@ -53,11 +53,11 @@ func (block Block) ToProto() *proto.Block {
 
 func BlockFromProto(block *proto.Block) Block {
 	return Block{
-		//HRST: HRST{
+		// HRST: HRST{
 		Height: block.Height,
 		Round:  block.Round,
 		Step:   int8(block.Step),
-		//},
+		// },
 		SignBytes: block.SignBytes,
 		Timestamp: time.Unix(0, block.Timestamp),
 	}

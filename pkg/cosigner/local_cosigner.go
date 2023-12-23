@@ -35,7 +35,7 @@ type LocalCosigner struct {
 	logger        cometlog.Logger
 	config        *config.RuntimeConfig
 	security      ICosignerSecurity
-	chainState    sync.Map // TODO: Add type so its not any?
+	chainState    sync.Map // chainState is a map of chainID to *ChainState
 	address       string
 	pendingDiskWG sync.WaitGroup
 
@@ -159,9 +159,10 @@ func (cosigner *LocalCosigner) getChainState(chainID string) (*ChainState, error
 		return nil, fmt.Errorf("failed to load chain state for %s", chainID)
 	}
 
+	// Asserting cs (type any) is actually of type *ChainState
 	ccs, ok := cs.(*ChainState)
 	if !ok {
-		return nil, fmt.Errorf("expected: (*ChainState), actual: (%T)", cs)
+		return nil, fmt.Errorf("Expected: (*ChainState), actual: (%T)", cs)
 	}
 
 	return ccs, nil
@@ -285,9 +286,10 @@ func (cosigner *LocalCosigner) generateNonces() ([]types.Nonces, error) {
 	total := len(cosigner.config.Config.ThresholdModeConfig.Cosigners)
 	meta := make([]types.Nonces, total)
 
-	// TODO: This should only geerate nonces for the cosigners that are online
-	// 		 actually
-	nonces, err := tss.GenerateNonces(
+	// TODO: This should only generate nonces for the cosigners that are online
+	// 		 although it might doesnt matter if we arent doing DKG
+	// Should call the interface
+	nonces, err := tss.NonceGenerator{}.GenerateNonces(
 		uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
 		uint8(total),
 	)
@@ -314,9 +316,9 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 		return err
 	}
 
-	//var signer IThresholdSigner
+	// var signer IThresholdSigner
 
-	signer, err := tss.NewThresholdSignerSoft(cosigner.config, cosigner.GetIndex(), chainID)
+	signer, err := tss.NewThresholdEd25519SignerSoft(cosigner.config, cosigner.GetIndex(), chainID)
 	if err != nil {
 		return err
 	}

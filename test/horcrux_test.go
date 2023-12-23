@@ -359,7 +359,7 @@ func TestMultipleChainHorcrux(t *testing.T) {
 	for i := 0; i < totalChains; i++ {
 		chainConfigs[i] = &cosignerChainConfig{
 			sentries: make([]cosmos.ChainNodes, sentriesPerSigner),
-			shards:   make([]tss.CosignerEd25519Key, totalSigners),
+			shards:   make([]tss.Ed25519Key, totalSigners),
 		}
 	}
 
@@ -453,7 +453,7 @@ func TestMultipleChainHorcrux(t *testing.T) {
 
 type cosignerChainConfig struct {
 	chainID  string
-	shards   []tss.CosignerEd25519Key
+	shards   []tss.Ed25519Key
 	sentries []cosmos.ChainNodes
 }
 
@@ -594,7 +594,7 @@ func TestHorcruxProxyGRPC(t *testing.T) {
 	for i := 0; i < totalChains; i++ {
 		chainConfigs[i] = &cosignerChainConfig{
 			sentries: make([]cosmos.ChainNodes, sentriesPerSigner),
-			shards:   make([]tss.CosignerEd25519Key, totalSigners),
+			shards:   make([]tss.Ed25519Key, totalSigners),
 		}
 	}
 

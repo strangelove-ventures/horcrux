@@ -29,7 +29,7 @@ func NewNodeGRPCServer(
 	raftStore *RaftStore,
 ) *NodeGRPCServer {
 	return &NodeGRPCServer{
-		//cosigner:           cosigner,
+		// cosigner:           cosigner,
 		thresholdValidator: thresholdValidator,
 		raftStore:          raftStore,
 	}
@@ -107,7 +107,8 @@ func (rpc *NodeGRPCServer) GetNonces(
 	}, nil
 }
 
-// TODO: // TransferLeadership should not be a CosignerGRPCServer method?
+// TODO: should not be a CosignerGRPCServer method
+// TransferLeadership transfers leadership to another candidate
 func (rpc *NodeGRPCServer) TransferLeadership(
 	_ context.Context,
 	req *proto.TransferLeadershipRequest,
@@ -118,12 +119,13 @@ func (rpc *NodeGRPCServer) TransferLeadership(
 	leaderID := req.GetLeaderID()
 	if leaderID != "" {
 		for _, c := range rpc.raftStore.Cosigners {
-			shardID := fmt.Sprint(c.GetIndex())
-			if shardID == leaderID {
+			shardIndex := fmt.Sprint(c.GetIndex())
+			if shardIndex == leaderID {
 				raftAddress := p2pURLToRaftAddress(c.GetAddress())
-				fmt.Printf("Transferring leadership to Index: %s - Address: %s\n", shardID, raftAddress)
-				rpc.raftStore.raft.LeadershipTransferToServer(raft.ServerID(shardID), raft.ServerAddress(raftAddress))
-				return &proto.TransferLeadershipResponse{LeaderID: shardID, LeaderAddress: raftAddress}, nil
+
+				// TODO: Change to logging
+				rpc.raftStore.raft.LeadershipTransferToServer(raft.ServerID(shardIndex), raft.ServerAddress(raftAddress))
+				return &proto.TransferLeadershipResponse{LeaderID: shardIndex, LeaderAddress: raftAddress}, nil
 			}
 		}
 	}

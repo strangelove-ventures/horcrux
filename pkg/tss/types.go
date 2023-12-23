@@ -20,7 +20,7 @@ type ISignerKey interface {
 }
 */
 
-// CosignerEd25519Key is a single Ed255219 key shard for an m-of-n threshold signer.
+// Ed25519Key is a single Ed255219 key shard for an m-of-n threshold signer.
 // TODO: This should be renamed to SignerEd25519 and tbh Private shard should private.
 type PersistentEd25519Key struct {
 	pubKey       cometcrypto.PubKey // Public key of the persistent shard. Pubkey is the same for all shards.
@@ -28,15 +28,26 @@ type PersistentEd25519Key struct {
 	index        int                // Shamir index of this shard
 }
 
-type CosignerEd25519Key struct {
+type VaultKey struct {
+	PubKey       cometcrypto.PubKey `json:"pubKey"`
+	privateShard []byte             //`// json:"privateShard"`
+	id           int                //`/Shamir index / json:"id"`
+}
+
+// TODO: Should not actually get this.
+func (key *VaultKey) ID() int {
+	return key.id
+}
+
+type Ed25519Key struct {
 	PubKey       cometcrypto.PubKey `json:"pubKey"`
 	PrivateShard []byte             `json:"privateShard"`
 	ID           int                `json:"id"`
 }
 
 // TODO: redo to a function.
-func (key *CosignerEd25519Key) MarshalJSON() ([]byte, error) {
-	type Alias CosignerEd25519Key
+func (key *Ed25519Key) MarshalJSON() ([]byte, error) {
+	type Alias Ed25519Key
 
 	protoPubkey, err := cometcryptoencoding.PubKeyToProto(key.PubKey)
 	if err != nil {
@@ -58,8 +69,8 @@ func (key *CosignerEd25519Key) MarshalJSON() ([]byte, error) {
 }
 
 // redo to a function
-func (key *CosignerEd25519Key) UnmarshalJSON(data []byte) error {
-	type Alias CosignerEd25519Key
+func (key *Ed25519Key) UnmarshalJSON(data []byte) error {
+	type Alias Ed25519Key
 
 	aux := &struct {
 		PubkeyBytes []byte `json:"pubKey"`
@@ -102,10 +113,10 @@ func (key *CosignerEd25519Key) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// ReadPrivValidatorFile reads in a privval.FilePVKey from a given file.
-func ReadPrivValidatorFile(priv string) (out privval.FilePVKey, err error) {
+// ReadCometBFTPrivValidatorFile reads in a privval.FilePVKey from a given file.
+func ReadCometBFTPrivValidatorFile(filename string) (out privval.FilePVKey, err error) {
 	var bz []byte
-	if bz, err = os.ReadFile(priv); err != nil {
+	if bz, err = os.ReadFile(filename); err != nil {
 		return
 	}
 	if err = cometjson.Unmarshal(bz, &out); err != nil {
@@ -114,9 +125,22 @@ func ReadPrivValidatorFile(priv string) (out privval.FilePVKey, err error) {
 	return
 }
 
-// WriteCosignerEd25519ShardFile writes a cosigner Ed25519 key to a given file name.
-func WriteCosignerEd25519ShardFile(cosigner CosignerEd25519Key, file string) error {
-	jsonBytes, err := json.Marshal(&cosigner)
+type VaultPrivateKey interface {
+	VaultKey | Ed25519Key | privval.FilePVKey
+}
+
+// WriteToFile writes a key structure to a given file name.
+func WriteToFile[VPK VaultPrivateKey](privateshare VPK, file string) error {
+	jsonBytes, err := json.Marshal(&privateshare)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(file, jsonBytes, 0600)
+}
+
+// WriteToFile writes a cosigner Ed25519 key to a given file name.
+func WriteToFileOld(object Ed25519Key, file string) error {
+	jsonBytes, err := json.Marshal(&object)
 	if err != nil {
 		return err
 	}

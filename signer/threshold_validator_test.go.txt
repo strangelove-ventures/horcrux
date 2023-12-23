@@ -58,7 +58,7 @@ func loadKeyForLocalCosigner(
 	privateShard []byte,
 	config *config.RuntimeConfig,
 ) error {
-	key := tss.CosignerEd25519Key{
+	key := tss.Ed25519Key{
 		PubKey:       pubKey,
 		PrivateShard: privateShard,
 		ID:           cosigner.GetIndex(),

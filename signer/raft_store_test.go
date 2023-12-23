@@ -30,7 +30,7 @@ func Test_StoreInMemOpenSingleNode(t *testing.T) {
 	eciesKey, err := ecies.GenerateKey(rand.Reader, secp256k1.S256(), nil)
 	require.NoError(t, err)
 
-	key := tss.CosignerEd25519Key{
+	key := tss.Ed25519Key{
 		PubKey:       dummyPub,
 		PrivateShard: []byte{},
 		ID:           1,

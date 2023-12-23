@@ -2,9 +2,9 @@ package cosigner
 
 /*
 Package cosigner:
-Cosinger is responsible for the network communication between the cosigners.
+Cosinger is responsible for the network MPC communication between threshold signers.
 
-You can thkin of it as:
+You can think of it as:
 - LocalCosigner is the server (we understand that local here is confussing but it is because it is local to the node)
 - RemoteCosigner is the client
 */
@@ -16,6 +16,16 @@ import (
 	"github.com/google/uuid"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 )
+
+// threshold-ed25519
+type MPC struct {
+	// our own cosigner
+	MyCosigner *LocalCosigner // TODO Should be an interface as well.
+
+	// peer cosigners
+	peerCosigners []*RemoteCosigner // "i.e clients to call"
+
+}
 
 type Localcosigner interface {
 	// TODO - add methods

@@ -46,7 +46,7 @@ func addressCmd() *cobra.Command {
 					return err
 				}
 
-				key, err := tss.LoadThresholdSignerEd25519Key(keyFile)
+				key, err := tss.LoadVaultKeyFromFile(keyFile)
 				if err != nil {
 					return fmt.Errorf("error reading threshold key: %w, check that key is present for chain id: %s", err, chainID)
 				}
