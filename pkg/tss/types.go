@@ -126,7 +126,7 @@ func ReadCometBFTPrivValidatorFile(filename string) (out privval.FilePVKey, err 
 }
 
 type VaultPrivateKey interface {
-	VaultKey | Ed25519Key | privval.FilePVKey
+	VaultKey | Ed25519Key
 }
 
 // WriteToFile writes a key structure to a given file name.
