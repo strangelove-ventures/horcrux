@@ -8,16 +8,22 @@ import (
 	"github.com/cometbft/cometbft/privval"
 )
 
-// LoadVaultKeyFromFile loads the persistent ThresholdSignerEd25519Key from file.
-func LoadVaultKeyFromFile(file string) (VaultKey, error) {
-	pvKey := VaultKey{}
+// LoadVaultKeyFromFile loads the persistent ThresholdSignerKey from file.
+
+func LoadVaultKeyFromFile(file string) (Ed25519Key, error) {
+	//pvKey := VaultKey{}
+	var pvKey Ed25519Key
 	keyJSONBytes, err := os.ReadFile(file)
-	if err != nil {
+	if err != nil || len(keyJSONBytes) == 0 {
+		fmt.Printf("Could not read key from file %s", file)
 		return pvKey, err
 	}
 
+	fmt.Printf("keyJsonBytes is: %s", keyJSONBytes)
+
 	err = json.Unmarshal(keyJSONBytes, &pvKey)
 	if err != nil {
+		fmt.Printf("Could not unmarshal key from file %s", file)
 		return pvKey, err
 	}
 
@@ -54,8 +60,8 @@ func generatePersistentThresholdSignShards(filePVKey privval.FilePVKey, function
 	for i, key := range keys {
 		vaultKeys[i] = VaultKey{
 			PubKey:       key.PubKey,
-			privateShard: key.PrivateShard,
-			id:           key.ID,
+			PrivateShard: key.PrivateShard,
+			ID:           key.ID,
 		}
 	}
 	return vaultKeys, nil

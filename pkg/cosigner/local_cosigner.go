@@ -316,9 +316,8 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 		return err
 	}
 
-	// var signer IThresholdSigner
-
-	signer, err := tss.NewThresholdEd25519SignerSoft(cosigner.config, cosigner.GetIndex(), chainID)
+	var signer IThresholdSigner
+	signer, err = tss.NewThresholdEd25519SignerSoft(cosigner.config, cosigner.GetIndex(), chainID)
 	if err != nil {
 		return err
 	}

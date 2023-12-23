@@ -130,7 +130,7 @@ func createCosignerEd25519ShardsCmd() *cobra.Command {
 			cmd.SilenceUsage = true
 
 			for _, c := range csKeys {
-				dir, err := createCosignerDirectoryIfNecessary(out, c.ID())
+				dir, err := createCosignerDirectoryIfNecessary(out, c.ID)
 				if err != nil {
 					return err
 				}

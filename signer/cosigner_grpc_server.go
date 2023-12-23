@@ -122,8 +122,8 @@ func (rpc *NodeGRPCServer) TransferLeadership(
 			shardIndex := fmt.Sprint(c.GetIndex())
 			if shardIndex == leaderID {
 				raftAddress := p2pURLToRaftAddress(c.GetAddress())
-
 				// TODO: Change to logging
+				fmt.Printf("Transferring leadership to Index: %s - Address: %s\n", shardIndex, raftAddress)
 				rpc.raftStore.raft.LeadershipTransferToServer(raft.ServerID(shardIndex), raft.ServerAddress(raftAddress))
 				return &proto.TransferLeadershipResponse{LeaderID: shardIndex, LeaderAddress: raftAddress}, nil
 			}

@@ -28,22 +28,26 @@ type PersistentEd25519Key struct {
 	index        int                // Shamir index of this shard
 }
 
-type VaultKey struct {
-	PubKey       cometcrypto.PubKey `json:"pubKey"`
-	privateShard []byte             //`// json:"privateShard"`
-	id           int                //`/Shamir index / json:"id"`
-}
+/*
+	type Ed25519Key struct {
+		PubKey       cometcrypto.PubKey `json:"pubKey"`
+		PrivateShard []byte             `json:"privateShard"`
+		Id           int                `json:"id"`
+	}
 
 // TODO: Should not actually get this.
-func (key *VaultKey) ID() int {
-	return key.id
-}
 
+	func (key *Ed25519Key) ID() int {
+		return key.Id
+	}
+*/
 type Ed25519Key struct {
 	PubKey       cometcrypto.PubKey `json:"pubKey"`
 	PrivateShard []byte             `json:"privateShard"`
 	ID           int                `json:"id"`
 }
+
+type VaultKey Ed25519Key
 
 // TODO: redo to a function.
 func (key *Ed25519Key) MarshalJSON() ([]byte, error) {
@@ -68,7 +72,6 @@ func (key *Ed25519Key) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// redo to a function
 func (key *Ed25519Key) UnmarshalJSON(data []byte) error {
 	type Alias Ed25519Key
 
@@ -126,7 +129,7 @@ func ReadCometBFTPrivValidatorFile(filename string) (out privval.FilePVKey, err 
 }
 
 type VaultPrivateKey interface {
-	VaultKey | Ed25519Key
+	Ed25519Key | VaultKey
 }
 
 // WriteToFile writes a key structure to a given file name.

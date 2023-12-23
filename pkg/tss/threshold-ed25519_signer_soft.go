@@ -47,19 +47,19 @@ func NewThresholdEd25519SignerSoft(config *config.RuntimeConfig, id int, chainID
 
 	key, err := LoadVaultKeyFromFile(keyFile)
 	if err != nil {
-		return nil, fmt.Errorf("error reading cosigner key: %s", err)
+		return nil, fmt.Errorf("error reading Vault key: %s", err)
 	}
 
-	if key.id != id {
-		return nil, fmt.Errorf("key shard Index (%d) in (%s) does not match cosigner Index (%d)", key.id, keyFile, id)
+	if key.ID != id {
+		return nil, fmt.Errorf("key shard Index (%d) in (%s) does not match cosigner Index (%d)", key.ID, keyFile, id)
 	}
 
 	s := ThresholdSignerSoft{
-		privateKeyShard: key.privateShard,
+		privateKeyShard: key.PrivateShard,
 		pubKey:          key.PubKey.Bytes(),
 		threshold:       uint8(config.Config.ThresholdModeConfig.Threshold),
 		total:           uint8(len(config.Config.ThresholdModeConfig.Cosigners)),
-		id:              uint8(key.id),
+		id:              uint8(key.ID),
 	}
 
 	return &s, nil
