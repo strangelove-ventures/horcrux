@@ -651,6 +651,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 	numPeers := len(pv.peerCosigners)
 	total := uint8(numPeers + 1)
 
+	// More or less everything belov here shoud be moved to a "cosigners"
 	peerStartTime := time.Now()
 
 	cosignersOrderedByFastest := pv.cosignerHealth.GetFastest()

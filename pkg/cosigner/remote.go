@@ -16,7 +16,8 @@ import (
 // var _ Cosigner = &RemoteCosigner{}
 
 // RemoteCosigner uses CosignerGRPC to request signing from a remote cosigner
-// Remote Cosigner are the CLIENT!
+// Remote Cosigner are CLIENTS! to every other cosigner, including the the nodes local cosigner
+// It calls the GRPC server of the other cosigner
 type RemoteCosigner struct {
 	id      int
 	address string
@@ -28,7 +29,7 @@ type RemoteCosigner struct {
 func InitRemoteCosigner(id int, address string, client proto.CosignerClient) *RemoteCosigner {
 	cosigner := &RemoteCosigner{
 		id:      id,
-		address: address,
+		address: address, // address is the P2P URL of the remote cosigner
 		Client:  client,
 	}
 
@@ -37,7 +38,7 @@ func InitRemoteCosigner(id int, address string, client proto.CosignerClient) *Re
 
 // NewRemoteCosigner returns a newly initialized RemoteCosigner
 func NewRemoteCosigner(id int, address string) (*RemoteCosigner, error) {
-	client, err := getGRPCClient(address)
+	client, err := getGRPCClient(address) // address is the P2P URL of the cosigner server to dial
 	if err != nil {
 		return nil, err
 	}

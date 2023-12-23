@@ -31,7 +31,10 @@ func CreateEd25519ThresholdSignShards(pv privval.FilePVKey, threshold, shards ui
 	return out
 }
 
-type ThresholdSignerSoft struct {
+// ted25519SignerSoft is a threshold signer that uses the threshold-ed25519 library
+// to perform the signing operations.
+// Its only responsibility is to sign a payload and combine signatures
+type ted25519SignerSoft struct {
 	privateKeyShard []byte
 	pubKey          []byte
 	threshold       uint8
@@ -39,7 +42,7 @@ type ThresholdSignerSoft struct {
 	id              uint8
 }
 
-func NewThresholdEd25519SignerSoft(config *config.RuntimeConfig, id int, chainID string) (*ThresholdSignerSoft, error) {
+func NewThresholdEd25519SignerSoft(config *config.RuntimeConfig, id int, chainID string) (*ted25519SignerSoft, error) {
 	keyFile, err := config.KeyFileExistsCosigner(chainID)
 	if err != nil {
 		return nil, err
@@ -54,7 +57,7 @@ func NewThresholdEd25519SignerSoft(config *config.RuntimeConfig, id int, chainID
 		return nil, fmt.Errorf("key shard Index (%d) in (%s) does not match cosigner Index (%d)", key.ID, keyFile, id)
 	}
 
-	s := ThresholdSignerSoft{
+	s := ted25519SignerSoft{
 		privateKeyShard: key.PrivateShard,
 		pubKey:          key.PubKey.Bytes(),
 		threshold:       uint8(config.Config.ThresholdModeConfig.Threshold),
@@ -65,12 +68,13 @@ func NewThresholdEd25519SignerSoft(config *config.RuntimeConfig, id int, chainID
 	return &s, nil
 }
 
-func (s *ThresholdSignerSoft) GetPubKey() []byte {
+func (s *ted25519SignerSoft) GetPubKey() []byte {
 	return s.pubKey
 }
 
-func (s *ThresholdSignerSoft) Sign(nonces []types.Nonce, payload []byte) ([]byte, error) {
-	nonceShare, noncePub, err := s.sumNonces(nonces)
+func (s *ted25519SignerSoft) Sign(nonces []types.Nonce, payload []byte) ([]byte, error) {
+	// sum the nonces to get the ephemeral public key and share
+	nonceShare, noncePub, err := sumNonces(nonces)
 	if err != nil {
 		return nil, fmt.Errorf("failed to combine nonces: %w", err)
 	}
@@ -80,7 +84,7 @@ func (s *ThresholdSignerSoft) Sign(nonces []types.Nonce, payload []byte) ([]byte
 	return append(noncePub, sig...), nil
 }
 
-func (s *ThresholdSignerSoft) sumNonces(nonces []types.Nonce) (tsed25519.Scalar, tsed25519.Element, error) {
+func sumNonces(nonces []types.Nonce) (tsed25519.Scalar, tsed25519.Element, error) {
 	shareParts := make([]tsed25519.Scalar, len(nonces))
 	publicKeys := make([]tsed25519.Element, len(nonces))
 
@@ -132,7 +136,7 @@ func (ng NonceGenerator) GenerateNonces(threshold, total uint8) (types.Nonces, e
 }
 
 // CombineSignatures combines partial signatures into a full signature
-func (s *ThresholdSignerSoft) CombineSignatures(signatures []types.PartialSignature) ([]byte, error) {
+func (s *ted25519SignerSoft) CombineSignatures(signatures []types.PartialSignature) ([]byte, error) {
 	sigIds := make([]int, len(signatures))
 	shareSigs := make([][]byte, len(signatures))
 	var ephPub []byte

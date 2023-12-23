@@ -17,6 +17,7 @@ import (
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 )
 
+/*
 // threshold-ed25519
 type MPC struct {
 	// our own cosigner
@@ -33,7 +34,7 @@ type Localcosigner interface {
 type Remotecosigner interface {
 	// TODO - add methods
 }
-
+*/
 // CosignerSignRequest is sent to a co-signer to obtain their signature for the SignBytes
 // The SignBytes should be a serialized block
 type CosignerSignRequest struct {
