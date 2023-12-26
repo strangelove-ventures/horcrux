@@ -56,7 +56,7 @@ func (rpc *NodeGRPCServer) SetNoncesAndSign(
 		ChainID: req.ChainID,
 		Nonces: &cosigner.CosignerUUIDNonces{
 			UUID:   uuid.UUID(req.Uuid),
-			Nonces: cosigner.CosignerNoncesFromProto(req.GetNonces()),
+			Nonces: cosigner.FromProtoToNonces(req.GetNonces()),
 		},
 		HRST:      types.HRSTFromProto(req.GetHrst()),
 		SignBytes: req.GetSignBytes(),

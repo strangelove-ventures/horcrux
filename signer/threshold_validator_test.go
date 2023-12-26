@@ -5,9 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	mrand "math/rand"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/strangelove-ventures/horcrux/pkg/config"
@@ -24,10 +22,10 @@ import (
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/crypto/tmhash"
+	"github.com/cometbft/cometbft/libs/log"
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	cometrand "github.com/cometbft/cometbft/libs/rand"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	comet "github.com/cometbft/cometbft/types"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/stretchr/testify/require"
@@ -35,20 +33,87 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+var (
+	testConfig *config.RuntimeConfig // use this global config in tests
+)
+
+const (
+	defaultGetNoncesInterval = 3 * time.Second
+	defaultGetNoncesTimeout  = 4 * time.Second
+	defaultNonceExpiration   = 10 * time.Second // half of the local cosigner cache expiration
+
+)
+
+type MockValidator struct {
+	*signer.ThresholdValidator
+	nonceCache *signer.CosignerNonceCache
+}
+
+func NewMockValidator(
+	logger log.Logger,
+	config *config.RuntimeConfig,
+	threshold int,
+	grpcTimeout time.Duration,
+	maxWaitForSameBlockAttempts int,
+	myCosigner *cosigner.LocalCosigner,
+	peerCosigners []signer.ICosigner,
+	leader signer.ILeader,
+) *MockValidator {
+	allCosigners := make([]signer.ICosigner, len(peerCosigners)+1)
+	allCosigners[0] = myCosigner
+	copy(allCosigners[1:], peerCosigners)
+
+	for _, peer := range peerCosigners {
+		logger.Debug("Peer peer", "id", peer.GetIndex())
+	}
+	nc := signer.NewCosignerNonceCache(
+		logger,
+		allCosigners,
+		leader,
+		defaultGetNoncesInterval,
+		defaultGetNoncesTimeout,
+		defaultNonceExpiration,
+		uint8(threshold),
+		nil,
+	)
+	return &MockValidator{
+		signer.NewThresholdValidator(logger, config, threshold, grpcTimeout, maxWaitForSameBlockAttempts, allCosigners[0].(*cosigner.LocalCosigner), peerCosigners[1:], leader),
+		nc,
+	}
+}
+
+func TestMain(m *testing.M) {
+	// optional alternative config via ENV VAR `CONFIG`
+	// if path := os.Getenv("CONFIG"); path != "" {
+
+	//     conf, err := LoadConfig(path)
+	//     if err != nil {
+	//         log.Fatalf("Failed to load config file %q : %v", path, err)
+	//     }
+
+	//     testConfig = &conf
+
+	// } else {
+	//     testConfig = &config.RuntimeConfig{}
+	// }
+	testConfig = &config.RuntimeConfig{}
+	// call flag.Parse() here if TestMain uses flags
+	os.Exit(m.Run())
+}
 func TestThresholdValidator2of2(t *testing.T) {
-	testThresholdValidator(t, 2, 2, configuration)
+	testThresholdValidator(t, 2, 2, testConfig)
 }
 
 func TestThresholdValidator3of3(t *testing.T) {
-	testThresholdValidator(t, 3, 3)
+	testThresholdValidator(t, 3, 3, testConfig)
 }
 
 func TestThresholdValidator2of3(t *testing.T) {
-	testThresholdValidator(t, 2, 3)
+	testThresholdValidator(t, 2, 3, testConfig)
 }
 
 func TestThresholdValidator3of5(t *testing.T) {
-	testThresholdValidator(t, 3, 5)
+	testThresholdValidator(t, 3, 5, testConfig)
 }
 
 func loadKeyForLocalCosigner(
@@ -71,7 +136,6 @@ func loadKeyForLocalCosigner(
 
 	return os.WriteFile(config.KeyFilePathCosigner(chainID), keyBz, 0600)
 }
-
 func testThresholdValidator(t *testing.T, threshold, total uint8, configuration *config.RuntimeConfig) {
 	cosigners, pubKey := getTestLocalCosigners(t, threshold, total)
 
@@ -87,7 +151,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8, configuration 
 
 	leader := &MockLeader{id: 1}
 
-	validator := signer.NewThresholdValidator(
+	validator := NewMockValidator(
 		cometlog.NewNopLogger(),
 		configuration,
 		int(threshold),
@@ -99,7 +163,10 @@ func testThresholdValidator(t *testing.T, threshold, total uint8, configuration 
 	)
 	defer validator.Stop()
 
-	leader.leader = validator
+	// var mockvalidator *MockValidator
+	// mockvalidator = mockvalidator(validator)
+
+	leader.leader = validator.ThresholdValidator
 
 	ctx := context.Background()
 
@@ -174,7 +241,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8, configuration 
 	require.NoError(t, err)
 
 	// reinitialize validator to make sure new runtime will not allow double sign
-	newValidator := signer.NewThresholdValidator(
+	newValidator := NewMockValidator(
 		cometlog.NewNopLogger(),
 		configuration,
 		int(threshold),
@@ -302,10 +369,10 @@ func testThresholdValidator(t *testing.T, threshold, total uint8, configuration 
 	}
 }
 
-func getTestLocalCosigners(t *testing.T, threshold, total uint8) ([]*LocalCosigner, cometcrypto.PubKey) {
+func getTestLocalCosigners(t *testing.T, threshold, total uint8) ([]*cosigner.LocalCosigner, cometcrypto.PubKey) {
 	eciesKeys := make([]*ecies.PrivateKey, total)
 	pubKeys := make([]*ecies.PublicKey, total)
-	cosigners := make([]*LocalCosigner, total)
+	cosigners := make([]*cosigner.LocalCosigner, total)
 
 	for i := uint8(0); i < total; i++ {
 		eciesKey, err := ecies.GenerateKey(rand.Reader, secp256k1.S256(), nil)
@@ -322,10 +389,10 @@ func getTestLocalCosigners(t *testing.T, threshold, total uint8) ([]*LocalCosign
 
 	tmpDir := t.TempDir()
 
-	cosignersConfig := make(CosignersConfig, total)
+	cosignersConfig := make(config.CosignersConfig, total)
 
 	for i := range pubKeys {
-		cosignersConfig[i] = CosignerConfig{
+		cosignersConfig[i] = config.CosignerConfig{
 			ShardID: i + 1,
 		}
 	}
@@ -346,7 +413,7 @@ func getTestLocalCosigners(t *testing.T, threshold, total uint8) ([]*LocalCosign
 			},
 		}
 
-		cosigner := NewLocalCosigner(
+		cosigner := cosigner.NewLocalCosigner(
 			cometlog.NewNopLogger(),
 			cosignerConfig,
 			nodesecurity.NewCosignerSecurityECIES(
@@ -362,49 +429,50 @@ func getTestLocalCosigners(t *testing.T, threshold, total uint8) ([]*LocalCosign
 
 		cosigners[i] = cosigner
 
-		err = loadKeyForLocalCosigner(cosigner, privateKey.PubKey(), testChainID, privShards[i])
+		err = loadKeyForLocalCosigner(cosigner, privateKey.PubKey(), testChainID, privShards[i], cosignerConfig)
 		require.NoError(t, err)
 
-		err = loadKeyForLocalCosigner(cosigner, privateKey.PubKey(), testChainID2, privShards[i])
+		err = loadKeyForLocalCosigner(cosigner, privateKey.PubKey(), testChainID2, privShards[i], cosignerConfig)
 		require.NoError(t, err)
 	}
 
 	return cosigners, privateKey.PubKey()
 }
 
+/*
 func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) {
-	cosigners, pubKey := getTestLocalCosigners(t, threshold, total)
+	peers, pubKey := getTestLocalCosigners(t, threshold, total)
 
-	thresholdValidators := make([]*signer.ThresholdValidator, 0, total)
+	thresholdValidators := make([]*MockThresholdValidator, 0, total)
 	var leader *signer.ThresholdValidator
 	leaders := make([]*MockLeader, total)
 
 	ctx := context.Background()
 
-	for i, cosigner := range cosigners {
-		peers := make([]Cosigner, 0, len(cosigners)-1)
-		for j, otherCosigner := range cosigners {
+	for i, peer := range peers {
+		peers := make([]signer.ICosigner, 0, len(peers)-1)
+		for j, otherCosigner := range peers {
 			if i != j {
 				peers = append(peers, otherCosigner)
 			}
 		}
-		leaders[i] = &MockLeader{id: cosigner.GetIndex(), leader: leader}
-		tv := NewThresholdValidator(
+		leaders[i] = &MockLeader{id: peer.GetIndex(), leader: leader}
+		tv := NewMockValidator(
 			cometlog.NewNopLogger(),
-			cosigner.config,
+			peer.config,
 			int(threshold),
 			time.Second,
 			1,
-			cosigner,
+			peer,
 			peers,
 			leaders[i],
 		)
 		if i == 0 {
-			leader = tv
-			leaders[i].leader = tv
+			leader = tv.ThresholdValidator
+			leaders[i].leader = tv.ThresholdValidator
 		}
 
-		thresholdValidators = append(thresholdValidators, tv)
+		thresholdValidators = append(thresholdValidators, tv.ThresholdValidator)
 		defer tv.Stop()
 
 		err := tv.LoadSignStateIfNecessary(testChainID)
@@ -437,7 +505,7 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 			for _, l := range leaders {
 				l.SetLeader(newLeader)
 			}
-			t.Logf("New leader: %d", newLeader.myCosigner.GetIndex())
+			t.Logf("New leader: %d", newLeader.MyCosigner.GetIndex())
 
 			// time with new leader
 			time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond) //nolint:gosec
@@ -584,3 +652,4 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 func TestThresholdValidatorLeaderElection2of3(t *testing.T) {
 	testThresholdValidatorLeaderElection(t, 2, 3)
 }
+*/

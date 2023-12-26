@@ -40,8 +40,8 @@ func (ch *CosignerHealth) Reconcile(ctx context.Context) {
 	}
 	var wg sync.WaitGroup
 	wg.Add(len(ch.cosigners))
-	for _, remote_cosigner := range ch.cosigners {
-		if rc, ok := remote_cosigner.(*cosigner.RemoteCosigner); ok {
+	for _, remotecosigner := range ch.cosigners {
+		if rc, ok := remotecosigner.(*cosigner.RemoteCosigner); ok {
 			go ch.updateRTT(ctx, rc, &wg)
 		}
 	}

@@ -162,7 +162,7 @@ func (cosigner *LocalCosigner) getChainState(chainID string) (*ChainState, error
 	// Asserting cs (type any) is actually of type *ChainState
 	ccs, ok := cs.(*ChainState)
 	if !ok {
-		return nil, fmt.Errorf("Expected: (*ChainState), actual: (%T)", cs)
+		return nil, fmt.Errorf("expected: (*ChainState), actual: (%T)", cs)
 	}
 
 	return ccs, nil
@@ -214,10 +214,10 @@ func (cosigner *LocalCosigner) VerifySignature(chainID string, payload, signatur
 // Sign the sign request using the cosigner's shard
 // Return the signed bytes or an error
 // Implements Cosigner interface
-func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignResponse, error) {
+func (cosigner *LocalCosigner) sign(req SignatureRequest) (SignatureResponse, error) {
 	chainID := req.ChainID
 
-	res := CosignerSignResponse{}
+	res := SignatureResponse{}
 
 	ccs, err := cosigner.getChainState(chainID)
 	if err != nil {
@@ -288,7 +288,7 @@ func (cosigner *LocalCosigner) generateNonces() ([]types.Nonces, error) {
 
 	// TODO: This should only generate nonces for the cosigners that are online
 	// 		 although it might doesnt matter if we arent doing DKG
-	// Should call the interface
+	// Should call an interface: dealnonce or something
 	nonces, err := tss.NonceGenerator{}.GenerateNonces(
 		uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
 		uint8(total),
@@ -359,7 +359,7 @@ func (cosigner *LocalCosigner) GetNonces(
 
 			var eg errgroup.Group
 
-			nonces := make([]CosignerNonce, total-1)
+			nonces := make([]Nonce, total-1)
 
 			for i := 0; i < total; i++ {
 				peerID := i + 1
@@ -433,8 +433,8 @@ func (cosigner *LocalCosigner) generateNoncesIfNecessary(uuid uuid.UUID) (*types
 func (cosigner *LocalCosigner) getNonce(
 	meta *types.NoncesWithExpiration,
 	peerID int,
-) (CosignerNonce, error) {
-	zero := CosignerNonce{}
+) (Nonce, error) {
+	zero := Nonce{}
 
 	id := cosigner.GetIndex()
 
@@ -448,7 +448,7 @@ func (cosigner *LocalCosigner) getNonce(
 }
 
 // setNonce stores a nonce provided by another cosigner
-func (cosigner *LocalCosigner) setNonce(uuid uuid.UUID, nonce CosignerNonce) error {
+func (cosigner *LocalCosigner) setNonce(uuid uuid.UUID, nonce Nonce) error {
 	// Verify the source signature
 	if nonce.Signature == nil {
 		return errors.New("signature field is required")
@@ -486,7 +486,7 @@ func (cosigner *LocalCosigner) setNonce(uuid uuid.UUID, nonce CosignerNonce) err
 
 func (cosigner *LocalCosigner) SetNoncesAndSign(
 	_ context.Context,
-	req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error) {
+	req CosignerSetNoncesAndSignRequest) (*SignatureResponse, error) {
 	chainID := req.ChainID
 
 	if err := cosigner.LoadSignStateIfNecessary(chainID); err != nil {
@@ -510,7 +510,7 @@ func (cosigner *LocalCosigner) SetNoncesAndSign(
 		return nil, err
 	}
 
-	res, err := cosigner.sign(CosignerSignRequest{
+	res, err := cosigner.sign(SignatureRequest{
 		UUID:      req.Nonces.UUID,
 		ChainID:   chainID,
 		SignBytes: req.SignBytes,

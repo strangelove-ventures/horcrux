@@ -10,7 +10,7 @@ type ICosignerSecurity interface {
 		id int,
 		noncePub []byte,
 		nonceShare []byte,
-	) (CosignerNonce, error)
+	) (Nonce, error)
 
 	// DecryptAndVerify decrypts the nonce and verifies the signature to authenticate the source cosigner.
 	DecryptAndVerify(

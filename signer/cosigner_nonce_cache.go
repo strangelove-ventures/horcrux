@@ -145,7 +145,7 @@ func (nc *NonceCache) PruneNonces() int {
 
 type CosignerNoncesRel struct {
 	Cosigner ICosigner
-	Nonces   cosigner.CosignerNonces
+	Nonces   cosigner.Nonces
 }
 
 type CachedNonceSingle struct {
@@ -361,7 +361,7 @@ func (cnc *CosignerNonceCache) GetNonces(fastestPeers []ICosigner) (*cosigner.Co
 	defer cnc.cache.mu.Unlock()
 CheckNoncesLoop:
 	for i, cn := range cnc.cache.cache {
-		var nonces cosigner.CosignerNonces
+		var nonces cosigner.Nonces
 		for _, p := range fastestPeers {
 			found := false
 			for _, n := range cn.Nonces {

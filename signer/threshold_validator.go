@@ -44,7 +44,7 @@ func nodecacheconfig() nodecacheconfigs {
 }
 
 // ThresholdValidator is the server that responds to sign requests from the "sentry"
-// Implements the [connector.PrivValidator] interface.
+// Implements the [connector.IPrivValidator] interface.
 type ThresholdValidator struct {
 	config *config.RuntimeConfig
 
@@ -457,7 +457,7 @@ func compareBlockSignatureAgainstHRS(
 func (pv *ThresholdValidator) getNoncesFallback(
 	ctx context.Context,
 ) (*cosigner.CosignerUUIDNonces, []ICosigner, error) {
-	nonces := make(map[ICosigner]cosigner.CosignerNonces)
+	nonces := make(map[ICosigner]cosigner.Nonces)
 
 	metrics.DrainedNonceCache.Inc()
 	metrics.TotalDrainedNonceCache.Inc()
@@ -483,7 +483,7 @@ func (pv *ThresholdValidator) getNoncesFallback(
 		return nil, nil, errors.New("timed out waiting for ephemeral shares")
 	}
 
-	var thresholdNonces cosigner.CosignerNonces
+	var thresholdNonces cosigner.Nonces
 	thresholdCosigners := make([]ICosigner, len(nonces))
 	i := 0
 	for c, n := range nonces {
@@ -518,7 +518,7 @@ func (pv *ThresholdValidator) waitForPeerNonces(
 	u uuid.UUID,
 	peer ICosigner,
 	wg *sync.WaitGroup,
-	nonces map[ICosigner]cosigner.CosignerNonces,
+	nonces map[ICosigner]cosigner.Nonces,
 	mu sync.Locker,
 ) {
 	peerStartTime := time.Now()
@@ -601,6 +601,9 @@ func (pv *ThresholdValidator) proxyIfNecessary(
 	return true, signRes.Signature, stamp, nil
 }
 
+// Sign returns the signature in byte for the given block and the time
+// This function is called by the sentry and its responsible for in its turn calling the MPC
+// to get a valid signature to return to the sentry.
 func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block types.Block) ([]byte, time.Time, error) {
 	height, round, step, stamp, signBytes := block.Height, block.Round, block.Step, block.Timestamp, block.SignBytes
 
@@ -648,10 +651,12 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 		return existingSignature, existingTimestamp, nil
 	}
 
+	// More or less everything belov here shoud be moved to a "cosigners"
+	// package. This is the actual MPC.
+	// MPC.SignBlock() is the actual function that does the MPC.
 	numPeers := len(pv.peerCosigners)
 	total := uint8(numPeers + 1)
 
-	// More or less everything belov here shoud be moved to a "cosigners"
 	peerStartTime := time.Now()
 
 	cosignersOrderedByFastest := pv.cosignerHealth.GetFastest()

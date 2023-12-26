@@ -153,7 +153,7 @@ func GenFilePV(keyFilePath, stateFilePath string) *FilePV {
 }
 
 // If loadState is true, we load from the stateFilePath. Otherwise, we use an empty LastSignState.
-func LoadFilePV(keyFilePath, stateFilePath string, loadState bool) (*FilePV, error) {
+func LoadPVFile(keyFilePath, stateFilePath string, loadState bool) (*FilePV, error) {
 	keyJSONBytes, err := os.ReadFile(keyFilePath)
 	if err != nil {
 		return nil, err

@@ -84,12 +84,12 @@ func (pv *SingleSignerValidator) loadChainStateIfNecessary(chainID string) (*Sin
 		}
 		// The only scenario in which we want to create a new state file
 		// on disk is when the state file does not exist.
-		filePV, err = LoadFilePV(keyFile, stateFile, false)
+		filePV, err = LoadPVFile(keyFile, stateFile, false)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		filePV, err = LoadFilePV(keyFile, stateFile, true)
+		filePV, err = LoadPVFile(keyFile, stateFile, true)
 		if err != nil {
 			return nil, err
 		}

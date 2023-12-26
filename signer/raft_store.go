@@ -92,6 +92,8 @@ func (s *RaftStore) SetThresholdValidator(thresholdValidator *ThresholdValidator
 	s.thresholdValidator.MyCosigner = s.mycosigner // TODO: Refactor out the use of cosigner.
 }
 
+// TODO: Should move away from this initilisation method
+// and instead use a "service" framework.
 func (s *RaftStore) init() error {
 	host := p2pURLToRaftAddress(s.RaftBind)
 	_, port, err := net.SplitHostPort(host)

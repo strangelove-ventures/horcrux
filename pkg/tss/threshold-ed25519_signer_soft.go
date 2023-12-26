@@ -23,7 +23,7 @@ func CreateEd25519ThresholdSignShards(pv privval.FilePVKey, threshold, shards ui
 	out := make([]Ed25519Key, shards)
 	for i, shard := range privShards {
 		out[i] = Ed25519Key{
-			PubKey:       pv.PubKey,
+			PubKey:       pv.PubKey.(PubKey),
 			PrivateShard: shard,
 			ID:           i + 1,
 		}
@@ -125,7 +125,7 @@ func (ng NonceGenerator) GenerateNonces(threshold, total uint8) (types.Nonces, e
 		Shares: make([][]byte, total),
 	}
 
-	// The lenght of shares is equal to total
+	// The length of shares is equal to total
 	shares := tsed25519.DealShares(secret, threshold, total)
 
 	for i, sh := range shares {

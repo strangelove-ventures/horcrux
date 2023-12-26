@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 
 	"github.com/strangelove-ventures/horcrux/pkg/cosigner/nodesecurity"
-	tss "github.com/strangelove-ventures/horcrux/pkg/tss"
+	"github.com/strangelove-ventures/horcrux/pkg/tss"
 
 	"github.com/spf13/cobra"
 )

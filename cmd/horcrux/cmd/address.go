@@ -30,7 +30,7 @@ func addressCmd() *cobra.Command {
 		Args:         cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			var pubKey crypto.PubKey
+			var pubKey tss.PubKey
 
 			chainID := args[0]
 
@@ -51,7 +51,7 @@ func addressCmd() *cobra.Command {
 					return fmt.Errorf("error reading threshold key: %w, check that key is present for chain id: %s", err, chainID)
 				}
 
-				pubKey = key.PubKey
+				pubKey = key.PubKey.(crypto.PubKey)
 			case cconfig.SignModeSingle:
 				err := config.Config.ValidateSingleSignerConfig()
 				if err != nil {
@@ -68,10 +68,10 @@ func addressCmd() *cobra.Command {
 			default:
 				panic(fmt.Errorf("unexpected sign mode: %s", config.Config.SignMode))
 			}
+			pubKeyComet := pubKey.(crypto.PubKey)
+			pubKeyAddress := pubKeyComet.Address()
 
-			pubKeyAddress := pubKey.Address()
-
-			pubKeyJSON, err := cconfig.PubKey("", pubKey)
+			pubKeyJSON, err := cconfig.PubKey("", pubKeyComet)
 			if err != nil {
 				return err
 			}
@@ -87,7 +87,7 @@ func addressCmd() *cobra.Command {
 					return err
 				}
 				output.ValConsAddress = bech32ValConsAddress
-				pubKeyBech32, err := cconfig.PubKey(args[1], pubKey)
+				pubKeyBech32, err := cconfig.PubKey(args[1], pubKeyComet)
 				if err != nil {
 					return err
 				}

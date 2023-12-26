@@ -129,8 +129,8 @@ func (c *CosignerSecurityRSA) GetID() int {
 }
 
 // EncryptAndSign encrypts the nonce and signs it for authentication.
-func (c *CosignerSecurityRSA) EncryptAndSign(id int, noncePub []byte, nonceShare []byte) (cosigner.CosignerNonce, error) {
-	nonce := cosigner.CosignerNonce{
+func (c *CosignerSecurityRSA) EncryptAndSign(id int, noncePub []byte, nonceShare []byte) (cosigner.Nonce, error) {
+	nonce := cosigner.Nonce{
 		SourceID: c.key.ID,
 	}
 
@@ -195,7 +195,7 @@ func (c *CosignerSecurityRSA) DecryptAndVerify(
 		return nil, nil, fmt.Errorf("unknown cosigner: %d", id)
 	}
 
-	digestMsg := cosigner.CosignerNonce{
+	digestMsg := cosigner.Nonce{
 		SourceID: id,
 		PubKey:   encryptedNoncePub,
 		Share:    encryptedNonceShare,

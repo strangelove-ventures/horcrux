@@ -2,11 +2,9 @@ package cosigner
 
 import (
 	"context"
-	"fmt"
 	"net/url"
 	"time"
 
-	cometcrypto "github.com/cometbft/cometbft/crypto"
 	"github.com/google/uuid"
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 	"google.golang.org/grpc"
@@ -69,15 +67,15 @@ func (cosigner *RemoteCosigner) GetAddress() string {
 
 // GetPubKey returns public key of the validator.
 // Implements Cosigner interface
-func (cosigner *RemoteCosigner) GetPubKey(_ string) (cometcrypto.PubKey, error) {
-	return nil, fmt.Errorf("unexpected call to RemoteCosigner.GetPubKey")
-}
+// func (cosigner *RemoteCosigner) GetPubKey(_ string) (cometcrypto.PubKey, error) {
+// 	return nil, fmt.Errorf("unexpected call to RemoteCosigner.GetPubKey")
+// }
 
 // VerifySignature validates a signed payload against the public key.
 // Implements Cosigner interface
-func (cosigner *RemoteCosigner) VerifySignature(_ string, _, _ []byte) bool {
-	return false
-}
+// func (cosigner *RemoteCosigner) VerifySignature(_ string, _, _ []byte) bool {
+// 	return false
+// }
 
 func getGRPCClient(address string) (proto.CosignerClient, error) {
 	var grpcAddress string
@@ -114,7 +112,7 @@ func (cosigner *RemoteCosigner) GetNonces(
 	for i, nonces := range res.Nonces {
 		out[i] = &CosignerUUIDNonces{
 			UUID:   uuid.UUID(nonces.Uuid),
-			Nonces: CosignerNoncesFromProto(nonces.Nonces),
+			Nonces: FromProtoToNonces(nonces.Nonces),
 		}
 	}
 	return out, nil
@@ -123,7 +121,7 @@ func (cosigner *RemoteCosigner) GetNonces(
 // Implements the cosigner interface
 func (cosigner *RemoteCosigner) SetNoncesAndSign(
 	ctx context.Context,
-	req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error) {
+	req CosignerSetNoncesAndSignRequest) (*SignatureResponse, error) {
 	res, err := cosigner.Client.SetNoncesAndSign(ctx, &proto.SetNoncesAndSignRequest{
 		Uuid:      req.Nonces.UUID[:],
 		ChainID:   req.ChainID,
@@ -134,13 +132,14 @@ func (cosigner *RemoteCosigner) SetNoncesAndSign(
 	if err != nil {
 		return nil, err
 	}
-	return &CosignerSignResponse{
+	return &SignatureResponse{
 		NoncePublic: res.GetNoncePublic(),
 		Timestamp:   time.Unix(0, res.GetTimestamp()),
 		Signature:   res.GetSignature(),
 	}, nil
 }
 
+// TODO: This should move to ThresholdValidator. Its is not the responsibility of the cosigner
 func (cosigner *RemoteCosigner) Sign(
 	ctx context.Context,
 	req CosignerSignBlockRequest,

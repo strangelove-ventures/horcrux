@@ -111,7 +111,8 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []cosi
 	privKeyBytes := [64]byte{}
 	copy(privKeyBytes[:], privateKey[:])
 	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
-	pubKey := privateKey.PubKey()
+	// Returns the public key from the private key and type asserts it to an tss key.
+	pubKey := privateKey.PubKey().(tss.PubKey)
 
 	cfg := config.Config{
 		ThresholdModeConfig: &config.ThresholdModeConfig{
@@ -125,7 +126,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []cosi
 	tmpDir := t.TempDir()
 
 	thresholdCosigners := make([]*cosigner.LocalCosigner, threshold)
-	nonces := make([][]cosigner.CosignerNonce, threshold)
+	nonces := make([][]cosigner.Nonce, threshold)
 
 	now := time.Now()
 
@@ -201,7 +202,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []cosi
 	sigs := make([]types.PartialSignature, threshold)
 
 	for i, local_cosigner := range thresholdCosigners {
-		cosignerNonces := make([]cosigner.CosignerNonce, 0, threshold-1)
+		cosignerNonces := make([]cosigner.Nonce, 0, threshold-1)
 
 		for j, nonce := range nonces {
 			if i == j {

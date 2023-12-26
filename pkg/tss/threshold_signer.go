@@ -11,7 +11,7 @@ import (
 // LoadVaultKeyFromFile loads the persistent ThresholdSignerKey from file.
 
 func LoadVaultKeyFromFile(file string) (Ed25519Key, error) {
-	//pvKey := VaultKey{}
+	// pvKey := VaultKey{}
 	var pvKey Ed25519Key
 	keyJSONBytes, err := os.ReadFile(file)
 	if err != nil || len(keyJSONBytes) == 0 {

@@ -20,44 +20,52 @@ import (
 /*
 // threshold-ed25519
 type MPC struct {
-	// our own cosigner
+	// our own cosigner (i.e server)
 	MyCosigner *LocalCosigner // TODO Should be an interface as well.
+	server
 
-	// peer cosigners
+	clients  // peers to call
+	// peer cosigners (i.e clients to call)
 	peerCosigners []*RemoteCosigner // "i.e clients to call"
 
+	cosignerHealth *CosignerHealth
+
+	// FIX: This f-up a lot. Now its like 3-4 places that
+	// spaggettio leaders, cosigners etc etc
+	nonceCache *CosignerNonceCache
+
 }
 
-type Localcosigner interface {
+type ServerCosigner interface {
 	// TODO - add methods
 }
-type Remotecosigner interface {
+type ClientCosigner interface {
 	// TODO - add methods
 }
 */
-// CosignerSignRequest is sent to a co-signer to obtain their signature for the SignBytes
+// SignatureRequest is sent to a co-signer to obtain their signature for the SignBytes
 // The SignBytes should be a serialized block
-type CosignerSignRequest struct {
+type SignatureRequest struct {
 	ChainID   string
 	SignBytes []byte
 	UUID      uuid.UUID
 }
 
-type CosignerSignResponse struct {
+type SignatureResponse struct {
 	NoncePublic []byte
 	Timestamp   time.Time
 	Signature   []byte
 }
 
-type CosignerNonce struct {
-	SourceID      int
-	DestinationID int
+type Nonce struct {
+	SourceID      int // Client ID
+	DestinationID int // Server ID
 	PubKey        []byte
 	Share         []byte
 	Signature     []byte
 }
 
-func (secretPart *CosignerNonce) toProto() *proto.Nonce {
+func (secretPart *Nonce) toProto() *proto.Nonce {
 	return &proto.Nonce{
 		SourceID:      int32(secretPart.SourceID),
 		DestinationID: int32(secretPart.DestinationID),
@@ -67,18 +75,19 @@ func (secretPart *CosignerNonce) toProto() *proto.Nonce {
 	}
 }
 
-// CosignerNonces are a list of CosignerNonce
-type CosignerNonces []CosignerNonce
+// Nonces is a list of CosignerNonce
+type Nonces []Nonce
 
-func (secretParts CosignerNonces) toProto() (out []*proto.Nonce) {
+func (secretParts Nonces) toProto() (out []*proto.Nonce) {
 	for _, secretPart := range secretParts {
 		out = append(out, secretPart.toProto())
 	}
 	return
 }
 
-func CosignerNonceFromProto(secretPart *proto.Nonce) CosignerNonce {
-	return CosignerNonce{
+// FromProtoToNonce converts a proto.Nonce to a Nonce
+func FromProtoToNonce(secretPart *proto.Nonce) Nonce {
+	return Nonce{
 		SourceID:      int(secretPart.SourceID),
 		DestinationID: int(secretPart.DestinationID),
 		PubKey:        secretPart.PubKey,
@@ -87,10 +96,10 @@ func CosignerNonceFromProto(secretPart *proto.Nonce) CosignerNonce {
 	}
 }
 
-func CosignerNoncesFromProto(secretParts []*proto.Nonce) []CosignerNonce {
-	out := make([]CosignerNonce, len(secretParts))
+func FromProtoToNonces(secretParts []*proto.Nonce) []Nonce {
+	out := make([]Nonce, len(secretParts))
 	for i, secretPart := range secretParts {
-		out[i] = CosignerNonceFromProto(secretPart)
+		out[i] = FromProtoToNonce(secretPart)
 	}
 	return out
 }
@@ -103,9 +112,11 @@ type CosignerSignBlockRequest struct {
 type CosignerSignBlockResponse struct {
 	Signature []byte
 }
+
+// CosignerUUIDNonces
 type CosignerUUIDNonces struct {
-	UUID   uuid.UUID
-	Nonces CosignerNonces
+	UUID   uuid.UUID // UUID is the unique identifier of the nonce
+	Nonces Nonces
 }
 
 func (n *CosignerUUIDNonces) For(id int) *CosignerUUIDNonces {
