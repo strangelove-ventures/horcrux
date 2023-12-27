@@ -1,4 +1,4 @@
-package tss
+package ted25519
 
 import (
 	"bytes"
@@ -6,9 +6,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/cometbft/cometbft/privval"
-
-	"github.com/strangelove-ventures/horcrux/pkg/config"
 	"github.com/strangelove-ventures/horcrux/pkg/types"
 
 	"gitlab.com/unit410/edwards25519"
@@ -17,24 +14,40 @@ import (
 
 // var _ IThresholdSigner = &ThresholdSignerSoft{}
 
-// CreateEd25519ThresholdSignShards creates Ed25519Key objects from a privval.FilePVKey
-func CreateEd25519ThresholdSignShards(pv privval.FilePVKey, threshold, shards uint8) []Ed25519Key {
-	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(pv.PrivKey.Bytes()[:32]), threshold, shards)
-	out := make([]Ed25519Key, shards)
-	for i, shard := range privShards {
-		out[i] = Ed25519Key{
-			PubKey:       pv.PubKey.(PubKey),
-			PrivateShard: shard,
-			ID:           i + 1,
-		}
+// GenerateEd25519ThresholdSignShards creates a map of shards from a private key
+func GenerateEd25519ThresholdSignShards(pv []byte, threshold, shards uint8) map[uint8][]byte {
+	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(pv[:32]), threshold, shards)
+	// TODO: Check that the length of privShards is equal to the number of shards
+	// TODO: Check that the pubkey is the same for all shards
+	out := make(map[uint8][]byte, shards)
+	for id, shard := range privShards {
+		id := uint8(id + 1)
+		out[id] = shard
 	}
 	return out
 }
 
-// ted25519SignerSoft is a threshold signer that uses the threshold-ed25519 library
+type AssymetricKey struct {
+	privateKey   []byte
+	privateShard []byte
+}
+
+type AssymetricKeyShard struct {
+	AssymetricKey
+	threshold uint8
+	total     uint8
+	id        uint8 // ID is the Shamir index or this shard.
+
+}
+
+type Ted25519SignerDealer struct {
+	Ted25519SignerSoft
+}
+
+// Ted25519SignerSoft is a threshold signer that uses the threshold-ed25519 library
 // to perform the signing operations.
 // Its only responsibility is to sign a payload and combine signatures
-type ted25519SignerSoft struct {
+type Ted25519SignerSoft struct {
 	privateKeyShard []byte
 	pubKey          []byte
 	threshold       uint8
@@ -42,37 +55,25 @@ type ted25519SignerSoft struct {
 	id              uint8
 }
 
-func NewThresholdEd25519SignerSoft(config *config.RuntimeConfig, id int, chainID string) (*ted25519SignerSoft, error) {
-	keyFile, err := config.KeyFileExistsCosigner(chainID)
-	if err != nil {
-		return nil, err
-	}
-
-	key, err := LoadVaultKeyFromFile(keyFile)
-	if err != nil {
-		return nil, fmt.Errorf("error reading Vault key: %s", err)
-	}
-
-	if key.ID != id {
-		return nil, fmt.Errorf("key shard Index (%d) in (%s) does not match cosigner Index (%d)", key.ID, keyFile, id)
-	}
-
-	s := ted25519SignerSoft{
-		privateKeyShard: key.PrivateShard,
-		pubKey:          key.PubKey.Bytes(),
-		threshold:       uint8(config.Config.ThresholdModeConfig.Threshold),
-		total:           uint8(len(config.Config.ThresholdModeConfig.Cosigners)),
-		id:              uint8(key.ID),
+func NewTed25519SignerSoft(privateKeyShard []byte, pubKey []byte, threshold, total, id uint8) (*Ted25519SignerSoft, error) {
+	s := Ted25519SignerSoft{
+		privateKeyShard: privateKeyShard,
+		pubKey:          pubKey,
+		threshold:       threshold,
+		total:           total,
+		id:              id,
 	}
 
 	return &s, nil
 }
 
-func (s *ted25519SignerSoft) GetPubKey() []byte {
+func (s *Ted25519SignerSoft) GetPubKey() []byte {
 	return s.pubKey
 }
 
-func (s *ted25519SignerSoft) Sign(nonces []types.Nonce, payload []byte) ([]byte, error) {
+// Sign signs a byte payload with the provided nonces.
+// The return are a "partial  signature".
+func (s *Ted25519SignerSoft) Sign(nonces []types.Nonce, payload []byte) ([]byte, error) {
 	// sum the nonces to get the ephemeral public key and share
 	nonceShare, noncePub, err := sumNonces(nonces)
 	if err != nil {
@@ -136,7 +137,7 @@ func (ng NonceGenerator) GenerateNonces(threshold, total uint8) (types.Nonces, e
 }
 
 // CombineSignatures combines partial signatures into a full signature
-func (s *ted25519SignerSoft) CombineSignatures(signatures []types.PartialSignature) ([]byte, error) {
+func (s *Ted25519SignerSoft) CombineSignatures(signatures []types.PartialSignature) ([]byte, error) {
 	sigIds := make([]int, len(signatures))
 	shareSigs := make([][]byte, len(signatures))
 	var ephPub []byte

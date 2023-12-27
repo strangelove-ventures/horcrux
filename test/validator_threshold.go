@@ -259,9 +259,9 @@ func getShardedPrivvalKey(ctx context.Context, node *cosmos.ChainNode, threshold
 		return nil, nil, err
 	}
 
-	ed25519Shards := tss.CreateEd25519ThresholdSignShards(pvKey, threshold, shards)
+	vaultKeys, err := tss.GeneratePersistentThresholdSignShards(pvKey.PrivKey.Bytes(), pvKey.PubKey, threshold, shards)
 
-	return ed25519Shards, pvKey.PubKey, nil
+	return vaultKeys, pvKey.PubKey, nil
 }
 
 // chainEd25519Shard is a wrapper for a chain Index and a shard of an ed25519 consensus key.

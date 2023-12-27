@@ -6,7 +6,44 @@ import (
 	"os"
 
 	"github.com/cometbft/cometbft/privval"
+	"github.com/strangelove-ventures/horcrux/pkg/config"
+	"github.com/strangelove-ventures/horcrux/pkg/tss/ted25519"
+
+	cometbytes "github.com/cometbft/cometbft/libs/bytes"
 )
+
+type Address = cometbytes.HexBytes
+
+type PubKey interface {
+	Address() Address
+	Bytes() []byte
+	VerifySignature(msg []byte, sig []byte) bool
+	// Equals(PubKey) bool
+	Type() string
+}
+
+func NewThresholdEd25519SignerSoft(config *config.RuntimeConfig, id int, chainID string) (*ted25519.Ted25519SignerSoft, error) {
+	keyFile, err := config.KeyFileExistsCosigner(chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	key, err := LoadVaultKeyFromFile(keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("error reading Vault key: %s", err)
+	}
+
+	if key.ID != id {
+		return nil, fmt.Errorf("key shard Index (%d) in (%s) does not match cosigner Index (%d)", key.ID, keyFile, id)
+	}
+	return ted25519.NewTed25519SignerSoft(
+		key.PrivateShard,
+		key.PubKey.Bytes(),
+		uint8(config.Config.ThresholdModeConfig.Threshold),
+		uint8(len(config.Config.ThresholdModeConfig.Cosigners)),
+		uint8(key.ID),
+	)
+}
 
 // LoadVaultKeyFromFile loads the persistent ThresholdSignerKey from file.
 
@@ -36,8 +73,9 @@ type ChainPrivate interface {
 
 // type Handler[VPK VaultPrivateKey, CP ChainPrivate] func(CP, uint8, uint8) []VPK
 // type ChainHandler[CP ChainPrivate] func(string) (CP, error)
+type fn func([]byte, uint8, uint8) map[uint8][]byte
 
-type fn func(privval.FilePVKey, uint8, uint8) []Ed25519Key
+//ted25519.GenerateEd25519ThresholdSignShards()
 
 // CreatePersistentEd25519ThresholdSignShardsFromFile creates Ed25519Key objects from a priv_validator_key.json file
 func CreatePersistentEd25519ThresholdSignShardsFromFile(filename string, threshold, shards uint8) ([]VaultKey, error) {
@@ -47,21 +85,37 @@ func CreatePersistentEd25519ThresholdSignShardsFromFile(filename string, thresho
 		return nil, err
 	}
 
-	persistentKeys, err := generatePersistentThresholdSignShards(pv, CreateEd25519ThresholdSignShards, threshold, shards)
+	pubkey := pv.PubKey.(PubKey)
+	persistentKeys, err := generatePersistentThresholdSignShards(pv.PrivKey.Bytes(), pubkey, ted25519.GenerateEd25519ThresholdSignShards, threshold, shards)
 	return persistentKeys, err
 
 }
 
+func GeneratePersistentThresholdSignShards[Key Ed25519Key](privateKey []byte, publicKey PubKey, threshold uint8, shards uint8) ([]Key, error) {
+	keys := ted25519.GenerateEd25519ThresholdSignShards(privateKey, threshold, shards)
+	// Transform ed25519Keys to VaultKey type
+
+	vaultKeys := make([]Key, len(keys))
+	for id, key := range keys {
+		vaultKeys[id] = Key{
+			PubKey:       publicKey,
+			PrivateShard: key,
+			ID:           int(id),
+		}
+	}
+	return vaultKeys, nil
+}
+
 // CreatePersistentThresholdSignShardsFromFile creates   objects from a priv_validator_key.json file
-func generatePersistentThresholdSignShards(filePVKey privval.FilePVKey, function fn, threshold uint8, shards uint8) ([]VaultKey, error) {
-	keys := function(filePVKey, threshold, shards)
+func generatePersistentThresholdSignShards(privateKey []byte, publicKey PubKey, function fn, threshold uint8, shards uint8) ([]VaultKey, error) {
+	keys := function(privateKey, threshold, shards)
 	// Transform ed25519Keys to VaultKey type
 	vaultKeys := make([]VaultKey, len(keys))
-	for i, key := range keys {
-		vaultKeys[i] = VaultKey{
-			PubKey:       key.PubKey,
-			PrivateShard: key.PrivateShard,
-			ID:           key.ID,
+	for id, key := range keys {
+		vaultKeys[id] = VaultKey{
+			PubKey:       publicKey,
+			PrivateShard: key,
+			ID:           int(id),
 		}
 	}
 	return vaultKeys, nil

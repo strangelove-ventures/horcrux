@@ -34,14 +34,17 @@ const ErrUnexpectedState = "unexpected state, metadata does not exist for U:"
 type LocalCosigner struct {
 	logger        cometlog.Logger
 	config        *config.RuntimeConfig
-	security      ICosignerSecurity
-	chainState    sync.Map // chainState is a map of chainID to *ChainState
+	security      ICosignerSecurity // TODO: Should be in a node above.
+	chainState    sync.Map          // chainState is a map of chainID to *ChainState
 	address       string
 	pendingDiskWG sync.WaitGroup
 
 	nonces map[uuid.UUID]*types.NoncesWithExpiration
 	// protects the nonces map
 	noncesMu sync.RWMutex
+
+	//dealer generates nonces according to the "DKG" protocol
+	dealer IThresholdDealer
 }
 
 func NewLocalCosigner(
@@ -64,8 +67,12 @@ type ChainState struct {
 	// lastSignState stores the last sign state for an HRS we have fully signed
 	// incremented whenever we are asked to sign an HRS
 	lastSignState *types.SignState
-	// signer generates nonces, combines nonces, signs, and verifies signatures.
+
+	// signer, combines signatures, signs, and verifies signatures.
 	signer IThresholdSigner
+
+	//dealer generates nonces according to the "DKG" protocol
+	// dealer IThresholdDealer
 }
 
 // StartNoncePruner periodically prunes nonces that have expired.
@@ -153,6 +160,7 @@ func (cosigner *LocalCosigner) GetAddress() string {
 	return cosigner.address
 }
 
+// TODO: Rename to fetchChainState
 func (cosigner *LocalCosigner) getChainState(chainID string) (*ChainState, error) {
 	cs, ok := cosigner.chainState.Load(chainID)
 	if !ok {
@@ -289,10 +297,8 @@ func (cosigner *LocalCosigner) generateNonces() ([]types.Nonces, error) {
 	// TODO: This should only generate nonces for the cosigners that are online
 	// 		 although it might doesnt matter if we arent doing DKG
 	// Should call an interface: dealnonce or something
-	nonces, err := tss.NonceGenerator{}.GenerateNonces(
-		uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
-		uint8(total),
-	)
+	threshold := uint8(cosigner.config.Config.ThresholdModeConfig.Threshold)
+	nonces, err := cosigner.dealer.KeyGenerator(uint8(threshold), uint8(total))
 	if err != nil {
 		return nil, err
 	}

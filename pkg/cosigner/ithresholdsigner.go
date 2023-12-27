@@ -14,3 +14,12 @@ type IThresholdSigner interface {
 	// CombineSignatures combines multiple partial signatures to a full signature.
 	CombineSignatures([]types.PartialSignature) ([]byte, error)
 }
+
+type IThresholdDealer interface {
+	KeyGenerator(threshold, total uint8) (types.Nonces, error)
+}
+
+type IThreshold interface {
+	IThresholdSigner
+	IThresholdDealer
+}

@@ -26,7 +26,7 @@ const (
 */
 type CosignerNonceCache struct {
 	logger    cometlog.Logger
-	cosigners []ICosigner
+	cosigners []ICosigner // RemoteCosigner?
 
 	leader ILeader
 

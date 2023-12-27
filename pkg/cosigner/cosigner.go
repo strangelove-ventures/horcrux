@@ -9,6 +9,7 @@ You can think of it as:
 - RemoteCosigner is the client
 */
 import (
+	"context"
 	"time"
 
 	"github.com/strangelove-ventures/horcrux/pkg/types"
@@ -17,32 +18,82 @@ import (
 	"github.com/strangelove-ventures/horcrux/signer/proto"
 )
 
-/*
-// threshold-ed25519
+// MPC is the interface for the MPC protocol
+// Its responsibility is to communicate with the other cosigners
+
+type ICosigner interface {
+	// GetIndex gets the index of the cosigner
+	// The index is the shamir index: 1, 2, etc...
+	GetIndex() int
+
+	// Get the P2P URL (GRPC)
+	GetAddress() string
+
+	// Get the combined public key
+	// TODO: Change name to FetchPubKey
+	// GetPubKey(chainID string) (cometcrypto.PubKey, error)
+
+	// VerifySignature(chainID string, payload, signature []byte) bool
+
+	// Get nonces for all cosigner shards
+	GetNonces(ctx context.Context, uuids []uuid.UUID) (CosignerUUIDNoncesMultiple, error)
+
+	// Sign the requested bytes
+	SetNoncesAndSign(ctx context.Context, req CosignerSetNoncesAndSignRequest) (*SignatureResponse, error)
+}
+
+type iMPC interface {
+	Pubkey()
+	Sign()
+	Start()
+	Stop()
+}
+
 type MPC struct {
+	// logger log.Logger,
+	chainID string
 	// our own cosigner (i.e server)
-	MyCosigner *LocalCosigner // TODO Should be an interface as well.
-	server
+	// MyCosigner *LocalCosigner // TODO Should be an interface as well.
+	server iServer // TODO Should be an interface as well.
 
-	clients  // peers to call
 	// peer cosigners (i.e clients to call)
-	peerCosigners []*RemoteCosigner // "i.e clients to call"
+	clients map[string]iClient // "i.e clients to call"
 
-	cosignerHealth *CosignerHealth
+	serverHealth iHealth
 
-	// FIX: This f-up a lot. Now its like 3-4 places that
-	// spaggettio leaders, cosigners etc etc
-	nonceCache *CosignerNonceCache
-
+	nonceCache  iNonceCache
+	noncePruner iNoncePruner
 }
 
-type ServerCosigner interface {
+func (mpc *MPC) Start(ctx context.Context) error {
+	//mpc.logger.Info("Starting ThresholdValidator services")
+
+	go mpc.serverHealth.Start(ctx)
+
+	go mpc.nonceCache.Start(ctx)
+
+	go mpc.noncePruner.Start(ctx)
+
+	return nil
+}
+
+type iHealth interface {
+	Start(ctx context.Context) error
+}
+type iNonceCache interface {
+	Start(ctx context.Context) error
+}
+type iNoncePruner interface {
+	Start(ctx context.Context) error
+}
+
+type iServer interface {
 	// TODO - add methods
 }
-type ClientCosigner interface {
+type iClient interface {
 	// TODO - add methods
 }
-*/
+
 // SignatureRequest is sent to a co-signer to obtain their signature for the SignBytes
 // The SignBytes should be a serialized block
 type SignatureRequest struct {

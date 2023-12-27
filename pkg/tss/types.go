@@ -7,22 +7,11 @@ import (
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	cometcryptoencoding "github.com/cometbft/cometbft/crypto/encoding"
-	cometbytes "github.com/cometbft/cometbft/libs/bytes"
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/cometbft/cometbft/privval"
 	cometprotocrypto "github.com/cometbft/cometbft/proto/tendermint/crypto"
 	"github.com/tendermint/go-amino"
 )
-
-type Address = cometbytes.HexBytes
-
-type PubKey interface {
-	Address() Address
-	Bytes() []byte
-	VerifySignature(msg []byte, sig []byte) bool
-	// Equals(PubKey) bool
-	Type() string
-}
 
 /*
 type ISignerKey interface {
@@ -53,22 +42,19 @@ type PersistentEd25519Key struct {
 	}
 */
 
-/*
-Public Private
+// Public Private
 
-	type AssymetricKey struct {
-		PubKey       cometcrypto.PubKey `json:"pubKey"`
-		PrivateShard []byte             `json:"privateShard"`
-	}
+type AssymetricKey struct {
+	PubKey       cometcrypto.PubKey `json:"pubKey"`
+	PrivateShard []byte             `json:"privateShard"`
+}
 
-	type AssymetricKeyShard struct {
-		AssymetricKey
-		ID           int                `json:"id"` // ID is the Shamir index or this shard.
+type AssymetricKeyShard struct {
+	AssymetricKey
+	ID int `json:"id"` // ID is the Shamir index or this shard.
 
 }
 
-type Ed25519Key
-*/
 type Ed25519Key struct {
 	PubKey       PubKey `json:"pubKey"`
 	PrivateShard []byte `json:"privateShard"`
@@ -166,15 +152,6 @@ type VaultPrivateKey interface {
 // 0600 permission.
 func WriteToFile[VPK VaultPrivateKey](privateshare VPK, file string) error {
 	jsonBytes, err := json.Marshal(&privateshare)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(file, jsonBytes, 0600)
-}
-
-// WriteToFile writes a cosigner Ed25519 key to a given file name.
-func WriteToFileOld(object Ed25519Key, file string) error {
-	jsonBytes, err := json.Marshal(&object)
 	if err != nil {
 		return err
 	}
