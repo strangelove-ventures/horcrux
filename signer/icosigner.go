@@ -10,6 +10,13 @@ import (
 
 // Cosigner interface is a set of methods for an m-of-n threshold signature.
 // This interface abstracts the underlying key storage and management
+type iMPC interface {
+	Pubkey()
+	Sign()
+	Start()
+	Stop()
+}
+
 type ICosigner interface {
 	// GetIndex gets the index of the cosigner
 	// The index is the shamir index: 1, 2, etc...

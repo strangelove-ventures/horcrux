@@ -202,7 +202,8 @@ func (cosigner *LocalCosigner) CombineSignatures(chainID string, signatures []ty
 }
 
 // VerifySignature validates a signed payload against the public key.
-// Implements Cosigner interface
+// Implements Cosigner interface Should not be part of Cosigner.
+// Should be part of a higher level interface.
 func (cosigner *LocalCosigner) VerifySignature(chainID string, payload, signature []byte) bool {
 	if err := cosigner.LoadSignStateIfNecessary(chainID); err != nil {
 		return false

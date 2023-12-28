@@ -50,7 +50,7 @@ type ThresholdValidator struct {
 
 	threshold int
 
-	grpcTimeout time.Duration
+	grpcTimeout time.Duration // TODO ask if this should move to icosigner?
 
 	// chainSignState is the watermark for sent blocks we have started to process
 	chainSignState sync.Map // - chainSignState["chainid"] -> types.chainSignState
@@ -216,11 +216,11 @@ func (pv *ThresholdValidator) mustLoadChainState(chainID string) ChainSignState 
 	return css
 }
 
-// SaveLastSignedStateInitiated updates the high watermark height/round/step (HRS) for an initiated
+// saveLastSignedStateInitiated updates the high watermark height/round/step (HRS) for an initiated
 // sign process if it is greater than the current high watermark. A mutex is used to avoid concurrent
 // state updates. The disk write is scheduled in a separate goroutine which will perform an atomic write.
 // pendingDiskWG is used upon termination in pendingDiskWG to ensure all writes have completed.
-func (pv *ThresholdValidator) SaveLastSignedStateInitiated(
+func (pv *ThresholdValidator) saveLastSignedStateInitiated(
 	chainID string, block *types.Block) ([]byte, time.Time, error) {
 	css := pv.mustLoadChainState(chainID)
 
@@ -642,7 +642,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 	*/
 
 	// Keep track of the last block that we began the signing process for. Only allow one attempt per block
-	existingSignature, existingTimestamp, err := pv.SaveLastSignedStateInitiated(chainID, &block)
+	existingSignature, existingTimestamp, err := pv.saveLastSignedStateInitiated(chainID, &block)
 	if err != nil {
 		return nil, stamp, fmt.Errorf("error saving last sign state initiated: %w", err)
 	}
