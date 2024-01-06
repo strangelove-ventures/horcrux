@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/pkg/types"
+	"github.com/strangelove-ventures/horcrux/src/types"
 
 	"github.com/stretchr/testify/require"
 )

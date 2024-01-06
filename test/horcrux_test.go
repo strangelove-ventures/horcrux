@@ -6,12 +6,12 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/strangelove-ventures/horcrux/pkg/cosigner/nodesecurity"
+	"github.com/strangelove-ventures/horcrux/src/cosigner/nodesecurity"
 
 	"github.com/cometbft/cometbft/crypto"
 	dockertypes "github.com/docker/docker/api/types"
-	"github.com/strangelove-ventures/horcrux/pkg/config"
-	tss "github.com/strangelove-ventures/horcrux/pkg/tss"
+	"github.com/strangelove-ventures/horcrux/src/config"
+	tss "github.com/strangelove-ventures/horcrux/src/tss"
 	interchaintest "github.com/strangelove-ventures/interchaintest/v8"
 	"github.com/strangelove-ventures/interchaintest/v8/chain/cosmos"
 	"github.com/strangelove-ventures/interchaintest/v8/ibc"

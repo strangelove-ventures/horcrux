@@ -40,9 +40,9 @@ sentry-1: 10.168.0.1
 sentry-2: 10.168.0.2
 sentry-3: 10.168.0.3
 
-signer-1: 10.168.1.1
-signer-2: 10.168.1.2
-signer-3: 10.168.1.3
+node-1: 10.168.1.1
+node-2: 10.168.1.2
+node-3: 10.168.1.3
 ```
 
 When installing `horcrux` we recommend using either the [container image](https://github.com/strangelove-ventures/horcrux/pkgs/container/horcrux) or the [prebuilt binary](https://github.com/strangelove-ventures/horcrux/releases) for the latest stable release.

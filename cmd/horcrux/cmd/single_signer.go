@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/strangelove-ventures/horcrux/signer"
+	"github.com/strangelove-ventures/horcrux/node"
 )
 
 const (
@@ -23,7 +23,7 @@ as it is not officially supported by Strangelove.`
 func NewSingleSignerValidator(
 	out io.Writer,
 	acceptRisk bool,
-) (*signer.SingleSignerValidator, error) {
+) (*node.SingleSignerValidator, error) {
 	fmt.Fprintln(out, singleSignerWarning)
 
 	if !acceptRisk {
@@ -34,5 +34,5 @@ func NewSingleSignerValidator(
 		return nil, err
 	}
 
-	return signer.NewSingleSignerValidator(&config), nil
+	return node.NewSingleSignerValidator(&config), nil
 }

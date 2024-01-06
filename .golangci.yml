@@ -91,7 +91,7 @@ linters-settings:
         alias: gmprometheus
       - pkg: github.com/mitchellh/go-homedir
         alias: homedir
-      - pkg: gitlab.com/unit410/threshold-ed25519/pkg
+      - pkg: gitlab.com/unit410/threshold-ed25519/src
         alias: tsed25519
       - pkg: github.com/Jille/raft-grpc-transport
         alias: raftgrpctransport
@@ -99,9 +99,9 @@ linters-settings:
         alias: boltdb
       - pkg: math/rand
         alias: mrand
-      - pkg: github.com/strangelove-ventures/horcrux/pkg/types
+      - pkg: github.com/strangelove-ventures/horcrux/src/types
         alias: htypes
-      - pkg: github.com/strangelove-ventures/horcrux/pkg/config
+      - pkg: github.com/strangelove-ventures/horcrux/src/config
         alias: cconfig
   maligned:
     suggest-new: true

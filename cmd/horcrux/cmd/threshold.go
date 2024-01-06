@@ -9,10 +9,10 @@ import (
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	cometservice "github.com/cometbft/cometbft/libs/service"
-	cconfig "github.com/strangelove-ventures/horcrux/pkg/config"
-	"github.com/strangelove-ventures/horcrux/pkg/cosigner"
-	"github.com/strangelove-ventures/horcrux/pkg/cosigner/nodesecurity"
-	"github.com/strangelove-ventures/horcrux/signer"
+	"github.com/strangelove-ventures/horcrux/node"
+	cconfig "github.com/strangelove-ventures/horcrux/src/config"
+	"github.com/strangelove-ventures/horcrux/src/cosigner"
+	"github.com/strangelove-ventures/horcrux/src/cosigner/nodesecurity"
 )
 
 const maxWaitForSameBlockAttempts = 3
@@ -49,14 +49,14 @@ func CosignerSecurityRSA(c cconfig.RuntimeConfig) (*nodesecurity.CosignerSecurit
 func NewThresholdValidator(
 	ctx context.Context,
 	logger cometlog.Logger,
-) ([]cometservice.Service, *signer.ThresholdValidator, error) {
+) ([]cometservice.Service, *node.ThresholdValidator, error) {
 	if err := config.Config.ValidateThresholdModeConfig(); err != nil {
 		return nil, nil, err
 	}
 
 	thresholdCfg := config.Config.ThresholdModeConfig
 
-	remoteCosigners := make([]signer.ICosigner, 0, len(thresholdCfg.Cosigners)-1)
+	remoteCosigners := make([]node.ICosigner, 0, len(thresholdCfg.Cosigners)-1)
 
 	var p2pListen string
 
@@ -111,14 +111,14 @@ func NewThresholdValidator(
 	nodeID := fmt.Sprint(security.GetID())
 
 	// Start RAFT store listener
-	raftStore := signer.NewRaftStore(nodeID,
+	raftStore := node.NewRaftStore(nodeID,
 		raftDir, p2pListen, raftTimeout, logger, localCosigner, remoteCosigners)
 	if err := raftStore.Start(); err != nil {
 		return nil, nil, fmt.Errorf("error starting raft store: %w", err)
 	}
 	services := []cometservice.Service{raftStore}
 
-	val := signer.NewThresholdValidator(
+	val := node.NewThresholdValidator(
 		logger,
 		&config,
 		thresholdCfg.Threshold,

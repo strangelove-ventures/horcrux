@@ -10,8 +10,8 @@ import (
 	cometprivval "github.com/cometbft/cometbft/privval"
 	"github.com/cosmos/cosmos-sdk/types/bech32"
 	"github.com/spf13/cobra"
-	cconfig "github.com/strangelove-ventures/horcrux/pkg/config"
-	"github.com/strangelove-ventures/horcrux/pkg/tss"
+	cconfig "github.com/strangelove-ventures/horcrux/src/config"
+	"github.com/strangelove-ventures/horcrux/src/tss"
 )
 
 type AddressCmdOutput struct {

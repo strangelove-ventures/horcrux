@@ -8,9 +8,9 @@ import (
 	"os"
 	"path/filepath"
 
-	cconfig "github.com/strangelove-ventures/horcrux/pkg/config"
-	"github.com/strangelove-ventures/horcrux/pkg/cosigner/nodesecurity"
-	"github.com/strangelove-ventures/horcrux/pkg/tss"
+	cconfig "github.com/strangelove-ventures/horcrux/src/config"
+	"github.com/strangelove-ventures/horcrux/src/cosigner/nodesecurity"
+	"github.com/strangelove-ventures/horcrux/src/tss"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"

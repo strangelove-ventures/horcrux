@@ -20,8 +20,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/strangelove-ventures/horcrux/pkg/cosigner/nodesecurity"
-	"github.com/strangelove-ventures/horcrux/pkg/tss"
+	"github.com/strangelove-ventures/horcrux/src/cosigner/nodesecurity"
+	"github.com/strangelove-ventures/horcrux/src/tss"
 
 	"github.com/spf13/cobra"
 )

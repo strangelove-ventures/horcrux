@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/strangelove-ventures/horcrux/pkg/connector"
+	"github.com/strangelove-ventures/horcrux/src/connector"
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/cometbft/cometbft/libs/service"
 	"github.com/spf13/cobra"
-	cconfig "github.com/strangelove-ventures/horcrux/pkg/config"
-	"github.com/strangelove-ventures/horcrux/signer"
+	"github.com/strangelove-ventures/horcrux/node"
+	cconfig "github.com/strangelove-ventures/horcrux/src/config"
 )
 
 func startCmd() *cobra.Command {
@@ -23,7 +23,7 @@ func startCmd() *cobra.Command {
 			out := cmd.OutOrStdout()
 			logger := cometlog.NewTMLogger(cometlog.NewSyncWriter(out))
 
-			err := signer.RequireNotRunning(logger, config.PidFile)
+			err := node.RequireNotRunning(logger, config.PidFile)
 			if err != nil {
 				return err
 			}
@@ -79,7 +79,7 @@ func startCmd() *cobra.Command {
 				return fmt.Errorf("failed to start remote signer(s): %w", err)
 			}
 
-			signer.WaitAndTerminate(logger, services, config.PidFile)
+			node.WaitAndTerminate(logger, services, config.PidFile)
 
 			return nil
 		},
