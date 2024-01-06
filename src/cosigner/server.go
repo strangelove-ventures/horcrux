@@ -59,7 +59,7 @@ func NewLocalCosigner(
 		security: security,
 		address:  address,
 		nonces:   make(map[uuid.UUID]*types.NoncesWithExpiration),
-		dealer:   tss.NewThresholdEd25519DealerSoft(config),
+		//dealer:   tss.NewThresholdEd25519DealerSoft(config),
 	}
 }
 

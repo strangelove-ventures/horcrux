@@ -11,8 +11,8 @@ import (
 
 	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"github.com/strangelove-ventures/horcrux/node"
-	"github.com/strangelove-ventures/horcrux/node/multiresolver"
-	"github.com/strangelove-ventures/horcrux/node/proto"
+	"github.com/strangelove-ventures/horcrux/src/multiresolver"
+	"github.com/strangelove-ventures/horcrux/src/proto"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
