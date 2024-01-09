@@ -45,15 +45,19 @@ func (cosigners Cosigners) GetByID(id int) Cosigner {
 // CosignerSignRequest is sent to a co-signer to obtain their signature for the SignBytes
 // The SignBytes should be a serialized block
 type CosignerSignRequest struct {
-	ChainID   string
-	SignBytes []byte
-	UUID      uuid.UUID
+	ChainID                string
+	SignBytes              []byte
+	UUID                   uuid.UUID
+	VoteExtensionSignBytes []byte
+	VoteExtUUID            uuid.UUID
 }
 
 type CosignerSignResponse struct {
-	NoncePublic []byte
-	Timestamp   time.Time
-	Signature   []byte
+	Timestamp                time.Time
+	NoncePublic              []byte
+	Signature                []byte
+	VoteExtensionNoncePublic []byte
+	VoteExtensionSignature   []byte
 }
 
 type CosignerNonce struct {
@@ -107,7 +111,8 @@ type CosignerSignBlockRequest struct {
 }
 
 type CosignerSignBlockResponse struct {
-	Signature []byte
+	Signature              []byte
+	VoteExtensionSignature []byte
 }
 type CosignerUUIDNonces struct {
 	UUID   uuid.UUID
@@ -138,8 +143,10 @@ func (n CosignerUUIDNoncesMultiple) toProto() []*proto.UUIDNonce {
 }
 
 type CosignerSetNoncesAndSignRequest struct {
-	ChainID   string
-	Nonces    *CosignerUUIDNonces
-	HRST      HRSTKey
-	SignBytes []byte
+	ChainID                string
+	Nonces                 *CosignerUUIDNonces
+	VoteExtensionNonces    *CosignerUUIDNonces
+	HRST                   HRSTKey
+	SignBytes              []byte
+	VoteExtensionSignBytes []byte
 }

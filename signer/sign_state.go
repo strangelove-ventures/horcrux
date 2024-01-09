@@ -62,11 +62,12 @@ func VoteToStep(vote *cometproto.Vote) int8 {
 
 func VoteToBlock(chainID string, vote *cometproto.Vote) Block {
 	return Block{
-		Height:    vote.Height,
-		Round:     int64(vote.Round),
-		Step:      VoteToStep(vote),
-		SignBytes: comet.VoteSignBytes(chainID, vote),
-		Timestamp: vote.Timestamp,
+		Height:                 vote.Height,
+		Round:                  int64(vote.Round),
+		Step:                   VoteToStep(vote),
+		SignBytes:              comet.VoteSignBytes(chainID, vote),
+		VoteExtensionSignBytes: comet.VoteExtensionSignBytes(chainID, vote),
+		Timestamp:              vote.Timestamp,
 	}
 }
 
@@ -159,11 +160,12 @@ func (signState *SignState) hrsKeyLocked() HRSKey {
 }
 
 type SignStateConsensus struct {
-	Height    int64
-	Round     int64
-	Step      int8
-	Signature []byte
-	SignBytes cometbytes.HexBytes
+	Height                 int64
+	Round                  int64
+	Step                   int8
+	Signature              []byte
+	VoteExtensionSignature []byte
+	SignBytes              cometbytes.HexBytes
 }
 
 func (signState SignStateConsensus) HRSKey() HRSKey {

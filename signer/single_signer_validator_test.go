@@ -58,7 +58,7 @@ func TestSingleSignerValidator(t *testing.T) {
 
 	ctx := context.Background()
 
-	signature, _, err := validator.Sign(ctx, testChainID, block)
+	signature, _, _, err := validator.Sign(ctx, testChainID, block)
 	require.NoError(t, err)
 
 	require.True(t, privateKey.PubKey().VerifySignature(block.SignBytes, signature))
@@ -66,7 +66,7 @@ func TestSingleSignerValidator(t *testing.T) {
 	proposal.Timestamp = time.Now()
 
 	// should be able to sign same proposal with only differing timestamp
-	_, _, err = validator.Sign(ctx, testChainID, ProposalToBlock(testChainID, &proposal))
+	_, _, _, err = validator.Sign(ctx, testChainID, ProposalToBlock(testChainID, &proposal))
 	require.NoError(t, err)
 
 	// construct different block ID for proposal at same height as highest signed
@@ -82,28 +82,28 @@ func TestSingleSignerValidator(t *testing.T) {
 	}
 
 	// should not be able to sign same proposal at same height as highest signed with different BlockID
-	_, _, err = validator.Sign(ctx, testChainID, ProposalToBlock(testChainID, &proposal))
+	_, _, _, err = validator.Sign(ctx, testChainID, ProposalToBlock(testChainID, &proposal))
 	require.Error(t, err, "double sign!")
 
 	proposal.Round = 19
 
 	// should not be able to sign lower than highest signed
-	_, _, err = validator.Sign(ctx, testChainID, ProposalToBlock(testChainID, &proposal))
+	_, _, _, err = validator.Sign(ctx, testChainID, ProposalToBlock(testChainID, &proposal))
 	require.Error(t, err, "double sign!")
 
 	// lower LSS should sign for different chain ID
-	_, _, err = validator.Sign(ctx, "different", ProposalToBlock("different", &proposal))
+	_, _, _, err = validator.Sign(ctx, "different", ProposalToBlock("different", &proposal))
 	require.NoError(t, err)
 
 	// reinitialize validator to make sure new runtime will not allow double sign
 	validator = NewSingleSignerValidator(runtimeConfig)
 
-	_, _, err = validator.Sign(ctx, testChainID, ProposalToBlock(testChainID, &proposal))
+	_, _, _, err = validator.Sign(ctx, testChainID, ProposalToBlock(testChainID, &proposal))
 	require.Error(t, err, "double sign!")
 
 	proposal.Round = 21
 
 	// signing higher block now should succeed
-	_, _, err = validator.Sign(ctx, testChainID, ProposalToBlock(testChainID, &proposal))
+	_, _, _, err = validator.Sign(ctx, testChainID, ProposalToBlock(testChainID, &proposal))
 	require.NoError(t, err)
 }

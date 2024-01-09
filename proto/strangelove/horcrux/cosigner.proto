@@ -17,7 +17,8 @@ message Block {
 	int64 round = 2;
 	int32 step = 3;
 	bytes signBytes = 4;
-	int64 timestamp = 5;
+	bytes voteExtSignBytes = 5;
+	int64 timestamp = 6;
 }
 
 message SignBlockRequest {
@@ -27,7 +28,8 @@ message SignBlockRequest {
 
 message SignBlockResponse {
 	bytes signature = 1;
-	int64 timestamp = 2;
+	bytes vote_ext_signature = 2;
+	int64 timestamp = 3;
 }
 
 message Nonce {
@@ -59,9 +61,11 @@ message SetNoncesAndSignRequest {
 }
 
 message SetNoncesAndSignResponse {
-	bytes noncePublic = 1;
-	int64 timestamp = 2;
+	int64 timestamp = 1;
+	bytes noncePublic = 2;
 	bytes signature = 3;
+	bytes voteExtNoncePublic = 4;
+	bytes voteExtSignature = 5;
 }
 
 message GetNoncesRequest {

@@ -119,9 +119,10 @@ func (cosigner *RemoteCosigner) SetNoncesAndSign(
 		return nil, err
 	}
 	return &CosignerSignResponse{
-		NoncePublic: res.GetNoncePublic(),
-		Timestamp:   time.Unix(0, res.GetTimestamp()),
-		Signature:   res.GetSignature(),
+		NoncePublic:              res.GetNoncePublic(),
+		Timestamp:                time.Unix(0, res.GetTimestamp()),
+		Signature:                res.GetSignature(),
+		VoteExtensionNoncePublic: res.GetVoteExtNoncePublic(),
 	}, nil
 }
 
@@ -137,6 +138,7 @@ func (cosigner *RemoteCosigner) Sign(
 		return nil, err
 	}
 	return &CosignerSignBlockResponse{
-		Signature: res.GetSignature(),
+		Signature:              res.GetSignature(),
+		VoteExtensionSignature: res.GetVoteExtSignature(),
 	}, nil
 }

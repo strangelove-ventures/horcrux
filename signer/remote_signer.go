@@ -22,7 +22,7 @@ const connRetrySec = 2
 // PrivValidator is a wrapper for tendermint PrivValidator,
 // with additional Stop method for safe shutdown.
 type PrivValidator interface {
-	Sign(ctx context.Context, chainID string, block Block) ([]byte, time.Time, error)
+	Sign(ctx context.Context, chainID string, block Block) ([]byte, []byte, time.Time, error)
 	GetPubKey(ctx context.Context, chainID string) ([]byte, error)
 	Stop()
 }
@@ -186,14 +186,15 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *cometp
 		Error: nil,
 	}}
 
-	signature, timestamp, err := signAndTrack(context.TODO(), rs.Logger, rs.privVal, chainID, VoteToBlock(chainID, vote))
+	sig, voteExtSig, timestamp, err := signAndTrack(context.TODO(), rs.Logger, rs.privVal, chainID, VoteToBlock(chainID, vote))
 	if err != nil {
 		msgSum.SignedVoteResponse.Error = getRemoteSignerError(err)
 		return cometprotoprivval.Message{Sum: msgSum}
 	}
 
 	msgSum.SignedVoteResponse.Vote.Timestamp = timestamp
-	msgSum.SignedVoteResponse.Vote.Signature = signature
+	msgSum.SignedVoteResponse.Vote.Signature = sig
+	msgSum.SignedVoteResponse.Vote.ExtensionSignature = voteExtSig
 	return cometprotoprivval.Message{Sum: msgSum}
 }
 
@@ -208,7 +209,7 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(
 		},
 	}
 
-	signature, timestamp, err := signAndTrack(
+	signature, _, timestamp, err := signAndTrack(
 		context.TODO(),
 		rs.Logger,
 		rs.privVal,

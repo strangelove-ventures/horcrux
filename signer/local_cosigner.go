@@ -232,6 +232,13 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		return res, nil
 	}
 
+	defer func() {
+		cosigner.noncesMu.Lock()
+		delete(cosigner.nonces, req.UUID)
+		delete(cosigner.nonces, req.VoteExtUUID)
+		cosigner.noncesMu.Unlock()
+	}()
+
 	nonces, err := cosigner.combinedNonces(
 		cosigner.GetID(),
 		uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
@@ -241,17 +248,45 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		return res, err
 	}
 
-	sig, err := ccs.signer.Sign(nonces, req.SignBytes)
-	if err != nil {
+	var voteExtNonces []Nonce
+	if len(req.VoteExtensionSignBytes) > 0 {
+		voteExtNonces, err = cosigner.combinedNonces(
+			cosigner.GetID(),
+			uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
+			req.VoteExtUUID,
+		)
+		if err != nil {
+			return res, err
+		}
+	}
+
+	var eg errgroup.Group
+
+	var sig, voteExtSig []byte
+	eg.Go(func() error {
+		var err error
+		sig, err = ccs.signer.Sign(nonces, req.SignBytes)
+		return err
+	})
+	if len(req.VoteExtensionSignBytes) > 0 {
+		eg.Go(func() error {
+			var err error
+			voteExtSig, err = ccs.signer.Sign(voteExtNonces, req.VoteExtensionSignBytes)
+			return err
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
 		return res, err
 	}
 
 	err = ccs.lastSignState.Save(SignStateConsensus{
-		Height:    hrst.Height,
-		Round:     hrst.Round,
-		Step:      hrst.Step,
-		Signature: sig,
-		SignBytes: req.SignBytes,
+		Height:                 hrst.Height,
+		Round:                  hrst.Round,
+		Step:                   hrst.Step,
+		Signature:              sig,
+		SignBytes:              req.SignBytes,
+		VoteExtensionSignature: res.VoteExtensionSignature,
 	}, &cosigner.pendingDiskWG)
 
 	if err != nil {
@@ -260,11 +295,8 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		}
 	}
 
-	cosigner.noncesMu.Lock()
-	delete(cosigner.nonces, req.UUID)
-	cosigner.noncesMu.Unlock()
-
 	res.Signature = sig
+	res.VoteExtensionSignature = voteExtSig
 
 	// Note - Function may return before this line so elapsed time for Finish may be multiple block times
 	metricsTimeKeeper.SetPreviousLocalSignFinish(time.Now())
@@ -496,14 +528,31 @@ func (cosigner *LocalCosigner) SetNoncesAndSign(
 		})
 	}
 
+	if req.VoteExtensionNonces != nil {
+		for _, secretPart := range req.VoteExtensionNonces.Nonces {
+			secretPart := secretPart
+
+			eg.Go(func() error {
+				return cosigner.setNonce(req.VoteExtensionNonces.UUID, secretPart)
+			})
+		}
+	}
+
 	if err := eg.Wait(); err != nil {
 		return nil, err
 	}
 
-	res, err := cosigner.sign(CosignerSignRequest{
+	cosignerReq := CosignerSignRequest{
 		UUID:      req.Nonces.UUID,
 		ChainID:   chainID,
 		SignBytes: req.SignBytes,
-	})
+	}
+
+	if len(req.VoteExtensionSignBytes) > 0 {
+		cosignerReq.VoteExtensionSignBytes = req.VoteExtensionSignBytes
+		cosignerReq.VoteExtUUID = req.VoteExtensionNonces.UUID
+	}
+
+	res, err := cosigner.sign(cosignerReq)
 	return &res, err
 }
