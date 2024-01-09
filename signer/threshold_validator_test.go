@@ -582,9 +582,13 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 
 				var extension = []byte{0x1, 0x2, 0x3}
 
+				blockIDHash := sha256.New()
+				blockIDHash.Write([]byte("something"))
+
 				preCommit := cometproto.Vote{
 					Height:    1 + int64(i),
 					Round:     1,
+					BlockID:   cometproto.BlockID{Hash: blockIDHash.Sum(nil)},
 					Type:      cometproto.PrecommitType,
 					Extension: extension,
 				}
