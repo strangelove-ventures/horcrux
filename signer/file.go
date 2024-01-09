@@ -201,7 +201,8 @@ func (pv *FilePV) GetPubKey() (crypto.PubKey, error) {
 }
 
 func (pv *FilePV) Sign(block Block) ([]byte, []byte, time.Time, error) {
-	height, round, step, signBytes, voteExtensionSignBytes := block.Height, int32(block.Round), block.Step, block.SignBytes, block.VoteExtensionSignBytes
+	height, round, step := block.Height, int32(block.Round), block.Step
+	signBytes, voteExtensionSignBytes := block.SignBytes, block.VoteExtensionSignBytes
 
 	lss := pv.LastSignState
 

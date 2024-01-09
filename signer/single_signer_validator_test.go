@@ -121,6 +121,7 @@ func TestSingleSignerValidator(t *testing.T) {
 
 	require.True(t, privateKey.PubKey().VerifySignature(block.SignBytes, sig), "signature verification failed")
 
-	require.True(t, privateKey.PubKey().VerifySignature(block.VoteExtensionSignBytes, voteExtSig), "vote extension signature verification failed")
+	require.True(t, privateKey.PubKey().VerifySignature(block.VoteExtensionSignBytes, voteExtSig),
+		"vote extension signature verification failed")
 
 }

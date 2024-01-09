@@ -186,7 +186,13 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *cometp
 		Error: nil,
 	}}
 
-	sig, voteExtSig, timestamp, err := signAndTrack(context.TODO(), rs.Logger, rs.privVal, chainID, VoteToBlock(chainID, vote))
+	sig, voteExtSig, timestamp, err := signAndTrack(
+		context.TODO(),
+		rs.Logger,
+		rs.privVal,
+		chainID,
+		VoteToBlock(chainID, vote),
+	)
 	if err != nil {
 		msgSum.SignedVoteResponse.Error = getRemoteSignerError(err)
 		return cometprotoprivval.Message{Sum: msgSum}

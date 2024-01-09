@@ -607,8 +607,6 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 				if !pubKey.VerifySignature(voteExtSignBytes, voteExtSig) {
 					t.Log("PreCommit vote extension signature verification failed")
 					return
-				} else {
-					t.Log("PreCommit vote extension signature verification succeeded")
 				}
 
 				mu.Lock()

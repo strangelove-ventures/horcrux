@@ -146,7 +146,10 @@ func (pv *ThresholdValidator) mustLoadChainState(chainID string) ChainSignState 
 // sign process if it is greater than the current high watermark. A mutex is used to avoid concurrent
 // state updates. The disk write is scheduled in a separate goroutine which will perform an atomic write.
 // pendingDiskWG is used upon termination in pendingDiskWG to ensure all writes have completed.
-func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, block *Block) ([]byte, []byte, time.Time, error) {
+func (pv *ThresholdValidator) SaveLastSignedStateInitiated(
+	chainID string,
+	block *Block,
+) ([]byte, []byte, time.Time, error) {
 	css := pv.mustLoadChainState(chainID)
 
 	height, round, step := block.Height, block.Round, block.Step
@@ -158,7 +161,8 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, block
 	}
 
 	// There was an error saving the last sign state, so check if there is an existing signature for this block.
-	existingSignature, existingVoteExtSignature, existingTimestamp, sameBlockErr := pv.getExistingBlockSignature(chainID, block)
+	existingSignature, existingVoteExtSignature,
+		existingTimestamp, sameBlockErr := pv.getExistingBlockSignature(chainID, block)
 
 	if _, ok := err.(*SameHRSError); !ok {
 		if sameBlockErr == nil {
@@ -208,7 +212,8 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(chainID string, block
 			continue
 		}
 
-		existingSignature, existingVoteExtSignature, existingTimestamp, sameBlockErr = pv.compareBlockSignatureAgainstSSC(chainID, block, &ssc)
+		existingSignature, existingVoteExtSignature,
+			existingTimestamp, sameBlockErr = pv.compareBlockSignatureAgainstSSC(chainID, block, &ssc)
 		if sameBlockErr == nil {
 			return existingSignature, existingVoteExtSignature, existingTimestamp, nil
 		}
@@ -397,7 +402,10 @@ func (pv *ThresholdValidator) LoadSignStateIfNecessary(chainID string) error {
 // getExistingBlockSignature returns the existing block signature and no error if the signature is valid for the block.
 // It returns nil signature and nil error if there is no signature and it's okay to sign (fresh or again).
 // It returns an error if we have already signed a greater block, or if we are still waiting for in in-progress sign.
-func (pv *ThresholdValidator) getExistingBlockSignature(chainID string, block *Block) ([]byte, []byte, time.Time, error) {
+func (pv *ThresholdValidator) getExistingBlockSignature(
+	chainID string,
+	block *Block,
+) ([]byte, []byte, time.Time, error) {
 	css := pv.mustLoadChainState(chainID)
 
 	latestBlock, existingSignature := css.lastSignState.GetFromCache(block.HRSKey())
@@ -615,8 +623,13 @@ func (pv *ThresholdValidator) proxyIfNecessary(
 	return true, signRes.Signature, signRes.VoteExtensionSignature, stamp, nil
 }
 
-func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block Block) ([]byte, []byte, time.Time, error) {
-	height, round, step, stamp, signBytes, voteExtensionSignBytes := block.Height, block.Round, block.Step, block.Timestamp, block.SignBytes, block.VoteExtensionSignBytes
+func (pv *ThresholdValidator) Sign(
+	ctx context.Context,
+	chainID string,
+	block Block,
+) ([]byte, []byte, time.Time, error) {
+	height, round, step, stamp := block.Height, block.Round, block.Step, block.Timestamp
+	signBytes, voteExtensionSignBytes := block.SignBytes, block.VoteExtensionSignBytes
 
 	log := pv.logger.With(
 		"chain_id", chainID,
