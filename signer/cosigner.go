@@ -2,9 +2,13 @@ package signer
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
+	"github.com/cometbft/cometbft/libs/protoio"
+	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	"github.com/google/uuid"
 	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 )
@@ -149,4 +153,52 @@ type CosignerSetNoncesAndSignRequest struct {
 	HRST                   HRSTKey
 	SignBytes              []byte
 	VoteExtensionSignBytes []byte
+}
+
+func verifySignPayload(chainID string, signBytes, voteExtensionSignBytes []byte) (HRSTKey, bool, error) {
+	var vote cometproto.CanonicalVote
+	voteErr := protoio.UnmarshalDelimited(signBytes, &vote)
+	if voteErr == nil && (vote.Type == cometproto.PrevoteType || vote.Type == cometproto.PrecommitType) {
+		hrstKey := HRSTKey{
+			Height:    vote.Height,
+			Round:     vote.Round,
+			Step:      CanonicalVoteToStep(&vote),
+			Timestamp: vote.Timestamp.UnixNano(),
+		}
+
+		if hrstKey.Step == stepPrecommit && len(voteExtensionSignBytes) > 0 && vote.BlockID != nil {
+			var voteExt cometproto.CanonicalVoteExtension
+			if err := protoio.UnmarshalDelimited(voteExtensionSignBytes, &voteExt); err != nil {
+				return hrstKey, false, fmt.Errorf("failed to unmarshal vote extension: %w", err)
+			}
+			if voteExt.ChainId != chainID {
+				return hrstKey, false, fmt.Errorf("vote extension chain ID %s does not match chain ID %s", voteExt.ChainId, chainID)
+			}
+			if voteExt.Height != hrstKey.Height {
+				return hrstKey, false,
+					fmt.Errorf("vote extension height %d does not match block height %d", voteExt.Height, hrstKey.Height)
+			}
+			if voteExt.Round != hrstKey.Round {
+				return hrstKey, false,
+					fmt.Errorf("vote extension round %d does not match block round %d", voteExt.Round, hrstKey.Round)
+			}
+			return hrstKey, true, nil
+		}
+
+		return hrstKey, false, nil
+	}
+
+	var proposal cometproto.CanonicalProposal
+	proposalErr := protoio.UnmarshalDelimited(signBytes, &proposal)
+	if proposalErr == nil {
+		return HRSTKey{
+			Height:    proposal.Height,
+			Round:     proposal.Round,
+			Step:      stepPropose,
+			Timestamp: proposal.Timestamp.UnixNano(),
+		}, false, nil
+	}
+
+	return HRSTKey{}, false,
+		fmt.Errorf("failed to unmarshal sign bytes into vote or proposal: %w", errors.Join(voteErr, proposalErr))
 }

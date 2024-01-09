@@ -214,13 +214,13 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		return res, err
 	}
 
-	// This function has multiple exit points.  Only start time can be guaranteed
-	metricsTimeKeeper.SetPreviousLocalSignStart(time.Now())
-
-	hrst, err := UnpackHRST(req.SignBytes)
+	hrst, hasVoteExtensions, err := verifySignPayload(chainID, req.SignBytes, req.VoteExtensionSignBytes)
 	if err != nil {
 		return res, err
 	}
+
+	// This function has multiple exit points.  Only start time can be guaranteed
+	metricsTimeKeeper.SetPreviousLocalSignStart(time.Now())
 
 	existingSignature, err := ccs.lastSignState.existingSignatureOrErrorIfRegression(hrst, req.SignBytes)
 	if err != nil {
@@ -249,7 +249,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	}
 
 	var voteExtNonces []Nonce
-	if len(req.VoteExtensionSignBytes) > 0 {
+	if hasVoteExtensions {
 		voteExtNonces, err = cosigner.combinedNonces(
 			cosigner.GetID(),
 			uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
@@ -268,7 +268,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		sig, err = ccs.signer.Sign(nonces, req.SignBytes)
 		return err
 	})
-	if len(req.VoteExtensionSignBytes) > 0 {
+	if hasVoteExtensions {
 		eg.Go(func() error {
 			var err error
 			voteExtSig, err = ccs.signer.Sign(voteExtNonces, req.VoteExtensionSignBytes)

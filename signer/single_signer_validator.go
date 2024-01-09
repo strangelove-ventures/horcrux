@@ -65,7 +65,7 @@ func (pv *SingleSignerValidator) Sign(
 	chainState.pvMutex.Lock()
 	defer chainState.pvMutex.Unlock()
 
-	return chainState.filePV.Sign(block)
+	return chainState.filePV.Sign(chainID, block)
 }
 
 func (pv *SingleSignerValidator) loadChainStateIfNecessary(chainID string) (*SingleSignerChainState, error) {

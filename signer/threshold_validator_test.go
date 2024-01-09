@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"fmt"
 	mrand "math/rand"
 	"path/filepath"
@@ -254,9 +255,13 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 		err = eg.Wait()
 		require.NoError(t, err)
 
+		blockIDHash := sha256.New()
+		blockIDHash.Write([]byte("something"))
+
 		precommit := cometproto.Vote{
 			Height:    int64(i),
 			Round:     0,
+			BlockID:   cometproto.BlockID{Hash: blockIDHash.Sum(nil)},
 			Type:      cometproto.PrecommitType,
 			Timestamp: time.Now(),
 			Extension: []byte("test"),

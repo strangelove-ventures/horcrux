@@ -699,7 +699,14 @@ func (pv *ThresholdValidator) Sign(
 	}
 
 	var voteExtNonces *CosignerUUIDNonces
-	if step == stepPrecommit && len(voteExtensionSignBytes) > 0 {
+
+	_, hasVoteExtensions, err := verifySignPayload(chainID, signBytes, voteExtensionSignBytes)
+	if err != nil {
+		pv.notifyBlockSignError(chainID, block.HRSKey(), signBytes)
+		return nil, nil, stamp, fmt.Errorf("failed to verify payload: %w", err)
+	}
+
+	if hasVoteExtensions {
 		voteExtNonces, err = pv.nonceCache.GetNonces(cosignersForThisBlock)
 		if err != nil {
 			// TODO how to handle fallback for vote extensions?
@@ -853,7 +860,7 @@ func (pv *ThresholdValidator) Sign(
 
 	var voteExtSig []byte
 
-	if step == stepPrecommit && len(voteExtensionSignBytes) > 0 {
+	if hasVoteExtensions {
 		// collect all valid responses into array of partial signatures
 		voteExtShareSigs := make([]PartialSignature, 0, pv.threshold)
 		for idx, shareSig := range voteExtShareSignatures {

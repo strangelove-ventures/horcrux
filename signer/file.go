@@ -200,7 +200,7 @@ func (pv *FilePV) GetPubKey() (crypto.PubKey, error) {
 	return pv.Key.PubKey, nil
 }
 
-func (pv *FilePV) Sign(block Block) ([]byte, []byte, time.Time, error) {
+func (pv *FilePV) Sign(chainID string, block Block) ([]byte, []byte, time.Time, error) {
 	height, round, step := block.Height, int32(block.Round), block.Step
 	signBytes, voteExtensionSignBytes := block.SignBytes, block.VoteExtensionSignBytes
 
@@ -211,13 +211,18 @@ func (pv *FilePV) Sign(block Block) ([]byte, []byte, time.Time, error) {
 		return nil, nil, block.Timestamp, err
 	}
 
+	_, hasVoteExtensions, err := verifySignPayload(chainID, signBytes, voteExtensionSignBytes)
+	if err != nil {
+		return nil, nil, block.Timestamp, err
+	}
+
 	// Vote extensions are non-deterministic, so it is possible that an
 	// application may have created a different extension. We therefore always
 	// re-sign the vote extensions of precommits. For prevotes and nil
 	// precommits, the extension signature will always be empty.
 	// Even if the signed over data is empty, we still add the signature
 	var extSig []byte
-	if block.Step == stepPrecommit && len(voteExtensionSignBytes) > 0 {
+	if hasVoteExtensions {
 		extSig, err = pv.Key.PrivKey.Sign(voteExtensionSignBytes)
 		if err != nil {
 			return nil, nil, block.Timestamp, err
