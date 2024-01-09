@@ -280,7 +280,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 			}
 
 			if !pubKey.VerifySignature(block.SignBytes, sig) {
-				return fmt.Errorf("vote extension signature verification failed")
+				return fmt.Errorf("signature verification failed")
 			}
 
 			if !pubKey.VerifySignature(block.VoteExtensionSignBytes, voteExtSig) {
@@ -299,7 +299,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 			}
 
 			if !pubKey.VerifySignature(block.SignBytes, sig) {
-				return fmt.Errorf("vote extension signature verification failed")
+				return fmt.Errorf("signature verification failed")
 			}
 
 			if !pubKey.VerifySignature(block.VoteExtensionSignBytes, voteExtSig) {
@@ -318,7 +318,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 			}
 
 			if !pubKey.VerifySignature(block.SignBytes, sig) {
-				return fmt.Errorf("vote extension signature verification failed")
+				return fmt.Errorf("signature verification failed")
 			}
 
 			if !pubKey.VerifySignature(block.VoteExtensionSignBytes, voteExtSig) {

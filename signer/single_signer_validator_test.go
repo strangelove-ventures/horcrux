@@ -106,4 +106,21 @@ func TestSingleSignerValidator(t *testing.T) {
 	// signing higher block now should succeed
 	_, _, _, err = validator.Sign(ctx, testChainID, ProposalToBlock(testChainID, &proposal))
 	require.NoError(t, err)
+
+	precommit := cometproto.Vote{
+		Height:    2,
+		Round:     0,
+		Type:      cometproto.PrecommitType,
+		Timestamp: time.Now(),
+		Extension: []byte("test"),
+	}
+
+	block = VoteToBlock(testChainID, &precommit)
+	sig, voteExtSig, _, err := validator.Sign(ctx, testChainID, block)
+	require.NoError(t, err)
+
+	require.True(t, privateKey.PubKey().VerifySignature(block.SignBytes, sig), "signature verification failed")
+
+	require.True(t, privateKey.PubKey().VerifySignature(block.VoteExtensionSignBytes, voteExtSig), "vote extension signature verification failed")
+
 }
