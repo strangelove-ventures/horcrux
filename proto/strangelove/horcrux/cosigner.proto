@@ -57,7 +57,10 @@ message SetNoncesAndSignRequest {
 	repeated Nonce nonces = 2;
 	HRST hrst = 3;
 	bytes signBytes = 4;
-	string chainID = 5;
+	bytes voteExtUuid = 5;
+	repeated Nonce voteExtNonces = 6;
+	bytes voteExtSignBytes = 7;
+	string chainID = 8;
 }
 
 message SetNoncesAndSignResponse {

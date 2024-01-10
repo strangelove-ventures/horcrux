@@ -48,15 +48,27 @@ func (rpc *CosignerGRPCServer) SetNoncesAndSign(
 	ctx context.Context,
 	req *proto.SetNoncesAndSignRequest,
 ) (*proto.SetNoncesAndSignResponse, error) {
-	res, err := rpc.cosigner.SetNoncesAndSign(ctx, CosignerSetNoncesAndSignRequest{
+	cosignerReq := CosignerSetNoncesAndSignRequest{
 		ChainID: req.ChainID,
+
+		HRST: HRSTKeyFromProto(req.Hrst),
+
 		Nonces: &CosignerUUIDNonces{
 			UUID:   uuid.UUID(req.Uuid),
-			Nonces: CosignerNoncesFromProto(req.GetNonces()),
+			Nonces: CosignerNoncesFromProto(req.Nonces),
 		},
-		HRST:      HRSTKeyFromProto(req.GetHrst()),
-		SignBytes: req.GetSignBytes(),
-	})
+		SignBytes: req.SignBytes,
+	}
+
+	if len(req.VoteExtSignBytes) > 0 && len(req.VoteExtUuid) == 16 {
+		cosignerReq.VoteExtensionNonces = &CosignerUUIDNonces{
+			UUID:   uuid.UUID(req.VoteExtUuid),
+			Nonces: CosignerNoncesFromProto(req.VoteExtNonces),
+		}
+		cosignerReq.VoteExtensionSignBytes = req.VoteExtSignBytes
+	}
+
+	res, err := rpc.cosigner.SetNoncesAndSign(ctx, cosignerReq)
 	if err != nil {
 		rpc.raftStore.logger.Error(
 			"Failed to sign with shard",

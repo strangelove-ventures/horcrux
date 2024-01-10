@@ -273,7 +273,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 		precommitClone2 := precommit
 		precommitClone2.Timestamp = precommit.Timestamp.Add(4 * time.Millisecond)
 
-		newValidator.nonceCache.LoadN(ctx, 6)
+		newValidator.nonceCache.LoadN(ctx, mrand.Intn(7))
 
 		eg.Go(func() error {
 			start := time.Now()

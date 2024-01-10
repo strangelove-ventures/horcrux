@@ -478,9 +478,8 @@ func (pv *ThresholdValidator) compareBlockSignatureAgainstHRS(
 
 func (pv *ThresholdValidator) getNoncesFallback(
 	ctx context.Context,
-) (*CosignerUUIDNonces, []Cosigner, error) {
-	nonces := make(map[Cosigner]CosignerNonces)
-
+	count int,
+) (*CosignersAndNonces, error) {
 	drainedNonceCache.Inc()
 	totalDrainedNonceCache.Inc()
 
@@ -489,36 +488,28 @@ func (pv *ThresholdValidator) getNoncesFallback(
 
 	var mu sync.Mutex
 
-	u := uuid.New()
+	uuids := make([]uuid.UUID, count)
+	for i := 0; i < count; i++ {
+		uuids[i] = uuid.New()
+	}
 
 	allCosigners := make([]Cosigner, len(pv.peerCosigners)+1)
 	allCosigners[0] = pv.myCosigner
 	copy(allCosigners[1:], pv.peerCosigners)
 
+	var thresholdNonces CosignersAndNonces
+
 	for _, c := range allCosigners {
-		go pv.waitForPeerNonces(ctx, u, c, &wg, nonces, &mu)
+		go pv.waitForPeerNonces(ctx, uuids, c, &wg, &thresholdNonces, &mu)
 	}
 
 	// Wait for threshold cosigners to be complete
 	// A Cosigner will either respond in time, or be cancelled with timeout
 	if waitUntilCompleteOrTimeout(&wg, pv.grpcTimeout) {
-		return nil, nil, errors.New("timed out waiting for ephemeral shares")
+		return nil, errors.New("timed out waiting for ephemeral shares")
 	}
 
-	var thresholdNonces CosignerNonces
-	thresholdCosigners := make([]Cosigner, len(nonces))
-	i := 0
-	for c, n := range nonces {
-		thresholdCosigners[i] = c
-		i++
-
-		thresholdNonces = append(thresholdNonces, n...)
-	}
-
-	return &CosignerUUIDNonces{
-		UUID:   u,
-		Nonces: thresholdNonces,
-	}, thresholdCosigners, nil
+	return &thresholdNonces, nil
 }
 
 func waitUntilCompleteOrTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
@@ -535,16 +526,22 @@ func waitUntilCompleteOrTimeout(wg *sync.WaitGroup, timeout time.Duration) bool 
 	}
 }
 
+type CosignersAndNonces struct {
+	Cosigners Cosigners
+	Nonces    CosignerUUIDNoncesMultiple
+}
+
 func (pv *ThresholdValidator) waitForPeerNonces(
 	ctx context.Context,
-	u uuid.UUID,
+	uuids []uuid.UUID,
 	peer Cosigner,
 	wg *sync.WaitGroup,
-	nonces map[Cosigner]CosignerNonces,
+	thresholdNonces *CosignersAndNonces,
 	mu sync.Locker,
 ) {
 	peerStartTime := time.Now()
-	peerNonces, err := peer.GetNonces(ctx, []uuid.UUID{u})
+
+	peerNonces, err := peer.GetNonces(ctx, uuids)
 	if err != nil {
 		missedNonces.WithLabelValues(peer.GetAddress()).Inc()
 		totalMissedNonces.WithLabelValues(peer.GetAddress()).Inc()
@@ -558,8 +555,21 @@ func (pv *ThresholdValidator) waitForPeerNonces(
 
 	// Check so that wg.Done is not called more than (threshold - 1) times which causes hardlock
 	mu.Lock()
-	if len(nonces) < pv.threshold {
-		nonces[peer] = peerNonces[0].Nonces
+	if len(thresholdNonces.Cosigners) < pv.threshold {
+		thresholdNonces.Cosigners = append(thresholdNonces.Cosigners, peer)
+		for _, n := range peerNonces {
+			var found bool
+			for _, nn := range thresholdNonces.Nonces {
+				if n.UUID == nn.UUID {
+					nn.Nonces = append(nn.Nonces, n.Nonces...)
+					found = true
+					break
+				}
+			}
+			if !found {
+				thresholdNonces.Nonces = append(thresholdNonces.Nonces, n)
+			}
+		}
 		defer wg.Done()
 	}
 	mu.Unlock()
@@ -682,23 +692,7 @@ func (pv *ThresholdValidator) Sign(
 	cosignersForThisBlock[0] = pv.myCosigner
 	copy(cosignersForThisBlock[1:], cosignersOrderedByFastest[:pv.threshold-1])
 
-	nonces, err := pv.nonceCache.GetNonces(cosignersForThisBlock)
-
 	var dontIterateFastestCosigners bool
-
-	if err != nil {
-		var fallbackErr error
-		nonces, cosignersForThisBlock, fallbackErr = pv.getNoncesFallback(ctx)
-		if fallbackErr != nil {
-			pv.notifyBlockSignError(chainID, block.HRSKey(), signBytes)
-			return nil, nil, stamp, fmt.Errorf("failed to get nonces: %w", errors.Join(err, fallbackErr))
-		}
-		dontIterateFastestCosigners = true
-	} else {
-		drainedNonceCache.Set(0)
-	}
-
-	var voteExtNonces *CosignerUUIDNonces
 
 	_, hasVoteExtensions, err := verifySignPayload(chainID, signBytes, voteExtensionSignBytes)
 	if err != nil {
@@ -706,12 +700,62 @@ func (pv *ThresholdValidator) Sign(
 		return nil, nil, stamp, fmt.Errorf("failed to verify payload: %w", err)
 	}
 
+	count := 1
 	if hasVoteExtensions {
+		count = 2
+	}
+
+	var voteExtNonces *CosignerUUIDNonces
+	nonces, err := pv.nonceCache.GetNonces(cosignersForThisBlock)
+	if err != nil {
+		var fallbackRes *CosignersAndNonces
+		var fallbackErr error
+
+		fallbackRes, fallbackErr = pv.getNoncesFallback(ctx, count)
+		if fallbackErr != nil {
+			pv.notifyBlockSignError(chainID, block.HRSKey(), signBytes)
+			return nil, nil, stamp, fmt.Errorf("failed to get nonces: %w", errors.Join(err, fallbackErr))
+		}
+
+		cosignersForThisBlock = fallbackRes.Cosigners
+		nonces = fallbackRes.Nonces[0]
+		if hasVoteExtensions {
+			voteExtNonces = fallbackRes.Nonces[1]
+		}
+		dontIterateFastestCosigners = true
+	} else {
+		drainedNonceCache.Set(0)
+	}
+
+	if err == nil && hasVoteExtensions {
 		voteExtNonces, err = pv.nonceCache.GetNonces(cosignersForThisBlock)
 		if err != nil {
-			// TODO how to handle fallback for vote extensions?
-			pv.notifyBlockSignError(chainID, block.HRSKey(), signBytes)
-			return nil, nil, stamp, fmt.Errorf("failed to get nonces for vote extensions: %w", err)
+
+			u := uuid.New()
+			var eg errgroup.Group
+			var mu sync.Mutex
+			for _, c := range cosignersForThisBlock {
+				c := c
+				eg.Go(func() error {
+					nonces, err := c.GetNonces(ctx, []uuid.UUID{u})
+					if err != nil {
+						return err
+					}
+					mu.Lock()
+					defer mu.Unlock()
+					if voteExtNonces == nil {
+						voteExtNonces = nonces[0]
+					} else {
+						voteExtNonces.Nonces = append(voteExtNonces.Nonces, nonces[0].Nonces...)
+					}
+					return nil
+				})
+			}
+
+			if fallbackErr := eg.Wait(); fallbackErr != nil {
+				pv.notifyBlockSignError(chainID, block.HRSKey(), signBytes)
+				return nil, nil, stamp, fmt.Errorf("failed to get nonces for vote extensions: %w", errors.Join(err, fallbackErr))
+			}
 		}
 	}
 
@@ -840,7 +884,7 @@ func (pv *ThresholdValidator) Sign(
 	if len(shareSigs) < pv.threshold {
 		totalInsufficientCosigners.Inc()
 		pv.notifyBlockSignError(chainID, block.HRSKey(), signBytes)
-		return nil, nil, stamp, errors.New("not enough co-signers")
+		return nil, nil, stamp, errors.New("not enough cosigners")
 	}
 
 	// assemble into final signature
@@ -882,7 +926,7 @@ func (pv *ThresholdValidator) Sign(
 		if len(voteExtShareSigs) < pv.threshold {
 			totalInsufficientCosigners.Inc()
 			pv.notifyBlockSignError(chainID, block.HRSKey(), signBytes)
-			return nil, nil, stamp, errors.New("not enough co-signers for vote extension")
+			return nil, nil, stamp, errors.New("not enough cosigners for vote extension")
 		}
 
 		// assemble into final signature
