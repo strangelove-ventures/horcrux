@@ -49,15 +49,23 @@ func (pv *SingleSignerValidator) GetPubKey(_ context.Context, chainID string) ([
 }
 
 // SignVote implements types.PrivValidator
-func (pv *SingleSignerValidator) Sign(_ context.Context, chainID string, block Block) ([]byte, time.Time, error) {
+func (pv *SingleSignerValidator) Sign(
+	_ context.Context,
+	chainID string,
+	block Block) (
+	[]byte,
+	[]byte,
+	time.Time,
+	error,
+) {
 	chainState, err := pv.loadChainStateIfNecessary(chainID)
 	if err != nil {
-		return nil, block.Timestamp, err
+		return nil, nil, block.Timestamp, err
 	}
 	chainState.pvMutex.Lock()
 	defer chainState.pvMutex.Unlock()
 
-	return chainState.filePV.Sign(block)
+	return chainState.filePV.Sign(chainID, block)
 }
 
 func (pv *SingleSignerValidator) loadChainStateIfNecessary(chainID string) (*SingleSignerChainState, error) {

@@ -45,7 +45,7 @@ const (
 	signerImageHomeDir = "/home/horcrux"
 
 	horcruxProxyRegistry = "ghcr.io/strangelove-ventures/horcrux-proxy"
-	horcruxProxyTag      = "andrew-horcrux_remote_signer_grpc"
+	horcruxProxyTag      = "andrew-vote_extensions"
 )
 
 // chainWrapper holds the initial configuration for a chain to start from genesis.
