@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/node"
 	"github.com/strangelove-ventures/horcrux/src/config"
 	"github.com/strangelove-ventures/horcrux/src/cosigner"
 	"github.com/strangelove-ventures/horcrux/src/cosigner/nodesecurity"
+	"github.com/strangelove-ventures/horcrux/src/node"
 	"github.com/strangelove-ventures/horcrux/src/tss"
 
 	"github.com/strangelove-ventures/horcrux/src/types"
@@ -139,7 +139,10 @@ func loadKeyForLocalCosigner(
 func testThresholdValidator(t *testing.T, threshold, total uint8, configuration *config.RuntimeConfig) {
 	cosigners, pubKey := getTestLocalCosigners(t, threshold, total)
 
+	fmt.Println("cosigners", threshold, total, len(cosigners))
+
 	thresholdCosigners := make([]node.ICosigner, 0, threshold-1)
+	fmt.Println("thresholdCosigners", threshold, total, len(thresholdCosigners))
 
 	for i, cosigner := range cosigners {
 		require.Equal(t, i+1, cosigner.GetIndex())

@@ -289,7 +289,8 @@ func (pv *ThresholdValidator) saveLastSignedStateInitiated(
 		if sameBlockErr == nil {
 			return existingSignature, existingTimestamp, nil
 		}
-		if _, ok := sameBlockErr.(*StillWaitingForBlockError); !ok {
+		var stillWaitingForBlockError *StillWaitingForBlockError
+		if !errors.As(sameBlockErr, &stillWaitingForBlockError) {
 			return nil, existingTimestamp, fmt.Errorf(
 				"same block error in loop, but we are not still waiting for signature: %w",
 				sameBlockErr,
@@ -413,7 +414,8 @@ func (pv *ThresholdValidator) compareBlockSignatureAgainstSSC(
 	stamp, signBytes := block.Timestamp, block.SignBytes
 
 	if err := compareBlockSignatureAgainstHRS(pv, chainID, block, existingSignature.HRSKey()); err != nil {
-		if _, ok := err.(*metrics.SameBlockError); !ok {
+		var sameBlockError *metrics.SameBlockError
+		if !errors.As(err, &sameBlockError) {
 			return nil, stamp, err
 		}
 	}
@@ -589,8 +591,11 @@ func (pv *ThresholdValidator) proxyIfNecessary(
 		Block:   &block,
 	})
 	if err != nil {
-		if _, ok := err.(*cometrpcjsontypes.RPCError); ok {
-			rpcErrUnwrapped := err.(*cometrpcjsontypes.RPCError).Data
+		var RPCError *cometrpcjsontypes.RPCError
+		if errors.As(err, &RPCError) {
+			var RPCError *cometrpcjsontypes.RPCError
+			errors.As(err, &RPCError)
+			rpcErrUnwrapped := RPCError.Data
 			// Need to return BeyondBlockError after proxy since the error type will be lost over RPC
 			if len(rpcErrUnwrapped) > 33 && rpcErrUnwrapped[:33] == "Progress already started on block" {
 				return true, nil, stamp, &metrics.BeyondBlockError{Msg: rpcErrUnwrapped}
@@ -660,7 +665,9 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 	peerStartTime := time.Now()
 
 	cosignersOrderedByFastest := pv.cosignerHealth.GetFastest()
+	fmt.Println("cosignersOrderedByFastest", len(cosignersOrderedByFastest))
 	cosignersForThisBlock := make([]ICosigner, pv.threshold)
+	fmt.Println("cosignersForThisBlock", len(cosignersForThisBlock), pv.threshold)
 	cosignersForThisBlock[0] = pv.MyCosigner
 	copy(cosignersForThisBlock[1:], cosignersOrderedByFastest[:pv.threshold-1])
 
@@ -832,7 +839,8 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 	err = css.lastSignState.Save(newLss.SignStateConsensus, &pv.pendingDiskWG)
 	css.lastSignStateMutex.Unlock()
 	if err != nil {
-		if _, isSameHRSError := err.(*types.SameHRSError); !isSameHRSError {
+		var sameHRSError *types.SameHRSError
+		if !errors.As(err, &sameHRSError) {
 
 			pv.notifyBlockSignError(chainID, block.GetHRS(), signBytes)
 			return nil, stamp, fmt.Errorf("error saving last sign state: %w", err)

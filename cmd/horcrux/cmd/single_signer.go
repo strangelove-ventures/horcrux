@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/strangelove-ventures/horcrux/node"
+	"github.com/strangelove-ventures/horcrux/src/node"
 )
 
 const (

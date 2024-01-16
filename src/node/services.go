@@ -61,7 +61,8 @@ func RequireNotRunning(log cometlog.Logger, pidFilePath string) error {
 		return nil
 	}
 
-	errno, ok := err.(syscall.Errno)
+	var errno syscall.Errno
+	ok := errors.As(err, &errno)
 	if !ok {
 		return fmt.Errorf("unexpected error type from signaling horcrux PID: %d", pid)
 	}

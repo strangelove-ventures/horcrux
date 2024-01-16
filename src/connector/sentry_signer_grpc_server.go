@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"errors"
 	"net"
 	"time"
 
@@ -109,8 +110,9 @@ func signAndTrack(
 ) ([]byte, time.Time, error) {
 	signature, timestamp, err := validator.Sign(ctx, chainID, block)
 	if err != nil {
-		switch typedErr := err.(type) {
-		case *metrics.BeyondBlockError:
+		var typedErr *metrics.BeyondBlockError
+		switch {
+		case errors.As(err, &typedErr):
 			logger.Debug(
 				"Rejecting sign request",
 				"type", types.SignType(block.Step),

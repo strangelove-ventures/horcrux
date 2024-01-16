@@ -10,8 +10,8 @@ import (
 	"time"
 
 	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
-	"github.com/strangelove-ventures/horcrux/node"
 	"github.com/strangelove-ventures/horcrux/src/multiresolver"
+	"github.com/strangelove-ventures/horcrux/src/node"
 	"github.com/strangelove-ventures/horcrux/src/proto"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"

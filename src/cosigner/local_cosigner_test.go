@@ -201,7 +201,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []cosi
 
 	sigs := make([]types.PartialSignature, threshold)
 
-	for i, local_cosigner := range thresholdCosigners {
+	for i, localCosigner := range thresholdCosigners {
 		cosignerNonces := make([]cosigner.Nonce, 0, threshold-1)
 
 		for j, nonce := range nonces {
@@ -210,13 +210,13 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []cosi
 			}
 
 			for _, n := range nonce {
-				if n.DestinationID == local_cosigner.GetIndex() {
+				if n.DestinationID == localCosigner.GetIndex() {
 					cosignerNonces = append(cosignerNonces, n)
 				}
 			}
 		}
 
-		sigRes, err := local_cosigner.SetNoncesAndSign(ctx, cosigner.CosignerSetNoncesAndSignRequest{
+		sigRes, err := localCosigner.SetNoncesAndSign(ctx, cosigner.CosignerSetNoncesAndSignRequest{
 			Nonces: &cosigner.CosignerUUIDNonces{
 				UUID:   u,
 				Nonces: cosignerNonces,
@@ -228,7 +228,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []cosi
 		require.NoError(t, err)
 
 		sigs[i] = types.PartialSignature{
-			Index:     local_cosigner.GetIndex(),
+			Index:     localCosigner.GetIndex(),
 			Signature: sigRes.Signature,
 		}
 	}

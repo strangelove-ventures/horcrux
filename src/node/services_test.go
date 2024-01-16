@@ -14,7 +14,7 @@ import (
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	cometservice "github.com/cometbft/cometbft/libs/service"
-	"github.com/strangelove-ventures/horcrux/node"
+	"github.com/strangelove-ventures/horcrux/src/node"
 
 	fork "github.com/kraken-hpc/go-fork"
 	"github.com/stretchr/testify/require"
@@ -33,6 +33,7 @@ func mockHorcruxChildProcess(pidFilePath string) {
 	)
 }
 
+// waitForFileToExist waits for a file to exist, returning an error if it does not exist after timeout.
 func waitForFileToExist(file string, timeout time.Duration) error {
 	exp := time.After(timeout)
 	tick := time.Tick(20 * time.Millisecond)

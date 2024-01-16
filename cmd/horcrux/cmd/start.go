@@ -9,8 +9,8 @@ import (
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/cometbft/cometbft/libs/service"
 	"github.com/spf13/cobra"
-	"github.com/strangelove-ventures/horcrux/node"
 	cconfig "github.com/strangelove-ventures/horcrux/src/config"
+	"github.com/strangelove-ventures/horcrux/src/node"
 )
 
 func startCmd() *cobra.Command {

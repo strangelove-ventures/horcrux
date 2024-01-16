@@ -13,7 +13,7 @@ import (
 	"github.com/strangelove-ventures/horcrux/src/types"
 
 	"github.com/spf13/cobra"
-	"github.com/strangelove-ventures/horcrux/node"
+	"github.com/strangelove-ventures/horcrux/src/node"
 
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	cometlog "github.com/cometbft/cometbft/libs/log"

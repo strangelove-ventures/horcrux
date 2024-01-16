@@ -116,7 +116,7 @@ func createCosignerEd25519ShardsCmd() *cobra.Command {
 
 			csKeys, err := tss.CreatePersistentEd25519ThresholdSignShardsFromFile(keyFile, threshold, shards)
 			if err != nil {
-				return err
+				return fmt.Errorf("error creating CreatePersistentEd25519ThresholdSignShardsFromFile (%s): %d, %d, %w", keyFile, threshold, shards, err)
 			}
 
 			out, _ := cmd.Flags().GetString(flagOutputDir)

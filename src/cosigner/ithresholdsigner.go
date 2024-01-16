@@ -16,7 +16,7 @@ type IThresholdSigner interface {
 }
 
 type IThresholdDealer interface {
-	KeyGenerator(threshold, total uint8) (types.Nonces, error)
+	GenerateNonces(threshold, total uint8) (types.Nonces, error)
 }
 
 type IThreshold interface {

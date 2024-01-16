@@ -56,8 +56,6 @@ func LoadVaultKeyFromFile(file string) (Ed25519Key, error) {
 		return pvKey, err
 	}
 
-	fmt.Printf("keyJsonBytes is: %s", keyJSONBytes)
-
 	err = json.Unmarshal(keyJSONBytes, &pvKey)
 	if err != nil {
 		fmt.Printf("Could not unmarshal key from file %s", file)
@@ -111,8 +109,11 @@ func generatePersistentThresholdSignShards(privateKey []byte, publicKey PubKey, 
 	keys := function(privateKey, threshold, shards)
 	// Transform ed25519Keys to VaultKey type
 	vaultKeys := make([]VaultKey, len(keys))
+
+	fmt.Printf("Number of keys to create: %d\n", len(keys))
 	for id, key := range keys {
-		vaultKeys[id] = VaultKey{
+		fmt.Printf("VaultKey: %d\n", id)
+		vaultKeys[id-1] = VaultKey{
 			PubKey:       publicKey,
 			PrivateShard: key,
 			ID:           int(id),

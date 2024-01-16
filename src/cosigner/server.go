@@ -10,6 +10,7 @@ import (
 	"github.com/strangelove-ventures/horcrux/src/config"
 	"github.com/strangelove-ventures/horcrux/src/metrics"
 	"github.com/strangelove-ventures/horcrux/src/tss"
+	"github.com/strangelove-ventures/horcrux/src/tss/ted25519"
 
 	"github.com/strangelove-ventures/horcrux/src/types"
 
@@ -59,7 +60,7 @@ func NewLocalCosigner(
 		security: security,
 		address:  address,
 		nonces:   make(map[uuid.UUID]*types.NoncesWithExpiration),
-		//dealer:   tss.NewThresholdEd25519DealerSoft(config),
+		dealer:   &ted25519.NonceGenerator{},
 	}
 }
 
@@ -275,7 +276,8 @@ func (cosigner *LocalCosigner) sign(req SignatureRequest) (SignatureResponse, er
 	}, &cosigner.pendingDiskWG)
 
 	if err != nil {
-		if _, isSameHRSError := err.(*types.SameHRSError); !isSameHRSError {
+		var sameHRSError *types.SameHRSError
+		if !errors.As(err, &sameHRSError) {
 			return res, err
 		}
 	}
@@ -300,8 +302,9 @@ func (cosigner *LocalCosigner) generateNonces() ([]types.Nonces, error) {
 	// 		 although it might doesnt matter if we arent doing DKG
 	// Should call an interface: dealnonce or something
 	threshold := uint8(cosigner.config.Config.ThresholdModeConfig.Threshold)
-	nonces, err := cosigner.dealer.KeyGenerator(uint8(threshold), uint8(total))
+	nonces, err := cosigner.dealer.GenerateNonces(uint8(threshold), uint8(total))
 	if err != nil {
+		fmt.Println("Error is: ", err)
 		return nil, err
 	}
 
@@ -421,6 +424,7 @@ func (cosigner *LocalCosigner) generateNoncesIfNecessary(uuid uuid.UUID) (*types
 
 	newNonces, err := cosigner.generateNonces()
 	if err != nil {
+		fmt.Println(err)
 		return nil, err
 	}
 

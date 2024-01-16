@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/node"
 	"github.com/strangelove-ventures/horcrux/src/config"
+	"github.com/strangelove-ventures/horcrux/src/node"
 	"github.com/strangelove-ventures/horcrux/src/types"
 
 	"os"

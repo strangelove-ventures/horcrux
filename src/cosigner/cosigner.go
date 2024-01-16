@@ -87,12 +87,13 @@ func (mpc *MPC) Stop(ctx context.Context) error {
 }
 
 func (mpc *MPC) Start(ctx context.Context) error {
-	//mpc.logger.Info("Starting ThresholdValidator services")
-
+	// mpc.logger.Info("Starting serverHealth services")
 	go mpc.serverHealth.Start(ctx)
 
+	// mpc.logger.Info("Starting serverHealth services")
 	go mpc.nonceCache.Start(ctx)
 
+	// mpc.logger.Info("Starting noncePruner services")
 	go mpc.noncePruner.Start(ctx)
 
 	// Should start the servers/clients?

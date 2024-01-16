@@ -3,8 +3,8 @@ package node_test
 import (
 	"sync"
 
-	"github.com/strangelove-ventures/horcrux/node"
 	"github.com/strangelove-ventures/horcrux/src/cosigner"
+	"github.com/strangelove-ventures/horcrux/src/node"
 	"github.com/strangelove-ventures/horcrux/src/types"
 )
 

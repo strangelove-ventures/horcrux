@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/node"
 	"github.com/strangelove-ventures/horcrux/src/config"
 	"github.com/strangelove-ventures/horcrux/src/cosigner"
 	"github.com/strangelove-ventures/horcrux/src/cosigner/nodesecurity"
+	"github.com/strangelove-ventures/horcrux/src/node"
 	tss "github.com/strangelove-ventures/horcrux/src/tss"
 
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
