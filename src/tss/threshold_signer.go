@@ -95,7 +95,7 @@ func GeneratePersistentThresholdSignShards[Key Ed25519Key](privateKey []byte, pu
 
 	vaultKeys := make([]Key, len(keys))
 	for id, key := range keys {
-		vaultKeys[id] = Key{
+		vaultKeys[id-1] = Key{
 			PubKey:       publicKey,
 			PrivateShard: key,
 			ID:           int(id),
