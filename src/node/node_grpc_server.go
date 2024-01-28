@@ -13,6 +13,10 @@ import (
 	"github.com/strangelove-ventures/horcrux/src/proto"
 )
 
+/*
+This is the NodeGRPCServer. It is the GRPC server for the node.
+*/
+
 var _ proto.CosignerServer = &NodeGRPCServer{}
 
 type NodeGRPCServer struct {
@@ -20,6 +24,8 @@ type NodeGRPCServer struct {
 	thresholdValidator *ThresholdValidator
 	raftStore          *RaftStore
 	// TODO: add logger and not rely on raftStore.logger
+
+	// TODO: Decouple cosignerserver from nodeserver.
 	proto.UnimplementedCosignerServer
 }
 

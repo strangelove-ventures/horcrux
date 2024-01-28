@@ -13,7 +13,6 @@ import (
 	"github.com/strangelove-ventures/horcrux/src/types"
 
 	"github.com/spf13/cobra"
-	"github.com/strangelove-ventures/horcrux/src/node"
 
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	cometlog "github.com/cometbft/cometbft/libs/log"
@@ -95,7 +94,7 @@ func setStateCmd() *cobra.Command {
 
 			// Resetting the priv_validator_state.json should only be allowed if the
 			// signer is not running.
-			if err := node.RequireNotRunning(logger, config.PidFile); err != nil {
+			if err := RequireNotRunning(logger, config.PidFile); err != nil {
 				return err
 			}
 
@@ -161,7 +160,7 @@ func importStateCmd() *cobra.Command {
 
 			// Resetting the priv_validator_state.json should only be allowed if the
 			// signer is not running.
-			if err := node.RequireNotRunning(logger, config.PidFile); err != nil {
+			if err := RequireNotRunning(logger, config.PidFile); err != nil {
 				return err
 			}
 

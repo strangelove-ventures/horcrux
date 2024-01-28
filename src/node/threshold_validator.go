@@ -45,6 +45,9 @@ func nodecacheconfig() nodecacheconfigs {
 
 // ThresholdValidator is the server that responds to sign requests from the "sentry"
 // Implements the [connector.IPrivValidator] interface.
+/*
+TODO: Move some parts of this to the MPC
+*/
 type ThresholdValidator struct {
 	config *config.RuntimeConfig
 
@@ -552,6 +555,7 @@ func (pv *ThresholdValidator) proxyIfNecessary(
 ) (bool, []byte, time.Time, error) {
 	height, round, step, stamp := block.Height, block.Round, block.Step, block.Timestamp
 
+	// Don't proxy if we are the leader
 	if pv.leader.IsLeader() {
 		return false, nil, time.Time{}, nil
 	}
@@ -559,6 +563,7 @@ func (pv *ThresholdValidator) proxyIfNecessary(
 	leader := pv.leader.GetLeader()
 
 	// TODO is there a better way than to poll during leader election?
+	// NOTE: This is really strange?
 	for i := 0; i < 500 && leader == -1; i++ {
 		time.Sleep(10 * time.Millisecond)
 		leader = pv.leader.GetLeader()
@@ -581,11 +586,13 @@ func (pv *ThresholdValidator) proxyIfNecessary(
 	)
 	metrics.TotalNotRaftLeader.Inc()
 
+	// Get Cosigner by leader index
 	cosignerLeader := pv.peerCosigners.GetByIndex(leader)
 	if cosignerLeader == nil {
 		return true, nil, stamp, fmt.Errorf("failed to find cosigner with id %d", leader)
 	}
 
+	// Here we actually proxies the request to the node who is leader.
 	signRes, err := cosignerLeader.(*cosigner.RemoteCosigner).Sign(ctx, cosigner.CosignerSignBlockRequest{
 		ChainID: chainID,
 		Block:   &block,
@@ -627,6 +634,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 	// but they just need to proxy the request to the raft leader
 	isProxied, proxySig, proxyStamp, err := pv.proxyIfNecessary(ctx, chainID, block)
 	if isProxied {
+		// Returns the proxy signature if the request was proxied
 		return proxySig, proxyStamp, err
 	}
 

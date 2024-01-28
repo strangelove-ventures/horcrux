@@ -7,12 +7,13 @@ import (
 	"path/filepath"
 	"time"
 
-	cometlog "github.com/cometbft/cometbft/libs/log"
-	cometservice "github.com/cometbft/cometbft/libs/service"
 	cconfig "github.com/strangelove-ventures/horcrux/src/config"
 	"github.com/strangelove-ventures/horcrux/src/cosigner"
 	"github.com/strangelove-ventures/horcrux/src/cosigner/nodesecurity"
 	"github.com/strangelove-ventures/horcrux/src/node"
+
+	cometlog "github.com/cometbft/cometbft/libs/log"
+	cometservice "github.com/cometbft/cometbft/libs/service"
 )
 
 const maxWaitForSameBlockAttempts = 3

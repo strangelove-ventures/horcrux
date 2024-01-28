@@ -32,6 +32,7 @@ const ErrUnexpectedState = "unexpected state, metadata does not exist for U:"
 // LocalCosigner responds to sign requests.
 // It maintains a high watermark to avoid double-signing.
 // Signing is thread safe.
+// TODO: Change name to CosignerServer
 type LocalCosigner struct {
 	logger        cometlog.Logger
 	config        *config.RuntimeConfig
@@ -48,6 +49,7 @@ type LocalCosigner struct {
 	dealer IThresholdDealer
 }
 
+// TODO: Change name to NewCosignerServer
 func NewLocalCosigner(
 	logger cometlog.Logger,
 	config *config.RuntimeConfig,
@@ -60,7 +62,7 @@ func NewLocalCosigner(
 		security: security,
 		address:  address,
 		nonces:   make(map[uuid.UUID]*types.NoncesWithExpiration),
-		dealer:   &ted25519.NonceGenerator{},
+		dealer:   &ted25519.NonceGenerator{}, // TODO: Change to interface
 	}
 }
 

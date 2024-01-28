@@ -38,6 +38,7 @@ type ICosigner interface {
 	SetNoncesAndSign(ctx context.Context, req cosigner.CosignerSetNoncesAndSignRequest) (*cosigner.SignatureResponse, error)
 }
 
+// TODO: Move to MPC package
 type ICosigners []ICosigner // ICosigners is a list of ICosigner's
 func (cosigners ICosigners) GetByIndex(id int) ICosigner {
 	// TODO: Add error handling

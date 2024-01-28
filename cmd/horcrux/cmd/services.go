@@ -1,4 +1,4 @@
-package node
+package cmd
 
 import (
 	"errors"
@@ -13,6 +13,7 @@ import (
 	cometservice "github.com/cometbft/cometbft/libs/service"
 )
 
+// TODO: Move RequireNotRunning outside of this package.
 func RequireNotRunning(log cometlog.Logger, pidFilePath string) error {
 	if _, err := os.Stat(pidFilePath); err != nil {
 		if os.IsNotExist(err) {

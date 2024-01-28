@@ -16,6 +16,7 @@ import (
 // RemoteCosigner uses CosignerGRPC to request signing from a remote cosigner
 // Remote Cosigner are CLIENTS! to every other cosigner, including the the nodes local cosigner
 // It calls the GRPC server of the other cosigner
+// TODO: Change name to CosignerClient
 type RemoteCosigner struct {
 	id      int
 	address string
@@ -24,6 +25,7 @@ type RemoteCosigner struct {
 }
 
 // Placeholder function because of testing
+// TODO: Change name to InitCosignerClient
 func InitRemoteCosigner(id int, address string, client proto.CosignerClient) *RemoteCosigner {
 	cosigner := &RemoteCosigner{
 		id:      id,
@@ -35,6 +37,7 @@ func InitRemoteCosigner(id int, address string, client proto.CosignerClient) *Re
 }
 
 // NewRemoteCosigner returns a newly initialized RemoteCosigner
+// TODO: Change name to NewCosignerClient
 func NewRemoteCosigner(id int, address string) (*RemoteCosigner, error) {
 	client, err := getGRPCClient(address) // address is the P2P URL of the cosigner server to dial
 	if err != nil {
@@ -55,6 +58,7 @@ func NewRemoteCosigner(id int, address string) (*RemoteCosigner, error) {
 
 // GetID returns the Index of the remote cosigner
 // Implements the cosigner interface
+// TODO: Change name from ShamirIndex
 func (cosigner *RemoteCosigner) GetIndex() int {
 	return cosigner.id
 }

@@ -3,6 +3,7 @@ package cosigner
 /*
 Package cosigner:
 Cosinger is responsible for the network MPC communication between threshold signers.
+The subdirectories are the different implementations of the MPC protocol.
 
 You can think of it as:
 - LocalCosigner is the server (we understand that local here is confussing but it is because it is local to the node)
@@ -68,8 +69,8 @@ type MPC struct {
 	// MyCosigner *LocalCosigner // TODO Should be an interface as well.
 	server iCosigner // TODO Should be an interface as well.
 
-	// Cosigner peers (i.e clients to call)
-	clients map[string]iCosigner // "i.e clients to call"
+	// Cosigner peers (i.e the nodes clients to other servers)
+	clients map[string]iCosigner // "i.e clients to call" (map is slowr than slice but we need to be able to remove elements)
 
 	serverHealth iHealth
 
