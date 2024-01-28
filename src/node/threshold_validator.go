@@ -13,7 +13,6 @@ import (
 	"github.com/strangelove-ventures/horcrux/src/cosigner"
 
 	"github.com/strangelove-ventures/horcrux/src/config"
-	"github.com/strangelove-ventures/horcrux/src/connector"
 	"github.com/strangelove-ventures/horcrux/src/metrics"
 
 	"github.com/strangelove-ventures/horcrux/src/types"
@@ -25,8 +24,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
-
-var _ connector.IPrivValidator = &ThresholdValidator{}
 
 // TODO: Must be a better way to do this?
 type nodecacheconfigs struct {

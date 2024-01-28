@@ -19,6 +19,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var _ node.ILeader = (*node.RaftStore)(nil)
+
 // Test_StoreInMemOpenSingleNode tests that a command can be applied to the log
 // stored in RAM.
 func Test_StoreInMemOpenSingleNode(t *testing.T) {

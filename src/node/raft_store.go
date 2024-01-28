@@ -36,8 +36,6 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-var _ ILeader = (*RaftStore)(nil)
-
 const (
 	retainSnapshotCount = 2
 )

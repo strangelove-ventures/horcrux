@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/strangelove-ventures/horcrux/src/config"
+	"github.com/strangelove-ventures/horcrux/src/connector"
 	"github.com/strangelove-ventures/horcrux/src/cosigner"
 	"github.com/strangelove-ventures/horcrux/src/cosigner/nodesecurity"
 	"github.com/strangelove-ventures/horcrux/src/node"
@@ -34,7 +35,8 @@ import (
 )
 
 var (
-	testConfig *config.RuntimeConfig // use this global config in tests
+	testConfig *config.RuntimeConfig    // use this global config in tests
+	_          connector.IPrivValidator = &node.ThresholdValidator{}
 )
 
 const (

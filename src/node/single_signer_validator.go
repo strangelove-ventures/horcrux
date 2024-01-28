@@ -8,12 +8,9 @@ import (
 	"time"
 
 	"github.com/strangelove-ventures/horcrux/src/config"
-	"github.com/strangelove-ventures/horcrux/src/connector"
 
 	"github.com/strangelove-ventures/horcrux/src/types"
 )
-
-var _ connector.IPrivValidator = &SingleSignerValidator{}
 
 // SingleSignerValidator guards access to an underlying PrivValidator by using mutexes
 // for each of the PrivValidator interface functions

@@ -17,6 +17,7 @@ import (
 This is the NodeGRPCServer. It is the GRPC server for the node.
 */
 
+// TODO: Remove this as we want NodeGRPCServer to NodeGRPCServer
 var _ proto.CosignerServer = &NodeGRPCServer{}
 
 type NodeGRPCServer struct {

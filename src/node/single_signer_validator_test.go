@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/strangelove-ventures/horcrux/src/config"
+	"github.com/strangelove-ventures/horcrux/src/connector"
 	"github.com/strangelove-ventures/horcrux/src/node"
 	"github.com/strangelove-ventures/horcrux/src/types"
 
@@ -26,6 +27,8 @@ const (
 	testChainID2 = "chain-2"
 	BitSize      = 4096
 )
+
+var _ connector.IPrivValidator = &node.SingleSignerValidator{}
 
 func TestSingleSignerValidator(t *testing.T) {
 	t.Skip("TODO: fix this test when run with 'make test'")
