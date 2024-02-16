@@ -1,11 +1,12 @@
 syntax = "proto3";
 package strangelove.horcrux;
 
-import "strangelove/horcrux/cosigner.proto";
+import "strangelove/horcrux/node.proto";
 
-option go_package = "github.com/strangelove-ventures/horcrux/signer/proto";
+option go_package = "github.com/strangelove-ventures/horcrux/src/proto";
 
-service RemoteSigner {
+// Connection to the remote signer (E.g the Sentry)
+service Connector {
 	rpc PubKey (PubKeyRequest) returns (PubKeyResponse) {}
 	rpc Sign(strangelove.horcrux.SignBlockRequest) returns (strangelove.horcrux.SignBlockResponse) {}
 }

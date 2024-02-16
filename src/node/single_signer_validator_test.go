@@ -31,7 +31,7 @@ const (
 var _ connector.IPrivValidator = &node.SingleSignerValidator{}
 
 func TestSingleSignerValidator(t *testing.T) {
-	t.Skip("TODO: fix this test when run with 'make test'")
+	// t.Skip("TODO: fix this test when run with 'make test'")
 
 	tmpDir := t.TempDir()
 	stateDir := filepath.Join(tmpDir, "state")

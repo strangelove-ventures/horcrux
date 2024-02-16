@@ -7,7 +7,7 @@ import (
 
 	"github.com/cometbft/cometbft/privval"
 	"github.com/strangelove-ventures/horcrux/src/config"
-	"github.com/strangelove-ventures/horcrux/src/tss/ted25519"
+	"github.com/strangelove-ventures/horcrux/src/tss/tss25519"
 
 	cometbytes "github.com/cometbft/cometbft/libs/bytes"
 )
@@ -22,7 +22,7 @@ type PubKey interface {
 	Type() string
 }
 
-func NewThresholdEd25519SignerSoft(config *config.RuntimeConfig, id int, chainID string) (*ted25519.Ted25519SignerSoft, error) {
+func NewThresholdEd25519SignerSoft(config *config.RuntimeConfig, id int, chainID string) (*tss25519.SignerSoft, error) {
 	keyFile, err := config.KeyFileExistsCosigner(chainID)
 	if err != nil {
 		return nil, err
@@ -36,7 +36,7 @@ func NewThresholdEd25519SignerSoft(config *config.RuntimeConfig, id int, chainID
 	if key.ID != id {
 		return nil, fmt.Errorf("key shard Index (%d) in (%s) does not match cosigner Index (%d)", key.ID, keyFile, id)
 	}
-	return ted25519.NewTed25519SignerSoft(
+	return tss25519.NewSignerSoft(
 		key.PrivateShard,
 		key.PubKey.Bytes(),
 		uint8(config.Config.ThresholdModeConfig.Threshold),
@@ -84,13 +84,13 @@ func CreatePersistentEd25519ThresholdSignShardsFromFile(filename string, thresho
 	}
 
 	pubkey := pv.PubKey.(PubKey)
-	persistentKeys, err := generatePersistentThresholdSignShards(pv.PrivKey.Bytes(), pubkey, ted25519.GenerateEd25519ThresholdSignShards, threshold, shards)
+	persistentKeys, err := generatePersistentThresholdSignShards(pv.PrivKey.Bytes(), pubkey, tss25519.GenerateSignatureShards, threshold, shards)
 	return persistentKeys, err
 
 }
 
 func GeneratePersistentThresholdSignShards[Key Ed25519Key](privateKey []byte, publicKey PubKey, threshold uint8, shards uint8) ([]Key, error) {
-	keys := ted25519.GenerateEd25519ThresholdSignShards(privateKey, threshold, shards)
+	keys := tss25519.GenerateSignatureShards(privateKey, threshold, shards)
 	// Transform ed25519Keys to VaultKey type
 
 	vaultKeys := make([]Key, len(keys))

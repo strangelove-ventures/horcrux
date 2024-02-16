@@ -142,6 +142,14 @@ func ReadCometBFTPrivValidatorFile(filename string) (out privval.FilePVKey, err 
 	return
 }
 
+func WriteCometBFTPrivValidatorFile(filename string, pv privval.FilePVKey) (err error) {
+	var bz []byte
+	if bz, err = cometjson.Marshal(pv); err != nil {
+		return err
+	}
+	return os.WriteFile(filename, bz, 0600)
+}
+
 type VaultPrivateKey interface {
 	Ed25519Key | VaultKey
 }

@@ -24,20 +24,20 @@ import (
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/crypto/tmhash"
 	"github.com/cometbft/cometbft/libs/log"
-	cometlog "github.com/cometbft/cometbft/libs/log"
 	cometrand "github.com/cometbft/cometbft/libs/rand"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/stretchr/testify/require"
-	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
+	ted25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 	"golang.org/x/sync/errgroup"
 )
 
 var (
-	testConfig *config.RuntimeConfig    // use this global config in tests
-	_          connector.IPrivValidator = &node.ThresholdValidator{}
+	testConfig *config.RuntimeConfig // use this global config in tests
+
 )
+var _ connector.IPrivValidator = &node.ThresholdValidator{}
 
 const (
 	defaultGetNoncesInterval = 3 * time.Second
@@ -49,6 +49,7 @@ const (
 type MockValidator struct {
 	*node.ThresholdValidator
 	nonceCache *node.CosignerNonceCache
+	// cosignerHealth *node.CosignerHealth
 }
 
 func NewMockValidator(
@@ -68,6 +69,7 @@ func NewMockValidator(
 	for _, peer := range peerCosigners {
 		logger.Debug("Peer peer", "id", peer.GetIndex())
 	}
+
 	nc := node.NewCosignerNonceCache(
 		logger,
 		allCosigners,
@@ -78,9 +80,10 @@ func NewMockValidator(
 		uint8(threshold),
 		nil,
 	)
+	// nch := node.NewCosignerHealth(logger, peerCosigners, leader)
 	return &MockValidator{
-		node.NewThresholdValidator(logger, config, threshold, grpcTimeout, maxWaitForSameBlockAttempts, allCosigners[0].(*cosigner.LocalCosigner), peerCosigners[1:], leader),
-		nc,
+		node.NewThresholdValidator(logger, config, threshold, grpcTimeout, maxWaitForSameBlockAttempts,
+			allCosigners[0].(*cosigner.LocalCosigner), peerCosigners[1:], leader), nc,
 	}
 }
 
@@ -157,7 +160,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8, configuration 
 	leader := &MockLeader{id: 1}
 
 	validator := NewMockValidator(
-		cometlog.NewNopLogger(),
+		log.NewNopLogger(),
 		configuration,
 		int(threshold),
 		time.Second,
@@ -185,7 +188,6 @@ func testThresholdValidator(t *testing.T, threshold, total uint8, configuration 
 	}
 
 	block := types.ProposalToBlock(testChainID, &proposal)
-
 	signature, _, err := validator.Sign(ctx, testChainID, block)
 	require.NoError(t, err)
 
@@ -247,7 +249,7 @@ func testThresholdValidator(t *testing.T, threshold, total uint8, configuration 
 
 	// reinitialize validator to make sure new runtime will not allow double sign
 	newValidator := NewMockValidator(
-		cometlog.NewNopLogger(),
+		log.NewNopLogger(),
 		configuration,
 		int(threshold),
 		time.Second,
@@ -390,7 +392,7 @@ func getTestLocalCosigners(t *testing.T, threshold, total uint8) ([]*cosigner.Lo
 
 	privateKey := cometcryptoed25519.GenPrivKey()
 	privKeyBytes := privateKey[:]
-	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
+	privShards := ted25519.DealShares(ted25519.ExpandSecret(privKeyBytes[:32]), threshold, total)
 
 	tmpDir := t.TempDir()
 
@@ -419,7 +421,7 @@ func getTestLocalCosigners(t *testing.T, threshold, total uint8) ([]*cosigner.Lo
 		}
 
 		cosigner := cosigner.NewLocalCosigner(
-			cometlog.NewNopLogger(),
+			log.NewNopLogger(),
 			cosignerConfig,
 			nodesecurity.NewCosignerSecurityECIES(
 				nodesecurity.CosignerECIESKey{

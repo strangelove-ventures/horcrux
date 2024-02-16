@@ -14,7 +14,9 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/bech32"
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	"github.com/docker/docker/client"
-	"github.com/strangelove-ventures/horcrux/src/proto"
+	"github.com/strangelove-ventures/horcrux/proto/strangelove/proto"
+
+	// "github.com/strangelove-ventures/horcrux/src/proto"
 	interchaintest "github.com/strangelove-ventures/interchaintest/v8"
 	"github.com/strangelove-ventures/interchaintest/v8/chain/cosmos"
 	"github.com/strangelove-ventures/interchaintest/v8/ibc"
@@ -297,7 +299,7 @@ func getLeader(ctx context.Context, cosigner *cosmos.SidecarProcess) (int, error
 	ctx, cancelFunc := context.WithTimeout(ctx, 10*time.Second)
 	defer cancelFunc()
 
-	grpcClient := proto.NewCosignerClient(conn)
+	grpcClient := proto.NewNodeServiceClient(conn)
 
 	res, err := grpcClient.GetLeader(ctx, &proto.GetLeaderRequest{})
 	if err != nil {

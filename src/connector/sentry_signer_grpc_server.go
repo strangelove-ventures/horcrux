@@ -13,15 +13,16 @@ import (
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	cometservice "github.com/cometbft/cometbft/libs/service"
 
-	"github.com/strangelove-ventures/horcrux/src/proto"
+	// "github.com/strangelove-ventures/horcrux/src/proto"
+	"github.com/strangelove-ventures/horcrux/proto/strangelove/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
 
-var _ proto.RemoteSignerServer = &SentrySignerGRPCServer{}
+var _ proto.ConnectorServer = &SentrySignerGRPCServer{}
 
-// SentrySignerGRPCServer is the server that listens for signing requests from the "sentry"
-// Sentry -> SentrySignerGRPCServer -> Sentry
+// SentrySignerGRPCServer is the server that listens for signing requests from the "sentry" which is the client
+// Sentry (a.k.a client) -> SentrySignerGRPCServer -> Sentry
 type SentrySignerGRPCServer struct {
 	cometservice.BaseService
 
@@ -31,7 +32,7 @@ type SentrySignerGRPCServer struct {
 
 	server *grpc.Server
 
-	proto.UnimplementedRemoteSignerServer
+	proto.UnimplementedConnectorServer
 }
 
 func NewSentrySignerGRPCServer(
@@ -55,7 +56,7 @@ func (s *SentrySignerGRPCServer) OnStart() error {
 		return err
 	}
 	s.server = grpc.NewServer()
-	proto.RegisterRemoteSignerServer(s.server, s)
+	proto.RegisterConnectorServer(s.server, s)
 	reflection.Register(s.server)
 	return s.server.Serve(sock)
 }

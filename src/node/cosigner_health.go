@@ -9,7 +9,8 @@ import (
 	"github.com/strangelove-ventures/horcrux/src/cosigner"
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
-	"github.com/strangelove-ventures/horcrux/src/proto"
+	"github.com/strangelove-ventures/horcrux/proto/strangelove/proto"
+	// "github.com/strangelove-ventures/horcrux/src/proto"
 )
 
 const (
@@ -41,7 +42,7 @@ func (ch *CosignerHealth) Reconcile(ctx context.Context) {
 	var wg sync.WaitGroup
 	wg.Add(len(ch.cosigners))
 	for _, remotecosigner := range ch.cosigners {
-		if rc, ok := remotecosigner.(*cosigner.RemoteCosigner); ok {
+		if rc, ok := remotecosigner.(*cosigner.CosignerClient); ok {
 			go ch.updateRTT(ctx, rc, &wg)
 		}
 	}
@@ -67,7 +68,7 @@ func (ch *CosignerHealth) MarkUnhealthy(cosigner ICosigner) {
 	ch.rtt[cosigner.GetIndex()] = -1
 }
 
-func (ch *CosignerHealth) updateRTT(ctx context.Context, cosigner *cosigner.RemoteCosigner, wg *sync.WaitGroup) {
+func (ch *CosignerHealth) updateRTT(ctx context.Context, cosigner *cosigner.CosignerClient, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	rtt := int64(-1)

@@ -83,7 +83,8 @@ func createCosignerEd25519ShardsCmd() *cobra.Command {
 			}
 
 			if chainID == "" {
-				return fmt.Errorf("chain-id flag must not be empty")
+				return fmt.Errorf(
+					"chain-id flag must not be empty")
 			}
 
 			if threshold == 0 {

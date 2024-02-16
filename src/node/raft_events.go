@@ -40,5 +40,5 @@ func (f *fsm) handleLSSEvent(value string) {
 		return
 	}
 	_ = f.thresholdValidator.SaveLastSignedState(lss.ChainID, lss.SignStateConsensus)
-	_ = f.mycosigner.SaveLastSignedState(lss.ChainID, lss.SignStateConsensus)
+	_ = f.thresholdValidator.mpc.MyCosigner.SaveLastSignedState(lss.ChainID, lss.SignStateConsensus)
 }

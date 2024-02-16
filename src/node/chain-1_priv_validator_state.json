@@ -1,7 +1,9 @@
 {
-  "height": "0",
-  "round": "0",
-  "step": 0,
+  "height": "1",
+  "round": "20",
+  "step": 1,
   "nonce_public": null,
+  "signature": "GNwkS4b0VQPhqkXYsROeorGBnLwMLKtivZJS6H68CxWgujYQU8nIFF81Xj+MwLum5i9MKEvLEtqek9SBCtbmCQ==",
+  "signbytes": "2A0820110100000000000000191400000000000000320B088092B8C398FEFFFFFF013A07636861696E2D31",
   "FilePath": "chain-1_priv_validator_state.json"
 }

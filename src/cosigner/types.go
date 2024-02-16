@@ -6,7 +6,8 @@ import (
 	"github.com/strangelove-ventures/horcrux/src/types"
 
 	"github.com/google/uuid"
-	"github.com/strangelove-ventures/horcrux/src/proto"
+	"github.com/strangelove-ventures/horcrux/proto/strangelove/proto"
+	// "github.com/strangelove-ventures/horcrux/src/proto"
 )
 
 // SignatureRequest is sent to a co-signer to obtain their signature for the SignBytes

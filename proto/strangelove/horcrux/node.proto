@@ -1,0 +1,45 @@
+syntax = "proto3";
+package strangelove.horcrux;
+
+option go_package = "github.com/strangelove-ventures/horcrux/src/proto";
+
+service TresholdValidator{
+    // TODO: ADD rpc Validate(ValidateRequest) returns (ValidateResponse);
+    
+    rpc SignBlock (SignBlockRequest) returns (SignBlockResponse) {}
+	rpc TransferLeadership (TransferLeadershipRequest) returns (TransferLeadershipResponse) {}
+	rpc GetLeader (GetLeaderRequest) returns (GetLeaderResponse) {}
+}
+
+message SignBlockRequest {
+	string chainID = 1;
+	Block block = 2;
+}
+
+message SignBlockResponse {
+	bytes signature = 1;
+	int64 timestamp = 2;
+}
+
+message TransferLeadershipRequest {
+ 	string leaderID = 1;
+}
+
+message TransferLeadershipResponse {
+	string leaderID = 1;
+	string leaderAddress = 2;
+}
+
+message GetLeaderRequest {}
+
+message GetLeaderResponse {
+	int32 leader = 1;
+}
+
+message Block {
+	int64 height = 1;
+	int64 round = 2;
+	int32 step = 3;
+	bytes signBytes = 4;
+	int64 timestamp = 5;
+}

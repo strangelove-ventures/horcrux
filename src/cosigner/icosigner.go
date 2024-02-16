@@ -70,7 +70,7 @@ type MPC struct {
 	server iCosigner // TODO Should be an interface as well.
 
 	// Cosigner peers (i.e the nodes clients to other servers)
-	clients map[string]iCosigner // "i.e clients to call" (map is slowr than slice but we need to be able to remove elements)
+	clients []iCosigner // "i.e clients to call" (map is slowr than slice but we need to be able to remove elements)
 
 	serverHealth iHealth
 
@@ -79,7 +79,7 @@ type MPC struct {
 }
 
 // Takes a signature request from the validator and returns a signature response
-func (mpc *MPC) Sign(ctx context.Context) error {
+func (mpc *MPC) SignBlock(ctx context.Context) error {
 	return nil
 }
 
@@ -98,6 +98,7 @@ func (mpc *MPC) Start(ctx context.Context) error {
 	go mpc.noncePruner.Start(ctx)
 
 	// Should start the servers/clients?
+	// TODO: Should we start the clients and servers here?
 
 	return nil
 }

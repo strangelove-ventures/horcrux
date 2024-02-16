@@ -10,8 +10,10 @@ import (
 	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/client"
+	"github.com/strangelove-ventures/horcrux/proto/strangelove/proto"
 	"github.com/strangelove-ventures/horcrux/src/multiresolver"
-	"github.com/strangelove-ventures/horcrux/src/proto"
+
+	// "github.com/strangelove-ventures/horcrux/src/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -70,7 +72,7 @@ horcrux elect 2 # elect specific leader`,
 			ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancelFunc()
 
-			grpcClient := proto.NewCosignerClient(conn)
+			grpcClient := proto.NewNodeServiceClient(conn)
 			_, err = grpcClient.TransferLeadership(
 				ctx,
 				&proto.TransferLeadershipRequest{LeaderID: leaderID},
@@ -167,7 +169,7 @@ func getLeaderCmd() *cobra.Command {
 			ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancelFunc()
 
-			grpcClient := proto.NewCosignerClient(conn)
+			grpcClient := proto.NewNodeServiceClient(conn)
 
 			res, err := grpcClient.GetLeader(ctx, &proto.GetLeaderRequest{})
 			if err != nil {

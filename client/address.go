@@ -6,6 +6,10 @@ import (
 	"strings"
 )
 
+type clientAdresses struct {
+	id []string
+}
+
 func SanitizeAddress(address string) (string, error) {
 	u, err := url.Parse(address)
 	if err != nil {

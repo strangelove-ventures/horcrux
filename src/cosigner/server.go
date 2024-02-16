@@ -10,7 +10,7 @@ import (
 	"github.com/strangelove-ventures/horcrux/src/config"
 	"github.com/strangelove-ventures/horcrux/src/metrics"
 	"github.com/strangelove-ventures/horcrux/src/tss"
-	"github.com/strangelove-ventures/horcrux/src/tss/ted25519"
+	"github.com/strangelove-ventures/horcrux/src/tss/tss25519"
 
 	"github.com/strangelove-ventures/horcrux/src/types"
 
@@ -62,7 +62,7 @@ func NewLocalCosigner(
 		security: security,
 		address:  address,
 		nonces:   make(map[uuid.UUID]*types.NoncesWithExpiration),
-		dealer:   &ted25519.NonceGenerator{}, // TODO: Change to interface
+		dealer:   &tss25519.NonceGenerator{}, // TODO: Change to interface
 	}
 }
 

@@ -1,4 +1,4 @@
-package ted25519
+package tss25519
 
 import (
 	"bytes"
@@ -9,14 +9,14 @@ import (
 	"github.com/strangelove-ventures/horcrux/src/types"
 
 	"gitlab.com/unit410/edwards25519"
-	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
+	ted25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
 
 // var _ IThresholdSigner = &ThresholdSignerSoft{}
 
-// GenerateEd25519ThresholdSignShards creates a map of shards from a private key
-func GenerateEd25519ThresholdSignShards(pv []byte, threshold, shards uint8) map[uint8][]byte {
-	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(pv[:32]), threshold, shards)
+// GenerateSignatureShards creates a map of shards from a private key
+func GenerateSignatureShards(pv []byte, threshold, shards uint8) map[uint8][]byte {
+	privShards := ted25519.DealShares(ted25519.ExpandSecret(pv[:32]), threshold, shards)
 	// TODO: Check that the length of privShards is equal to the number of shards
 	// TODO: Check that the pubkey is the same for all shards
 	out := make(map[uint8][]byte, shards)
@@ -27,6 +27,7 @@ func GenerateEd25519ThresholdSignShards(pv []byte, threshold, shards uint8) map[
 	return out
 }
 
+/*
 type AssymetricKey struct {
 	privateKey   []byte
 	privateShard []byte
@@ -40,14 +41,15 @@ type AssymetricKeyShard struct {
 
 }
 
-type Ted25519SignerDealer struct {
-	Ted25519SignerSoft
+type SignerDealer struct {
+	SignerSoft
 }
+*/
 
-// Ted25519SignerSoft is a threshold signer that uses the threshold-ed25519 library
+// SignerSoft is a threshold signer that uses the threshold-ed25519 library
 // to perform the signing operations.
 // Its only responsibility is to sign a payload and combine signatures
-type Ted25519SignerSoft struct {
+type SignerSoft struct {
 	privateKeyShard []byte
 	pubKey          []byte
 	threshold       uint8
@@ -55,8 +57,8 @@ type Ted25519SignerSoft struct {
 	id              uint8
 }
 
-func NewTed25519SignerSoft(privateKeyShard []byte, pubKey []byte, threshold, total, id uint8) (*Ted25519SignerSoft, error) {
-	s := Ted25519SignerSoft{
+func NewSignerSoft(privateKeyShard []byte, pubKey []byte, threshold, total, id uint8) (*SignerSoft, error) {
+	s := SignerSoft{
 		privateKeyShard: privateKeyShard,
 		pubKey:          pubKey,
 		threshold:       threshold,
@@ -67,35 +69,35 @@ func NewTed25519SignerSoft(privateKeyShard []byte, pubKey []byte, threshold, tot
 	return &s, nil
 }
 
-func (s *Ted25519SignerSoft) GetPubKey() []byte {
+func (s *SignerSoft) GetPubKey() []byte {
 	return s.pubKey
 }
 
 // Sign signs a byte payload with the provided nonces.
 // The return are a "partial  signature".
-func (s *Ted25519SignerSoft) Sign(nonces []types.Nonce, payload []byte) ([]byte, error) {
+func (s *SignerSoft) Sign(nonces []types.Nonce, payload []byte) ([]byte, error) {
 	// sum the nonces to get the ephemeral public key and share
 	nonceShare, noncePub, err := sumNonces(nonces)
 	if err != nil {
 		return nil, fmt.Errorf("failed to combine nonces: %w", err)
 	}
 
-	sig := tsed25519.SignWithShare(
+	sig := ted25519.SignWithShare(
 		payload, s.privateKeyShard, nonceShare, s.pubKey, noncePub)
 	return append(noncePub, sig...), nil
 }
 
-func sumNonces(nonces []types.Nonce) (tsed25519.Scalar, tsed25519.Element, error) {
-	shareParts := make([]tsed25519.Scalar, len(nonces))
-	publicKeys := make([]tsed25519.Element, len(nonces))
+func sumNonces(nonces []types.Nonce) (ted25519.Scalar, ted25519.Element, error) {
+	shareParts := make([]ted25519.Scalar, len(nonces))
+	publicKeys := make([]ted25519.Element, len(nonces))
 
 	for i, n := range nonces {
 		shareParts[i] = n.Share
 		publicKeys[i] = n.PubKey
 	}
 
-	nonceShare := tsed25519.AddScalars(shareParts)
-	noncePub := tsed25519.AddElements(publicKeys)
+	nonceShare := ted25519.AddScalars(shareParts)
+	noncePub := ted25519.AddElements(publicKeys)
 
 	// check bounds for ephemeral share to avoid passing out of bounds valids to SignWithShare
 	if len(nonceShare) != 32 {
@@ -122,12 +124,12 @@ func (ng NonceGenerator) GenerateNonces(threshold, total uint8) (types.Nonces, e
 	}
 
 	nonces := types.Nonces{
-		PubKey: tsed25519.ScalarMultiplyBase(secret),
+		PubKey: ted25519.ScalarMultiplyBase(secret),
 		Shares: make([][]byte, total),
 	}
 
 	// The length of shares is equal to total
-	shares := tsed25519.DealShares(secret, threshold, total)
+	shares := ted25519.DealShares(secret, threshold, total)
 
 	for i, sh := range shares {
 		nonces.Shares[i] = sh
@@ -137,7 +139,7 @@ func (ng NonceGenerator) GenerateNonces(threshold, total uint8) (types.Nonces, e
 }
 
 // CombineSignatures combines partial signatures into a full signature
-func (s *Ted25519SignerSoft) CombineSignatures(signatures []types.PartialSignature) ([]byte, error) {
+func (s *SignerSoft) CombineSignatures(signatures []types.PartialSignature) ([]byte, error) {
 	sigIds := make([]int, len(signatures))
 	shareSigs := make([][]byte, len(signatures))
 	var ephPub []byte
@@ -151,7 +153,7 @@ func (s *Ted25519SignerSoft) CombineSignatures(signatures []types.PartialSignatu
 		}
 		shareSigs[i] = sig.Signature[32:]
 	}
-	combinedSig := tsed25519.CombineShares(s.total, sigIds, shareSigs)
+	combinedSig := ted25519.CombineShares(s.total, sigIds, shareSigs)
 
 	return append(ephPub, combinedSig...), nil
 }

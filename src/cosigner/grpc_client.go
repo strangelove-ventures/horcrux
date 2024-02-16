@@ -6,18 +6,20 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/strangelove-ventures/horcrux/src/proto"
+	"github.com/strangelove-ventures/horcrux/proto/strangelove/proto"
+
+	// "github.com/strangelove-ventures/horcrux/src/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 // var _ Cosigner = &RemoteCosigner{}
 
-// RemoteCosigner uses CosignerGRPC to request signing from a remote cosigner
+// CosignerClient uses CosignerGRPC to request signing from a remote cosigner
 // Remote Cosigner are CLIENTS! to every other cosigner, including the the nodes local cosigner
 // It calls the GRPC server of the other cosigner
 // TODO: Change name to CosignerClient
-type RemoteCosigner struct {
+type CosignerClient struct {
 	id      int
 	address string
 
@@ -26,8 +28,8 @@ type RemoteCosigner struct {
 
 // Placeholder function because of testing
 // TODO: Change name to InitCosignerClient
-func InitRemoteCosigner(id int, address string, client proto.CosignerClient) *RemoteCosigner {
-	cosigner := &RemoteCosigner{
+func InitCosignerClient(id int, address string, client proto.CosignerClient) *CosignerClient {
+	cosigner := &CosignerClient{
 		id:      id,
 		address: address, // address is the P2P URL of the remote cosigner
 		Client:  client,
@@ -36,14 +38,14 @@ func InitRemoteCosigner(id int, address string, client proto.CosignerClient) *Re
 	return cosigner
 }
 
-// NewRemoteCosigner returns a newly initialized RemoteCosigner
+// NewCosignerClient returns a newly initialized RemoteCosigner
 // TODO: Change name to NewCosignerClient
-func NewRemoteCosigner(id int, address string) (*RemoteCosigner, error) {
+func NewCosignerClient(id int, address string) (*CosignerClient, error) {
 	client, err := getGRPCClient(address) // address is the P2P URL of the cosigner server to dial
 	if err != nil {
 		return nil, err
 	}
-	cosigner := InitRemoteCosigner(id, address, client)
+	cosigner := InitCosignerClient(id, address, client)
 	return cosigner, nil
 	/*
 		cosigner := &RemoteCosigner{
@@ -59,13 +61,13 @@ func NewRemoteCosigner(id int, address string) (*RemoteCosigner, error) {
 // GetID returns the Index of the remote cosigner
 // Implements the cosigner interface
 // TODO: Change name from ShamirIndex
-func (cosigner *RemoteCosigner) GetIndex() int {
+func (cosigner *CosignerClient) GetIndex() int {
 	return cosigner.id
 }
 
 // GetAddress returns the P2P URL of the remote cosigner
 // Implements the cosigner interface
-func (cosigner *RemoteCosigner) GetAddress() string {
+func (cosigner *CosignerClient) GetAddress() string {
 	return cosigner.address
 }
 
@@ -97,7 +99,7 @@ func getGRPCClient(address string) (proto.CosignerClient, error) {
 }
 
 // GetNonces implements the cosigner interface
-func (cosigner *RemoteCosigner) GetNonces(
+func (cosigner *CosignerClient) GetNonces(
 	ctx context.Context,
 	uuids []uuid.UUID,
 ) (CosignerUUIDNoncesMultiple, error) {
@@ -123,7 +125,7 @@ func (cosigner *RemoteCosigner) GetNonces(
 }
 
 // Implements the cosigner interface
-func (cosigner *RemoteCosigner) SetNoncesAndSign(
+func (cosigner *CosignerClient) SetNoncesAndSign(
 	ctx context.Context,
 	req CosignerSetNoncesAndSignRequest) (*SignatureResponse, error) {
 	res, err := cosigner.Client.SetNoncesAndSign(ctx, &proto.SetNoncesAndSignRequest{
@@ -144,7 +146,8 @@ func (cosigner *RemoteCosigner) SetNoncesAndSign(
 }
 
 // TODO: This should move to ThresholdValidator. Its is not the responsibility of the cosigner
-func (cosigner *RemoteCosigner) Sign(
+/*
+func (cosigner *ClientCosigner) Sign(
 	ctx context.Context,
 	req CosignerSignBlockRequest,
 ) (*CosignerSignBlockResponse, error) {
@@ -159,3 +162,4 @@ func (cosigner *RemoteCosigner) Sign(
 		Signature: res.GetSignature(),
 	}, nil
 }
+*/

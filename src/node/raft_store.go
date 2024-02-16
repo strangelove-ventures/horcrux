@@ -30,7 +30,10 @@ import (
 	"github.com/cometbft/cometbft/libs/service"
 	"github.com/hashicorp/raft"
 	boltdb "github.com/hashicorp/raft-boltdb/v2"
-	"github.com/strangelove-ventures/horcrux/src/proto"
+
+	// "github.com/strangelove-ventures/horcrux/src/proto"
+	"github.com/strangelove-ventures/horcrux/proto/strangelove/proto"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
@@ -46,7 +49,8 @@ type command struct {
 	Value string `json:"value,omitempty"`
 }
 
-// Store is a simple key-value store, where all changes are made via Raft consensus.
+// RaftStore is a simple key-value store, where all changes are made via Raft consensus.
+// RafStore implements ILeader.
 type RaftStore struct {
 	service.BaseService
 
@@ -54,15 +58,15 @@ type RaftStore struct {
 	RaftDir     string
 	RaftBind    string
 	RaftTimeout time.Duration
-	Cosigners   []ICosigner
+	// Cosigners   []ICosigner
 
 	mu sync.Mutex
 	m  map[string]string // The key-value store for the system.
 
 	raft *raft.Raft // The consensus mechanism
 
-	logger             log.Logger
-	mycosigner         *cosigner.LocalCosigner
+	logger log.Logger
+	// mycosigner         *cosigner.LocalCosigner
 	thresholdValidator *ThresholdValidator
 }
 
@@ -77,17 +81,17 @@ func NewRaftStore(
 		RaftTimeout: timeout,
 		m:           make(map[string]string),
 		logger:      logger,
-		mycosigner:  cosigner,
-		Cosigners:   cosigners,
+		// mycosigner:  cosigner,
+		// Cosigners:   cosigners,
 	}
 
 	cosignerRaftStore.BaseService = *service.NewBaseService(logger, "CosignerRaftStore", cosignerRaftStore)
 	return cosignerRaftStore
 }
 
-func (s *RaftStore) SetThresholdValidator(thresholdValidator *ThresholdValidator) {
+func (s *RaftStore) SetThresholdValidator(thresholdValidator *ThresholdValidator, mycosigner *cosigner.LocalCosigner) {
 	s.thresholdValidator = thresholdValidator
-	s.thresholdValidator.MyCosigner = s.mycosigner // TODO: Refactor out the use of cosigner.
+	s.thresholdValidator.mpc.MyCosigner = mycosigner // TODO: Refactor out the use of cosigner.
 }
 
 // TODO: Should move away from this initilisation method
@@ -108,8 +112,9 @@ func (s *RaftStore) init() error {
 		return err
 	}
 	grpcServer := grpc.NewServer()
-	// proto.RegisterCosignerServer(grpcServer, NewNodeGRPCServer(s.cosigner, s.thresholdValidator, s))
-	proto.RegisterCosignerServer(grpcServer, NewNodeGRPCServer(s.thresholdValidator, s))
+	// TODO: RegisterCosignerServer
+	// proto.RegisterCosignerServer(grpcServer, NewNodeGRPCServer(s.thresholdValidator, s))
+	proto.RegisterNodeServiceServer(grpcServer, NewNodeGRPCServer(s.thresholdValidator, s))
 	transportManager.Register(grpcServer)
 	leaderhealth.Setup(s.raft, grpcServer, []string{"Leader"})
 	raftadmin.Register(grpcServer, s.raft)
@@ -190,7 +195,7 @@ func (s *RaftStore) Open() (*raftgrpctransport.Manager, error) {
 			},
 		},
 	}
-	for _, c := range s.Cosigners {
+	for _, c := range s.thresholdValidator.mpc.peerCosigners {
 		configuration.Servers = append(configuration.Servers, raft.Server{
 			ID:      raft.ServerID(fmt.Sprint(c.GetIndex())), // TODO: Refactor out the use of cosigner.
 			Address: raft.ServerAddress(p2pURLToRaftAddress(c.GetAddress())),

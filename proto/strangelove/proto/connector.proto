@@ -1,0 +1,20 @@
+syntax = "proto3";
+package strangelove.proto;
+
+import "strangelove/proto/node.proto";
+
+option go_package = "github.com/strangelove-ventures/horcrux/proto/strangelove/proto";
+
+// Connection to the remote signer (E.g the Sentry)
+service Connector {
+	rpc PubKey (PubKeyRequest) returns (PubKeyResponse) {}
+	rpc Sign(strangelove.proto.SignBlockRequest) returns (strangelove.proto.SignBlockResponse) {}
+}
+
+message PubKeyRequest {
+	string chain_id = 1;
+}
+
+message PubKeyResponse {
+	bytes pub_key = 1;
+}

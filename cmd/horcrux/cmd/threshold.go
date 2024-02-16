@@ -75,7 +75,7 @@ func NewThresholdValidator(
 
 	for _, c := range thresholdCfg.Cosigners {
 		if c.ShardID != security.GetID() {
-			rc, err := cosigner.NewRemoteCosigner(c.ShardID, c.P2PAddr)
+			rc, err := cosigner.NewCosignerClient(c.ShardID, c.P2PAddr)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to initialize remote cosigner: %w", err)
 			}
@@ -130,7 +130,7 @@ func NewThresholdValidator(
 		raftStore,
 	)
 
-	raftStore.SetThresholdValidator(val)
+	raftStore.SetThresholdValidator(val, localCosigner)
 
 	if err := val.Start(ctx); err != nil {
 		return nil, nil, fmt.Errorf("failed to start threshold validator: %w", err)

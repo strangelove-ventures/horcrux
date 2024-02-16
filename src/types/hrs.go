@@ -1,7 +1,8 @@
 package types
 
 import (
-	"github.com/strangelove-ventures/horcrux/src/proto"
+	// "github.com/strangelove-ventures/horcrux/src/proto"
+	"github.com/strangelove-ventures/horcrux/proto/strangelove/proto"
 )
 
 // HRS represents the HRS (Height, Round Step) metadata map.

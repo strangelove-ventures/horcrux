@@ -46,10 +46,10 @@ func (m *MockLeader) ShareSigned(_ types.ChainSignStateConsensus) error {
 
 func TestCosignerHealth(t *testing.T) {
 
-	cosigner2 := cosigner.InitRemoteCosigner(2, "", nil)
-	cosigner3 := cosigner.InitRemoteCosigner(3, "", nil)
-	cosigner4 := cosigner.InitRemoteCosigner(4, "", nil)
-	cosigner5 := cosigner.InitRemoteCosigner(5, "", nil)
+	cosigner2 := cosigner.InitCosignerClient(2, "", nil)
+	cosigner3 := cosigner.InitCosignerClient(3, "", nil)
+	cosigner4 := cosigner.InitCosignerClient(4, "", nil)
+	cosigner5 := cosigner.InitCosignerClient(5, "", nil)
 
 	var cosigners []ICosigner
 	cosigners = append(cosigners, cosigner2, cosigner3, cosigner4, cosigner5)

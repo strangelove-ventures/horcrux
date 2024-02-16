@@ -62,6 +62,7 @@ func startCmd() *cobra.Command {
 				panic(fmt.Errorf("unexpected sign mode: %s", config.Config.SignMode))
 			}
 
+			// Start the service so the Sentry can connecto to our GRPC server
 			if config.Config.GRPCAddr != "" {
 				grpcServer := connector.NewSentrySignerGRPCServer(logger, val, config.Config.GRPCAddr)
 				services = append(services, grpcServer)
@@ -73,6 +74,7 @@ func startCmd() *cobra.Command {
 
 			go EnableDebugAndMetrics(cmd.Context(), out)
 
+			// "Entrypoint" to start remote signers
 			services, err = connector.StartRemoteSigners(services, logger, val, config.Config.Nodes())
 			if err != nil {
 				return fmt.Errorf("failed to start remote signer(s): %w", err)

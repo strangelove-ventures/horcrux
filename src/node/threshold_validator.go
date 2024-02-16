@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/strangelove-ventures/horcrux/proto/strangelove/proto"
 	"github.com/strangelove-ventures/horcrux/src/cosigner"
 
 	"github.com/strangelove-ventures/horcrux/src/config"
@@ -40,40 +41,85 @@ func nodecacheconfig() nodecacheconfigs {
 	}
 }
 
-// ThresholdValidator is the server that responds to sign requests from the "sentry"
+// ThresholdValidator is the server that responds to sign requests from the "sentry" client
 // Implements the [connector.IPrivValidator] interface.
 /*
 TODO: Move some parts of this to the MPC
 */
+
+type MPC struct {
+	MyCosigner *cosigner.LocalCosigner // TODO Should be an interface as well.
+	// peer cosigners
+	peerCosigners ICosigners // "i.e clients to call"
+	// our own cosigner
+
+	cosignerHealth *CosignerHealth
+	nonceCache     *CosignerNonceCache
+}
+
+func (mpc *MPC) Sign(
+	ctx context.Context) {
+}
+func (mpc *MPC) GetClientIndex(index int) ICosigner {
+	return mpc.peerCosigners[index]
+}
+
+// TODO: This is not called anywhere it seems!
+type ThresholdClient struct {
+	id      int
+	address string
+
+	Client proto.NodeServiceClient // GRPC Client
+
+	nonceCache *CosignerNonceCache
+}
+
+func (tc *ThresholdClient) SignBlock(
+	ctx context.Context,
+	chainID string,
+	block types.Block,
+) ([]byte, time.Time, error) {
+	res, err := tc.Client.SignBlock(ctx, &proto.SignBlockRequest{
+		ChainID: chainID,
+		Block:   block.ToProto(),
+	})
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	return res.GetSignature(), block.Timestamp, nil
+}
+
+type ThresholdClients []ThresholdClient
+
+func (clients ThresholdClients) GetClientIndex(index int) (ThresholdClient, error) {
+	if index > (len(clients) + 1) {
+		return ThresholdClient{}, fmt.Errorf("index out of range")
+	}
+	return clients[index-1], nil
+}
+
+// ThresholdValidator is the conductor for the threshold signing process.
 type ThresholdValidator struct {
 	config *config.RuntimeConfig
 
+	clients   ThresholdClients
 	threshold int
 
 	grpcTimeout time.Duration // TODO ask if this should move to icosigner?
 
 	// chainSignState is the watermark for sent blocks we have started to process
 	chainSignState sync.Map // - chainSignState["chainid"] -> types.chainSignState
-	// MPC 		*MPC // This is our multi party computation/communucatibn
-	// our own cosigner
-	MyCosigner *cosigner.LocalCosigner // TODO Should be an interface as well.
 
-	// peer cosigners
-	peerCosigners ICosigners // "i.e clients to call"
+	mpc *MPC
 
-	leader ILeader
+	leader ILeader // Basically our RAFT implementation
 
 	logger log.Logger
 
 	pendingDiskWG sync.WaitGroup
 
 	maxWaitForSameBlockAttempts int
-
-	cosignerHealth *CosignerHealth
-
-	// FIX: This f-up a lot. Now its like 3-4 places that
-	// spaggettio leaders, cosigners etc etc
-	nonceCache *CosignerNonceCache
+	// TODO: Should separate node and cosigner health
 }
 
 type StillWaitingForBlockError struct {
@@ -162,30 +208,36 @@ func NewThresholdValidator(
 		uint8(threshold),
 		nil,
 	)
+	fmt.Printf("peerCosigner: %v\nleader: %v\n", peerCosigners, leader)
+	nch := NewCosignerHealth(logger, peerCosigners, leader)
+	fmt.Printf("nch: %v\n", nch)
 	return &ThresholdValidator{
 		logger:                      logger,
 		config:                      config,
 		threshold:                   threshold,
 		grpcTimeout:                 grpcTimeout,
 		maxWaitForSameBlockAttempts: maxWaitForSameBlockAttempts,
-		// MPC:                         mpc,
-		MyCosigner:     myCosigner,
-		peerCosigners:  peerCosigners,
-		leader:         leader,
-		cosignerHealth: NewCosignerHealth(logger, peerCosigners, leader),
-		nonceCache:     nc,
+		mpc:                         &MPC{MyCosigner: myCosigner, peerCosigners: peerCosigners, cosignerHealth: nch, nonceCache: nc},
+		leader:                      leader,
 	}
+}
+
+func (pv *ThresholdValidator) getLeaderClient(index int) (ThresholdClient, error) {
+	client, err := pv.clients.GetClientIndex(index)
+	if err != nil {
+		return client, err
+	}
+	return client, nil
 }
 
 // Start starts the ThresholdValidator.
 func (pv *ThresholdValidator) Start(ctx context.Context) error {
 	pv.logger.Info("Starting ThresholdValidator services")
 
-	go pv.cosignerHealth.Start(ctx)
-
-	go pv.nonceCache.Start(ctx)
-
-	go pv.MyCosigner.StartNoncePruner(ctx)
+	// TODO: Should be moved to MPC
+	go pv.mpc.cosignerHealth.Start(ctx)
+	go pv.mpc.nonceCache.Start(ctx)
+	go pv.mpc.MyCosigner.StartNoncePruner(ctx)
 
 	return nil
 }
@@ -343,13 +395,13 @@ func (pv *ThresholdValidator) Stop() {
 func (pv *ThresholdValidator) waitForSignStatesToFlushToDisk() {
 	pv.pendingDiskWG.Wait()
 
-	pv.MyCosigner.WaitForSignStatesToFlushToDisk()
+	pv.mpc.MyCosigner.WaitForSignStatesToFlushToDisk()
 }
 
 // GetPubKey returns the public key of the validator.
 // Implements PrivValidator.
 func (pv *ThresholdValidator) GetPubKey(_ context.Context, chainID string) ([]byte, error) {
-	pubKey, err := pv.MyCosigner.GetPubKey(chainID)
+	pubKey, err := pv.mpc.MyCosigner.GetPubKey(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -377,7 +429,7 @@ func (pv *ThresholdValidator) LoadSignStateIfNecessary(chainID string) error {
 		lastSignStateInitiatedMutex: &sync.Mutex{},
 	})
 
-	return pv.MyCosigner.LoadSignStateIfNecessary(chainID)
+	return pv.mpc.MyCosigner.LoadSignStateIfNecessary(chainID)
 }
 
 // getExistingBlockSignature returns the existing block signature and no error if the signature is valid for the block.
@@ -471,9 +523,9 @@ func (pv *ThresholdValidator) getNoncesFallback(
 
 	u := uuid.New()
 
-	allCosigners := make([]ICosigner, len(pv.peerCosigners)+1)
-	allCosigners[0] = pv.MyCosigner
-	copy(allCosigners[1:], pv.peerCosigners)
+	allCosigners := make([]ICosigner, len(pv.mpc.peerCosigners)+1)
+	allCosigners[0] = pv.mpc.MyCosigner
+	copy(allCosigners[1:], pv.mpc.peerCosigners)
 
 	for _, c := range allCosigners {
 		go pv.waitForPeerNonces(ctx, u, c, &wg, nonces, &mu)
@@ -545,6 +597,20 @@ func (pv *ThresholdValidator) waitForPeerNonces(
 	mu.Unlock()
 }
 
+func (pv *ThresholdValidator) SignBlock(
+	ctx context.Context,
+	req *proto.SignBlockRequest,
+
+) (*proto.SignBlockResponse, error) {
+	res, _, err := pv.Sign(ctx, req.ChainID, types.BlockFromProto(req.Block))
+	if err != nil {
+		return nil, err
+	}
+	return &proto.SignBlockResponse{
+		Signature: res,
+	}, nil
+}
+
 func (pv *ThresholdValidator) proxyIfNecessary(
 	ctx context.Context,
 	chainID string,
@@ -571,7 +637,8 @@ func (pv *ThresholdValidator) proxyIfNecessary(
 		return true, nil, stamp, fmt.Errorf("timed out waiting for raft leader")
 	}
 
-	if leader == pv.MyCosigner.GetIndex() {
+	// Don't proxy call if we are the leader
+	if leader == pv.mpc.MyCosigner.GetIndex() {
 		return false, nil, time.Time{}, nil
 	}
 
@@ -583,17 +650,18 @@ func (pv *ThresholdValidator) proxyIfNecessary(
 	)
 	metrics.TotalNotRaftLeader.Inc()
 
-	// Get Cosigner by leader index
-	cosignerLeader := pv.peerCosigners.GetByIndex(leader)
-	if cosignerLeader == nil {
-		return true, nil, stamp, fmt.Errorf("failed to find cosigner with id %d", leader)
+	// Get Node by leader index
+	// TODO: Change so the this is the node.
+	nodeLeader, err := pv.getLeaderClient(leader) // This is a nodeclient
+	if err != nil {
+		return true, nil, stamp, fmt.Errorf("failed to find cosigner (node) with id %d", leader)
 	}
 
-	// Here we actually proxies the request to the node who is leader.
-	signRes, err := cosignerLeader.(*cosigner.RemoteCosigner).Sign(ctx, cosigner.CosignerSignBlockRequest{
-		ChainID: chainID,
-		Block:   &block,
-	})
+	// Here we actually sending the request to the node who is leader. Should be
+	// ProxySign
+	// nodeLeader.(*cosigner.CosignerClient)
+	signRes, stamp, err := nodeLeader.SignBlock(ctx, chainID, block)
+
 	if err != nil {
 		var RPCError *cometrpcjsontypes.RPCError
 		if errors.As(err, &RPCError) {
@@ -607,12 +675,16 @@ func (pv *ThresholdValidator) proxyIfNecessary(
 		}
 		return true, nil, stamp, err
 	}
-	return true, signRes.Signature, stamp, nil
+
+	return true, signRes, stamp, nil
+
+	// return false, nil, stamp, nil
 }
 
 // Sign returns the signature in byte for the given block and the time
 // This function is called by the sentry and its responsible for in its turn calling the MPC
 // to get a valid signature to return to the sentry.
+// Sign implements the [connector.IPrivValidator] interface.
 func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block types.Block) ([]byte, time.Time, error) {
 	height, round, step, stamp, signBytes := block.Height, block.Round, block.Step, block.Timestamp, block.SignBytes
 
@@ -628,12 +700,14 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 	}
 
 	// Only the leader can execute this function. Followers can handle the requests,
-	// but they just need to proxy the request to the raft leader
+	// but they just need to proxy the request to the raft leader which handles the orchestration of signing
 	isProxied, proxySig, proxyStamp, err := pv.proxyIfNecessary(ctx, chainID, block)
 	if isProxied {
 		// Returns the proxy signature if the request was proxied
 		return proxySig, proxyStamp, err
 	}
+
+	// isSigned, Sig, Stamp, err := pv.Sign(ctx, chainID, block)
 
 	metrics.TotalRaftLeader.Inc()
 
@@ -664,19 +738,22 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 	// More or less everything belov here shoud be moved to a "cosigners"
 	// package. This is the actual MPC.
 	// MPC.SignBlock() is the actual function that does the MPC.
-	numPeers := len(pv.peerCosigners)
+	numPeers := len(pv.mpc.peerCosigners)
 	total := uint8(numPeers + 1)
 
 	peerStartTime := time.Now()
 
-	cosignersOrderedByFastest := pv.cosignerHealth.GetFastest()
+	fmt.Println("pv.cosignerHealth: ", pv.mpc.cosignerHealth)
+	cosignersOrderedByFastest := pv.mpc.cosignerHealth.GetFastest()
+
 	fmt.Println("cosignersOrderedByFastest", len(cosignersOrderedByFastest))
 	cosignersForThisBlock := make([]ICosigner, pv.threshold)
+
 	fmt.Println("cosignersForThisBlock", len(cosignersForThisBlock), pv.threshold)
-	cosignersForThisBlock[0] = pv.MyCosigner
+	cosignersForThisBlock[0] = pv.mpc.MyCosigner
 	copy(cosignersForThisBlock[1:], cosignersOrderedByFastest[:pv.threshold-1])
 
-	nonces, err := pv.nonceCache.GetNonces(cosignersForThisBlock)
+	nonces, err := pv.mpc.nonceCache.GetNonces(cosignersForThisBlock)
 
 	var dontIterateFastestCosigners bool
 
@@ -707,7 +784,7 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 
 	metrics.TimedSignBlockThresholdLag.Observe(time.Since(timeStartSignBlock).Seconds())
 
-	for _, peer := range pv.peerCosigners {
+	for _, peer := range pv.mpc.peerCosigners {
 		metrics.MissedNonces.WithLabelValues(peer.GetAddress()).Set(0)
 		metrics.TimedCosignerNonceLag.WithLabelValues(peer.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
 	}
@@ -722,57 +799,58 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 	shareSignatures := make([][]byte, total)
 
 	var eg errgroup.Group
-	for _, remote_cosigner := range cosignersForThisBlock {
-		remote_cosigner := remote_cosigner
+	for _, remote_Cosigner := range cosignersForThisBlock {
+		// NOTE: This is really odd isnt it?
+		remoteCosigner := remote_Cosigner
 		eg.Go(func() error {
-			for remote_cosigner != nil {
+			for remoteCosigner != nil {
 				signCtx, cancel := context.WithTimeout(ctx, pv.grpcTimeout)
 				defer cancel()
 
 				peerStartTime := time.Now()
 
 				// set peerNonces and sign in single rpc call.
-				sigRes, err := remote_cosigner.SetNoncesAndSign(signCtx, cosigner.CosignerSetNoncesAndSignRequest{
+				sigRes, err := remoteCosigner.SetNoncesAndSign(signCtx, cosigner.CosignerSetNoncesAndSignRequest{
 					ChainID:   chainID,
-					Nonces:    nonces.For(remote_cosigner.GetIndex()),
+					Nonces:    nonces.For(remoteCosigner.GetIndex()),
 					HRST:      hrst,
 					SignBytes: signBytes,
 				})
 				if err != nil {
 					log.Error(
 						"Cosigner failed to set nonces and sign",
-						"cosigner", remote_cosigner.GetIndex(),
+						"cosigner", remoteCosigner.GetIndex(),
 						"err", err.Error(),
 					)
 
 					if strings.Contains(err.Error(), cosigner.ErrUnexpectedState) {
-						pv.nonceCache.ClearNonces(remote_cosigner)
+						pv.mpc.nonceCache.ClearNonces(remoteCosigner)
 					}
 
-					if remote_cosigner.GetIndex() == pv.MyCosigner.GetIndex() {
+					if remoteCosigner.GetIndex() == pv.mpc.MyCosigner.GetIndex() {
 						return err
 					}
 
 					if c := status.Code(err); c == codes.DeadlineExceeded || c == codes.NotFound || c == codes.Unavailable {
-						pv.cosignerHealth.MarkUnhealthy(remote_cosigner)
-						pv.nonceCache.ClearNonces(remote_cosigner)
+						pv.mpc.cosignerHealth.MarkUnhealthy(remoteCosigner)
+						pv.mpc.nonceCache.ClearNonces(remoteCosigner)
 					}
 
 					if dontIterateFastestCosigners {
-						remote_cosigner = nil
+						remoteCosigner = nil
 						continue
 					}
 
 					// this will only work if the next cosigner has the nonces we've already decided to use for this block
 					// otherwise the sign attempt will fail
-					remote_cosigner = getNextFastestCosigner()
+					remoteCosigner = getNextFastestCosigner()
 					continue
 				}
 
-				if remote_cosigner != pv.MyCosigner {
-					metrics.TimedCosignerSignLag.WithLabelValues(remote_cosigner.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
+				if remoteCosigner != pv.mpc.MyCosigner {
+					metrics.TimedCosignerSignLag.WithLabelValues(remoteCosigner.GetAddress()).Observe(time.Since(peerStartTime).Seconds())
 				}
-				shareSignatures[remote_cosigner.GetIndex()-1] = sigRes.Signature
+				shareSignatures[remoteCosigner.GetIndex()-1] = sigRes.Signature
 
 				return nil
 			}
@@ -812,14 +890,14 @@ func (pv *ThresholdValidator) Sign(ctx context.Context, chainID string, block ty
 	}
 
 	// assemble into final signature
-	signature, err := pv.MyCosigner.CombineSignatures(chainID, shareSigs)
+	signature, err := pv.mpc.MyCosigner.CombineSignatures(chainID, shareSigs)
 	if err != nil {
 		pv.notifyBlockSignError(chainID, block.GetHRS(), signBytes)
 		return nil, stamp, fmt.Errorf("error combining signatures: %w", err)
 	}
 
 	// verify the combined signature before saving to watermark
-	if !pv.MyCosigner.VerifySignature(chainID, signBytes, signature) {
+	if !pv.mpc.MyCosigner.VerifySignature(chainID, signBytes, signature) {
 		metrics.TotalInvalidSignature.Inc()
 
 		pv.notifyBlockSignError(chainID, block.GetHRS(), signBytes)

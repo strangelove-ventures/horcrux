@@ -3,7 +3,9 @@ package types
 import (
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/src/proto"
+	"github.com/strangelove-ventures/horcrux/proto/strangelove/proto"
+
+	//	"github.com/strangelove-ventures/horcrux/src/proto"
 
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	comet "github.com/cometbft/cometbft/types"
