@@ -2,14 +2,11 @@ package signer
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"time"
 
 	cometcrypto "github.com/strangelove-ventures/horcrux/v3/comet/crypto"
 	grpccosigner "github.com/strangelove-ventures/horcrux/v3/grpc/cosigner"
 	"github.com/strangelove-ventures/horcrux/v3/types"
-	"github.com/strangelove-ventures/horcrux/v3/comet/libs/protoio"
 
 	"github.com/google/uuid"
 )

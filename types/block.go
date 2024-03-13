@@ -37,7 +37,7 @@ type Block struct {
 	Step      int8
 	BlockID   *BlockID
 	POLRound  int64
-	VoteExtensionSignBytes []byte
+	VoteExtension []byte
 	Timestamp time.Time
 }
 
@@ -63,8 +63,8 @@ func (block Block) ToProto() *grpccosigner.Block {
 		Height:    block.Height,
 		Round:     block.Round,
 		Step:      int32(block.Step),
-		POLRound:  block.POLRound,
-		VoteExtSignBytes: block.VoteExtensionSignBytes,
+		POLRound:  int32(block.POLRound),
+		VoteExtension: block.VoteExtension,
 		Timestamp: block.Timestamp.UnixNano(),
 	}
 
@@ -84,8 +84,8 @@ func BlockFromProto(block *grpccosigner.Block) Block {
 		Height:    block.Height,
 		Round:     block.Round,
 		Step:      int8(block.Step),
-		POLRound:  block.POLRound,
-		VoteExtensionSignBytes: block.VoteExtSignBytes,
+		POLRound:  int64(block.POLRound),
+		VoteExtension: block.VoteExtension,
 		Timestamp: time.Unix(0, block.Timestamp),
 	}
 
@@ -120,6 +120,15 @@ func (b Block) ToCanonicalVoteNoTimestamp(chainID string) cometproto.CanonicalVo
 		Round:   b.Round,
 		BlockID: b.BlockID.ToCanonical(),
 		ChainID: chainID,
+	}
+}
+
+func (b Block) ToCanonicalVoteExtension(chainID string) cometproto.CanonicalVoteExtension {
+	return cometproto.CanonicalVoteExtension{
+		Extension: b.VoteExtension,
+		Height:  b.Height,
+		Round:   b.Round,
+		ChainId:   chainID,
 	}
 }
 

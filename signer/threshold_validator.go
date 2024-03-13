@@ -576,7 +576,7 @@ func (pv *ThresholdValidator) proxyIfNecessary(
 	if err != nil {
 		errStr := err.Error()
 		if strings.Contains(errStr, msgProgressAlreadyStarted) {
-			return true, nil, stamp, &BeyondBlockError{msg: errStr}
+			return true, nil, nil, stamp, &BeyondBlockError{msg: errStr}
 		}
 		return true, nil, nil, stamp, err
 	}
@@ -616,11 +616,11 @@ func (pv *ThresholdValidator) Sign(
 
 	signBytes, voteExtSignBytes, err := pv.myCosigner.SignBytes(chainID, block)
 	if err != nil {
-		return nil, stamp, fmt.Errorf("error getting sign bytes: %w", err)
+		return nil, nil, stamp, fmt.Errorf("error getting sign bytes: %w", err)
 	}
 
 	// Keep track of the last block that we began the signing process for. Only allow one attempt per block
-	existingSignature, existingVoteExtSigm existingTimestamp, err := pv.SaveLastSignedStateInitiated(chainID, &block, signBytes)
+	existingSignature, existingVoteExtSig, existingTimestamp, err := pv.SaveLastSignedStateInitiated(chainID, &block, signBytes)
 	if err != nil {
 		return nil, nil, stamp, fmt.Errorf("error saving last sign state initiated: %w", err)
 	}
@@ -641,11 +641,7 @@ func (pv *ThresholdValidator) Sign(
 
 	var dontIterateFastestCosigners bool
 
-	_, hasVoteExtensions, err := verifySignPayload(chainID, signBytes, voteExtensionSignBytes)
-	if err != nil {
-		pv.notifyBlockSignError(chainID, block.HRSKey(), signBytes)
-		return nil, nil, stamp, fmt.Errorf("failed to verify payload: %w", err)
-	}
+	hasVoteExtensions := len(voteExtSignBytes) > 0
 
 	count := 1
 	if hasVoteExtensions {
@@ -882,7 +878,7 @@ func (pv *ThresholdValidator) Sign(
 		}
 
 		// verify the combined signature before saving to watermark
-		if !pv.myCosigner.VerifySignature(chainID, voteExtensionSignBytes, voteExtSig) {
+		if !pv.myCosigner.VerifySignature(chainID, voteExtSignBytes, voteExtSig) {
 			totalInvalidSignature.Inc()
 
 			pv.notifyBlockSignError(chainID, block.HRSKey(), signBytes)

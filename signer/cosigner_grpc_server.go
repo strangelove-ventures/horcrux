@@ -35,7 +35,7 @@ func (rpc *CosignerGRPCServer) SignBlock(
 	ctx context.Context,
 	req *grpccosigner.SignBlockRequest,
 ) (*grpccosigner.SignBlockResponse, error) {
-	sig, voteExtSig, _, err := rpc.thresholdValidator.Sign(ctx, req.ChainID, BlockFromProto(req.Block))
+	sig, voteExtSig, _, err := rpc.thresholdValidator.Sign(ctx, req.ChainID, types.BlockFromProto(req.Block))
 	if err != nil {
 		return nil, err
 	}
@@ -59,15 +59,16 @@ func (rpc *CosignerGRPCServer) SetNoncesAndSign(
 			UUID:   uuid.UUID(req.Uuid),
 			Nonces: CosignerNoncesFromProto(req.Nonces),
 		},
-		SignBytes: SignBytes: req.GetSignBytes(),
 	}
 
-	if len(req.VoteExtSignBytes) > 0 && len(req.VoteExtUuid) == 16 {
+	if len(b.VoteExtension) > 0 && len(req.VoteExtUuid) == 16 {
 		cosignerReq.VoteExtensionNonces = &CosignerUUIDNonces{
 			UUID:   uuid.UUID(req.VoteExtUuid),
 			Nonces: CosignerNoncesFromProto(req.VoteExtNonces),
 		}
 	}
+
+	hrst := b.HRSTKey()
 
 	res, err := rpc.cosigner.SetNoncesAndSign(ctx, cosignerReq)
 	if err != nil {

@@ -192,10 +192,10 @@ func (cosigner *LocalCosigner) CombineSignatures(chainID string, signatures []Pa
 	return ccs.signer.CombineSignatures(signatures)
 }
 
-func (cosigner *LocalCosigner) SignBytes(chainID string, block types.Block) ([]byte, error) {
+func (cosigner *LocalCosigner) SignBytes(chainID string, block types.Block) ([]byte, []byte, error) {
 	ccs, err := cosigner.getChainState(chainID)
 	if err != nil {
-		return nil, fmt.Errorf("error getting chain state: %s", err)
+		return nil, nil, fmt.Errorf("error getting chain state: %s", err)
 	}
 
 	return ccs.signer.ConstructPayload(chainID, block)
@@ -271,7 +271,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	}
 
 	var voteExtNonces []Nonce
-	if hasVoteExtensions {
+	if len(voteExtensionSignBytes) > 0 {
 		voteExtNonces, err = cosigner.combinedNonces(
 			cosigner.GetID(),
 			uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
@@ -290,7 +290,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		sig, err = ccs.signer.Sign(nonces, signBytes)
 		return err
 	})
-	if hasVoteExtensions {
+	if len(voteExtensionSignBytes) > 0 {
 		eg.Go(func() error {
 			var err error
 			voteExtSig, err = ccs.signer.Sign(voteExtNonces, voteExtensionSignBytes)
@@ -589,12 +589,12 @@ func (cosigner *LocalCosigner) SetNoncesAndSign(
 	}
 
 	cosignerReq := CosignerSignRequest{
-		UUID:      req.Nonces.UUID,
-		ChainID:   chainID,
-		Block:	 req.Block,
+		ChainID: chainID,
+		Block:   req.Block,
+		UUID:    req.Nonces.UUID,
 	}
 
-	if len(req.Block.VoteExtensionSignBytes) > 0 {
+	if len(req.Block.VoteExtension) > 0 {
 		cosignerReq.VoteExtUUID = req.VoteExtensionNonces.UUID
 	}
 

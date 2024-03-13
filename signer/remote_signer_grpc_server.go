@@ -2,6 +2,7 @@ package signer
 
 import (
 	"context"
+	"encoding/hex"
 	"log/slog"
 	"net"
 	"time"
@@ -101,7 +102,7 @@ func signAndTrack(
 	logger *slog.Logger,
 	validator PrivValidator,
 	chainID string,
-	block Block,
+	block types.Block,
 ) ([]byte, []byte, time.Time, error) {
 	sig, voteExtSig, timestamp, err := validator.Sign(ctx, chainID, block)
 	if err != nil {
@@ -145,8 +146,8 @@ func signAndTrack(
 		"chain_id", chainID,
 		"height", block.Height,
 		"round", block.Round,
-		"sig", sig[:sigLen],
-		"vote_ext_sig", voteExtSig[:extSigLen],
+		"sig", hex.EncodeToString(sig[:sigLen]),
+		"vote_ext_sig", hex.EncodeToString(voteExtSig[:extSigLen]),
 		"ts", block.Timestamp,
 	)
 

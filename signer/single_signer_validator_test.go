@@ -19,7 +19,7 @@ import (
 )
 
 func TestSingleSignerValidator(t *testing.T) {
-	t.Skip("TODO: fix this test when run with 'make test'")
+	// t.Skip("TODO: fix this test when run with 'make test'")
 
 	tmpDir := t.TempDir()
 	stateDir := filepath.Join(tmpDir, "state")
@@ -62,7 +62,7 @@ func TestSingleSignerValidator(t *testing.T) {
 	signature, _, _, err := validator.Sign(ctx, testChainID, block)
 	require.NoError(t, err)
 
-	signBytes, err := horcruxed25519.SignBytes(testChainID, block)
+	signBytes, _, err := horcruxed25519.SignBytes(testChainID, block)
 	require.NoError(t, err)
 
 	require.True(t, privateKey.PubKey().VerifySignature(signBytes, signature))
@@ -70,7 +70,7 @@ func TestSingleSignerValidator(t *testing.T) {
 	proposal.Timestamp = time.Now()
 
 	// should be able to sign same proposal with only differing timestamp
-	_, _, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposal))
+	_, _, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(&proposal))
 	require.NoError(t, err)
 
 	// construct different block ID for proposal at same height as highest signed
@@ -89,29 +89,29 @@ func TestSingleSignerValidator(t *testing.T) {
 	}
 
 	// should not be able to sign same proposal at same height as highest signed with different BlockID
-	_, _, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposal))
+	_, _, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(&proposal))
 	require.Error(t, err, "double sign!")
 
 	proposal.Round = 19
 
 	// should not be able to sign lower than highest signed
-	_, _, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposal))
+	_, _, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(&proposal))
 	require.Error(t, err, "double sign!")
 
 	// lower LSS should sign for different chain ID
-	_, _, _, err = validator.Sign(ctx, "different", types.ProposalToBlock("different", &proposal))
+	_, _, _, err = validator.Sign(ctx, "different", types.ProposalToBlock(&proposal))
 	require.NoError(t, err)
 
 	// reinitialize validator to make sure new runtime will not allow double sign
 	validator = NewSingleSignerValidator(runtimeConfig)
 
-	_, _, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposal))
+	_, _, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(&proposal))
 	require.Error(t, err, "double sign!")
 
 	proposal.Round = 21
 
 	// signing higher block now should succeed
-	_, _, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposal))
+	_, _, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(&proposal))
 	require.NoError(t, err)
 
 	precommit := cometproto.Vote{
@@ -122,13 +122,16 @@ func TestSingleSignerValidator(t *testing.T) {
 		Extension: []byte("test"),
 	}
 
-	block = VoteToBlock(testChainID, &precommit)
+	block = types.VoteToBlock(&precommit)
 	sig, voteExtSig, _, err := validator.Sign(ctx, testChainID, block)
 	require.NoError(t, err)
 
-	require.True(t, privateKey.PubKey().VerifySignature(block.SignBytes, sig), "signature verification failed")
+	signBytes, voteExtSignBytes, err := horcruxed25519.SignBytes(testChainID, block)
+	require.NoError(t, err)
 
-	require.True(t, privateKey.PubKey().VerifySignature(block.VoteExtensionSignBytes, voteExtSig),
+	require.True(t, privateKey.PubKey().VerifySignature(signBytes, sig), "signature verification failed")
+
+	require.True(t, privateKey.PubKey().VerifySignature(voteExtSignBytes, voteExtSig),
 		"vote extension signature verification failed")
 
 }

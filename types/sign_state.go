@@ -60,7 +60,7 @@ func VoteToBlock(vote *cometproto.Vote) Block {
 				Hash:  vote.BlockID.PartSetHeader.Hash,
 			},
 		},
-		VoteExtensionSignBytes: vote.Extension,
+		VoteExtension: vote.Extension,
 		Timestamp:              vote.Timestamp,
 	}
 }

@@ -127,7 +127,7 @@ func testThresholdValidator(t *testing.T, keyType string, threshold, total uint8
 	signature, _, _, err := validator.Sign(ctx, testChainID, block)
 	require.NoError(t, err)
 
-	signBytes, err := validator.myCosigner.SignBytes(testChainID, block)
+	signBytes, _, err := validator.myCosigner.SignBytes(testChainID, block)
 	require.NoError(t, err)
 
 	require.True(t, validator.myCosigner.VerifySignature(testChainID, signBytes, signature))
@@ -171,7 +171,7 @@ func testThresholdValidator(t *testing.T, keyType string, threshold, total uint8
 
 	// different than single-signer mode, threshold mode will be successful for this,
 	// but it will return the same signature as before.
-	signature, _, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposal))
+	signature, _, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(&proposal))
 	require.NoError(t, err)
 
 	require.True(t, bytes.Equal(firstSignature, signature))
@@ -181,13 +181,13 @@ func testThresholdValidator(t *testing.T, keyType string, threshold, total uint8
 	validator.nonceCache.LoadN(ctx, 1)
 
 	// should not be able to sign lower than highest signed
-	_, _, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposal))
+	_, _, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(&proposal))
 	require.Error(t, err, "double sign!")
 
 	validator.nonceCache.LoadN(ctx, 1)
 
 	// lower LSS should sign for different chain ID
-	_, _, _, err = validator.Sign(ctx, testChainID2, types.ProposalToBlock(testChainID2, &proposal))
+	_, _, _, err = validator.Sign(ctx, testChainID2, types.ProposalToBlock(&proposal))
 	require.NoError(t, err)
 
 	// reinitialize validator to make sure new runtime will not allow double sign
@@ -205,7 +205,7 @@ func testThresholdValidator(t *testing.T, keyType string, threshold, total uint8
 
 	newValidator.nonceCache.LoadN(ctx, 1)
 
-	_, _, _, err = newValidator.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposal))
+	_, _, _, err = newValidator.Sign(ctx, testChainID, types.ProposalToBlock(&proposal))
 	require.Error(t, err, "double sign!")
 
 	proposal = cometproto.Proposal{
@@ -226,15 +226,15 @@ func testThresholdValidator(t *testing.T, keyType string, threshold, total uint8
 	newValidator.nonceCache.LoadN(ctx, 3)
 
 	eg.Go(func() error {
-		_, _, _, err := newValidator.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposal))
+		_, _, _, err := newValidator.Sign(ctx, testChainID, types.ProposalToBlock(&proposal))
 		return err
 	})
 	eg.Go(func() error {
-		_, _, _, err := newValidator.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposalClone))
+		_, _, _, err := newValidator.Sign(ctx, testChainID, types.ProposalToBlock(&proposalClone))
 		return err
 	})
 	eg.Go(func() error {
-		_, _, _, err := newValidator.Sign(ctx, testChainID, types.ProposalToBlock(testChainID, &proposalClone2))
+		_, _, _, err := newValidator.Sign(ctx, testChainID, types.ProposalToBlock(&proposalClone2))
 		return err
 	})
 	// signing higher block now should succeed
@@ -260,19 +260,19 @@ func testThresholdValidator(t *testing.T, keyType string, threshold, total uint8
 
 		eg.Go(func() error {
 			start := time.Now()
-			_, _, _, err := newValidator.Sign(ctx, testChainID, types.VoteToBlock(testChainID, &prevote))
+			_, _, _, err := newValidator.Sign(ctx, testChainID, types.VoteToBlock(&prevote))
 			t.Log("Sign time", "duration", time.Since(start))
 			return err
 		})
 		eg.Go(func() error {
 			start := time.Now()
-			_, _, _, err := newValidator.Sign(ctx, testChainID, types.VoteToBlock(testChainID, &prevoteClone))
+			_, _, _, err := newValidator.Sign(ctx, testChainID, types.VoteToBlock(&prevoteClone))
 			t.Log("Sign time", "duration", time.Since(start))
 			return err
 		})
 		eg.Go(func() error {
 			start := time.Now()
-			_, _, _, err := newValidator.Sign(ctx, testChainID, types.VoteToBlock(testChainID, &prevoteClone2))
+			_, _, _, err := newValidator.Sign(ctx, testChainID, types.VoteToBlock(&prevoteClone2))
 			t.Log("Sign time", "duration", time.Since(start))
 			return err
 		})
@@ -300,20 +300,28 @@ func testThresholdValidator(t *testing.T, keyType string, threshold, total uint8
 
 		newValidator.nonceCache.LoadN(ctx, mrand.Intn(7)) //nolint:gosec
 
+		pubKey, err := newValidator.myCosigner.GetPubKey(testChainID)
+		require.NoError(t, err)
+
 		eg.Go(func() error {
 			start := time.Now()
 			t.Log("Sign time", "duration", time.Since(start))
-			block := types.VoteToBlock(testChainID, &precommit)
+			block := types.VoteToBlock(&precommit)
 			sig, voteExtSig, _, err := newValidator.Sign(ctx, testChainID, block)
 			if err != nil {
 				return err
 			}
 
-			if !pubKey.VerifySignature(block.SignBytes, sig) {
+			signBytes, voteExtSignBytes, err := newValidator.myCosigner.SignBytes(testChainID, block)
+			if err != nil {
+				return err
+			}
+
+			if !pubKey.VerifySignature(signBytes, sig) {
 				return fmt.Errorf("signature verification failed")
 			}
 
-			if !pubKey.VerifySignature(block.VoteExtensionSignBytes, voteExtSig) {
+			if !pubKey.VerifySignature(voteExtSignBytes, voteExtSig) {
 				return fmt.Errorf("vote extension signature verification failed")
 			}
 
@@ -322,17 +330,22 @@ func testThresholdValidator(t *testing.T, keyType string, threshold, total uint8
 		eg.Go(func() error {
 			start := time.Now()
 			t.Log("Sign time", "duration", time.Since(start))
-			block := types.VoteToBlock(testChainID, &precommitClone)
+			block := types.VoteToBlock(&precommitClone)
 			sig, voteExtSig, _, err := newValidator.Sign(ctx, testChainID, block)
 			if err != nil {
 				return err
 			}
 
-			if !pubKey.VerifySignature(block.SignBytes, sig) {
+			signBytes, voteExtSignBytes, err := newValidator.myCosigner.SignBytes(testChainID, block)
+			if err != nil {
+				return err
+			}
+
+			if !pubKey.VerifySignature(signBytes, sig) {
 				return fmt.Errorf("signature verification failed")
 			}
 
-			if !pubKey.VerifySignature(block.VoteExtensionSignBytes, voteExtSig) {
+			if !pubKey.VerifySignature(voteExtSignBytes, voteExtSig) {
 				return fmt.Errorf("vote extension signature verification failed")
 			}
 
@@ -340,18 +353,23 @@ func testThresholdValidator(t *testing.T, keyType string, threshold, total uint8
 		})
 		eg.Go(func() error {
 			start := time.Now()
-			block := VoteToBlock(testChainID, &precommitClone2)
+			block := types.VoteToBlock(&precommitClone2)
 			sig, voteExtSig, _, err := newValidator.Sign(ctx, testChainID, block)
 			t.Log("Sign time", "duration", time.Since(start))
 			if err != nil {
 				return err
 			}
 
-			if !pubKey.VerifySignature(block.SignBytes, sig) {
+			signBytes, voteExtSignBytes, err := newValidator.myCosigner.SignBytes(testChainID, block)
+			if err != nil {
+				return err
+			}
+
+			if !pubKey.VerifySignature(signBytes, sig) {
 				return fmt.Errorf("signature verification failed")
 			}
 
-			if !pubKey.VerifySignature(block.VoteExtensionSignBytes, voteExtSig) {
+			if !pubKey.VerifySignature(voteExtSignBytes, voteExtSig) {
 				return fmt.Errorf("vote extension signature verification failed")
 			}
 
@@ -554,7 +572,7 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 					return
 				}
 
-				signBytes, err := tv.myCosigner.SignBytes(testChainID, block)
+				signBytes, _, err := tv.myCosigner.SignBytes(testChainID, block)
 				if err != nil {
 					t.Log("Proposal sign bytes failed", "error", err)
 					return
@@ -602,7 +620,7 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 					return
 				}
 
-				signBytes, err := tv.myCosigner.SignBytes(testChainID, block)
+				signBytes, _, err := tv.myCosigner.SignBytes(testChainID, block)
 				if err != nil {
 					t.Log("PreVote sign bytes failed", "error", err)
 					return
@@ -657,7 +675,7 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 					return
 				}
 
-				signBytes, err := tv.myCosigner.SignBytes(testChainID, block)
+				signBytes, voteExtSignBytes, err := tv.myCosigner.SignBytes(testChainID, block)
 				if err != nil {
 					t.Log("PreCommit sign bytes failed", "error", err)
 					return
@@ -671,9 +689,14 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 					return
 				}
 
-				voteExtSignBytes := comet.VoteExtensionSignBytes(testChainID, &preCommit)
 				voteExtSig := make([]byte, len(voteExtSignature))
 				copy(voteExtSig, voteExtSignature)
+
+				pubKey, err := tv.myCosigner.GetPubKey(testChainID)
+				if err != nil {
+					t.Log("PreCommit get pub key failed", "error", err)
+					return
+				}
 
 				if !pubKey.VerifySignature(voteExtSignBytes, voteExtSig) {
 					t.Log("PreCommit vote extension signature verification failed")

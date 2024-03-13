@@ -17,7 +17,7 @@ type ThresholdSigner interface {
 	PubKey() []byte
 
 	// ConstructPayload constructs the payload to be signed.
-	ConstructPayload(chainID string, block types.Block) ([]byte, error)
+	ConstructPayload(chainID string, block types.Block) ([]byte, []byte, error)
 
 	// Sign signs a byte payload with the provided nonces.
 	Sign(nonces []Nonce, payload []byte) ([]byte, error)

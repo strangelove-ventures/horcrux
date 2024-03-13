@@ -115,7 +115,7 @@ func (cosigner *RemoteCosigner) SetNoncesAndSign(
 		Block:   req.Block.ToProto(),
 	}
 
-	if req.VoteExtensionNonces != nil && len(req.Block.VoteExtensionSignBytes) > 0 {
+	if req.VoteExtensionNonces != nil && len(req.Block.VoteExtension) > 0 {
 		cosignerReq.VoteExtUuid = req.VoteExtensionNonces.UUID[:]
 		cosignerReq.VoteExtNonces = req.VoteExtensionNonces.Nonces.toProto()
 	}

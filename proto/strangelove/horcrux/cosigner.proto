@@ -19,7 +19,7 @@ message Block {
 	BlockID blockID = 4;
 	int32 pOLRound = 5;
 	int64 timestamp = 6;
-	bytes voteExtSignBytes = 7;
+	bytes voteExtension = 7;
 }
 
 message BlockID {
@@ -61,9 +61,11 @@ message HRST {
 
 message SetNoncesAndSignRequest {
 	bytes uuid = 1;
-	bytes voteExtUuid = 2;
-	repeated Nonce nonces = 3;
+	repeated Nonce nonces = 2;
+
+	bytes voteExtUuid = 3;
 	repeated Nonce voteExtNonces = 4;
+
 	Block block = 5;
 	string chainID = 6;
 }

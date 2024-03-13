@@ -10,7 +10,7 @@ import (
 	"github.com/strangelove-ventures/horcrux/v3/types"
 )
 
-func SignBytes(chainID string, block types.Block) ([]byte, error) {
+func SignBytes(chainID string, block types.Block) ([]byte, []byte, error) {
 	t := types.StepToType(block.Step)
 
 	switch t {
@@ -20,19 +20,52 @@ func SignBytes(chainID string, block types.Block) ([]byte, error) {
 		// return VoteSignBytes(chainID, block), nil
 
 		// for union < v0.19
-		return VoteSignBytesPre(chainID, block)
+		return VoteSignBytesPre(chainID, block), VoteExtensionSignBytes(chainID, block), nil
 	case cometproto.ProposalType:
 		fmt.Println("Bn254 ProposalSignBytes")
-		return protoio.MarshalDelimited(block.ToCanonicalProposal(chainID))
+		return ProposalSignBytes(chainID, block), nil, nil
 	default:
-		return nil, fmt.Errorf("unknown step type: %v", t)
+		return nil, nil, fmt.Errorf("unknown step type: %v", t)
 	}
 }
 
-func VoteSignBytesPre(chainID string, vote types.Block) ([]byte, error) {
+func VoteSignBytesPre(chainID string, vote types.Block) []byte {
 	pb := vote.ToCanonicalVoteNoTimestamp(chainID)
-	fmt.Printf("CanonicalVote: %v\n", pb)
-	return protoio.MarshalDelimited(&pb)
+	bz, err := protoio.MarshalDelimited(&pb)
+	if err != nil {
+		panic(err)
+	}
+
+	return bz
+}
+
+func ProposalSignBytes(chainID string, proposal types.Block) []byte {
+	pb := proposal.ToCanonicalProposal(chainID)
+	bz, err := protoio.MarshalDelimited(pb)
+	if err != nil {
+		panic(err)
+	}
+
+	return bz
+}
+
+// VoteExtensionSignBytes returns the proto-encoding of the canonicalized vote
+// extension for signing. Panics if the marshaling fails.
+//
+// Similar to VoteSignBytes, the encoded Protobuf message is varint
+// length-prefixed for backwards-compatibility with the Amino encoding.
+func VoteExtensionSignBytes(chainID string, vote types.Block) []byte {
+	if vote.Step != types.StepPrecommit || len(vote.VoteExtension) == 0 {
+		return nil
+	}
+
+	pb := vote.ToCanonicalVoteExtension(chainID)
+	bz, err := protoio.MarshalDelimited(&pb)
+	if err != nil {
+		panic(err)
+	}
+
+	return bz
 }
 
 // VoteSignBytes returns the proto-encoding of the canonicalized Vote, for

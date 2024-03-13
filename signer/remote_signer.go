@@ -24,7 +24,7 @@ const connRetrySec = 2
 // with additional Stop method for safe shutdown.
 type PrivValidator interface {
 	Sign(ctx context.Context, chainID string, block types.Block) ([]byte, []byte, time.Time, error)
-	GetPubKey(ctx context.Context, chainID string) ([]byte, error)
+	GetPubKey(ctx context.Context, chainID string) (cometcrypto.PubKey, error)
 	Stop()
 }
 
@@ -175,7 +175,7 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *cometp
 
 	sig, voteExtSig, timestamp, err := signAndTrack(
 		context.TODO(),
-		rs.Logger,
+		rs.logger,
 		rs.privVal,
 		chainID,
 		types.VoteToBlock(vote),
@@ -237,7 +237,8 @@ func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) cometprotopriv
 		msgSum.PubKeyResponse.Error = getRemoteSignerError(err)
 		return cometprotoprivval.Message{Sum: msgSum}
 	}
-	pk, err := encoding.PubKeyToProto(pubKey)
+
+	pk, err := encoding.PubKeyToProto(cometcrypto.PubKey(pubKey))
 	if err != nil {
 		rs.logger.Error(
 			"Failed to get Pub Key",

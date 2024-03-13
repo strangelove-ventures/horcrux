@@ -69,6 +69,6 @@ func (s *ThresholdSignerSoftBn254) VerifySignature(msg, signature []byte) bool {
 	return cometcryptobn254.PubKey(s.pubKey).VerifySignature(msg, signature)
 }
 
-func (s *ThresholdSignerSoftBn254) ConstructPayload(chainID string, block types.Block) ([]byte, error) {
+func (s *ThresholdSignerSoftBn254) ConstructPayload(chainID string, block types.Block) ([]byte, []byte, error) {
 	return horcruxbn254.SignBytes(chainID, block)
 }

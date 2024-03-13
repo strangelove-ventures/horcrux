@@ -187,7 +187,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 
 	block := types.VoteToBlock(&vote)
 
-	signBytes, err := horcruxed25519.SignBytes("chain-id", block)
+	signBytes, _, err := horcruxed25519.SignBytes(testChainID, block)
 	require.NoError(t, err)
 
 	sigs := make([]PartialSignature, threshold)

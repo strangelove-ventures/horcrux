@@ -209,21 +209,21 @@ func (pv *FilePV) GetPubKey() (crypto.PubKey, error) {
 	return pv.Key.PubKey, nil
 }
 
-func (pv *FilePV) Sign(chainID string, block types.Block) ([]byte, time.Time, error) {
+func (pv *FilePV) Sign(chainID string, block types.Block) ([]byte, []byte, time.Time, error) {
 	height, round, step := block.Height, int32(block.Round), block.Step
 
-	var signBytes []byte
+	var signBytes, voteExtSignBytes []byte
 	var err error
 	switch pv.Key.PrivKey.(type) {
 	case ed25519.PrivKey:
-		signBytes, err = horcruxed25519.SignBytes(chainID, block)
+		signBytes, voteExtSignBytes, err = horcruxed25519.SignBytes(chainID, block)
 		if err != nil {
-			return nil, block.Timestamp, err
+			return nil, nil, block.Timestamp, err
 		}
 	case bn254.PrivKey:
-		signBytes, err = horcruxbn254.SignBytes(chainID, block)
+		signBytes, voteExtSignBytes, err = horcruxbn254.SignBytes(chainID, block)
 		if err != nil {
-			return nil, block.Timestamp, err
+			return nil, nil, block.Timestamp, err
 		}
 	}
 
@@ -234,19 +234,14 @@ func (pv *FilePV) Sign(chainID string, block types.Block) ([]byte, time.Time, er
 		return nil, nil, block.Timestamp, err
 	}
 
-	_, hasVoteExtensions, err := verifySignPayload(chainID, signBytes, voteExtensionSignBytes)
-	if err != nil {
-		return nil, nil, block.Timestamp, err
-	}
-
 	// Vote extensions are non-deterministic, so it is possible that an
 	// application may have created a different extension. We therefore always
 	// re-sign the vote extensions of precommits. For prevotes and nil
 	// precommits, the extension signature will always be empty.
 	// Even if the signed over data is empty, we still add the signature
 	var extSig []byte
-	if hasVoteExtensions {
-		extSig, err = pv.Key.PrivKey.Sign(voteExtensionSignBytes)
+	if len(voteExtSignBytes) > 0 {
+		extSig, err = pv.Key.PrivKey.Sign(voteExtSignBytes)
 		if err != nil {
 			return nil, nil, block.Timestamp, err
 		}
@@ -358,11 +353,21 @@ func checkProposalsOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) (ti
 		panic(fmt.Sprintf("signBytes cannot be unmarshalled into proposal: %v", err))
 	}
 
-	lastTime := lastProposal.Timestamp
-	// set the times to the same value and check equality
-	now := time.Now()
-	lastProposal.Timestamp = now
-	newProposal.Timestamp = now
+	var blockIDEqual bool
+	if lastProposal.BlockID != nil && newProposal.BlockID != nil {
+		blockIDEqual = bytes.Equal(lastProposal.BlockID.Hash, newProposal.BlockID.Hash) &&
+			lastProposal.BlockID.PartSetHeader.Total == newProposal.BlockID.PartSetHeader.Total &&
+			bytes.Equal(lastProposal.BlockID.PartSetHeader.Hash, newProposal.BlockID.PartSetHeader.Hash)
+	} else if lastProposal.BlockID == nil && newProposal.BlockID == nil {
+		blockIDEqual = true
+	}
 
-	return lastTime, proto.Equal(&newProposal, &lastProposal)
+	equal := newProposal.ChainID == lastProposal.ChainID &&
+		newProposal.Type == lastProposal.Type &&
+		newProposal.Height == lastProposal.Height &&
+		newProposal.Round == lastProposal.Round &&
+		blockIDEqual &&
+		newProposal.POLRound == lastProposal.POLRound
+
+	return lastProposal.Timestamp, equal
 }
