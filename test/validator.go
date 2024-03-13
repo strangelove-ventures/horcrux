@@ -26,8 +26,8 @@ import (
 )
 
 const (
-	testChain        = "gaia" // ghcr.io/strangelove-ventures/heighliner/gaia
-	testChainVersion = "v10.0.2"
+	testChain        = "union" // ghcr.io/strangelove-ventures/heighliner/gaia
+	testChainVersion = "v0.19.0"
 
 	signerPort       = "2222"
 	signerPortDocker = signerPort + "/tcp"
@@ -80,8 +80,25 @@ func startChains(
 			NumValidators: &c.totalValidators,
 			NumFullNodes:  &c.totalSentries,
 			ChainConfig: ibc.ChainConfig{
-				ModifyGenesis: c.modifyGenesis,
-				PreGenesis:    preGenesis,
+				Type:    "cosmos",
+				Name:    testChain,
+				ChainID: "union-1",
+				Images: []ibc.DockerImage{
+					{
+						Repository: "ghcr.io/strangelove-ventures/heighliner/" + testChain,
+						Version:    testChainVersion,
+						UidGid:     "1025:1025",
+					},
+				},
+				Bin:            "uniond",
+				Bech32Prefix:   "union",
+				Denom:          "umuno",
+				CoinType:       "118",
+				GasPrices:      "0umuno",
+				GasAdjustment:  1.2,
+				TrustingPeriod: "336h",
+				ModifyGenesis:  c.modifyGenesis,
+				PreGenesis:     preGenesis,
 				ConfigFileOverrides: map[string]any{
 					"config/config.toml": testutil.Toml{
 						"consensus": testutil.Toml{
