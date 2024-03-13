@@ -69,7 +69,6 @@ func TestStateSetCmd(t *testing.T) {
 				require.Equal(t, height, ss.Height)
 				require.Equal(t, int64(0), ss.Round)
 				require.Equal(t, int8(0), ss.Step)
-				require.Nil(t, ss.NoncePublic)
 				require.Nil(t, ss.Signature)
 				require.Nil(t, ss.SignBytes)
 
@@ -78,7 +77,6 @@ func TestStateSetCmd(t *testing.T) {
 				require.Equal(t, height, ss.Height)
 				require.Equal(t, int64(0), ss.Round)
 				require.Equal(t, int8(0), ss.Step)
-				require.Nil(t, ss.NoncePublic)
 				require.Nil(t, ss.Signature)
 				require.Nil(t, ss.SignBytes)
 			}

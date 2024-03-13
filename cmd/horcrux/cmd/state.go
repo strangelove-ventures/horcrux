@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"bufio"
-	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log/slog"
@@ -116,13 +116,8 @@ func setStateCmd() *cobra.Command {
 
 			fmt.Fprintf(out, "Setting height %d\n", height)
 
-			pv.NoncePublic, cs.NoncePublic = nil, nil
 			signState := types.SignStateConsensus{
-				Height:    height,
-				Round:     0,
-				Step:      0,
-				Signature: nil,
-				SignBytes: nil,
+				Height: height,
 			}
 			err = pv.Save(signState, nil)
 			if err != nil {
@@ -203,13 +198,10 @@ func importStateCmd() *cobra.Command {
 				return err
 			}
 
-			pv.NoncePublic = nil
 			signState := types.SignStateConsensus{
-				Height:    pvState.Height,
-				Round:     int64(pvState.Round),
-				Step:      pvState.Step,
-				Signature: nil,
-				SignBytes: nil,
+				Height: pvState.Height,
+				Round:  int64(pvState.Round),
+				Step:   pvState.Step,
 			}
 			fmt.Printf("Saving New Sign State: \n"+
 				"  Height:    %v\n"+
@@ -239,11 +231,8 @@ func printSignState(out io.Writer, ss *types.SignState) {
 		"  Step:      %v\n",
 		ss.Height, ss.Round, ss.Step)
 
-	if ss.NoncePublic != nil {
-		fmt.Fprintln(out, "  Nonce Public Key:", base64.StdEncoding.EncodeToString(ss.NoncePublic))
-	}
 	if ss.Signature != nil {
-		fmt.Fprintln(out, "  Signature:", base64.StdEncoding.EncodeToString(ss.Signature))
+		fmt.Fprintln(out, "  Signature:", hex.EncodeToString(ss.Signature))
 	}
 	if ss.SignBytes != nil {
 		fmt.Fprintln(out, "  SignBytes:", ss.SignBytes)

@@ -237,14 +237,14 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	// This function has multiple exit points.  Only start time can be guaranteed
 	metricsTimeKeeper.SetPreviousLocalSignStart(time.Now())
 
-	hrst := req.Block.HRSTKey()
+	block := req.Block
 
-	signBytes, voteExtensionSignBytes, err := ccs.signer.ConstructPayload(chainID, req.Block)
+	signBytes, voteExtensionSignBytes, err := ccs.signer.ConstructPayload(chainID, block)
 	if err != nil {
 		return res, err
 	}
 
-	existingSignature, err := ccs.lastSignState.ExistingSignatureOrErrorIfRegression(hrst, signBytes)
+	existingSignature, err := ccs.lastSignState.ExistingSignatureOrErrorIfRegression(block, signBytes)
 	if err != nil {
 		return res, err
 	}
@@ -302,14 +302,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		return res, err
 	}
 
-	err = ccs.lastSignState.Save(types.SignStateConsensus{
-		Height:                 hrst.Height,
-		Round:                  hrst.Round,
-		Step:                   hrst.Step,
-		Signature:              sig,
-		SignBytes:              signBytes,
-		VoteExtensionSignature: voteExtSig,
-	}, &cosigner.pendingDiskWG)
+	err = ccs.lastSignState.Save(block.SignStateConsensus(signBytes, sig, voteExtSig), &cosigner.pendingDiskWG)
 
 	if err != nil {
 		if _, isSameHRSError := err.(*types.SameHRSError); !isSameHRSError {

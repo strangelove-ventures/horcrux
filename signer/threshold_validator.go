@@ -152,7 +152,7 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(
 
 	height, round, step := block.Height, block.Round, block.Step
 
-	err := css.lastSignStateInitiated.Save(types.NewSignStateConsensus(height, round, step), &pv.pendingDiskWG)
+	err := css.lastSignStateInitiated.Save(block.SignStateConsensus(nil, nil, nil), &pv.pendingDiskWG)
 	if err == nil {
 		// good to sign
 		return nil, nil, time.Time{}, nil
@@ -354,8 +354,8 @@ func (pv *ThresholdValidator) LoadSignStateIfNecessary(chainID string) error {
 // It returns nil signature and nil error if there is no signature and it's okay to sign (fresh or again).
 // It returns an error if we have already signed a greater block, or if we are still waiting for in in-progress sign.
 func (pv *ThresholdValidator) getExistingBlockSignature(
-	chainID string, 
-	block *types.Block, 
+	chainID string,
+	block *types.Block,
 	signBytes []byte,
 ) ([]byte, []byte, time.Time, error) {
 	css := pv.mustLoadChainState(chainID)
@@ -400,7 +400,7 @@ func (pv *ThresholdValidator) compareBlockSignatureAgainstSSC(
 	}
 
 	// If there is a difference in the existing signature payload other than timestamp, return that error.
-	if err := existingSignature.OnlyDifferByTimestamp(signBytes); err != nil {
+	if err := existingSignature.Block().EqualForSigning(*block); err != nil {
 		return nil, nil, stamp, err
 	}
 
@@ -584,8 +584,8 @@ func (pv *ThresholdValidator) proxyIfNecessary(
 }
 
 func (pv *ThresholdValidator) Sign(
-	ctx context.Context, 
-	chainID string, 
+	ctx context.Context,
+	chainID string,
 	block types.Block,
 ) ([]byte, []byte, time.Time, error) {
 	height, round, step, stamp := block.Height, block.Round, block.Step, block.Timestamp
@@ -743,8 +743,8 @@ func (pv *ThresholdValidator) Sign(
 				peerStartTime := time.Now()
 
 				sigReq := CosignerSetNoncesAndSignRequest{
-					ChainID:   chainID,
-					Nonces:    nonces.For(cosigner.GetID()),
+					ChainID: chainID,
+					Nonces:  nonces.For(cosigner.GetID()),
 					Block:   block,
 				}
 
@@ -887,15 +887,8 @@ func (pv *ThresholdValidator) Sign(
 	}
 
 	newLss := types.ChainSignStateConsensus{
-		ChainID: chainID,
-		SignStateConsensus: types.SignStateConsensus{
-			Height:                 height,
-			Round:                  round,
-			Step:                   step,
-			Signature:              signature,
-			SignBytes:              signBytes,
-			VoteExtensionSignature: voteExtSig,
-		},
+		ChainID:            chainID,
+		SignStateConsensus: block.SignStateConsensus(signBytes, signature, voteExtSig),
 	}
 
 	css := pv.mustLoadChainState(chainID)

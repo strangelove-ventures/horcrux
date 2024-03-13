@@ -2,16 +2,13 @@ package types
 
 import (
 	"bytes"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
 	"sync"
 	"time"
 
-	"github.com/cosmos/gogoproto/proto"
 	cometjson "github.com/strangelove-ventures/horcrux/v3/comet/libs/json"
-	"github.com/strangelove-ventures/horcrux/v3/comet/libs/protoio"
 	"github.com/strangelove-ventures/horcrux/v3/comet/libs/tempfile"
 	cometproto "github.com/strangelove-ventures/horcrux/v3/comet/proto/types"
 	"github.com/strangelove-ventures/horcrux/v3/signer/cond"
@@ -50,9 +47,9 @@ func VoteTypeToStep(voteType cometproto.SignedMsgType) int8 {
 
 func VoteToBlock(vote *cometproto.Vote) Block {
 	return Block{
-		Height:                 vote.Height,
-		Round:                  int64(vote.Round),
-		Step:                   VoteTypeToStep(vote.Type),
+		Height: vote.Height,
+		Round:  int64(vote.Round),
+		Step:   VoteTypeToStep(vote.Type),
 		BlockID: &BlockID{
 			Hash: vote.BlockID.Hash,
 			PartSetHeader: PartSetHeader{
@@ -61,7 +58,7 @@ func VoteToBlock(vote *cometproto.Vote) Block {
 			},
 		},
 		VoteExtension: vote.Extension,
-		Timestamp:              vote.Timestamp,
+		Timestamp:     vote.Timestamp,
 	}
 }
 
@@ -101,13 +98,17 @@ func StepToType(step int8) cometproto.SignedMsgType {
 
 // SignState stores signing information for high level watermark management.
 type SignState struct {
-	Height      int64  `json:"height"`
-	Round       int64  `json:"round"`
-	Step        int8   `json:"step"`
-	NoncePublic []byte `json:"nonce_public"`
-	Signature   []byte `json:"signature,omitempty"`
-	SignBytes   []byte `json:"signbytes,omitempty"`
-	VoteExtensionSignature []byte              `json:"vote_ext_signature,omitempty"`
+	Height    int64    `json:"height"`
+	Round     int64    `json:"round"`
+	Step      int8     `json:"step"`
+	BlockID   *BlockID `json:"block_id"`
+	POLRound  int64    `json:"pol_round"`
+	Timestamp int64    `json:"timestamp"`
+
+	SignBytes []byte `json:"sign_bytes,omitempty"`
+
+	Signature              []byte `json:"signature,omitempty"`
+	VoteExtensionSignature []byte `json:"vote_ext_signature,omitempty"`
 
 	filePath string
 
@@ -115,6 +116,17 @@ type SignState struct {
 	mu    sync.RWMutex
 	cache map[HRSKey]SignStateConsensus
 	cond  *cond.Cond
+}
+
+func (signState *SignState) Block() Block {
+	return Block{
+		Height:    signState.Height,
+		Round:     signState.Round,
+		Step:      signState.Step,
+		BlockID:   signState.BlockID,
+		POLRound:  signState.POLRound,
+		Timestamp: time.Unix(0, signState.Timestamp),
+	}
 }
 
 func (signState *SignState) CondLock() {
@@ -146,11 +158,11 @@ func (signState *SignState) ClearFile() {
 	signState.filePath = os.DevNull
 }
 
-func (signState *SignState) ExistingSignatureOrErrorIfRegression(hrst HRSTKey, signBytes []byte) ([]byte, error) {
+func (signState *SignState) ExistingSignatureOrErrorIfRegression(block Block, signBytes []byte) ([]byte, error) {
 	signState.mu.RLock()
 	defer signState.mu.RUnlock()
 
-	sameHRS, err := signState.CheckHRS(hrst)
+	sameHRS, err := signState.CheckHRS(block.HRSTKey())
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +176,7 @@ func (signState *SignState) ExistingSignatureOrErrorIfRegression(hrst HRSTKey, s
 	// It is ok to re-sign a different timestamp if that is the only difference in the sign bytes
 	if bytes.Equal(signBytes, signState.SignBytes) {
 		return signState.Signature, nil
-	} else if err := signState.OnlyDifferByTimestamp(signBytes); err != nil {
+	} else if err := signState.Block().EqualForSigning(block); err != nil {
 		return nil, err
 	}
 
@@ -194,9 +206,25 @@ type SignStateConsensus struct {
 	Height    int64
 	Round     int64
 	Step      int8
-	Signature []byte
-	VoteExtensionSignature []byte
+	BlockID   *BlockID
+	POLRound  int64
+	Timestamp int64
+
 	SignBytes []byte
+
+	Signature              []byte
+	VoteExtensionSignature []byte
+}
+
+func (signState SignStateConsensus) Block() Block {
+	return Block{
+		Height:    signState.Height,
+		Round:     signState.Round,
+		Step:      signState.Step,
+		BlockID:   signState.BlockID,
+		POLRound:  signState.POLRound,
+		Timestamp: time.Unix(0, signState.Timestamp),
+	}
 }
 
 func (signState SignStateConsensus) HRSKey() HRSKey {
@@ -217,19 +245,6 @@ func NewSignStateConsensus(height int64, round int64, step int8) SignStateConsen
 		Height: height,
 		Round:  round,
 		Step:   step,
-	}
-}
-
-type ConflictingDataError struct {
-	msg string
-}
-
-func (e *ConflictingDataError) Error() string { return e.msg }
-
-func newConflictingDataError(existingSignBytes, newSignBytes []byte) *ConflictingDataError {
-	return &ConflictingDataError{
-		msg: fmt.Sprintf("conflicting data. existing: %s - new: %s",
-			hex.EncodeToString(existingSignBytes), hex.EncodeToString(newSignBytes)),
 	}
 }
 
@@ -261,8 +276,13 @@ func (signState *SignState) cacheAndMarshal(ssc SignStateConsensus) []byte {
 	signState.Height = ssc.Height
 	signState.Round = ssc.Round
 	signState.Step = ssc.Step
-	signState.Signature = ssc.Signature
+	signState.BlockID = ssc.BlockID
+	signState.POLRound = ssc.POLRound
+	signState.Timestamp = ssc.Timestamp
+
 	signState.SignBytes = ssc.SignBytes
+
+	signState.Signature = ssc.Signature
 	signState.VoteExtensionSignature = ssc.VoteExtensionSignature
 
 	jsonBytes, err := cometjson.MarshalIndent(signState, "", "  ")
@@ -451,7 +471,9 @@ func (signState *SignState) FreshCache() *SignState {
 		Height:                 signState.Height,
 		Round:                  signState.Round,
 		Step:                   signState.Step,
-		NoncePublic:            signState.NoncePublic,
+		BlockID:                signState.BlockID,
+		POLRound:               signState.POLRound,
+		Timestamp:              signState.Timestamp,
 		Signature:              signState.Signature,
 		SignBytes:              signState.SignBytes,
 		VoteExtensionSignature: signState.VoteExtensionSignature,
@@ -470,8 +492,11 @@ func (signState *SignState) FreshCache() *SignState {
 		Height:                 signState.Height,
 		Round:                  signState.Round,
 		Step:                   signState.Step,
-		Signature:              signState.Signature,
+		BlockID:                signState.BlockID,
+		POLRound:               signState.POLRound,
+		Timestamp:              signState.Timestamp,
 		SignBytes:              signState.SignBytes,
+		Signature:              signState.Signature,
 		VoteExtensionSignature: signState.VoteExtensionSignature,
 	}
 
@@ -523,126 +548,4 @@ func LoadOrCreateSignState(filepath string) (*SignState, error) {
 	}
 
 	return LoadSignState(filepath)
-}
-
-// OnlyDifferByTimestamp returns true if the sign bytes of the sign state
-// are the same as the new sign bytes excluding the timestamp.
-func (signState *SignState) OnlyDifferByTimestamp(signBytes []byte) error {
-	return onlyDifferByTimestamp(signState.Step, signState.SignBytes, signBytes)
-}
-
-func (signState *SignStateConsensus) OnlyDifferByTimestamp(signBytes []byte) error {
-	return onlyDifferByTimestamp(signState.Step, signState.SignBytes, signBytes)
-}
-
-func onlyDifferByTimestamp(step int8, signStateSignBytes, signBytes []byte) error {
-	if step == StepPropose {
-		return checkProposalOnlyDifferByTimestamp(signStateSignBytes, signBytes)
-	} else if step == StepPrevote || step == StepPrecommit {
-		return checkVoteOnlyDifferByTimestamp(signStateSignBytes, signBytes)
-	}
-
-	panic(fmt.Errorf("unexpected sign step: %d", step))
-}
-
-type UnmarshalError struct {
-	name     string
-	signType string
-	err      error
-}
-
-func (e *UnmarshalError) Error() string {
-	return fmt.Sprintf("%s cannot be unmarshalled into %s: %v", e.name, e.signType, e.err)
-}
-
-func newUnmarshalError(name, signType string, err error) *UnmarshalError {
-	return &UnmarshalError{
-		name:     name,
-		signType: signType,
-		err:      err,
-	}
-}
-
-type AlreadySignedVoteError struct {
-	nonFirst bool
-}
-
-func (e *AlreadySignedVoteError) Error() string {
-	if e.nonFirst {
-		return "already signed vote with non-nil BlockID. refusing to sign vote on nil BlockID"
-	}
-	return "already signed vote with nil BlockID. refusing to sign vote on non-nil BlockID"
-}
-
-func newAlreadySignedVoteError(nonFirst bool) *AlreadySignedVoteError {
-	return &AlreadySignedVoteError{
-		nonFirst: nonFirst,
-	}
-}
-
-type DiffBlockIDsError struct {
-	first  []byte
-	second []byte
-}
-
-func (e *DiffBlockIDsError) Error() string {
-	return fmt.Sprintf("differing block IDs - last Vote: %s, new Vote: %s", e.first, e.second)
-}
-
-func newDiffBlockIDsError(first, second []byte) *DiffBlockIDsError {
-	return &DiffBlockIDsError{
-		first:  first,
-		second: second,
-	}
-}
-
-func checkVoteOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) error {
-	var lastVote, newVote cometproto.CanonicalVote
-	if err := protoio.UnmarshalDelimited(lastSignBytes, &lastVote); err != nil {
-		return newUnmarshalError("lastSignBytes", "vote", err)
-	}
-	if err := protoio.UnmarshalDelimited(newSignBytes, &newVote); err != nil {
-		return newUnmarshalError("newSignBytes", "vote", err)
-	}
-
-	// set the times to the same value and check equality
-	newVote.Timestamp = lastVote.Timestamp
-
-	if proto.Equal(&newVote, &lastVote) {
-		return nil
-	}
-
-	lastVoteBlockID := lastVote.GetBlockID()
-	newVoteBlockID := newVote.GetBlockID()
-	if newVoteBlockID == nil && lastVoteBlockID != nil {
-		return newAlreadySignedVoteError(true)
-	}
-	if newVoteBlockID != nil && lastVoteBlockID == nil {
-		return newAlreadySignedVoteError(false)
-	}
-	if !bytes.Equal(lastVoteBlockID.GetHash(), newVoteBlockID.GetHash()) {
-		return newDiffBlockIDsError(lastVoteBlockID.GetHash(), newVoteBlockID.GetHash())
-	}
-	return newConflictingDataError(lastSignBytes, newSignBytes)
-}
-
-func checkProposalOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) error {
-	var lastProposal, newProposal cometproto.CanonicalProposal
-	if err := protoio.UnmarshalDelimited(lastSignBytes, &lastProposal); err != nil {
-		return newUnmarshalError("lastSignBytes", "proposal", err)
-	}
-	if err := protoio.UnmarshalDelimited(newSignBytes, &newProposal); err != nil {
-		return newUnmarshalError("newSignBytes", "proposal", err)
-	}
-
-	// set the times to the same value and check equality
-	newProposal.Timestamp = lastProposal.Timestamp
-
-	isEqual := proto.Equal(&newProposal, &lastProposal)
-
-	if !isEqual {
-		return newConflictingDataError(lastSignBytes, newSignBytes)
-	}
-
-	return nil
 }
