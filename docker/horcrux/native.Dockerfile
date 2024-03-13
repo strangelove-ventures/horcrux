@@ -4,7 +4,7 @@ RUN apk add --update --no-cache curl make git libc-dev bash gcc linux-headers eu
 
 WORKDIR /horcrux
 
-ADD go.mod go.sum ./
+ADD go.mod go.sum gnark-crypto ./
 
 RUN go mod download
 

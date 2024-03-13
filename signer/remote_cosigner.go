@@ -109,17 +109,15 @@ func (cosigner *RemoteCosigner) SetNoncesAndSign(
 	ctx context.Context,
 	req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error) {
 	cosignerReq := &grpccosigner.SetNoncesAndSignRequest{
-		Uuid:      req.Nonces.UUID[:],
-		ChainID:   req.ChainID,
-		Nonces:    req.Nonces.Nonces.toProto(),
-		Hrst:      req.HRST.ToProto(),
-		SignBytes: req.SignBytes,
+		Uuid:    req.Nonces.UUID[:],
+		ChainID: req.ChainID,
+		Nonces:  req.Nonces.Nonces.toProto(),
+		Block:   req.Block.ToProto(),
 	}
 
-	if req.VoteExtensionNonces != nil && len(req.VoteExtensionSignBytes) > 0 {
+	if req.VoteExtensionNonces != nil && len(req.Block.VoteExtensionSignBytes) > 0 {
 		cosignerReq.VoteExtUuid = req.VoteExtensionNonces.UUID[:]
 		cosignerReq.VoteExtNonces = req.VoteExtensionNonces.Nonces.toProto()
-		cosignerReq.VoteExtSignBytes = req.VoteExtensionSignBytes
 	}
 
 	res, err := cosigner.client.SetNoncesAndSign(ctx, cosignerReq)

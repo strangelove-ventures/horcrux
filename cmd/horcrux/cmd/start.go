@@ -20,7 +20,9 @@ func startCmd() *cobra.Command {
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			out := cmd.OutOrStdout()
-			logger := slog.New(slog.NewTextHandler(out, nil))
+			logger := slog.New(slog.NewTextHandler(out, &slog.HandlerOptions{
+				Level: slog.LevelDebug,
+			}))
 
 			err := signer.RequireNotRunning(logger, config.PidFile)
 			if err != nil {

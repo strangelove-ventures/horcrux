@@ -6,6 +6,7 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	cometcryptobn254 "github.com/strangelove-ventures/horcrux/v3/comet/crypto/bn254"
 	horcruxbn254 "github.com/strangelove-ventures/horcrux/v3/signer/bn254"
+	"github.com/strangelove-ventures/horcrux/v3/types"
 )
 
 var _ ThresholdSigner = &ThresholdSignerSoftBn254{}
@@ -66,4 +67,8 @@ func (s *ThresholdSignerSoftBn254) CombineSignatures(signatures []PartialSignatu
 
 func (s *ThresholdSignerSoftBn254) VerifySignature(msg, signature []byte) bool {
 	return cometcryptobn254.PubKey(s.pubKey).VerifySignature(msg, signature)
+}
+
+func (s *ThresholdSignerSoftBn254) ConstructPayload(chainID string, block types.Block) ([]byte, error) {
+	return horcruxbn254.SignBytes(chainID, block)
 }

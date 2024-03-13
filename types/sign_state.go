@@ -14,7 +14,6 @@ import (
 	"github.com/strangelove-ventures/horcrux/v3/comet/libs/protoio"
 	"github.com/strangelove-ventures/horcrux/v3/comet/libs/tempfile"
 	cometproto "github.com/strangelove-ventures/horcrux/v3/comet/proto/types"
-	comet "github.com/strangelove-ventures/horcrux/v3/comet/types"
 	"github.com/strangelove-ventures/horcrux/v3/signer/cond"
 )
 
@@ -38,8 +37,8 @@ func SignType(step int8) string {
 	}
 }
 
-func CanonicalVoteToStep(vote *cometproto.CanonicalVote) int8 {
-	switch vote.Type {
+func VoteTypeToStep(voteType cometproto.SignedMsgType) int8 {
+	switch voteType {
 	case cometproto.PrevoteType:
 		return StepPrevote
 	case cometproto.PrecommitType:
@@ -49,24 +48,19 @@ func CanonicalVoteToStep(vote *cometproto.CanonicalVote) int8 {
 	}
 }
 
-func VoteToStep(vote *cometproto.Vote) int8 {
-	switch vote.Type {
-	case cometproto.PrevoteType:
-		return StepPrevote
-	case cometproto.PrecommitType:
-		return StepPrecommit
-	default:
-		panic("Unknown vote type")
-	}
-}
-
-func VoteToBlock(chainID string, vote *cometproto.Vote) Block {
+func VoteToBlock(vote *cometproto.Vote) Block {
 	return Block{
 		Height:                 vote.Height,
 		Round:                  int64(vote.Round),
-		Step:                   VoteToStep(vote),
-		SignBytes:              comet.VoteSignBytes(chainID, vote),
-		VoteExtensionSignBytes: comet.VoteExtensionSignBytes(chainID, vote),
+		Step:                   VoteTypeToStep(vote.Type),
+		BlockID: &BlockID{
+			Hash: vote.BlockID.Hash,
+			PartSetHeader: PartSetHeader{
+				Total: vote.BlockID.PartSetHeader.Total,
+				Hash:  vote.BlockID.PartSetHeader.Hash,
+			},
+		},
+		VoteExtensionSignBytes: vote.Extension,
 		Timestamp:              vote.Timestamp,
 	}
 }
@@ -75,12 +69,19 @@ func ProposalToStep(_ *cometproto.Proposal) int8 {
 	return StepPropose
 }
 
-func ProposalToBlock(chainID string, proposal *cometproto.Proposal) Block {
+func ProposalToBlock(proposal *cometproto.Proposal) Block {
 	return Block{
-		Height:    proposal.Height,
-		Round:     int64(proposal.Round),
-		Step:      ProposalToStep(proposal),
-		SignBytes: comet.ProposalSignBytes(chainID, proposal),
+		Height: proposal.Height,
+		Round:  int64(proposal.Round),
+		Step:   ProposalToStep(proposal),
+		BlockID: &BlockID{
+			Hash: proposal.BlockID.Hash,
+			PartSetHeader: PartSetHeader{
+				Total: proposal.BlockID.PartSetHeader.Total,
+				Hash:  proposal.BlockID.PartSetHeader.Hash,
+			},
+		},
+		POLRound:  int64(proposal.PolRound),
 		Timestamp: proposal.Timestamp,
 	}
 }

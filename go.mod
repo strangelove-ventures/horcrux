@@ -26,6 +26,7 @@ require (
 	github.com/spf13/viper v1.16.0
 	github.com/stretchr/testify v1.8.4
 	github.com/tendermint/go-amino v0.16.0
+	github.com/tunabay/go-bitarray v1.3.1
 	gitlab.com/unit410/edwards25519 v0.0.0-20220725154547-61980033348e
 	gitlab.com/unit410/threshold-ed25519 v0.0.0-20220812172601-56783212c4cc
 	golang.org/x/crypto v0.14.0

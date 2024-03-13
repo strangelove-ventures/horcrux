@@ -17,7 +17,7 @@ import (
 	"github.com/google/uuid"
 	cometcryptoed25519 "github.com/strangelove-ventures/horcrux/v3/comet/crypto/ed25519"
 	cometproto "github.com/strangelove-ventures/horcrux/v3/comet/proto/types"
-	comet "github.com/strangelove-ventures/horcrux/v3/comet/types"
+	horcruxed25519 "github.com/strangelove-ventures/horcrux/v3/signer/ed25519"
 	"github.com/strangelove-ventures/horcrux/v3/types"
 	"github.com/stretchr/testify/require"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
@@ -125,13 +125,6 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 
 	now := time.Now()
 
-	hrst := types.HRSTKey{
-		Height:    1,
-		Round:     0,
-		Step:      2,
-		Timestamp: now.UnixNano(),
-	}
-
 	u, err := uuid.NewRandom()
 	require.NoError(t, err)
 
@@ -192,7 +185,10 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 	vote.Type = cometproto.PrevoteType
 	vote.Timestamp = now
 
-	signBytes := comet.VoteSignBytes("chain-id", &vote)
+	block := types.VoteToBlock(&vote)
+
+	signBytes, err := horcruxed25519.SignBytes("chain-id", block)
+	require.NoError(t, err)
 
 	sigs := make([]PartialSignature, threshold)
 
@@ -216,9 +212,8 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 				UUID:   u,
 				Nonces: cosignerNonces,
 			},
-			ChainID:   testChainID,
-			HRST:      hrst,
-			SignBytes: signBytes,
+			ChainID: testChainID,
+			Block:   block,
 		})
 		require.NoError(t, err)
 

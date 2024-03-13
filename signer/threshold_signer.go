@@ -1,6 +1,10 @@
 package signer
 
-import "time"
+import (
+	"time"
+
+	"github.com/strangelove-ventures/horcrux/v3/types"
+)
 
 const (
 	CosignerKeyTypeEd25519 = "ed25519"
@@ -11,6 +15,9 @@ const (
 type ThresholdSigner interface {
 	// PubKey returns the public key bytes for the combination of all cosigners.
 	PubKey() []byte
+
+	// ConstructPayload constructs the payload to be signed.
+	ConstructPayload(chainID string, block types.Block) ([]byte, error)
 
 	// Sign signs a byte payload with the provided nonces.
 	Sign(nonces []Nonce, payload []byte) ([]byte, error)

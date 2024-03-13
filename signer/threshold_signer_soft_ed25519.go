@@ -7,6 +7,8 @@ import (
 	"fmt"
 
 	cometcryptoed25519 "github.com/strangelove-ventures/horcrux/v3/comet/crypto/ed25519"
+	horcruxed25519 "github.com/strangelove-ventures/horcrux/v3/signer/ed25519"
+	"github.com/strangelove-ventures/horcrux/v3/types"
 	"gitlab.com/unit410/edwards25519"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
@@ -111,4 +113,8 @@ func (s *ThresholdSignerSoftEd25519) CombineSignatures(signatures []PartialSigna
 
 func (s *ThresholdSignerSoftEd25519) VerifySignature(payload, signature []byte) bool {
 	return cometcryptoed25519.PubKey(s.pubKey).VerifySignature(payload, signature)
+}
+
+func (s *ThresholdSignerSoftEd25519) ConstructPayload(chainID string, block types.Block) ([]byte, error) {
+	return horcruxed25519.SignBytes(chainID, block)
 }

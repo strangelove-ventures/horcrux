@@ -178,7 +178,7 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *cometp
 		rs.Logger,
 		rs.privVal,
 		chainID,
-		types.VoteToBlock(chainID, vote),
+		types.VoteToBlock(vote),
 	)
 	if err != nil {
 		msgSum.SignedVoteResponse.Error = getRemoteSignerError(err)
@@ -207,7 +207,7 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(
 		rs.logger,
 		rs.privVal,
 		chainID,
-		types.ProposalToBlock(chainID, proposal),
+		types.ProposalToBlock(proposal),
 	)
 	if err != nil {
 		msgSum.SignedProposalResponse.Error = getRemoteSignerError(err)

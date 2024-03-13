@@ -9,12 +9,15 @@ import (
 
 	"github.com/cosmos/gogoproto/proto"
 	"github.com/strangelove-ventures/horcrux/v3/comet/crypto"
+	"github.com/strangelove-ventures/horcrux/v3/comet/crypto/bn254"
 	"github.com/strangelove-ventures/horcrux/v3/comet/crypto/ed25519"
 	cometjson "github.com/strangelove-ventures/horcrux/v3/comet/libs/json"
 	"github.com/strangelove-ventures/horcrux/v3/comet/libs/protoio"
 	"github.com/strangelove-ventures/horcrux/v3/comet/libs/tempfile"
 	cometproto "github.com/strangelove-ventures/horcrux/v3/comet/proto/types"
 	comettypes "github.com/strangelove-ventures/horcrux/v3/comet/types"
+	horcruxbn254 "github.com/strangelove-ventures/horcrux/v3/signer/bn254"
+	horcruxed25519 "github.com/strangelove-ventures/horcrux/v3/signer/ed25519"
 	"github.com/strangelove-ventures/horcrux/v3/types"
 )
 
@@ -206,9 +209,23 @@ func (pv *FilePV) GetPubKey() (crypto.PubKey, error) {
 	return pv.Key.PubKey, nil
 }
 
-func (pv *FilePV) Sign(chainID string, block Block) ([]byte, []byte, time.Time, error) {
+func (pv *FilePV) Sign(chainID string, block types.Block) ([]byte, time.Time, error) {
 	height, round, step := block.Height, int32(block.Round), block.Step
-	signBytes, voteExtensionSignBytes := block.SignBytes, block.VoteExtensionSignBytes
+
+	var signBytes []byte
+	var err error
+	switch pv.Key.PrivKey.(type) {
+	case ed25519.PrivKey:
+		signBytes, err = horcruxed25519.SignBytes(chainID, block)
+		if err != nil {
+			return nil, block.Timestamp, err
+		}
+	case bn254.PrivKey:
+		signBytes, err = horcruxbn254.SignBytes(chainID, block)
+		if err != nil {
+			return nil, block.Timestamp, err
+		}
+	}
 
 	lss := pv.LastSignState
 

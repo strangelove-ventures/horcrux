@@ -49,10 +49,11 @@ func (rpc *CosignerGRPCServer) SetNoncesAndSign(
 	ctx context.Context,
 	req *grpccosigner.SetNoncesAndSignRequest,
 ) (*grpccosigner.SetNoncesAndSignResponse, error) {
+	b := types.BlockFromProto(req.Block)
 	cosignerReq := CosignerSetNoncesAndSignRequest{
 		ChainID: req.ChainID,
 
-		HRST:      types.HRSTKeyFromProto(req.GetHrst()),
+		Block: b,
 
 		Nonces: &CosignerUUIDNonces{
 			UUID:   uuid.UUID(req.Uuid),
@@ -66,7 +67,6 @@ func (rpc *CosignerGRPCServer) SetNoncesAndSign(
 			UUID:   uuid.UUID(req.VoteExtUuid),
 			Nonces: CosignerNoncesFromProto(req.VoteExtNonces),
 		}
-		cosignerReq.VoteExtensionSignBytes = req.VoteExtSignBytes
 	}
 
 	res, err := rpc.cosigner.SetNoncesAndSign(ctx, cosignerReq)
@@ -74,9 +74,9 @@ func (rpc *CosignerGRPCServer) SetNoncesAndSign(
 		rpc.raftStore.logger.Error(
 			"Failed to sign with shard",
 			"chain_id", req.ChainID,
-			"height", req.Hrst.Height,
-			"round", req.Hrst.Round,
-			"step", req.Hrst.Step,
+			"height", hrst.Height,
+			"round", hrst.Round,
+			"step", hrst.Step,
 			"error", err,
 		)
 		return nil, err
@@ -84,9 +84,9 @@ func (rpc *CosignerGRPCServer) SetNoncesAndSign(
 	rpc.raftStore.logger.Info(
 		"Signed with shard",
 		"chain_id", req.ChainID,
-		"height", req.Hrst.Height,
-		"round", req.Hrst.Round,
-		"step", req.Hrst.Step,
+		"height", hrst.Height,
+		"round", hrst.Round,
+		"step", hrst.Step,
 	)
 	return &grpccosigner.SetNoncesAndSignResponse{
 		NoncePublic:        res.NoncePublic,

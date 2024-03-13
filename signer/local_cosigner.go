@@ -192,6 +192,15 @@ func (cosigner *LocalCosigner) CombineSignatures(chainID string, signatures []Pa
 	return ccs.signer.CombineSignatures(signatures)
 }
 
+func (cosigner *LocalCosigner) SignBytes(chainID string, block types.Block) ([]byte, error) {
+	ccs, err := cosigner.getChainState(chainID)
+	if err != nil {
+		return nil, fmt.Errorf("error getting chain state: %s", err)
+	}
+
+	return ccs.signer.ConstructPayload(chainID, block)
+}
+
 // VerifySignature validates a signed payload against the public key.
 // Implements Cosigner interface
 func (cosigner *LocalCosigner) VerifySignature(chainID string, payload, signature []byte) bool {
@@ -225,15 +234,17 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		return res, err
 	}
 
-	hrst, hasVoteExtensions, err := verifySignPayload(chainID, req.SignBytes, req.VoteExtensionSignBytes)
+	// This function has multiple exit points.  Only start time can be guaranteed
+	metricsTimeKeeper.SetPreviousLocalSignStart(time.Now())
+
+	hrst := req.Block.HRSTKey()
+
+	signBytes, voteExtensionSignBytes, err := ccs.signer.ConstructPayload(chainID, req.Block)
 	if err != nil {
 		return res, err
 	}
 
-	// This function has multiple exit points.  Only start time can be guaranteed
-	metricsTimeKeeper.SetPreviousLocalSignStart(time.Now())
-
-	existingSignature, err := ccs.lastSignState.existingSignatureOrErrorIfRegression(hrst, req.SignBytes)
+	existingSignature, err := ccs.lastSignState.ExistingSignatureOrErrorIfRegression(hrst, signBytes)
 	if err != nil {
 		return res, err
 	}
@@ -276,13 +287,13 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	var sig, voteExtSig []byte
 	eg.Go(func() error {
 		var err error
-		sig, err = ccs.signer.Sign(nonces, req.SignBytes)
+		sig, err = ccs.signer.Sign(nonces, signBytes)
 		return err
 	})
 	if hasVoteExtensions {
 		eg.Go(func() error {
 			var err error
-			voteExtSig, err = ccs.signer.Sign(voteExtNonces, req.VoteExtensionSignBytes)
+			voteExtSig, err = ccs.signer.Sign(voteExtNonces, voteExtensionSignBytes)
 			return err
 		})
 	}
@@ -296,8 +307,8 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		Round:                  hrst.Round,
 		Step:                   hrst.Step,
 		Signature:              sig,
-		SignBytes:              req.SignBytes,
-		VoteExtensionSignature: res.VoteExtensionSignature,
+		SignBytes:              signBytes,
+		VoteExtensionSignature: voteExtSig,
 	}, &cosigner.pendingDiskWG)
 
 	if err != nil {
@@ -580,11 +591,10 @@ func (cosigner *LocalCosigner) SetNoncesAndSign(
 	cosignerReq := CosignerSignRequest{
 		UUID:      req.Nonces.UUID,
 		ChainID:   chainID,
-		SignBytes: req.SignBytes,
+		Block:	 req.Block,
 	}
 
-	if len(req.VoteExtensionSignBytes) > 0 {
-		cosignerReq.VoteExtensionSignBytes = req.VoteExtensionSignBytes
+	if len(req.Block.VoteExtensionSignBytes) > 0 {
 		cosignerReq.VoteExtUUID = req.VoteExtensionNonces.UUID
 	}
 

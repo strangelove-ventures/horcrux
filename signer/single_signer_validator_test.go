@@ -13,6 +13,7 @@ import (
 	cometjson "github.com/strangelove-ventures/horcrux/v3/comet/libs/json"
 	cometprivval "github.com/strangelove-ventures/horcrux/v3/comet/privval"
 	cometproto "github.com/strangelove-ventures/horcrux/v3/comet/proto/types"
+	horcruxed25519 "github.com/strangelove-ventures/horcrux/v3/signer/ed25519"
 	"github.com/strangelove-ventures/horcrux/v3/types"
 	"github.com/stretchr/testify/require"
 )
@@ -54,14 +55,17 @@ func TestSingleSignerValidator(t *testing.T) {
 		Type:   cometproto.ProposalType,
 	}
 
-	block := types.ProposalToBlock(testChainID, &proposal)
+	block := types.ProposalToBlock(&proposal)
 
 	ctx := context.Background()
 
 	signature, _, _, err := validator.Sign(ctx, testChainID, block)
 	require.NoError(t, err)
 
-	require.True(t, privateKey.PubKey().VerifySignature(block.SignBytes, signature))
+	signBytes, err := horcruxed25519.SignBytes(testChainID, block)
+	require.NoError(t, err)
+
+	require.True(t, privateKey.PubKey().VerifySignature(signBytes, signature))
 
 	proposal.Timestamp = time.Now()
 

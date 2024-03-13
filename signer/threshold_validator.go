@@ -146,6 +146,7 @@ func (pv *ThresholdValidator) mustLoadChainState(chainID string) ChainSignState 
 func (pv *ThresholdValidator) SaveLastSignedStateInitiated(
 	chainID string,
 	block *types.Block,
+	signBytes []byte,
 ) ([]byte, []byte, time.Time, error) {
 	css := pv.mustLoadChainState(chainID)
 
@@ -158,8 +159,7 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(
 	}
 
 	// There was an error saving the last sign state, so check if there is an existing signature for this block.
-	existingSignature, existingVoteExtSignature,
-		existingTimestamp, sameBlockErr := pv.getExistingBlockSignature(chainID, block)
+	existingSignature, existingVoteExtSignature, existingTimestamp, sameBlockErr := pv.getExistingBlockSignature(chainID, block, signBytes)
 
 	if _, ok := err.(*types.SameHRSError); !ok {
 		if sameBlockErr == nil {
@@ -209,8 +209,7 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(
 			continue
 		}
 
-		existingSignature, existingVoteExtSignature,
-			existingTimestamp, sameBlockErr = pv.compareBlockSignatureAgainstSSC(chainID, block, &ssc)
+		existingSignature, existingVoteExtSignature, existingTimestamp, sameBlockErr = pv.compareBlockSignatureAgainstSSC(chainID, block, &ssc, signBytes)
 		if sameBlockErr == nil {
 			return existingSignature, existingVoteExtSignature, existingTimestamp, nil
 		}
@@ -355,15 +354,16 @@ func (pv *ThresholdValidator) LoadSignStateIfNecessary(chainID string) error {
 // It returns nil signature and nil error if there is no signature and it's okay to sign (fresh or again).
 // It returns an error if we have already signed a greater block, or if we are still waiting for in in-progress sign.
 func (pv *ThresholdValidator) getExistingBlockSignature(
-	chainID string,
-	block *types.Block,
+	chainID string, 
+	block *types.Block, 
+	signBytes []byte,
 ) ([]byte, []byte, time.Time, error) {
 	css := pv.mustLoadChainState(chainID)
 
 	latestBlock, existingSignature := css.lastSignState.GetFromCache(block.HRSKey())
 	if existingSignature != nil {
 		// signature exists in cache, so compare against that
-		return pv.compareBlockSignatureAgainstSSC(chainID, block, existingSignature)
+		return pv.compareBlockSignatureAgainstSSC(chainID, block, existingSignature, signBytes)
 	}
 
 	// signature does not exist in cache, so compare against latest signed block.
@@ -383,9 +383,10 @@ func (pv *ThresholdValidator) getExistingBlockSignature(
 func (pv *ThresholdValidator) compareBlockSignatureAgainstSSC(
 	chainID string,
 	block *types.Block,
-	existingSignature *SignStateConsensus,
+	existingSignature *types.SignStateConsensus,
+	signBytes []byte,
 ) ([]byte, []byte, time.Time, error) {
-	stamp, signBytes := block.Timestamp, block.SignBytes
+	stamp := block.Timestamp
 
 	if err := pv.compareBlockSignatureAgainstHRS(chainID, block, existingSignature.HRSKey()); err != nil {
 		if _, ok := err.(*SameBlockError); !ok {
@@ -583,12 +584,11 @@ func (pv *ThresholdValidator) proxyIfNecessary(
 }
 
 func (pv *ThresholdValidator) Sign(
-	ctx context.Context,
-	chainID string,
+	ctx context.Context, 
+	chainID string, 
 	block types.Block,
 ) ([]byte, []byte, time.Time, error) {
 	height, round, step, stamp := block.Height, block.Round, block.Step, block.Timestamp
-	signBytes, voteExtensionSignBytes := block.SignBytes, block.VoteExtensionSignBytes
 
 	log := pv.logger.With(
 		"chain_id", chainID,
@@ -614,15 +614,13 @@ func (pv *ThresholdValidator) Sign(
 
 	timeStartSignBlock := time.Now()
 
-	hrst := types.HRSTKey{
-		Height:    height,
-		Round:     round,
-		Step:      step,
-		Timestamp: stamp.UnixNano(),
+	signBytes, voteExtSignBytes, err := pv.myCosigner.SignBytes(chainID, block)
+	if err != nil {
+		return nil, stamp, fmt.Errorf("error getting sign bytes: %w", err)
 	}
 
 	// Keep track of the last block that we began the signing process for. Only allow one attempt per block
-	existingSignature, existingVoteExtSig, existingTimestamp, err := pv.SaveLastSignedStateInitiated(chainID, &block)
+	existingSignature, existingVoteExtSigm existingTimestamp, err := pv.SaveLastSignedStateInitiated(chainID, &block, signBytes)
 	if err != nil {
 		return nil, nil, stamp, fmt.Errorf("error saving last sign state initiated: %w", err)
 	}
@@ -751,12 +749,10 @@ func (pv *ThresholdValidator) Sign(
 				sigReq := CosignerSetNoncesAndSignRequest{
 					ChainID:   chainID,
 					Nonces:    nonces.For(cosigner.GetID()),
-					HRST:      hrst,
-					SignBytes: signBytes,
+					Block:   block,
 				}
 
 				if voteExtNonces != nil {
-					sigReq.VoteExtensionSignBytes = voteExtensionSignBytes
 					sigReq.VoteExtensionNonces = voteExtNonces.For(cosigner.GetID())
 				}
 
