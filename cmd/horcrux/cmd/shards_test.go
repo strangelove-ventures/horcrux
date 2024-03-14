@@ -19,9 +19,11 @@ func TestEd25519Shards(t *testing.T) {
 	tmp := t.TempDir()
 
 	privValidatorKeyFile := filepath.Join(tmp, "priv_validator_key.json")
-	privValidatorStateFile := filepath.Join(tmp, "priv_validator_state.json")
-	pv := privval.NewFilePV(ed25519.GenPrivKey(), privValidatorKeyFile, privValidatorStateFile)
-	pv.Save()
+
+	privKey := ed25519.GenPrivKey()
+
+	filePv := privval.NewFilePVKey(privKey, privValidatorKeyFile)
+	filePv.Save()
 
 	tcs := []struct {
 		name      string

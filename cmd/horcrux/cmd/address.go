@@ -61,7 +61,7 @@ func addressCmd() *cobra.Command {
 					return fmt.Errorf("error reading priv-validator key: %w, check that key is present for chain ID: %s", err, chainID)
 				}
 
-				filePV, err := cometprivval.LoadFilePV(keyFile, "", false)
+				filePV, err := cometprivval.LoadFilePV(keyFile, "")
 				if err != nil {
 					return err
 				}

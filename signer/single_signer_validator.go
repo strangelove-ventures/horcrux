@@ -58,7 +58,7 @@ func (pv *SingleSignerValidator) Sign(
 	_ context.Context,
 	chainID string,
 	block types.Block,
-) ([]byte,[]byte,time.Time,error) {
+) ([]byte, []byte, time.Time, error) {
 	chainState, err := pv.loadChainStateIfNecessary(chainID)
 	if err != nil {
 		return nil, nil, block.Timestamp, err
@@ -81,22 +81,10 @@ func (pv *SingleSignerValidator) loadChainStateIfNecessary(chainID string) (*Sin
 	}
 
 	stateFile := pv.config.PrivValStateFile(chainID)
-	var filePV *privval.FilePV
-	if _, err := os.Stat(stateFile); err != nil {
-		if !os.IsNotExist(err) {
-			panic(fmt.Errorf("failed to load state file (%s) - %w", stateFile, err))
-		}
-		// The only scenario in which we want to create a new state file
-		// on disk is when the state file does not exist.
-		filePV, err = privval.LoadFilePV(keyFile, stateFile, false)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		filePV, err = privval.LoadFilePV(keyFile, stateFile, true)
-		if err != nil {
-			return nil, err
-		}
+
+	filePV, err := privval.LoadFilePV(keyFile, stateFile)
+	if err != nil {
+		return nil, err
 	}
 
 	chainState := &SingleSignerChainState{
