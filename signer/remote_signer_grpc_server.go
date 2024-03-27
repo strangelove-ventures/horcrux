@@ -8,7 +8,7 @@ import (
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	cometservice "github.com/cometbft/cometbft/libs/service"
 
-	"github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -83,14 +83,15 @@ func (s *RemoteSignerGRPCServer) Sign(
 ) (*proto.SignBlockResponse, error) {
 	chainID, block := req.ChainID, BlockFromProto(req.Block)
 
-	signature, timestamp, err := signAndTrack(ctx, s.logger, s.validator, chainID, block)
+	sig, voteExtSig, timestamp, err := signAndTrack(ctx, s.logger, s.validator, chainID, block)
 	if err != nil {
 		return nil, err
 	}
 
 	return &proto.SignBlockResponse{
-		Signature: signature,
-		Timestamp: timestamp.UnixNano(),
+		Signature:        sig,
+		VoteExtSignature: voteExtSig,
+		Timestamp:        timestamp.UnixNano(),
 	}, nil
 }
 
@@ -100,8 +101,8 @@ func signAndTrack(
 	validator PrivValidator,
 	chainID string,
 	block Block,
-) ([]byte, time.Time, error) {
-	signature, timestamp, err := validator.Sign(ctx, chainID, block)
+) ([]byte, []byte, time.Time, error) {
+	sig, voteExtSig, timestamp, err := validator.Sign(ctx, chainID, block)
 	if err != nil {
 		switch typedErr := err.(type) {
 		case *BeyondBlockError:
@@ -125,13 +126,17 @@ func signAndTrack(
 			)
 			failedSignVote.WithLabelValues(chainID).Inc()
 		}
-		return nil, block.Timestamp, err
+		return nil, nil, block.Timestamp, err
 	}
 
 	// Show signatures provided to each node have the same signature and timestamps
 	sigLen := 6
-	if len(signature) < sigLen {
-		sigLen = len(signature)
+	if len(sig) < sigLen {
+		sigLen = len(sig)
+	}
+	extSigLen := 6
+	if len(voteExtSig) < extSigLen {
+		extSigLen = len(voteExtSig)
 	}
 	logger.Info(
 		"Signed",
@@ -139,7 +144,8 @@ func signAndTrack(
 		"chain_id", chainID,
 		"height", block.Height,
 		"round", block.Round,
-		"sig", signature[:sigLen],
+		"sig", sig[:sigLen],
+		"vote_ext_sig", voteExtSig[:extSigLen],
 		"ts", block.Timestamp,
 	)
 
@@ -182,5 +188,5 @@ func signAndTrack(
 		totalPrecommitsSigned.WithLabelValues(chainID).Inc()
 	}
 
-	return signature, timestamp, nil
+	return sig, voteExtSig, timestamp, nil
 }

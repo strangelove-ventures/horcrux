@@ -3,8 +3,8 @@ COMMIT  := $(shell git log -1 --format='%H')
 
 all: install
 
-LD_FLAGS = -X github.com/strangelove-ventures/horcrux/cmd/horcrux/cmd.Version=$(VERSION) \
-	-X github.com/strangelove-ventures/horcrux/cmd/horcrux/cmd.Commit=$(COMMIT)
+LD_FLAGS = -X github.com/strangelove-ventures/horcrux/v3/cmd/horcrux/cmd.Version=$(VERSION) \
+	-X github.com/strangelove-ventures/horcrux/v3/cmd/horcrux/cmd.Commit=$(COMMIT)
 
 LD_FLAGS += $(LDFLAGS)
 LD_FLAGS := $(strip $(LD_FLAGS))

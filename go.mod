@@ -1,4 +1,4 @@
-module github.com/strangelove-ventures/horcrux
+module github.com/strangelove-ventures/horcrux/v3
 
 go 1.21
 
@@ -7,7 +7,7 @@ require (
 	github.com/Jille/raft-grpc-transport v1.4.0
 	github.com/Jille/raftadmin v1.2.1
 	github.com/armon/go-metrics v0.4.1
-	github.com/cometbft/cometbft v0.38.0
+	github.com/cometbft/cometbft v0.38.2
 	github.com/cosmos/cosmos-sdk v0.50.1
 	github.com/cosmos/gogoproto v1.4.11
 	github.com/ethereum/go-ethereum v1.13.5

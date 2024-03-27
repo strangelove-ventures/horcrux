@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/signer"
+	"github.com/strangelove-ventures/horcrux/v3/signer"
 	"github.com/stretchr/testify/require"
 )
 

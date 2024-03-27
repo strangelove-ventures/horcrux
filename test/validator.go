@@ -14,7 +14,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/bech32"
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	"github.com/docker/docker/client"
-	"github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 	interchaintest "github.com/strangelove-ventures/interchaintest/v8"
 	"github.com/strangelove-ventures/interchaintest/v8/chain/cosmos"
 	"github.com/strangelove-ventures/interchaintest/v8/ibc"
@@ -45,7 +45,7 @@ const (
 	signerImageHomeDir = "/home/horcrux"
 
 	horcruxProxyRegistry = "ghcr.io/strangelove-ventures/horcrux-proxy"
-	horcruxProxyTag      = "andrew-horcrux_remote_signer_grpc"
+	horcruxProxyTag      = "andrew-vote_extensions"
 )
 
 // chainWrapper holds the initial configuration for a chain to start from genesis.

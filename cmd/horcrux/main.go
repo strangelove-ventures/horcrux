@@ -15,7 +15,7 @@ limitations under the License.
 */
 package main
 
-import "github.com/strangelove-ventures/horcrux/cmd/horcrux/cmd"
+import "github.com/strangelove-ventures/horcrux/v3/cmd/horcrux/cmd"
 
 func main() {
 	cmd.Execute()

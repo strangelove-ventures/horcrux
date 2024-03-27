@@ -3,7 +3,7 @@ package client_test
 import (
 	"testing"
 
-	"github.com/strangelove-ventures/horcrux/client"
+	"github.com/strangelove-ventures/horcrux/v3/client"
 	"github.com/stretchr/testify/require"
 )
 

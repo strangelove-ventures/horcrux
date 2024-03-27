@@ -8,7 +8,7 @@ import (
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	"github.com/google/uuid"
-	"github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -108,20 +108,30 @@ func (cosigner *RemoteCosigner) GetNonces(
 func (cosigner *RemoteCosigner) SetNoncesAndSign(
 	ctx context.Context,
 	req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error) {
-	res, err := cosigner.client.SetNoncesAndSign(ctx, &proto.SetNoncesAndSignRequest{
+	cosignerReq := &proto.SetNoncesAndSignRequest{
 		Uuid:      req.Nonces.UUID[:],
 		ChainID:   req.ChainID,
 		Nonces:    req.Nonces.Nonces.toProto(),
 		Hrst:      req.HRST.toProto(),
 		SignBytes: req.SignBytes,
-	})
+	}
+
+	if req.VoteExtensionNonces != nil && len(req.VoteExtensionSignBytes) > 0 {
+		cosignerReq.VoteExtUuid = req.VoteExtensionNonces.UUID[:]
+		cosignerReq.VoteExtNonces = req.VoteExtensionNonces.Nonces.toProto()
+		cosignerReq.VoteExtSignBytes = req.VoteExtensionSignBytes
+	}
+
+	res, err := cosigner.client.SetNoncesAndSign(ctx, cosignerReq)
 	if err != nil {
 		return nil, err
 	}
 	return &CosignerSignResponse{
-		NoncePublic: res.GetNoncePublic(),
-		Timestamp:   time.Unix(0, res.GetTimestamp()),
-		Signature:   res.GetSignature(),
+		NoncePublic:              res.NoncePublic,
+		Timestamp:                time.Unix(0, res.Timestamp),
+		Signature:                res.Signature,
+		VoteExtensionSignature:   res.VoteExtSignature,
+		VoteExtensionNoncePublic: res.VoteExtNoncePublic,
 	}, nil
 }
 
@@ -137,6 +147,7 @@ func (cosigner *RemoteCosigner) Sign(
 		return nil, err
 	}
 	return &CosignerSignBlockResponse{
-		Signature: res.GetSignature(),
+		Signature:              res.Signature,
+		VoteExtensionSignature: res.VoteExtSignature,
 	}, nil
 }

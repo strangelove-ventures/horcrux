@@ -16,7 +16,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/cosmos/cosmos-sdk/types/bech32"
-	"github.com/strangelove-ventures/horcrux/client"
+	"github.com/strangelove-ventures/horcrux/v3/client"
 	"gopkg.in/yaml.v2"
 )
 

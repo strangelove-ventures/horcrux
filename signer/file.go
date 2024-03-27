@@ -200,14 +200,33 @@ func (pv *FilePV) GetPubKey() (crypto.PubKey, error) {
 	return pv.Key.PubKey, nil
 }
 
-func (pv *FilePV) Sign(block Block) ([]byte, time.Time, error) {
-	height, round, step, signBytes := block.Height, int32(block.Round), block.Step, block.SignBytes
+func (pv *FilePV) Sign(chainID string, block Block) ([]byte, []byte, time.Time, error) {
+	height, round, step := block.Height, int32(block.Round), block.Step
+	signBytes, voteExtensionSignBytes := block.SignBytes, block.VoteExtensionSignBytes
 
 	lss := pv.LastSignState
 
 	sameHRS, err := lss.CheckHRS(height, round, step)
 	if err != nil {
-		return nil, block.Timestamp, err
+		return nil, nil, block.Timestamp, err
+	}
+
+	_, hasVoteExtensions, err := verifySignPayload(chainID, signBytes, voteExtensionSignBytes)
+	if err != nil {
+		return nil, nil, block.Timestamp, err
+	}
+
+	// Vote extensions are non-deterministic, so it is possible that an
+	// application may have created a different extension. We therefore always
+	// re-sign the vote extensions of precommits. For prevotes and nil
+	// precommits, the extension signature will always be empty.
+	// Even if the signed over data is empty, we still add the signature
+	var extSig []byte
+	if hasVoteExtensions {
+		extSig, err = pv.Key.PrivKey.Sign(voteExtensionSignBytes)
+		if err != nil {
+			return nil, nil, block.Timestamp, err
+		}
 	}
 
 	// We might crash before writing to the wal,
@@ -218,28 +237,28 @@ func (pv *FilePV) Sign(block Block) ([]byte, time.Time, error) {
 	if sameHRS {
 		switch {
 		case bytes.Equal(signBytes, lss.SignBytes):
-			return lss.Signature, block.Timestamp, nil
+			return lss.Signature, nil, block.Timestamp, nil
 		case block.Step == stepPropose:
 			if timestamp, ok := checkProposalsOnlyDifferByTimestamp(lss.SignBytes, signBytes); ok {
-				return lss.Signature, timestamp, nil
+				return lss.Signature, nil, timestamp, nil
 			}
 		case block.Step == stepPrevote || block.Step == stepPrecommit:
 			if timestamp, ok := checkVotesOnlyDifferByTimestamp(lss.SignBytes, signBytes); ok {
-				return lss.Signature, timestamp, nil
+				return lss.Signature, extSig, timestamp, nil
 			}
 		}
 
-		return nil, block.Timestamp, fmt.Errorf("conflicting data")
+		return nil, extSig, block.Timestamp, fmt.Errorf("conflicting data")
 	}
 
 	// It passed the checks. Sign the vote
 	sig, err := pv.Key.PrivKey.Sign(signBytes)
 	if err != nil {
-		return nil, block.Timestamp, err
+		return nil, nil, block.Timestamp, err
 	}
 	pv.saveSigned(height, round, step, signBytes, sig)
 
-	return sig, block.Timestamp, nil
+	return sig, extSig, block.Timestamp, nil
 }
 
 // Save persists the FilePV to disk.

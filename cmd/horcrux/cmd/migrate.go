@@ -13,7 +13,7 @@ import (
 	cometcryptoencoding "github.com/cometbft/cometbft/crypto/encoding"
 	cometprotocrypto "github.com/cometbft/cometbft/proto/tendermint/crypto"
 	"github.com/spf13/cobra"
-	"github.com/strangelove-ventures/horcrux/signer"
+	"github.com/strangelove-ventures/horcrux/v3/signer"
 	amino "github.com/tendermint/go-amino"
 	"gopkg.in/yaml.v2"
 )

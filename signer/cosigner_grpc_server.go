@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/raft"
-	"github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 )
 
 var _ proto.CosignerServer = &CosignerGRPCServer{}
@@ -34,12 +34,13 @@ func (rpc *CosignerGRPCServer) SignBlock(
 	ctx context.Context,
 	req *proto.SignBlockRequest,
 ) (*proto.SignBlockResponse, error) {
-	res, _, err := rpc.thresholdValidator.Sign(ctx, req.ChainID, BlockFromProto(req.Block))
+	sig, voteExtSig, _, err := rpc.thresholdValidator.Sign(ctx, req.ChainID, BlockFromProto(req.Block))
 	if err != nil {
 		return nil, err
 	}
 	return &proto.SignBlockResponse{
-		Signature: res,
+		Signature:        sig,
+		VoteExtSignature: voteExtSig,
 	}, nil
 }
 
@@ -47,15 +48,27 @@ func (rpc *CosignerGRPCServer) SetNoncesAndSign(
 	ctx context.Context,
 	req *proto.SetNoncesAndSignRequest,
 ) (*proto.SetNoncesAndSignResponse, error) {
-	res, err := rpc.cosigner.SetNoncesAndSign(ctx, CosignerSetNoncesAndSignRequest{
+	cosignerReq := CosignerSetNoncesAndSignRequest{
 		ChainID: req.ChainID,
+
+		HRST: HRSTKeyFromProto(req.Hrst),
+
 		Nonces: &CosignerUUIDNonces{
 			UUID:   uuid.UUID(req.Uuid),
-			Nonces: CosignerNoncesFromProto(req.GetNonces()),
+			Nonces: CosignerNoncesFromProto(req.Nonces),
 		},
-		HRST:      HRSTKeyFromProto(req.GetHrst()),
-		SignBytes: req.GetSignBytes(),
-	})
+		SignBytes: req.SignBytes,
+	}
+
+	if len(req.VoteExtSignBytes) > 0 && len(req.VoteExtUuid) == 16 {
+		cosignerReq.VoteExtensionNonces = &CosignerUUIDNonces{
+			UUID:   uuid.UUID(req.VoteExtUuid),
+			Nonces: CosignerNoncesFromProto(req.VoteExtNonces),
+		}
+		cosignerReq.VoteExtensionSignBytes = req.VoteExtSignBytes
+	}
+
+	res, err := rpc.cosigner.SetNoncesAndSign(ctx, cosignerReq)
 	if err != nil {
 		rpc.raftStore.logger.Error(
 			"Failed to sign with shard",
@@ -75,9 +88,11 @@ func (rpc *CosignerGRPCServer) SetNoncesAndSign(
 		"step", req.Hrst.Step,
 	)
 	return &proto.SetNoncesAndSignResponse{
-		NoncePublic: res.NoncePublic,
-		Timestamp:   res.Timestamp.UnixNano(),
-		Signature:   res.Signature,
+		NoncePublic:        res.NoncePublic,
+		Timestamp:          res.Timestamp.UnixNano(),
+		Signature:          res.Signature,
+		VoteExtNoncePublic: res.VoteExtensionNoncePublic,
+		VoteExtSignature:   res.VoteExtensionSignature,
 	}, nil
 }
 

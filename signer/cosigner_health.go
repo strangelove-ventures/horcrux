@@ -7,7 +7,7 @@ import (
 	"time"
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
-	"github.com/strangelove-ventures/horcrux/signer/proto"
+	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 )
 
 const (

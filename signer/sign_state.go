@@ -15,7 +15,7 @@ import (
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	comet "github.com/cometbft/cometbft/types"
 	"github.com/gogo/protobuf/proto"
-	"github.com/strangelove-ventures/horcrux/signer/cond"
+	"github.com/strangelove-ventures/horcrux/v3/signer/cond"
 )
 
 const (
@@ -62,11 +62,12 @@ func VoteToStep(vote *cometproto.Vote) int8 {
 
 func VoteToBlock(chainID string, vote *cometproto.Vote) Block {
 	return Block{
-		Height:    vote.Height,
-		Round:     int64(vote.Round),
-		Step:      VoteToStep(vote),
-		SignBytes: comet.VoteSignBytes(chainID, vote),
-		Timestamp: vote.Timestamp,
+		Height:                 vote.Height,
+		Round:                  int64(vote.Round),
+		Step:                   VoteToStep(vote),
+		SignBytes:              comet.VoteSignBytes(chainID, vote),
+		VoteExtensionSignBytes: comet.VoteExtensionSignBytes(chainID, vote),
+		Timestamp:              vote.Timestamp,
 	}
 }
 
@@ -99,12 +100,13 @@ func StepToType(step int8) cometproto.SignedMsgType {
 
 // SignState stores signing information for high level watermark management.
 type SignState struct {
-	Height      int64               `json:"height"`
-	Round       int64               `json:"round"`
-	Step        int8                `json:"step"`
-	NoncePublic []byte              `json:"nonce_public"`
-	Signature   []byte              `json:"signature,omitempty"`
-	SignBytes   cometbytes.HexBytes `json:"signbytes,omitempty"`
+	Height                 int64               `json:"height"`
+	Round                  int64               `json:"round"`
+	Step                   int8                `json:"step"`
+	NoncePublic            []byte              `json:"nonce_public"`
+	Signature              []byte              `json:"signature,omitempty"`
+	SignBytes              cometbytes.HexBytes `json:"signbytes,omitempty"`
+	VoteExtensionSignature []byte              `json:"vote_ext_signature,omitempty"`
 
 	filePath string
 
@@ -159,11 +161,12 @@ func (signState *SignState) hrsKeyLocked() HRSKey {
 }
 
 type SignStateConsensus struct {
-	Height    int64
-	Round     int64
-	Step      int8
-	Signature []byte
-	SignBytes cometbytes.HexBytes
+	Height                 int64
+	Round                  int64
+	Step                   int8
+	Signature              []byte
+	VoteExtensionSignature []byte
+	SignBytes              cometbytes.HexBytes
 }
 
 func (signState SignStateConsensus) HRSKey() HRSKey {
@@ -230,6 +233,7 @@ func (signState *SignState) cacheAndMarshal(ssc SignStateConsensus) []byte {
 	signState.Step = ssc.Step
 	signState.Signature = ssc.Signature
 	signState.SignBytes = ssc.SignBytes
+	signState.VoteExtensionSignature = ssc.VoteExtensionSignature
 
 	jsonBytes, err := cometjson.MarshalIndent(signState, "", "  ")
 	if err != nil {
@@ -414,13 +418,14 @@ func (signState *SignState) GetErrorIfLessOrEqual(height int64, round int64, ste
 // including the most recent sign state.
 func (signState *SignState) FreshCache() *SignState {
 	newSignState := &SignState{
-		Height:      signState.Height,
-		Round:       signState.Round,
-		Step:        signState.Step,
-		NoncePublic: signState.NoncePublic,
-		Signature:   signState.Signature,
-		SignBytes:   signState.SignBytes,
-		cache:       make(map[HRSKey]SignStateConsensus),
+		Height:                 signState.Height,
+		Round:                  signState.Round,
+		Step:                   signState.Step,
+		NoncePublic:            signState.NoncePublic,
+		Signature:              signState.Signature,
+		SignBytes:              signState.SignBytes,
+		VoteExtensionSignature: signState.VoteExtensionSignature,
+		cache:                  make(map[HRSKey]SignStateConsensus),
 
 		filePath: signState.filePath,
 	}
@@ -432,11 +437,12 @@ func (signState *SignState) FreshCache() *SignState {
 		Round:  signState.Round,
 		Step:   signState.Step,
 	}] = SignStateConsensus{
-		Height:    signState.Height,
-		Round:     signState.Round,
-		Step:      signState.Step,
-		Signature: signState.Signature,
-		SignBytes: signState.SignBytes,
+		Height:                 signState.Height,
+		Round:                  signState.Round,
+		Step:                   signState.Step,
+		Signature:              signState.Signature,
+		SignBytes:              signState.SignBytes,
+		VoteExtensionSignature: signState.VoteExtensionSignature,
 	}
 
 	return newSignState
