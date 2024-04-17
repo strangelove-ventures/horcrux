@@ -10,8 +10,8 @@ import (
 	"net/http/pprof"
 	"time"
 
-	"github.com/armon/go-metrics"
-	gmprometheus "github.com/armon/go-metrics/prometheus"
+	"github.com/hashicorp/go-metrics"
+	gmprometheus "github.com/hashicorp/go-metrics/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/strangelove-ventures/horcrux/v3/signer"
 )

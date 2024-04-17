@@ -81,7 +81,7 @@ func startCmd() *cobra.Command {
 				dialer := net.Dialer{Timeout: 2 * time.Second}
 				s := signer.NewReconnRemoteSigner(node, logger, val, dialer)
 
-				s.Start(ctx)
+				go s.Start(ctx)
 			}
 
 			signer.WaitAndTerminate(logger, cancel, config.PidFile)

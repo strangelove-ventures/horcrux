@@ -65,13 +65,15 @@ linters-settings:
         alias: cometprotocrypto
       - pkg: github.com/strangelove-ventures/horcrux/v3/comet/proto/privval
         alias: cometprotoprivval
+      - pkg: github.com/strangelove-ventures/horcrux/v3/signer/ed25519
+        alias: horcruxed25519
       - pkg: github.com/ecies/go/v2
         alias: ecies
       - pkg: github.com/grpc-ecosystem/go-grpc-middleware/retry
         alias: grpcretry
       - pkg : github.com/kraken-hpc/go-fork
         alias: fork
-      - pkg: github.com/armon/go-metrics/prometheus
+      - pkg: github.com/hashicorp/go-metrics/prometheus
         alias: gmprometheus
       - pkg: github.com/mitchellh/go-homedir
         alias: homedir

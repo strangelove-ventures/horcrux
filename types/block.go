@@ -58,14 +58,14 @@ type Block struct {
 	Timestamp     time.Time
 }
 
-func (block Block) SignStateConsensus(signBytes, signature, voteExtensionSignature []byte) SignStateConsensus {
+func (b Block) SignStateConsensus(signBytes, signature, voteExtensionSignature []byte) SignStateConsensus {
 	return SignStateConsensus{
-		Height:    block.Height,
-		Round:     block.Round,
-		Step:      block.Step,
-		BlockID:   block.BlockID,
-		POLRound:  block.POLRound,
-		Timestamp: block.Timestamp.UnixNano(),
+		Height:    b.Height,
+		Round:     b.Round,
+		Step:      b.Step,
+		BlockID:   b.BlockID,
+		POLRound:  b.POLRound,
+		Timestamp: b.Timestamp.UnixNano(),
 
 		SignBytes: signBytes,
 
@@ -74,32 +74,45 @@ func (block Block) SignStateConsensus(signBytes, signature, voteExtensionSignatu
 	}
 }
 
-func (block Block) EqualForSigning(newBlock Block) error {
+func (b Block) EqualForSigning(newBlock Block) error {
 	var errs error
 
-	if block.Height != newBlock.Height {
-		errs = errors.Join(errs, fmt.Errorf("conflicting data. heights do not match: %d != %d", block.Height, newBlock.Height))
+	if b.Height != newBlock.Height {
+		errs = errors.Join(errs, fmt.Errorf(
+			"conflicting data. heights do not match: %d != %d", b.Height, newBlock.Height,
+		))
 	}
 
-	if block.Round != newBlock.Round {
-		errs = errors.Join(errs, fmt.Errorf("conflicting data. rounds do not match: %d != %d", block.Round, newBlock.Round))
+	if b.Round != newBlock.Round {
+		errs = errors.Join(errs, fmt.Errorf(
+			"conflicting data. rounds do not match: %d != %d", b.Round, newBlock.Round,
+		))
 	}
 
-	if block.Step != newBlock.Step {
-		errs = errors.Join(errs, fmt.Errorf("conflicting data. steps do not match: %d != %d", block.Step, newBlock.Step))
+	if b.Step != newBlock.Step {
+		errs = errors.Join(errs, fmt.Errorf(
+			"conflicting data. steps do not match: %d != %d", b.Step, newBlock.Step,
+		))
 	}
 
-	if block.POLRound != newBlock.POLRound {
-		errs = errors.Join(errs, fmt.Errorf("conflicting data. polrounds do not match: %d != %d", block.POLRound, newBlock.POLRound))
+	if b.POLRound != newBlock.POLRound {
+		errs = errors.Join(errs, fmt.Errorf(
+			"conflicting data. polrounds do not match: %d != %d", b.POLRound, newBlock.POLRound,
+		))
 	}
 
-	if block.BlockID != nil && newBlock.BlockID == nil {
+	switch {
+	case b.BlockID != nil && newBlock.BlockID == nil:
 		errs = errors.Join(errs, fmt.Errorf("already signed non-nil blockID, but new blockID is nil"))
-	} else if block.BlockID == nil && newBlock.BlockID != nil {
+	case b.BlockID == nil && newBlock.BlockID != nil:
 		errs = errors.Join(errs, fmt.Errorf("already signed nil blockID, but new blockID is non-nil"))
-	} else if block.BlockID != nil && newBlock.BlockID != nil {
-		if !block.BlockID.Equals(newBlock.BlockID) {
-			errs = errors.Join(errs, fmt.Errorf("conflicting data. blockIDs do not match: %s != %s", hex.EncodeToString(newBlock.BlockID.Hash), hex.EncodeToString(newBlock.BlockID.Hash)))
+	case b.BlockID != nil && newBlock.BlockID != nil:
+		if !b.BlockID.Equals(newBlock.BlockID) {
+			errs = errors.Join(errs, fmt.Errorf(
+				"conflicting data. blockIDs do not match: %s != %s",
+				hex.EncodeToString(newBlock.BlockID.Hash),
+				hex.EncodeToString(newBlock.BlockID.Hash),
+			))
 		}
 	}
 
@@ -109,42 +122,42 @@ func (block Block) EqualForSigning(newBlock Block) error {
 	return errs
 }
 
-func (block Block) HRSKey() HRSKey {
+func (b Block) HRSKey() HRSKey {
 	return HRSKey{
-		Height: block.Height,
-		Round:  block.Round,
-		Step:   block.Step,
+		Height: b.Height,
+		Round:  b.Round,
+		Step:   b.Step,
 	}
 }
 
-func (block Block) HRSTKey() HRSTKey {
+func (b Block) HRSTKey() HRSTKey {
 	return HRSTKey{
-		Height:    block.Height,
-		Round:     block.Round,
-		Step:      block.Step,
-		Timestamp: block.Timestamp.UnixNano(),
+		Height:    b.Height,
+		Round:     b.Round,
+		Step:      b.Step,
+		Timestamp: b.Timestamp.UnixNano(),
 	}
 }
 
-func (block Block) ToProto() *grpccosigner.Block {
-	b := &grpccosigner.Block{
-		Height:        block.Height,
-		Round:         block.Round,
-		Step:          int32(block.Step),
-		POLRound:      int32(block.POLRound),
-		VoteExtension: block.VoteExtension,
-		Timestamp:     block.Timestamp.UnixNano(),
+func (b Block) ToProto() *grpccosigner.Block {
+	block := &grpccosigner.Block{
+		Height:        b.Height,
+		Round:         b.Round,
+		Step:          int32(b.Step),
+		POLRound:      int32(b.POLRound),
+		VoteExtension: b.VoteExtension,
+		Timestamp:     b.Timestamp.UnixNano(),
 	}
 
-	if block.BlockID != nil {
-		b.BlockID = &grpccosigner.BlockID{
-			Hash:               block.BlockID.Hash,
-			PartSetHeaderTotal: block.BlockID.PartSetHeader.Total,
-			PartSetHeaderHash:  block.BlockID.PartSetHeader.Hash,
+	if b.BlockID != nil {
+		block.BlockID = &grpccosigner.BlockID{
+			Hash:               b.BlockID.Hash,
+			PartSetHeaderTotal: b.BlockID.PartSetHeader.Total,
+			PartSetHeaderHash:  b.BlockID.PartSetHeader.Hash,
 		}
 	}
 
-	return b
+	return block
 }
 
 func BlockFromProto(block *grpccosigner.Block) Block {
@@ -205,7 +218,7 @@ func (b Block) ToCanonicalProposal(chainID string) *cometproto.CanonicalProposal
 		Type:      cometproto.ProposalType,
 		Height:    b.Height,
 		Round:     b.Round,
-		POLRound:  int64(b.POLRound),
+		POLRound:  b.POLRound,
 		BlockID:   b.BlockID.ToCanonical(),
 		Timestamp: b.Timestamp,
 		ChainID:   chainID,

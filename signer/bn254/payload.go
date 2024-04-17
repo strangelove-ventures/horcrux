@@ -87,7 +87,7 @@ func VoteSignBytes(chainID string, vote types.Block) []byte {
 	mimc := mimc.NewMiMC()
 	var padded [32]byte
 	writeI64 := func(x int64) {
-		big.NewInt(int64(x)).FillBytes(padded[:])
+		big.NewInt(x).FillBytes(padded[:])
 		_, err := mimc.Write(padded[:])
 		if err != nil {
 			panic(err)
@@ -134,7 +134,7 @@ func VoteSignBytes(chainID string, vote types.Block) []byte {
 		writeMiMCHash([]byte{})
 	} else {
 		writeMiMCHash(vote.BlockID.Hash)
-		//writeHash(vote.BlockID.Hash)
+		// writeHash(vote.BlockID.Hash)
 		writeU32(vote.BlockID.PartSetHeader.Total)
 		if vote.BlockID.PartSetHeader.Hash == nil {
 			writeMiMCHash([]byte{})

@@ -167,7 +167,7 @@ func horcruxSidecar(ctx context.Context, node *cosmos.ChainNode, name string, cl
 	if err := node.NewSidecarProcess(
 		ctx, false, name, client, network,
 		ibc.DockerImage{Repository: signerImage, Version: "latest", UidGid: signerImageUidGid},
-		signerImageHomeDir, []string{signerPortDocker, grpcPortDocker, debugPortDocker}, startCmd,
+		signerImageHomeDir, []string{signerPortDocker, grpcPortDocker, debugPortDocker}, startCmd, nil,
 	); err != nil {
 		return nil, err
 	}
@@ -182,7 +182,7 @@ func horcruxProxySidecar(ctx context.Context, node *cosmos.ChainNode, name strin
 	if err := node.NewSidecarProcess(
 		ctx, false, name, client, network,
 		ibc.DockerImage{Repository: horcruxProxyRegistry, Version: horcruxProxyTag, UidGid: "100:1000"},
-		signerImageHomeDir, nil, startCmd,
+		signerImageHomeDir, nil, startCmd, nil,
 	); err != nil {
 		return nil, err
 	}

@@ -395,17 +395,16 @@ func getCosignerMetrics(ctx context.Context, cosigners cosmos.SidecarProcesses) 
 }
 
 func getMetrics(ctx context.Context, cosigner *cosmos.SidecarProcess) (map[string]*dto.MetricFamily, error) {
-
 	debugAddr, err := cosigner.GetHostPorts(ctx, debugPortDocker)
 	if err != nil {
 		return nil, err
 	}
+
 	req, err := http.NewRequestWithContext(ctx, "GET", "http://"+debugAddr[0]+"/metrics", nil)
-
 	if err != nil {
-
 		return nil, err
 	}
+
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err

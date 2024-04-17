@@ -176,19 +176,27 @@ func (rs *ReconnRemoteSigner) handleSignVoteRequest(chainID string, vote *cometp
 		types.VoteToBlock(vote),
 	)
 	if err != nil {
-		return cometprotoprivval.Message{Sum: &cometprotoprivval.Message_SignedVoteResponse{SignedVoteResponse: &cometprotoprivval.SignedVoteResponse{
-			Vote:  *vote,
-			Error: getRemoteSignerError(err),
-		}}}
+		return cometprotoprivval.Message{
+			Sum: &cometprotoprivval.Message_SignedVoteResponse{
+				SignedVoteResponse: &cometprotoprivval.SignedVoteResponse{
+					Vote:  *vote,
+					Error: getRemoteSignerError(err),
+				},
+			},
+		}
 	}
 
 	vote.Timestamp = timestamp
 	vote.Signature = sig
 	vote.ExtensionSignature = voteExtSig
 
-	return cometprotoprivval.Message{Sum: &cometprotoprivval.Message_SignedVoteResponse{SignedVoteResponse: &cometprotoprivval.SignedVoteResponse{
-		Vote: *vote,
-	}}}
+	return cometprotoprivval.Message{
+		Sum: &cometprotoprivval.Message_SignedVoteResponse{
+			SignedVoteResponse: &cometprotoprivval.SignedVoteResponse{
+				Vote: *vote,
+			},
+		},
+	}
 }
 
 func (rs *ReconnRemoteSigner) handleSignProposalRequest(
@@ -203,18 +211,26 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(
 		types.ProposalToBlock(proposal),
 	)
 	if err != nil {
-		return cometprotoprivval.Message{Sum: &cometprotoprivval.Message_SignedProposalResponse{SignedProposalResponse: &cometprotoprivval.SignedProposalResponse{
-			Proposal: *proposal,
-			Error:    getRemoteSignerError(err),
-		}}}
+		return cometprotoprivval.Message{
+			Sum: &cometprotoprivval.Message_SignedProposalResponse{
+				SignedProposalResponse: &cometprotoprivval.SignedProposalResponse{
+					Proposal: *proposal,
+					Error:    getRemoteSignerError(err),
+				},
+			},
+		}
 	}
 
 	proposal.Timestamp = timestamp
 	proposal.Signature = signature
 
-	return cometprotoprivval.Message{Sum: &cometprotoprivval.Message_SignedProposalResponse{SignedProposalResponse: &cometprotoprivval.SignedProposalResponse{
-		Proposal: *proposal,
-	}}}
+	return cometprotoprivval.Message{
+		Sum: &cometprotoprivval.Message_SignedProposalResponse{
+			SignedProposalResponse: &cometprotoprivval.SignedProposalResponse{
+				Proposal: *proposal,
+			},
+		},
+	}
 }
 
 func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) cometprotoprivval.Message {
@@ -236,7 +252,7 @@ func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) cometprotopriv
 		return cometprotoprivval.Message{Sum: msgSum}
 	}
 
-	pk, err := encoding.PubKeyToProto(cometcrypto.PubKey(pubKey))
+	pk, err := encoding.PubKeyToProto(pubKey)
 	if err != nil {
 		rs.logger.Error(
 			"Failed to get Pub Key",

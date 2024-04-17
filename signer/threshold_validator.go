@@ -159,7 +159,8 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(
 	}
 
 	// There was an error saving the last sign state, so check if there is an existing signature for this block.
-	existingSignature, existingVoteExtSignature, existingTimestamp, sameBlockErr := pv.getExistingBlockSignature(chainID, block, signBytes)
+	existingSignature, existingVoteExtSignature, existingTimestamp, sameBlockErr :=
+		pv.getExistingBlockSignature(chainID, block, signBytes)
 
 	if _, ok := err.(*types.SameHRSError); !ok {
 		if sameBlockErr == nil {
@@ -209,7 +210,8 @@ func (pv *ThresholdValidator) SaveLastSignedStateInitiated(
 			continue
 		}
 
-		existingSignature, existingVoteExtSignature, existingTimestamp, sameBlockErr = pv.compareBlockSignatureAgainstSSC(chainID, block, &ssc, signBytes)
+		existingSignature, existingVoteExtSignature, existingTimestamp, sameBlockErr =
+			pv.compareBlockSignatureAgainstSSC(chainID, block, &ssc, signBytes)
 		if sameBlockErr == nil {
 			return existingSignature, existingVoteExtSignature, existingTimestamp, nil
 		}
@@ -620,7 +622,8 @@ func (pv *ThresholdValidator) Sign(
 	}
 
 	// Keep track of the last block that we began the signing process for. Only allow one attempt per block
-	existingSignature, existingVoteExtSig, existingTimestamp, err := pv.SaveLastSignedStateInitiated(chainID, &block, signBytes)
+	existingSignature, existingVoteExtSig, existingTimestamp, err :=
+		pv.SaveLastSignedStateInitiated(chainID, &block, signBytes)
 	if err != nil {
 		return nil, nil, stamp, fmt.Errorf("error saving last sign state initiated: %w", err)
 	}
