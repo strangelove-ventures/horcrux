@@ -61,7 +61,7 @@ func (rpc *CosignerGRPCServer) SetNoncesAndSign(
 		},
 	}
 
-	if len(b.VoteExtension) > 0 && len(req.VoteExtUuid) == 16 {
+	if b.Step == types.StepPrecommit && len(req.VoteExtUuid) == 16 {
 		cosignerReq.VoteExtensionNonces = &CosignerUUIDNonces{
 			UUID:   uuid.UUID(req.VoteExtUuid),
 			Nonces: CosignerNoncesFromProto(req.VoteExtNonces),

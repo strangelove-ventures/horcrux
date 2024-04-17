@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	cometcrypto "github.com/strangelove-ventures/horcrux/v3/comet/crypto"
 	grpccosigner "github.com/strangelove-ventures/horcrux/v3/grpc/cosigner"
+	"github.com/strangelove-ventures/horcrux/v3/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -115,7 +116,7 @@ func (cosigner *RemoteCosigner) SetNoncesAndSign(
 		Block:   req.Block.ToProto(),
 	}
 
-	if req.VoteExtensionNonces != nil && len(req.Block.VoteExtension) > 0 {
+	if req.Block.Step == types.StepPrecommit && req.VoteExtensionNonces != nil {
 		cosignerReq.VoteExtUuid = req.VoteExtensionNonces.UUID[:]
 		cosignerReq.VoteExtNonces = req.VoteExtensionNonces.Nonces.toProto()
 	}

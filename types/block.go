@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
@@ -98,7 +99,7 @@ func (block Block) EqualForSigning(newBlock Block) error {
 		errs = errors.Join(errs, fmt.Errorf("already signed nil blockID, but new blockID is non-nil"))
 	} else if block.BlockID != nil && newBlock.BlockID != nil {
 		if !block.BlockID.Equals(newBlock.BlockID) {
-			errs = errors.Join(errs, fmt.Errorf("conflicting data. blockIDs do not match: %v != %v", block.BlockID, newBlock.BlockID))
+			errs = errors.Join(errs, fmt.Errorf("conflicting data. blockIDs do not match: %s != %s", hex.EncodeToString(newBlock.BlockID.Hash), hex.EncodeToString(newBlock.BlockID.Hash)))
 		}
 	}
 

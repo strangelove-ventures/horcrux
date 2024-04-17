@@ -92,7 +92,7 @@ func (cosigner *LocalCosigner) combinedNonces(myID int, threshold uint8, uuid uu
 
 	nonces, ok := cosigner.nonces[uuid]
 	if !ok {
-		return nil, errors.New("no metadata at HRS")
+		return nil, fmt.Errorf("no nonces found for UUID: %s", uuid)
 	}
 
 	combinedNonces := make([]Nonce, 0, threshold)
@@ -587,7 +587,7 @@ func (cosigner *LocalCosigner) SetNoncesAndSign(
 		UUID:    req.Nonces.UUID,
 	}
 
-	if len(req.Block.VoteExtension) > 0 {
+	if req.Block.Step == types.StepPrecommit && req.VoteExtensionNonces != nil {
 		cosignerReq.VoteExtUUID = req.VoteExtensionNonces.UUID
 	}
 

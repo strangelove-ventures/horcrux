@@ -15,14 +15,17 @@ func SignBytes(chainID string, block types.Block) ([]byte, []byte, error) {
 
 	switch t {
 	case cometproto.PrecommitType, cometproto.PrevoteType:
-		fmt.Println("Bn254 VoteSignBytes")
+		var extBytes []byte
+		if block.Step == types.StepPrecommit {
+			extBytes = VoteExtensionSignBytes(chainID, block)
+		}
+
 		// For union v0.20+
-		// return VoteSignBytes(chainID, block), nil
+		// return VoteSignBytes(chainID, block), extBytes, nil
 
 		// for union < v0.19
-		return VoteSignBytesPre(chainID, block), VoteExtensionSignBytes(chainID, block), nil
+		return VoteSignBytesPre(chainID, block), extBytes, nil
 	case cometproto.ProposalType:
-		fmt.Println("Bn254 ProposalSignBytes")
 		return ProposalSignBytes(chainID, block), nil, nil
 	default:
 		return nil, nil, fmt.Errorf("unknown step type: %v", t)
@@ -55,10 +58,6 @@ func ProposalSignBytes(chainID string, proposal types.Block) []byte {
 // Similar to VoteSignBytes, the encoded Protobuf message is varint
 // length-prefixed for backwards-compatibility with the Amino encoding.
 func VoteExtensionSignBytes(chainID string, vote types.Block) []byte {
-	if vote.Step != types.StepPrecommit || len(vote.VoteExtension) == 0 {
-		return nil
-	}
-
 	pb := vote.ToCanonicalVoteExtension(chainID)
 	bz, err := protoio.MarshalDelimited(&pb)
 	if err != nil {
