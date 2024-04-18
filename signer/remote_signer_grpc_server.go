@@ -7,6 +7,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/strangelove-ventures/horcrux/v3/comet/encoding"
 	grpccosigner "github.com/strangelove-ventures/horcrux/v3/grpc/cosigner"
 	grpchorcrux "github.com/strangelove-ventures/horcrux/v3/grpc/horcrux"
 	"github.com/strangelove-ventures/horcrux/v3/types"
@@ -74,8 +75,18 @@ func (s *RemoteSignerGRPCServer) PubKey(
 		return nil, err
 	}
 
+	protoPubkey, err := encoding.PubKeyToProto(pubKey)
+	if err != nil {
+		return nil, err
+	}
+
+	protoBytes, err := protoPubkey.Marshal()
+	if err != nil {
+		return nil, err
+	}
+
 	return &grpchorcrux.PubKeyResponse{
-		PubKey: pubKey.Bytes(),
+		PubKey: protoBytes,
 	}, nil
 }
 
