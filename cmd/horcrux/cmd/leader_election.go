@@ -30,7 +30,7 @@ To choose a specific leader, pass that leader's ID as an argument.
 		Example: `horcrux elect # elect next eligible leader
 horcrux elect 2 # elect specific leader`,
 		SilenceUsage: true,
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
+		RunE: func(_ *cobra.Command, args []string) (err error) {
 			if config.Config.ThresholdModeConfig == nil {
 				return fmt.Errorf("threshold mode configuration is not present in config file")
 			}
@@ -97,7 +97,7 @@ func getLeaderCmd() *cobra.Command {
 		Args:         cobra.NoArgs,
 		Example:      `horcrux leader`,
 		SilenceUsage: true,
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
+		RunE: func(_ *cobra.Command, _ []string) (err error) {
 			thresholdCfg := config.Config.ThresholdModeConfig
 			if thresholdCfg == nil {
 				return fmt.Errorf("threshold mode configuration is not present in config file")

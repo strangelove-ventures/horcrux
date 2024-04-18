@@ -27,7 +27,7 @@ func addressCmd() *cobra.Command {
 		Example:      `horcrux cosigner address cosmos`,
 		SilenceUsage: true,
 		Args:         cobra.RangeArgs(1, 2),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 
 			var pubKey []byte
 

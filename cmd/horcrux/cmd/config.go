@@ -42,7 +42,7 @@ func initCmd() *cobra.Command {
 for threshold signer mode, --cosigner flags and --threshold flag are required.
 		`,
 		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
+		RunE: func(cmd *cobra.Command, _ []string) (err error) {
 			cmdFlags := cmd.Flags()
 
 			bare, _ := cmdFlags.GetBool(flagBare)
