@@ -11,7 +11,9 @@ import (
 )
 
 func init() {
+	json.RegisterType((*protocrypto.PublicKey)(nil), "tendermint.crypto.PublicKey")
 	json.RegisterType((*protocrypto.PublicKey_Bn254)(nil), "tendermint.crypto.PublicKey_Bn254")
+	json.RegisterType((*protocrypto.PublicKey_Ed25519)(nil), "tendermint.crypto.PublicKey_Ed25519")
 }
 
 // PubKeyToProto takes crypto.PubKey and transforms it to a protobuf Pubkey

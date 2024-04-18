@@ -8,9 +8,11 @@ import (
 	"testing"
 	"time"
 
+	cometbftjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/cosmos/cosmos-sdk/types/bech32"
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	"github.com/docker/docker/client"
+	cometcryptobn254 "github.com/strangelove-ventures/horcrux/v3/comet/crypto/bn254"
 	cometjson "github.com/strangelove-ventures/horcrux/v3/comet/libs/json"
 	"github.com/strangelove-ventures/horcrux/v3/comet/privval"
 	grpccosigner "github.com/strangelove-ventures/horcrux/v3/grpc/cosigner"
@@ -26,6 +28,9 @@ import (
 )
 
 const (
+	// testChain        = "gaia" // ghcr.io/strangelove-ventures/heighliner/gaia
+	// testChainVersion = "v10.0.2"
+
 	testChain        = "union" // ghcr.io/strangelove-ventures/heighliner/gaia
 	testChainVersion = "v0.19.0"
 
@@ -44,7 +49,7 @@ const (
 	signerImageHomeDir = "/home/horcrux"
 
 	horcruxProxyRegistry = "ghcr.io/strangelove-ventures/horcrux-proxy"
-	horcruxProxyTag      = "andrew-vote_extensions"
+	horcruxProxyTag      = "bn254"
 )
 
 // chainWrapper holds the initial configuration for a chain to start from genesis.
@@ -54,6 +59,10 @@ type chainWrapper struct {
 	totalSentries   int // number of additional sentry nodes
 	modifyGenesis   func(cc ibc.ChainConfig, b []byte) ([]byte, error)
 	preGenesis      func(*chainWrapper) func(ibc.ChainConfig) error
+}
+
+func init() {
+	cometbftjson.RegisterType(cometcryptobn254.PubKey{}, cometcryptobn254.PubKeyName)
 }
 
 // startChains starts the given chains locally within docker composed of containers.
@@ -82,7 +91,7 @@ func startChains(
 			ChainConfig: ibc.ChainConfig{
 				Type:    "cosmos",
 				Name:    testChain,
-				ChainID: "union-1",
+				ChainID: fmt.Sprintf("union-%d", i),
 				Images: []ibc.DockerImage{
 					{
 						Repository: "ghcr.io/strangelove-ventures/heighliner/" + testChain,

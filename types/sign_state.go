@@ -105,7 +105,7 @@ type SignState struct {
 	POLRound  int64    `json:"pol_round"`
 	Timestamp int64    `json:"timestamp"`
 
-	SignBytes []byte `json:"sign_bytes,omitempty"`
+	SignBytes []byte `json:"signbytes,omitempty"`
 
 	Signature              []byte `json:"signature,omitempty"`
 	VoteExtensionSignature []byte `json:"vote_ext_signature,omitempty"`
