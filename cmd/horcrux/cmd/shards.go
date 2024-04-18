@@ -212,7 +212,7 @@ func createCosignerRSAShardsCmd() *cobra.Command {
 		Args:  cobra.NoArgs,
 		Short: "Create cosigner RSA shards",
 
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
+		RunE: func(cmd *cobra.Command, _ []string) (err error) {
 			shards, _ := cmd.Flags().GetUint8(flagShards)
 
 			if shards <= 0 {
