@@ -10,7 +10,11 @@ import (
 )
 
 func TestPubKeyEncodingEd25519(t *testing.T) {
-	const shard = `{"pubKey":"CiCIu0WMSHxz/vavkpyuYC3FTo6/nqvF8wCUKMxwqG7YsQ==","privateShard":"MqnT3qkD93YdbPkibp3rFtc2IUTtqn97Kgo5xlHblwE=","id":1}`
+	const shard = `{
+	"pubKey":"CiCIu0WMSHxz/vavkpyuYC3FTo6/nqvF8wCUKMxwqG7YsQ==",
+	"privateShard":"MqnT3qkD93YdbPkibp3rFtc2IUTtqn97Kgo5xlHblwE=",
+	"id":1
+}`
 
 	key := new(signer.CosignerKey)
 
@@ -32,7 +36,12 @@ func TestPubKeyEncodingEd25519(t *testing.T) {
 }
 
 func TestPubKeyEncodingEd25519New(t *testing.T) {
-	const shard = `{"pubKey":"CiCIu0WMSHxz/vavkpyuYC3FTo6/nqvF8wCUKMxwqG7YsQ==","keyType":"ed25519","privateShard":"MqnT3qkD93YdbPkibp3rFtc2IUTtqn97Kgo5xlHblwE=","id":1}`
+	const shard = `{
+	"pubKey":"CiCIu0WMSHxz/vavkpyuYC3FTo6/nqvF8wCUKMxwqG7YsQ==",
+	"keyType":"ed25519",
+	"privateShard":"MqnT3qkD93YdbPkibp3rFtc2IUTtqn97Kgo5xlHblwE=",
+	"id":1
+}`
 
 	key := new(signer.CosignerKey)
 
@@ -54,7 +63,12 @@ func TestPubKeyEncodingEd25519New(t *testing.T) {
 }
 
 func TestPubKeyEncodingBn254(t *testing.T) {
-	const shard = `{"pubKey":"GiDdw489mIOeveo0DtEo92+I20JoPopwpxkYsfYiCCsFHw==","keyType":"bn254","privateShard":"FRPM7QlT/UJunPz5DgMAQ7H0RTZiEc9ZXQz16somPw0=","id":1}`
+	const shard = `{
+		"pubKey":"GiDdw489mIOeveo0DtEo92+I20JoPopwpxkYsfYiCCsFHw==",
+		"keyType":"bn254",
+		"privateShard":"FRPM7QlT/UJunPz5DgMAQ7H0RTZiEc9ZXQz16somPw0=",
+		"id":1
+}`
 
 	key := new(signer.CosignerKey)
 

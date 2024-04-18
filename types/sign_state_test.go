@@ -13,6 +13,7 @@ import (
 )
 
 func TestLegacySignState(t *testing.T) {
+	//nolint: lll
 	const signState = `{
 	"height": "120802",
 	"round": "0",
@@ -26,7 +27,7 @@ func TestLegacySignState(t *testing.T) {
 
 	signStateFilePath := filepath.Join(t.TempDir(), "signstate.json")
 
-	err := os.WriteFile(signStateFilePath, []byte(signState), 0644)
+	err := os.WriteFile(signStateFilePath, []byte(signState), 0600)
 	require.NoError(t, err)
 
 	signStateOld, err := types.LoadSignState(signStateFilePath)
@@ -36,16 +37,19 @@ func TestLegacySignState(t *testing.T) {
 	require.Equal(t, int64(0), signStateOld.Round)
 	require.Equal(t, int8(3), signStateOld.Step)
 
+	//nolint: lll
 	signbytesBz, err := hex.DecodeString("72080211E2D701000000000022480A204F4BF00C4AE3E71106CE705A20C07009A4DC39FE2D7DA80CA9D509C87E9E263912240801122012BE46D23277FDD30F4DED498A5E52A34B5A1CD2F38E9A0EC994A42A2CEBC9962A0C08FFEADAB006109F8CB59103320D7373632D746573746E65742D32")
 	require.NoError(t, err)
 
 	require.Equal(t, signbytesBz, signStateOld.SignBytes)
 
+	//nolint: lll
 	signatureBz, err := base64.StdEncoding.DecodeString("AXiV7BDzYDuIlgf4adJ3zAu7lzprXfB5gvEP2JHmEzWo2zpNs8yfrEovl4ktZE3wa1tI4Hm+7vNuZwOOTbW5Ag==")
 	require.NoError(t, err)
 
 	require.Equal(t, signatureBz, signStateOld.Signature)
 
+	//nolint: lll
 	voteExtSignatureBz, err := base64.StdEncoding.DecodeString("wOFUBF+R3r+OKVDfOmd4BLgij/DEJl88v5CgCf07UA6MNqJRRzqFJZfiLraRgMyt+n9amkJ+ZrjiGzA2jCorAQ==")
 	require.NoError(t, err)
 
@@ -123,7 +127,7 @@ func TestNewSignState(t *testing.T) {
 
 	signStateFilePath := filepath.Join(t.TempDir(), "signstate.json")
 
-	err := os.WriteFile(signStateFilePath, []byte(signState), 0644)
+	err := os.WriteFile(signStateFilePath, []byte(signState), 0600)
 	require.NoError(t, err)
 
 	signStateNew, err := types.LoadSignState(signStateFilePath)
