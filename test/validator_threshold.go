@@ -179,7 +179,7 @@ func convertValidatorToHorcrux(
 ) ([]byte, error) {
 	sentriesForCosigners := getSentriesForCosignerConnection(sentries, totalSigners, sentriesPerSigner)
 
-	keyShards, pvPubKey, err := getShardedPrivvalKey(ctx, validator, threshold, uint8(totalSigners))
+	ed25519Shards, pvPubKey, err := getShardedPrivvalKey(ctx, validator, threshold, uint8(totalSigners))
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +232,7 @@ func convertValidatorToHorcrux(
 		eg.Go(func() error {
 			if err := writeConfigAndKeysThreshold(
 				ctx, cosigner, config, eciesShards[i],
-				chainShard{chainID: validator.Chain.Config().ChainID, key: keyShards[i]},
+				chainEd25519Shard{chainID: validator.Chain.Config().ChainID, key: ed25519Shards[i]},
 			); err != nil {
 				return err
 			}
@@ -267,8 +267,8 @@ func getShardedPrivvalKey(ctx context.Context, node *cosmos.ChainNode, threshold
 	return privShards, pvKey.PubKey.Bytes(), nil
 }
 
-// chainShard is a wrapper for a chain ID and a shard of an ed25519 consensus key.
-type chainShard struct {
+// chainEd25519Shard is a wrapper for a chain ID and a shard of an ed25519 consensus key.
+type chainEd25519Shard struct {
 	chainID string
 	key     signer.CosignerKey
 }
@@ -279,7 +279,7 @@ func writeConfigAndKeysThreshold(
 	cosigner *cosmos.SidecarProcess,
 	config signer.Config,
 	eciesKey signer.CosignerECIESKey,
-	keyShards ...chainShard,
+	ed25519Shards ...chainEd25519Shard,
 ) error {
 	configBz, err := yaml.Marshal(config)
 	if err != nil {
@@ -299,7 +299,7 @@ func writeConfigAndKeysThreshold(
 		return fmt.Errorf("failed to write ecies_keys.json: %w", err)
 	}
 
-	for _, key := range keyShards {
+	for _, key := range ed25519Shards {
 		ed25519KeyBz, err := json.Marshal(&key.key)
 		if err != nil {
 			return fmt.Errorf("failed to marshal ed25519 shard: %w", err)
