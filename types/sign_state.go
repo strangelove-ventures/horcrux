@@ -2,13 +2,16 @@ package types
 
 import (
 	"bytes"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
-	cometjson "github.com/strangelove-ventures/horcrux/v3/comet/libs/json"
 	"github.com/strangelove-ventures/horcrux/v3/comet/libs/tempfile"
 	cometproto "github.com/strangelove-ventures/horcrux/v3/comet/proto/types"
 	"github.com/strangelove-ventures/horcrux/v3/signer/cond"
@@ -96,6 +99,17 @@ func StepToType(step int8) cometproto.SignedMsgType {
 	}
 }
 
+type SignStateLegacy struct {
+	Height string `json:"height"`
+	Round  string `json:"round"`
+	Step   int8   `json:"step"`
+
+	SignBytes string `json:"signbytes,omitempty"`
+
+	Signature              string `json:"signature,omitempty"`
+	VoteExtensionSignature string `json:"vote_ext_signature,omitempty"`
+}
+
 // SignState stores signing information for high level watermark management.
 type SignState struct {
 	Height    int64    `json:"height"`
@@ -105,7 +119,7 @@ type SignState struct {
 	POLRound  int64    `json:"pol_round"`
 	Timestamp int64    `json:"timestamp"`
 
-	SignBytes []byte `json:"signbytes,omitempty"`
+	SignBytes []byte `json:"sign_bytes,omitempty"`
 
 	Signature              []byte `json:"signature,omitempty"`
 	VoteExtensionSignature []byte `json:"vote_ext_signature,omitempty"`
@@ -285,7 +299,7 @@ func (signState *SignState) cacheAndMarshal(ssc SignStateConsensus) []byte {
 	signState.Signature = ssc.Signature
 	signState.VoteExtensionSignature = ssc.VoteExtensionSignature
 
-	jsonBytes, err := cometjson.MarshalIndent(signState, "", "  ")
+	jsonBytes, err := json.MarshalIndent(signState, "", "  ")
 	if err != nil {
 		panic(err)
 	}
@@ -512,9 +526,42 @@ func LoadSignState(filepath string) (*SignState, error) {
 
 	state := new(SignState)
 
-	err = cometjson.Unmarshal(stateJSONBytes, &state)
-	if err != nil {
-		return nil, err
+	legacyState := new(SignStateLegacy)
+
+	if legacyErr := json.Unmarshal(stateJSONBytes, legacyState); legacyErr == nil {
+		state.Height, err = strconv.ParseInt(legacyState.Height, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse height: %w", err)
+		}
+
+		state.Round, err = strconv.ParseInt(legacyState.Round, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse round: %w", err)
+		}
+
+		state.Step = legacyState.Step
+
+		if legacyState.SignBytes != "" {
+			// If the sign bytes are not valid hex, we don't need to throw an error.
+			// It will just force that we do not ever sign again for this HRS.
+			state.SignBytes, _ = hex.DecodeString(legacyState.SignBytes)
+		}
+
+		if legacyState.Signature != "" {
+			// If the signature is not valid base64, we don't need to throw an error.
+			// It will just force that we do not ever sign again for this HRS.
+			state.Signature, _ = base64.StdEncoding.DecodeString(legacyState.Signature)
+		}
+
+		if legacyState.VoteExtensionSignature != "" {
+			// If the signature is not valid base64, we don't need to throw an error.
+			// It will just force that we do not ever sign again for this HRS.
+			state.VoteExtensionSignature, _ = base64.StdEncoding.DecodeString(legacyState.VoteExtensionSignature)
+		}
+	} else {
+		if err := json.Unmarshal(stateJSONBytes, state); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal sign state: %w", errors.Join(legacyErr, err))
+		}
 	}
 
 	state.filePath = filepath
@@ -538,7 +585,7 @@ func LoadOrCreateSignState(filepath string) (*SignState, error) {
 		}
 		state.cond = cond.New(&state.mu)
 
-		jsonBytes, err := cometjson.MarshalIndent(state, "", "  ")
+		jsonBytes, err := json.MarshalIndent(state, "", "  ")
 		if err != nil {
 			panic(err)
 		}

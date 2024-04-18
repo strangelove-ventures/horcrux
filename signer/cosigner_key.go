@@ -95,6 +95,15 @@ func (key *CosignerKey) UnmarshalJSON(data []byte) error {
 		}
 	}
 
+	switch pubkey.(type) {
+	case cometcryptobn254.PubKey:
+		key.KeyType = CosignerKeyTypeBn254
+	case cometcryptoed25519.PubKey:
+		key.KeyType = CosignerKeyTypeEd25519
+	default:
+		return fmt.Errorf("unsupported key type: %T", pubkey)
+	}
+
 	key.PubKey = pubkey.Bytes()
 	return nil
 }
