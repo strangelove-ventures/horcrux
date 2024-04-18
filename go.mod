@@ -7,7 +7,7 @@ require (
 	github.com/Jille/raft-grpc-transport v1.5.0
 	github.com/Jille/raftadmin v1.2.1
 	github.com/consensys/gnark-crypto v0.12.1
-	github.com/cosmos/cosmos-sdk v0.50.5
+	github.com/cosmos/btcutil v1.0.5
 	github.com/cosmos/gogoproto v1.4.12
 	github.com/ethereum/go-ethereum v1.13.15
 	github.com/google/uuid v1.6.0
@@ -43,7 +43,6 @@ require (
 	github.com/btcsuite/btcd/btcec/v2 v2.3.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/consensys/bavard v0.1.13 // indirect
-	github.com/cosmos/btcutil v1.0.5 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
 	github.com/fatih/color v1.16.0 // indirect
@@ -70,6 +69,7 @@ require (
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.47.0 // indirect
 	github.com/prometheus/procfs v0.13.0 // indirect
+	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect

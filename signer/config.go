@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/cosmos/cosmos-sdk/types/bech32"
 	"github.com/strangelove-ventures/horcrux/v3/client"
+	"github.com/strangelove-ventures/horcrux/v3/signer/bech32"
 	"gopkg.in/yaml.v2"
 )
 

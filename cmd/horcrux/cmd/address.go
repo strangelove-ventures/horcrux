@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cosmos/cosmos-sdk/types/bech32"
 	"github.com/spf13/cobra"
 	cometprivval "github.com/strangelove-ventures/horcrux/v3/comet/privval"
 	"github.com/strangelove-ventures/horcrux/v3/signer"
+	"github.com/strangelove-ventures/horcrux/v3/signer/bech32"
 )
 
 type AddressCmdOutput struct {
