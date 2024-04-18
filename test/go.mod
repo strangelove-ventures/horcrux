@@ -4,7 +4,7 @@ go 1.22.2
 
 require (
 	github.com/cosmos/cosmos-sdk v0.50.5
-	github.com/docker/docker v24.0.7+incompatible
+	github.com/docker/docker v24.0.9+incompatible
 	github.com/prometheus/client_model v0.6.1
 	github.com/prometheus/common v0.50.0
 	github.com/strangelove-ventures/horcrux/v3 v3.3.0
