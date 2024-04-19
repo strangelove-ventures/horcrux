@@ -16,7 +16,7 @@ func SignBytes(chainID string, block types.Block) ([]byte, []byte, error) {
 	switch t {
 	case cometproto.PrecommitType, cometproto.PrevoteType:
 		var extBytes []byte
-		if block.Step == types.StepPrecommit {
+		if block.Step == types.StepPrecommit && !block.BlockID.IsZero() {
 			extBytes = VoteExtensionSignBytes(chainID, block)
 		}
 
