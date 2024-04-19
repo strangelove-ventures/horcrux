@@ -118,6 +118,7 @@ func TestSingleSignerValidator(t *testing.T) {
 		Height:    2,
 		Round:     0,
 		Type:      cometproto.PrecommitType,
+		BlockID:   cometproto.BlockID{Hash: []byte("test")},
 		Timestamp: time.Now(),
 		Extension: []byte("test"),
 	}
