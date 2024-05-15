@@ -393,13 +393,13 @@ func TestMultipleChainHorcrux(t *testing.T) {
 
 				chainConfig.chainID = cw.chain.Config().ChainID
 
-				ed25519Shards, pvPubKey, err := getShardedPrivvalKey(ctx, firstSentry, threshold, uint8(totalSigners))
+				keyShards, pvPubKey, err := getShardedPrivvalKey(ctx, firstSentry, threshold, uint8(totalSigners))
 				if err != nil {
 					wg.Done()
 					return err
 				}
 
-				chainConfig.shards = ed25519Shards
+				chainConfig.shards = keyShards
 
 				pubKeys[i] = pvPubKey
 
@@ -504,7 +504,7 @@ func configureAndStartSidecars(
 
 		chainNodes := make(signer.ChainNodes, 0, numSentries)
 
-		ed25519Shards := make([]chainEd25519Shard, len(chainConfigs))
+		keyShards := make([]chainShard, len(chainConfigs))
 
 		for j, chainConfig := range chainConfigs {
 			if s.proxy == nil {
@@ -515,7 +515,7 @@ func configureAndStartSidecars(
 				}
 			}
 
-			ed25519Shards[j] = chainEd25519Shard{
+			keyShards[j] = chainShard{
 				chainID: chainConfig.chainID,
 				key:     chainConfig.shards[i],
 			}
@@ -554,7 +554,7 @@ func configureAndStartSidecars(
 
 		// configure and start cosigner in parallel
 		eg.Go(func() error {
-			if err := writeConfigAndKeysThreshold(ctx, cosigner, config, eciesShards[i], ed25519Shards...); err != nil {
+			if err := writeConfigAndKeysThreshold(ctx, cosigner, config, eciesShards[i], keyShards...); err != nil {
 				return err
 			}
 
@@ -634,13 +634,13 @@ func TestHorcruxProxyGRPC(t *testing.T) {
 
 				chainConfig.chainID = cw.chain.Config().ChainID
 
-				ed25519Shards, pvPubKey, err := getShardedPrivvalKey(ctx, firstSentry, threshold, uint8(totalSigners))
+				keyShards, pvPubKey, err := getShardedPrivvalKey(ctx, firstSentry, threshold, uint8(totalSigners))
 				if err != nil {
 					wg.Done()
 					return err
 				}
 
-				chainConfig.shards = ed25519Shards
+				chainConfig.shards = keyShards
 
 				pubKeys[i] = pvPubKey
 
