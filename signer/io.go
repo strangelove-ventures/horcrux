@@ -8,9 +8,11 @@ import (
 )
 
 // ReadMsg reads a message from an io.Reader
-func ReadMsg(reader io.Reader) (msg cometprotoprivval.Message, err error) {
-	const maxRemoteSignerMsgSize = 1024 * 10
-	protoReader := protoio.NewDelimitedReader(reader, maxRemoteSignerMsgSize)
+func ReadMsg(reader io.Reader, maxReadSize int) (msg cometprotoprivval.Message, err error) {
+	if maxReadSize <= 0 {
+		maxReadSize = 1024 * 1024 // 1MB
+	}
+	protoReader := protoio.NewDelimitedReader(reader, maxReadSize)
 	_, err = protoReader.ReadMsg(&msg)
 	return msg, err
 }
