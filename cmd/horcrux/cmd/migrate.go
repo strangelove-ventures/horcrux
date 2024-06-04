@@ -296,6 +296,7 @@ func migrateCmd() *cobra.Command {
 				}
 
 				config.Config.SignMode = signMode
+				config.Config.MaxReadSize = 1024 * 1024
 
 				if err := config.WriteConfigFile(); err != nil {
 					return err
