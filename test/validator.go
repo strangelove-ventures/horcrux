@@ -32,7 +32,7 @@ const (
 	// testChainVersion = "v10.0.2"
 
 	testChain        = "union" // ghcr.io/strangelove-ventures/heighliner/gaia
-	testChainVersion = "v0.19.0"
+	testChainVersion = "v0.24.0"
 
 	signerPort       = "2222"
 	signerPortDocker = signerPort + "/tcp"

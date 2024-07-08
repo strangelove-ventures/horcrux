@@ -1,6 +1,7 @@
 package types
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -29,13 +30,13 @@ func (bid *BlockID) Equals(other *BlockID) bool {
 		return false
 	}
 
-	return string(bid.Hash) == string(other.Hash) &&
+	return bytes.Equal(bid.Hash, other.Hash) &&
 		bid.PartSetHeader.Total == other.PartSetHeader.Total &&
-		string(bid.PartSetHeader.Hash) == string(other.PartSetHeader.Hash)
+		bytes.Equal(bid.PartSetHeader.Hash, other.PartSetHeader.Hash)
 }
 
 func (bid *BlockID) ToCanonical() *cometproto.CanonicalBlockID {
-	if bid == nil || (len(bid.Hash) == 0 && bid.PartSetHeader.Total == 0 && len(bid.PartSetHeader.Hash) == 0) {
+	if bid == nil {
 		return nil
 	}
 

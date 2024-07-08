@@ -21,10 +21,7 @@ func SignBytes(chainID string, block types.Block) ([]byte, []byte, error) {
 		}
 
 		// For union v0.20+
-		// return VoteSignBytes(chainID, block), extBytes, nil
-
-		// for union < v0.19
-		return VoteSignBytesPre(chainID, block), extBytes, nil
+		return VoteSignBytes(chainID, block), extBytes, nil
 	case cometproto.ProposalType:
 		return ProposalSignBytes(chainID, block), nil, nil
 	default:
@@ -101,7 +98,6 @@ func VoteSignBytes(chainID string, vote types.Block) []byte {
 		}
 	}
 	writeMiMCHash := func(b []byte) {
-		fmt.Printf("writeMiMCHash: %x\n", b)
 		_, err := mimc.Write(b)
 		if err != nil {
 			panic(err)
@@ -134,7 +130,6 @@ func VoteSignBytes(chainID string, vote types.Block) []byte {
 		writeMiMCHash([]byte{})
 	} else {
 		writeMiMCHash(vote.BlockID.Hash)
-		// writeHash(vote.BlockID.Hash)
 		writeU32(vote.BlockID.PartSetHeader.Total)
 		if vote.BlockID.PartSetHeader.Hash == nil {
 			writeMiMCHash([]byte{})
