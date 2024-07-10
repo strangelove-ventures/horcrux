@@ -37,6 +37,8 @@ type ReconnRemoteSigner struct {
 	privVal PrivValidator
 
 	dialer net.Dialer
+
+	maxReadSize int
 }
 
 // NewReconnRemoteSigner return a ReconnRemoteSigner that will dial using the given
@@ -49,12 +51,14 @@ func NewReconnRemoteSigner(
 	logger cometlog.Logger,
 	privVal PrivValidator,
 	dialer net.Dialer,
+	maxReadSize int,
 ) *ReconnRemoteSigner {
 	rs := &ReconnRemoteSigner{
-		address: address,
-		privVal: privVal,
-		dialer:  dialer,
-		privKey: cometcryptoed25519.GenPrivKey(),
+		address:     address,
+		privVal:     privVal,
+		dialer:      dialer,
+		privKey:     cometcryptoed25519.GenPrivKey(),
+		maxReadSize: maxReadSize,
 	}
 
 	rs.BaseService = *cometservice.NewBaseService(logger, "RemoteSigner", rs)
@@ -136,7 +140,7 @@ func (rs *ReconnRemoteSigner) loop(ctx context.Context) {
 			return
 		}
 
-		req, err := ReadMsg(conn)
+		req, err := ReadMsg(conn, rs.maxReadSize)
 		if err != nil {
 			rs.Logger.Error(
 				"Failed to read message from connection",
@@ -288,6 +292,7 @@ func StartRemoteSigners(
 	logger cometlog.Logger,
 	privVal PrivValidator,
 	nodes []string,
+	maxReadSize int,
 ) ([]cometservice.Service, error) {
 	var err error
 	go StartMetrics()
@@ -296,7 +301,7 @@ func StartRemoteSigners(
 		// A long timeout such as 30 seconds would cause the sentry to fail in loops
 		// Use a short timeout and dial often to connect within 3 second window
 		dialer := net.Dialer{Timeout: 2 * time.Second}
-		s := NewReconnRemoteSigner(node, logger, privVal, dialer)
+		s := NewReconnRemoteSigner(node, logger, privVal, dialer, maxReadSize)
 
 		err = s.Start()
 		if err != nil {

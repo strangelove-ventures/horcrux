@@ -35,6 +35,7 @@ type Config struct {
 	ChainNodes          ChainNodes           `yaml:"chainNodes"`
 	DebugAddr           string               `yaml:"debugAddr"`
 	GRPCAddr            string               `yaml:"grpcAddr"`
+	MaxReadSize         int                  `yaml:"maxReadSize"`
 }
 
 func (c *Config) Nodes() (out []string) {
