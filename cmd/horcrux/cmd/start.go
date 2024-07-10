@@ -69,7 +69,7 @@ func startCmd() *cobra.Command {
 			if config.Config.GRPCAddr != "" {
 				grpcServer := signer.NewRemoteSignerGRPCServer(logger, val, config.Config.GRPCAddr)
 
-				grpcServer.Start()
+				go grpcServer.Start()
 			}
 
 			go EnableDebugAndMetrics(ctx, out)
