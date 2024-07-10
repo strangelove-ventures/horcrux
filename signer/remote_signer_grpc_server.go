@@ -2,6 +2,7 @@ package signer
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"time"
 
@@ -50,7 +51,14 @@ func (s *RemoteSignerGRPCServer) OnStart() error {
 	s.server = grpc.NewServer()
 	proto.RegisterRemoteSignerServer(s.server, s)
 	reflection.Register(s.server)
-	return s.server.Serve(sock)
+	go s.serve(sock)
+	return nil
+}
+
+func (s *RemoteSignerGRPCServer) serve(sock net.Listener) {
+	if err := s.server.Serve(sock); err != nil {
+		panic(fmt.Errorf("failed to start remote signer grpc server: %w", err))
+	}
 }
 
 func (s *RemoteSignerGRPCServer) OnStop() {
