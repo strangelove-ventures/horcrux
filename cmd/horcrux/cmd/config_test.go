@@ -48,6 +48,7 @@ chainNodes:
 - privValAddr: tcp://10.168.0.2:1234
 debugAddr: ""
 grpcAddr: ""
+maxReadSize: 1048576
 `,
 		},
 		{
@@ -64,6 +65,7 @@ chainNodes:
 - privValAddr: tcp://10.168.0.2:1234
 debugAddr: ""
 grpcAddr: ""
+maxReadSize: 1048576
 `,
 		},
 		{
