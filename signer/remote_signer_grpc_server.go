@@ -57,7 +57,7 @@ func (s *RemoteSignerGRPCServer) OnStart() error {
 
 func (s *RemoteSignerGRPCServer) serve(sock net.Listener) {
 	if err := s.server.Serve(sock); err != nil {
-		panic(fmt.Errorf("failed to start remote signer grpc server: %w", err))
+		panic(fmt.Errorf("remote signer grpc server: %w", err))
 	}
 }
 
