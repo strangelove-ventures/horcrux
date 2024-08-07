@@ -206,7 +206,7 @@ The signer will continue retrying attempts to reach the sentries until we turn t
 - Misnaming or incorrect structure of the files in `~/.horcrux/state`. Double check these if you see errors
 - Misnaming or misplacement of the `~/.horcrux/{chain-id}_shard.json` file
 
-> **NOTE:** leaving these logs streaming in seperate terminal windows will enable you to watch the cluster connect to the sentries.
+> **NOTE:** leaving these logs streaming in separate terminal windows will enable you to watch the cluster connect to the sentries.
 
 ### 8. Configure and start your full nodes
 
