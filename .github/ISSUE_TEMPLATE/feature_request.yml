@@ -1,0 +1,26 @@
+name: Feature Request
+description: Request an enhancement or new feature
+title: "[Feature]: "
+body:
+  - type: textarea
+    id: inspiration
+    attributes:
+      label: Inspiration
+      description: What are you trying to accomplish but finding hard or not possible?
+      placeholder: What's your end goal?
+    validations:
+      required: true
+  - type: textarea
+    id: valueadd
+    attributes:
+      label: Use Cases and Audiences
+      description: What new possibilities does this feature enable, and what types of users will find it helpful?
+      placeholder: Who is the audience and what new applications would this feature enable?
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our [Code of Conduct](../../../CODE_OF_CONDUCT.md). 
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true
