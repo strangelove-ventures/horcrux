@@ -13,6 +13,7 @@ import (
 	cometrand "github.com/cometbft/cometbft/libs/rand"
 	cometprivval "github.com/cometbft/cometbft/privval"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSingleSignerValidator(t *testing.T) {

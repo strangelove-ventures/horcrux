@@ -20,6 +20,11 @@ import (
 	cometrand "github.com/cometbft/cometbft/libs/rand"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	comet "github.com/cometbft/cometbft/types"
+	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"github.com/ethereum/go-ethereum/crypto/secp256k1"
+	"github.com/stretchr/testify/require"
+	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
+	"golang.org/x/sync/errgroup"
 )
 
 func TestThresholdValidator2of2(t *testing.T) {
