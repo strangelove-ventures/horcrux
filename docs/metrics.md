@@ -51,7 +51,7 @@ Single node signers don't execute any cosigner code, so the basic metrics are:
 
 If the 'seconds_since' metrics exceeds the normal block time, it may indicate a sentry failure or a network stall/halt.
 
-If there are skips in the block heights requested to be signed the following counters will increase AFTER the sentry is able to report the latest block height.  Until then, from the perspective of horcrux, it looks no different than a network stall.
+If there are skips in the block heights requested to be signed the following counters will increase AFTER the sentry is able to report the latest block height.  Until then, from the perspective of horcrux, it looks no different from a network stall.
  * signer_total_missed_precommits 
  * signer_total_missed_prevotes 
 
@@ -87,7 +87,7 @@ As a result, followers also do not update these metrics
 
 
 ## Checking Signing Performance
-We currently only have metrics between the leader and followers (not full p2p metrics).  However it is still useful in determining when a particular peer lags significantly.
+We currently only have metrics between the leader and followers (not full p2p metrics).  However, it is still useful in determining when a particular peer lags significantly.
 
 Your cluster should reach the threshold for availability in a short time.  Monitor the following:
 

@@ -14,11 +14,11 @@ Take your validator infrastructure to the next level of security and availabilit
 
 Validator operators balance operational and risk tradeoffs to avoid penalties via slashing for liveliness faults or double signing blocks.
 
-Traditional high-availability systems where the keys exist on hot spares risk double signing if there are failover detection bugs. Low-availability systems, or manual failover, risk downtime if manual intervention cannot respond in a timely manner.
+Traditional high-availability systems where the keys exist on hot spares risk double signing if there are fail over detection bugs. Low-availability systems, or manual fail over, risk downtime if manual intervention cannot respond in a timely manner.
 
-Multi-party computation using threshold signatures is able to provide high-availability while maintaining high security and avoiding double signing via consensus and failover detection mechanisms.
+Multi-party computation using threshold signatures is able to provide high-availability while maintaining high security and avoiding double signing via consensus and fail over detection mechanisms.
 
-For more on how the Horcrux MPC signing flow works, see [`docs/signing.md`](/docs/signing.md)
+For more on how the Horcrux MPC signing flow works, see [`docs/signing.md`](./docs/signing.md)
 
 ![Screenshot from 2022-03-07 18-09-49](https://user-images.githubusercontent.com/6722152/157145772-8557b4b5-a0cc-4073-8834-86afda1900fc.png)
 
@@ -39,7 +39,7 @@ Horcrux signer cluster configured with 5 total nodes, threshold 3.
 
 ## Running Horcrux
 
-See documentation in [`docs/migrating.md`](/docs/migrating.md) to learn how to upgrade your validator infrastructure with Horcrux.
+See documentation in [`docs/migrating.md`](./docs/migrating.md) to learn how to upgrade your validator infrastructure with Horcrux.
 
 ## Security
 
