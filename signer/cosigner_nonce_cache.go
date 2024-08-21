@@ -7,8 +7,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/google/uuid"
+
+	cometlog "github.com/cometbft/cometbft/libs/log"
 )
 
 const (

@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
-	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+
+	cometlog "github.com/cometbft/cometbft/libs/log"
 )
 
 func TestNonceCache(_ *testing.T) {

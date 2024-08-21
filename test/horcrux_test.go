@@ -375,7 +375,6 @@ func TestMultipleChainHorcrux(t *testing.T) {
 		chainConfig := chainConfig
 		preGenesises[i] = func(cw *chainWrapper) func(ibc.ChainConfig) error {
 			return func(cc ibc.ChainConfig) error {
-
 				firstSentry := cw.chain.Validators[0]
 				sentries := append(cosmos.ChainNodes{firstSentry}, cw.chain.FullNodes...)
 
@@ -613,7 +612,6 @@ func TestHorcruxProxyGRPC(t *testing.T) {
 		chainConfig := chainConfig
 		preGenesises[i] = func(cw *chainWrapper) func(ibc.ChainConfig) error {
 			return func(cc ibc.ChainConfig) error {
-
 				firstSentry := cw.chain.Validators[0]
 				sentries := append(cosmos.ChainNodes{firstSentry}, cw.chain.FullNodes...)
 

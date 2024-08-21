@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/raft"
+
 	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 )
 

@@ -10,8 +10,9 @@ import (
 	"fmt"
 	"os"
 
-	cometjson "github.com/cometbft/cometbft/libs/json"
 	"golang.org/x/sync/errgroup"
+
+	cometjson "github.com/cometbft/cometbft/libs/json"
 )
 
 var _ CosignerSecurity = &CosignerSecurityRSA{}
@@ -164,7 +165,6 @@ func (c *CosignerSecurityRSA) EncryptAndSign(id int, noncePub []byte, nonceShare
 	// cosigners can verify the signature to confirm sender validity
 
 	jsonBytes, err := cometjson.Marshal(nonce)
-
 	if err != nil {
 		return nonce, err
 	}

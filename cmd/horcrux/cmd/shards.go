@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+
 	"github.com/strangelove-ventures/horcrux/v3/signer"
 )
 
@@ -31,7 +32,7 @@ func createCosignerDirectoryIfNecessary(out string, id int) (string, error) {
 		if !os.IsNotExist(err) {
 			return "", fmt.Errorf("unexpected error fetching info for cosigner directory: %w", err)
 		}
-		if err := os.Mkdir(dir, 0700); err != nil {
+		if err := os.Mkdir(dir, 0o700); err != nil {
 			return "", fmt.Errorf("failed to make directory for cosigner files: %w", err)
 		}
 		return dir, nil
@@ -119,7 +120,7 @@ func createCosignerEd25519ShardsCmd() *cobra.Command {
 
 			out, _ := cmd.Flags().GetString(flagOutputDir)
 			if out != "" {
-				if err := os.MkdirAll(out, 0700); err != nil {
+				if err := os.MkdirAll(out, 0o700); err != nil {
 					return err
 				}
 			}
@@ -177,7 +178,7 @@ func createCosignerECIESShardsCmd() *cobra.Command {
 
 			out, _ := cmd.Flags().GetString(flagOutputDir)
 			if out != "" {
-				if err := os.MkdirAll(out, 0700); err != nil {
+				if err := os.MkdirAll(out, 0o700); err != nil {
 					return err
 				}
 			}
@@ -225,7 +226,7 @@ func createCosignerRSAShardsCmd() *cobra.Command {
 
 			out, _ := cmd.Flags().GetString(flagOutputDir)
 			if out != "" {
-				if err := os.MkdirAll(out, 0700); err != nil {
+				if err := os.MkdirAll(out, 0o700); err != nil {
 					return err
 				}
 			}

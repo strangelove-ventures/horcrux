@@ -7,8 +7,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/strangelove-ventures/horcrux/v3/cmd/horcrux/cmd/testdata"
 	"github.com/stretchr/testify/require"
+
+	"github.com/strangelove-ventures/horcrux/v3/cmd/horcrux/cmd/testdata"
 )
 
 func TestMigrateV2toV3(t *testing.T) {
@@ -16,12 +17,12 @@ func TestMigrateV2toV3(t *testing.T) {
 
 	configFile := filepath.Join(tmp, "config.yaml")
 
-	err := os.WriteFile(configFile, testdata.ConfigV2, 0600)
+	err := os.WriteFile(configFile, testdata.ConfigV2, 0o600)
 	require.NoError(t, err)
 
 	keyShareFile := filepath.Join(tmp, "share.json")
 
-	err = os.WriteFile(keyShareFile, testdata.CosignerKeyV2, 0600)
+	err = os.WriteFile(keyShareFile, testdata.CosignerKeyV2, 0o600)
 	require.NoError(t, err)
 
 	cmd := rootCmd()
@@ -57,7 +58,7 @@ func TestMigrateV2toV3(t *testing.T) {
 
 func appendToFile(file, append string) error {
 	f, err := os.OpenFile(file,
-		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
 	}
@@ -70,12 +71,12 @@ func TestMigrateV2toV3DifferentKeyFilePath(t *testing.T) {
 	tmp := t.TempDir()
 
 	keyDir := filepath.Join(tmp, "keys")
-	err := os.Mkdir(keyDir, 0700)
+	err := os.Mkdir(keyDir, 0o700)
 	require.NoError(t, err)
 
 	configFile := filepath.Join(tmp, "config.yaml")
 
-	err = os.WriteFile(configFile, testdata.ConfigV2, 0600)
+	err = os.WriteFile(configFile, testdata.ConfigV2, 0o600)
 	require.NoError(t, err)
 
 	keyShareFile := filepath.Join(keyDir, "share.json")
@@ -83,7 +84,7 @@ func TestMigrateV2toV3DifferentKeyFilePath(t *testing.T) {
 	err = appendToFile(configFile, fmt.Sprintf("key-file: %s", keyShareFile))
 	require.NoError(t, err)
 
-	err = os.WriteFile(keyShareFile, testdata.CosignerKeyV2, 0600)
+	err = os.WriteFile(keyShareFile, testdata.CosignerKeyV2, 0o600)
 	require.NoError(t, err)
 
 	cmd := rootCmd()
@@ -117,13 +118,13 @@ func TestMigrateV2toV3DifferentKeyFilePath(t *testing.T) {
 	require.Equal(t, fmt.Sprintf("keyDir: %s\n", keyDir)+testdata.ConfigMigrated, string(newConfigFileBz))
 }
 
-// Should migrate keys only if config has already been migrated
+// Should migrate keys only if config has already been migrated.
 func TestMigrateV2toV3KeysOnly(t *testing.T) {
 	tmp := t.TempDir()
 
 	keyShareFile := filepath.Join(tmp, "share.json")
 
-	err := os.WriteFile(keyShareFile, testdata.CosignerKeyV2, 0600)
+	err := os.WriteFile(keyShareFile, testdata.CosignerKeyV2, 0o600)
 	require.NoError(t, err)
 
 	cmd := rootCmd()
@@ -152,18 +153,18 @@ func TestMigrateV2toV3KeysOnly(t *testing.T) {
 	require.Equal(t, testdata.CosignerRSAKeyMigrated, string(newRSAKeyFileBz))
 }
 
-// Should not modify config that is already in v3 format
+// Should not modify config that is already in v3 format.
 func TestMigrateV2toV3ConfigAlreadyMigrated(t *testing.T) {
 	tmp := t.TempDir()
 
 	configFile := filepath.Join(tmp, "config.yaml")
 
-	err := os.WriteFile(configFile, []byte(testdata.ConfigMigrated), 0600)
+	err := os.WriteFile(configFile, []byte(testdata.ConfigMigrated), 0o600)
 	require.NoError(t, err)
 
 	keyShareFile := filepath.Join(tmp, "share.json")
 
-	err = os.WriteFile(keyShareFile, testdata.CosignerKeyV2, 0600)
+	err = os.WriteFile(keyShareFile, testdata.CosignerKeyV2, 0o600)
 	require.NoError(t, err)
 
 	cmd := rootCmd()
@@ -197,23 +198,23 @@ func TestMigrateV2toV3ConfigAlreadyMigrated(t *testing.T) {
 	require.Equal(t, testdata.ConfigMigrated, string(newConfigFileBz))
 }
 
-// Should not modify config or keys that are already in v3 format
+// Should not modify config or keys that are already in v3 format.
 func TestMigrateV2toV3AlreadyMigrated(t *testing.T) {
 	tmp := t.TempDir()
 
 	configFile := filepath.Join(tmp, "config.yaml")
 
-	err := os.WriteFile(configFile, []byte(testdata.ConfigMigrated), 0600)
+	err := os.WriteFile(configFile, []byte(testdata.ConfigMigrated), 0o600)
 	require.NoError(t, err)
 
 	ed25519KeyShardFile := filepath.Join(tmp, "test_shard.json")
 
-	err = os.WriteFile(ed25519KeyShardFile, []byte(testdata.CosignerEd25519KeyMigrated), 0600)
+	err = os.WriteFile(ed25519KeyShardFile, []byte(testdata.CosignerEd25519KeyMigrated), 0o600)
 	require.NoError(t, err)
 
 	rsaKeyShardFile := filepath.Join(tmp, "rsa_keys.json")
 
-	err = os.WriteFile(rsaKeyShardFile, []byte(testdata.CosignerRSAKeyMigrated), 0600)
+	err = os.WriteFile(rsaKeyShardFile, []byte(testdata.CosignerRSAKeyMigrated), 0o600)
 	require.NoError(t, err)
 
 	cmd := rootCmd()

@@ -84,7 +84,8 @@ func preGenesisSingleNodeAndHorcruxThreshold(
 	totalSigners int, // total number of signers for the single horcrux validator
 	threshold uint8, // key shard threshold, and therefore how many horcrux signers must participate to sign a block
 	sentriesPerSigner int, // how many sentries should each horcrux signer connect to (min: 1, max: totalSentries)
-	pubKey *crypto.PubKey) func(*chainWrapper) func(ibc.ChainConfig) error {
+	pubKey *crypto.PubKey,
+) func(*chainWrapper) func(ibc.ChainConfig) error {
 	return func(cw *chainWrapper) func(ibc.ChainConfig) error {
 		return func(cc ibc.ChainConfig) error {
 			horcruxValidator := cw.chain.Validators[0]
@@ -124,7 +125,8 @@ func preGenesisAllHorcruxThreshold(
 	sentriesPerValidator int, // how many sentries for each horcrux validator (min: sentriesPerSigner, max: totalSentries)
 	sentriesPerSigner int, // how many sentries should each horcrux signer connect to (min: 1, max: sentriesPerValidator)
 
-	pubKeys []crypto.PubKey) func(*chainWrapper) func(ibc.ChainConfig) error {
+	pubKeys []crypto.PubKey,
+) func(*chainWrapper) func(ibc.ChainConfig) error {
 	return func(cw *chainWrapper) func(ibc.ChainConfig) error {
 		return func(cc ibc.ChainConfig) error {
 			fnsPerVal := sentriesPerValidator - 1 // minus 1 for the validator itself
@@ -146,7 +148,6 @@ func preGenesisAllHorcruxThreshold(
 						sentries,
 						sentriesPerSigner,
 					)
-
 					if err != nil {
 						return err
 					}
@@ -366,6 +367,7 @@ func getSentriesForCosignerConnection(sentries cosmos.ChainNodes, numSigners int
 	}
 	return peers
 }
+
 func getCosignerMetrics(ctx context.Context, cosigners cosmos.SidecarProcesses) {
 	for _, s := range cosigners {
 		s := s
@@ -390,15 +392,12 @@ func getCosignerMetrics(ctx context.Context, cosigners cosmos.SidecarProcesses) 
 }
 
 func getMetrics(ctx context.Context, cosigner *cosmos.SidecarProcess) (map[string]*dto.MetricFamily, error) {
-
 	debugAddr, err := cosigner.GetHostPorts(ctx, debugPortDocker)
 	if err != nil {
 		return nil, err
 	}
 	req, err := http.NewRequestWithContext(ctx, "GET", "http://"+debugAddr[0]+"/metrics", nil)
-
 	if err != nil {
-
 		return nil, err
 	}
 	resp, err := http.DefaultClient.Do(req)
@@ -410,7 +409,6 @@ func getMetrics(ctx context.Context, cosigner *cosmos.SidecarProcess) (map[strin
 	var parser expfmt.TextParser
 	mf, err := parser.TextToMetricFamilies(resp.Body)
 	if err != nil {
-
 		return nil, err
 	}
 

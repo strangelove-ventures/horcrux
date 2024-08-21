@@ -8,14 +8,16 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/spf13/cobra"
+	amino "github.com/tendermint/go-amino"
+	"gopkg.in/yaml.v2"
+
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	cometcryptoencoding "github.com/cometbft/cometbft/crypto/encoding"
 	cometprotocrypto "github.com/cometbft/cometbft/proto/tendermint/crypto"
-	"github.com/spf13/cobra"
+
 	"github.com/strangelove-ventures/horcrux/v3/signer"
-	amino "github.com/tendermint/go-amino"
-	"gopkg.in/yaml.v2"
 )
 
 func legacyConfig() (*v2Config, error) {
@@ -230,7 +232,7 @@ func migrateCmd() *cobra.Command {
 			}
 
 			newEd25519Path := config.KeyFilePathCosigner(chainID)
-			if err := os.WriteFile(newEd25519Path, newEd25519KeyBz, 0600); err != nil {
+			if err := os.WriteFile(newEd25519Path, newEd25519KeyBz, 0o600); err != nil {
 				return fmt.Errorf("failed to write new Ed25519 key to %s: %w", newEd25519Path, err)
 			}
 
@@ -246,7 +248,7 @@ func migrateCmd() *cobra.Command {
 			}
 
 			newRSAPath := config.KeyFilePathCosignerRSA()
-			if err := os.WriteFile(newRSAPath, newRSAKeyBz, 0600); err != nil {
+			if err := os.WriteFile(newRSAPath, newRSAKeyBz, 0o600); err != nil {
 				return fmt.Errorf("failed to write new RSA key to %s: %w", newRSAPath, err)
 			}
 

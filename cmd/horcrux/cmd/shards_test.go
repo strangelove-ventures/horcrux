@@ -5,9 +5,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/privval"
-	"github.com/stretchr/testify/require"
 )
 
 const testChainID = "test"
@@ -89,7 +90,6 @@ func TestEd25519Shards(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-
 			cmd := rootCmd()
 			cmd.SetOutput(io.Discard)
 			args := append([]string{"create-ed25519-shards", "--home", tmp, "--out", tmp}, tc.args...)

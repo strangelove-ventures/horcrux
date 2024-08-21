@@ -6,16 +6,18 @@ import (
 	"net/url"
 	"time"
 
-	cometcrypto "github.com/cometbft/cometbft/crypto"
 	"github.com/google/uuid"
-	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+
+	cometcrypto "github.com/cometbft/cometbft/crypto"
+
+	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 )
 
 var _ Cosigner = &RemoteCosigner{}
 
-// RemoteCosigner uses CosignerGRPC to request signing from a remote cosigner
+// RemoteCosigner uses CosignerGRPC to request signing from a remote cosigner.
 type RemoteCosigner struct {
 	id      int
 	address string
@@ -23,7 +25,7 @@ type RemoteCosigner struct {
 	client proto.CosignerClient
 }
 
-// NewRemoteCosigner returns a newly initialized RemoteCosigner
+// NewRemoteCosigner returns a newly initialized RemoteCosigner.
 func NewRemoteCosigner(id int, address string) (*RemoteCosigner, error) {
 	client, err := getGRPCClient(address)
 	if err != nil {
@@ -40,25 +42,25 @@ func NewRemoteCosigner(id int, address string) (*RemoteCosigner, error) {
 }
 
 // GetID returns the ID of the remote cosigner
-// Implements the cosigner interface
+// Implements the cosigner interface.
 func (cosigner *RemoteCosigner) GetID() int {
 	return cosigner.id
 }
 
 // GetAddress returns the P2P URL of the remote cosigner
-// Implements the cosigner interface
+// Implements the cosigner interface.
 func (cosigner *RemoteCosigner) GetAddress() string {
 	return cosigner.address
 }
 
 // GetPubKey returns public key of the validator.
-// Implements Cosigner interface
+// Implements Cosigner interface.
 func (cosigner *RemoteCosigner) GetPubKey(_ string) (cometcrypto.PubKey, error) {
 	return nil, fmt.Errorf("unexpected call to RemoteCosigner.GetPubKey")
 }
 
 // VerifySignature validates a signed payload against the public key.
-// Implements Cosigner interface
+// Implements Cosigner interface.
 func (cosigner *RemoteCosigner) VerifySignature(_ string, _, _ []byte) bool {
 	return false
 }
@@ -78,7 +80,7 @@ func getGRPCClient(address string) (proto.CosignerClient, error) {
 	return proto.NewCosignerClient(conn), nil
 }
 
-// Implements the cosigner interface
+// Implements the cosigner interface.
 func (cosigner *RemoteCosigner) GetNonces(
 	ctx context.Context,
 	uuids []uuid.UUID,
@@ -104,10 +106,11 @@ func (cosigner *RemoteCosigner) GetNonces(
 	return out, nil
 }
 
-// Implements the cosigner interface
+// Implements the cosigner interface.
 func (cosigner *RemoteCosigner) SetNoncesAndSign(
 	ctx context.Context,
-	req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error) {
+	req CosignerSetNoncesAndSignRequest,
+) (*CosignerSignResponse, error) {
 	cosignerReq := &proto.SetNoncesAndSignRequest{
 		Uuid:      req.Nonces.UUID[:],
 		ChainID:   req.ChainID,

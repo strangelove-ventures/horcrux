@@ -68,12 +68,12 @@ func (mt *metricsTimer) UpdatePrometheusMetrics() {
 }
 
 var (
-	// Variables to calculate Prometheus Metrics
+	// Variables to calculate Prometheus Metrics.
 	previousPrecommitHeight = int64(0)
 	previousPrevoteHeight   = int64(0)
 	metricsTimeKeeper       = newMetricsTimer()
 
-	// Prometheus Metrics
+	// Prometheus Metrics.
 	totalPubKeyRequests = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "signer_total_pubkey_requests",

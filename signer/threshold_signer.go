@@ -2,7 +2,7 @@ package signer
 
 import "time"
 
-// Interface for the local signer whether it's a soft sign or HSM
+// Interface for the local signer whether it's a soft sign or HSM.
 type ThresholdSigner interface {
 	// PubKey returns the public key bytes for the combination of all cosigners.
 	PubKey() []byte

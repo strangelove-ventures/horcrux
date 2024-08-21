@@ -7,12 +7,11 @@ import (
 	"crypto/sha256"
 	"fmt"
 	mrand "math/rand"
+	"os"
 	"path/filepath"
 	"sync"
-	"time"
-
-	"os"
 	"testing"
+	"time"
 
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
@@ -21,11 +20,6 @@ import (
 	cometrand "github.com/cometbft/cometbft/libs/rand"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	comet "github.com/cometbft/cometbft/types"
-	"github.com/ethereum/go-ethereum/crypto/ecies"
-	"github.com/ethereum/go-ethereum/crypto/secp256k1"
-	"github.com/stretchr/testify/require"
-	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
-	"golang.org/x/sync/errgroup"
 )
 
 func TestThresholdValidator2of2(t *testing.T) {
@@ -61,7 +55,7 @@ func loadKeyForLocalCosigner(
 		return err
 	}
 
-	return os.WriteFile(cosigner.config.KeyFilePathCosigner(chainID), keyBz, 0600)
+	return os.WriteFile(cosigner.config.KeyFilePathCosigner(chainID), keyBz, 0o600)
 }
 
 func testThresholdValidator(t *testing.T, threshold, total uint8) {
@@ -132,8 +126,10 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 
 	// construct different block ID for proposal at same height as highest signed
 	randHash := cometrand.Bytes(tmhash.Size)
-	blockID := cometproto.BlockID{Hash: randHash,
-		PartSetHeader: cometproto.PartSetHeader{Total: 5, Hash: randHash}}
+	blockID := cometproto.BlockID{
+		Hash:          randHash,
+		PartSetHeader: cometproto.PartSetHeader{Total: 5, Hash: randHash},
+	}
 
 	proposal = cometproto.Proposal{
 		Height:  1,
@@ -368,7 +364,7 @@ func getTestLocalCosigners(t *testing.T, threshold, total uint8) ([]*LocalCosign
 
 	for i := range pubKeys {
 		cosignerDir := filepath.Join(tmpDir, fmt.Sprintf("cosigner_%d", i+1))
-		err := os.MkdirAll(cosignerDir, 0777)
+		err := os.MkdirAll(cosignerDir, 0o777)
 		require.NoError(t, err)
 
 		cosignerConfig := &RuntimeConfig{
@@ -580,7 +576,7 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 				// stagger signing requests with random sleep
 				time.Sleep(time.Duration(mrand.Intn(50)+100) * time.Millisecond) //nolint:gosec
 
-				var extension = []byte{0x1, 0x2, 0x3}
+				extension := []byte{0x1, 0x2, 0x3}
 
 				blockIDHash := sha256.New()
 				blockIDHash.Write([]byte("something"))

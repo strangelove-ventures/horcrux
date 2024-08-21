@@ -6,12 +6,13 @@ import (
 	"net"
 	"time"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
+
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	cometservice "github.com/cometbft/cometbft/libs/service"
 
 	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
 )
 
 var _ proto.RemoteSignerServer = &RemoteSignerGRPCServer{}

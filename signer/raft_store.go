@@ -22,14 +22,16 @@ import (
 	"github.com/Jille/raft-grpc-leader-rpc/leaderhealth"
 	raftgrpctransport "github.com/Jille/raft-grpc-transport"
 	"github.com/Jille/raftadmin"
-	"github.com/cometbft/cometbft/libs/log"
-	"github.com/cometbft/cometbft/libs/service"
 	"github.com/hashicorp/raft"
 	boltdb "github.com/hashicorp/raft-boltdb/v2"
-	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
+
+	"github.com/cometbft/cometbft/libs/log"
+	"github.com/cometbft/cometbft/libs/service"
+
+	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 )
 
 var _ Leader = (*RaftStore)(nil)
@@ -67,7 +69,8 @@ type RaftStore struct {
 // New returns a new Store.
 func NewRaftStore(
 	nodeID string, directory string, bindAddress string, timeout time.Duration,
-	logger log.Logger, cosigner *LocalCosigner, cosigners []Cosigner) *RaftStore {
+	logger log.Logger, cosigner *LocalCosigner, cosigners []Cosigner,
+) *RaftStore {
 	cosignerRaftStore := &RaftStore{
 		NodeID:      nodeID,
 		RaftDir:     directory,
@@ -111,7 +114,7 @@ func (s *RaftStore) init() error {
 	return grpcServer.Serve(sock)
 }
 
-// OnStart starts the raft server
+// OnStart starts the raft server.
 func (s *RaftStore) OnStart() error {
 	go func() {
 		err := s.init()
@@ -399,7 +402,6 @@ func (f *fsmSnapshot) Persist(sink raft.SnapshotSink) error {
 		// Close the sink.
 		return sink.Close()
 	}()
-
 	if err != nil {
 		f.logger.Error("Snapshot persist error", err.Error())
 		sinkErr := sink.Cancel()

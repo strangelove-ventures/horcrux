@@ -6,11 +6,12 @@ import (
 	"testing"
 	"time"
 
-	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	"github.com/cometbft/cometbft/libs/log"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/stretchr/testify/require"
+
+	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/libs/log"
 )
 
 // Test_StoreInMemOpenSingleNode tests that a command can be applied to the log

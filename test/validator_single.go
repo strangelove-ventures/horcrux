@@ -65,7 +65,8 @@ func preGenesisSingleNodeAndHorcruxSingle(
 	logger *zap.Logger,
 	client *client.Client,
 	network string,
-	pubKey *crypto.PubKey) func(*chainWrapper) func(ibc.ChainConfig) error {
+	pubKey *crypto.PubKey,
+) func(*chainWrapper) func(ibc.ChainConfig) error {
 	return func(cw *chainWrapper) func(ibc.ChainConfig) error {
 		return func(cc ibc.ChainConfig) error {
 			horcruxValidator := cw.chain.Validators[0]

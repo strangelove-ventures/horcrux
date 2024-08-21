@@ -149,7 +149,7 @@ maxReadSize: 1048576
 		t.Run(tc.name, func(t *testing.T) {
 			tmpConfig := filepath.Join(tc.home, ".horcrux")
 
-			err := os.MkdirAll(tc.home, 0777)
+			err := os.MkdirAll(tc.home, 0o777)
 			require.NoError(t, err)
 
 			cmd := rootCmd()

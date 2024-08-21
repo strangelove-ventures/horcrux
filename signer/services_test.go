@@ -12,12 +12,13 @@ import (
 	"testing"
 	"time"
 
-	cometlog "github.com/cometbft/cometbft/libs/log"
-	cometservice "github.com/cometbft/cometbft/libs/service"
-	"github.com/strangelove-ventures/horcrux/v3/signer"
-
 	fork "github.com/kraken-hpc/go-fork"
 	"github.com/stretchr/testify/require"
+
+	cometlog "github.com/cometbft/cometbft/libs/log"
+	cometservice "github.com/cometbft/cometbft/libs/service"
+
+	"github.com/strangelove-ventures/horcrux/v3/signer"
 )
 
 func init() {
@@ -29,7 +30,7 @@ func mockHorcruxChildProcess(pidFilePath string) {
 	_ = os.WriteFile(
 		pidFilePath,
 		[]byte(fmt.Sprintf("%d\n", os.Getpid())),
-		0600,
+		0o600,
 	)
 }
 
@@ -125,7 +126,7 @@ func TestIsRunningNonExistentPid(t *testing.T) {
 	err = os.WriteFile(
 		pidFilePath,
 		[]byte(fmt.Sprintf("%d\n", pid)),
-		0600,
+		0o600,
 	)
 	require.NoError(t, err, "error writing pid file")
 

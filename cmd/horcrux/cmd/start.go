@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/spf13/cobra"
+
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/cometbft/cometbft/libs/service"
-	"github.com/spf13/cobra"
+
 	"github.com/strangelove-ventures/horcrux/v3/signer"
 )
 
@@ -30,7 +32,7 @@ func startCmd() *cobra.Command {
 			}
 
 			// create all directories up to the state directory
-			if err = os.MkdirAll(config.StateDir, 0700); err != nil {
+			if err = os.MkdirAll(config.StateDir, 0o700); err != nil {
 				return err
 			}
 

@@ -10,13 +10,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cometbft/cometbft/libs/log"
-	cometrpcjsontypes "github.com/cometbft/cometbft/rpc/jsonrpc/types"
 	"github.com/google/uuid"
-	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/cometbft/cometbft/libs/log"
+	cometrpcjsontypes "github.com/cometbft/cometbft/rpc/jsonrpc/types"
+
+	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 )
 
 var _ PrivValidator = &ThresholdValidator{}
@@ -60,7 +62,7 @@ type ChainSignState struct {
 	lastSignStateInitiatedMutex *sync.Mutex
 }
 
-// NewThresholdValidator creates and returns a new ThresholdValidator
+// NewThresholdValidator creates and returns a new ThresholdValidator.
 func NewThresholdValidator(
 	logger log.Logger,
 	config *RuntimeConfig,
@@ -730,7 +732,6 @@ func (pv *ThresholdValidator) Sign(
 	if err == nil && hasVoteExtensions {
 		voteExtNonces, err = pv.nonceCache.GetNonces(cosignersForThisBlock)
 		if err != nil {
-
 			u := uuid.New()
 			var eg errgroup.Group
 			var mu sync.Mutex
@@ -965,7 +966,6 @@ func (pv *ThresholdValidator) Sign(
 	css.lastSignStateMutex.Unlock()
 	if err != nil {
 		if _, isSameHRSError := err.(*SameHRSError); !isSameHRSError {
-
 			pv.notifyBlockSignError(chainID, block.HRSKey(), signBytes)
 			return nil, nil, stamp, fmt.Errorf("error saving last sign state: %w", err)
 		}

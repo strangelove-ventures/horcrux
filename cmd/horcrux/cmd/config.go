@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
 	"github.com/strangelove-ventures/horcrux/v3/signer"
 )
 
@@ -123,7 +124,7 @@ for threshold signer mode, --cosigner flags and --threshold flag are required.
 			cmd.SilenceUsage = true
 
 			// create all directories up to the state directory
-			if err = os.MkdirAll(config.StateDir, 0755); err != nil {
+			if err = os.MkdirAll(config.StateDir, 0o755); err != nil {
 				return err
 			}
 			// create the config file

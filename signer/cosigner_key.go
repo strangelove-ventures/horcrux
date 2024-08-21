@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"os"
 
+	amino "github.com/tendermint/go-amino"
+
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	cometcryptoencoding "github.com/cometbft/cometbft/crypto/encoding"
 	cometprotocrypto "github.com/cometbft/cometbft/proto/tendermint/crypto"
-	amino "github.com/tendermint/go-amino"
 )
 
 // CosignerEd25519Key is a single Ed255219 key shard for an m-of-n threshold signer.

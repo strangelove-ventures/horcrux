@@ -17,11 +17,13 @@ import (
 	"google.golang.org/grpc/serviceconfig"
 )
 
-var _ resolver.Builder = builder{}
-var _ resolver.ClientConn = &partialClientConn{}
-var _ resolver.Resolver = &multiResolver{}
+var (
+	_ resolver.Builder    = builder{}
+	_ resolver.ClientConn = &partialClientConn{}
+	_ resolver.Resolver   = &multiResolver{}
+)
 
-// Register registers the multiresolver builder
+// Register registers the multiresolver builder.
 func Register() {
 	resolver.Register(builder{})
 }

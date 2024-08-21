@@ -5,8 +5,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/strangelove-ventures/horcrux/v3/signer/cond"
 	"github.com/stretchr/testify/require"
+
+	"github.com/strangelove-ventures/horcrux/v3/signer/cond"
 )
 
 func TestRace(t *testing.T) {

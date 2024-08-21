@@ -77,7 +77,7 @@ func RequireNotRunning(log cometlog.Logger, pidFilePath string) error {
 func WaitAndTerminate(logger cometlog.Logger, services []cometservice.Service, pidFilePath string) {
 	done := make(chan struct{})
 
-	pidFile, err := os.OpenFile(pidFilePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	pidFile, err := os.OpenFile(pidFilePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		panic(fmt.Errorf("error opening PID file: %s. %w", pidFilePath, err))
 	}

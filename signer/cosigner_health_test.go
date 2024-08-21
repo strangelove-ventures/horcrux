@@ -4,8 +4,9 @@ import (
 	"os"
 	"testing"
 
-	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/stretchr/testify/require"
+
+	cometlog "github.com/cometbft/cometbft/libs/log"
 )
 
 func TestCosignerHealth(t *testing.T) {

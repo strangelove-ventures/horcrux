@@ -11,10 +11,11 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/strangelove-ventures/horcrux/v3/signer"
 
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	cometlog "github.com/cometbft/cometbft/libs/log"
+
+	"github.com/strangelove-ventures/horcrux/v3/signer"
 )
 
 // Snippet Taken from https://raw.githubusercontent.com/cometbft/cometbft/main/privval/file.go
@@ -46,7 +47,6 @@ func showStateCmd() *cobra.Command {
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-
 			chainID := args[0]
 
 			if _, err := os.Stat(config.HomeDir); os.IsNotExist(err) {
