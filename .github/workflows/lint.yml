@@ -1,4 +1,6 @@
-name: golangci-lint
+# Lint the entire golang project. This workflow relies on the
+# '.golangci.yml' file for its configuration settings.
+name: Lint
 on:
   push:
     tags:
@@ -7,15 +9,26 @@ on:
       - master
       - main
   pull_request:
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: 1.21
+
 jobs:
   golangci:
-    name: lint
+    name: golangci-lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
+      - uses: actions/setup-go@v5
         with:
-          version: latest
-          only-new-issues: true
-          args: --timeout=3m
+          go-version: ${{ env.GO_VERSION }}
+
+      - uses: actions/checkout@v4
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6.1.0
+        with:
+          version: v1.57.2
+          args: --timeout 15m
