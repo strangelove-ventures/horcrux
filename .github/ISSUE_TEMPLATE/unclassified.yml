@@ -1,0 +1,20 @@
+name: Unclassified Issue
+description: Open an issue
+title: "[Unclassified]: "
+labels: ["unclassified", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: Please open a Feature Request, Docs, or Bug Report issue, but if none of those are applicable you can use this generic form.
+  - type: textarea
+    id: description
+    attributes:
+      label: Issue Description
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our [Code of Conduct](../../../CODE_OF_CONDUCT.md). 
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true

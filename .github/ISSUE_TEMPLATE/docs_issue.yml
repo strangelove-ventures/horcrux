@@ -1,0 +1,31 @@
+name: Docs Issue
+description: Report an error or omission in the documentation.
+title: "[Docs]: "
+labels: ["docs", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to let us know how we can improve the docs!
+  - type: input
+    id: docs_page_link
+    attributes:
+      label: What page needs improvement?
+      value: Link a URL
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Please describe the way the docs didn't meet your needs.
+  - type: textarea
+    id: remedy
+    attributes:
+      label: Remedy
+      description: Please describe what you think needs to be added or changed for the docs to meet your needs.
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our [Code of Conduct](../../../CODE_OF_CONDUCT.md). 
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true
