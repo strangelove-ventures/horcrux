@@ -29,6 +29,7 @@ linters:
     - gosmopolitan
     - govet
     - grouper
+    - importas
     - ineffassign
     - loggercheck
     - misspell
@@ -65,8 +66,6 @@ linters-settings:
   gosec:
     excludes:
       - G404 # disables checks on insecure random number source
-  dogsled:
-    max-blank-identifiers: 3
   importas:
     no-extra-aliases: true
     alias:
@@ -140,6 +139,9 @@ linters-settings:
         alias: boltdb
       - pkg: math/rand
         alias: mrand
+  testifylint:
+    disable:
+      - float-compare
 
 issues:
   max-issues-per-linter: 0
