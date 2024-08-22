@@ -6,7 +6,7 @@ Horcrux is a [multi-party-computation (MPC)](https://en.wikipedia.org/wiki/Secur
 
 Take your validator infrastructure to the next level of security and availability
 
-- Composed of a cluster of signer nodes in place of the [remote signer](https://docs.tendermint.com/master/nodes/remote-signer.html), enabling High Availability (HA) for block signing through fault tolerance.
+- Composed of a cluster of signer nodes in place of the [remote signer](https://docs.tendermint.com/v0.34/tools/remote-signer-validation.html), enabling High Availability (HA) for block signing through fault tolerance.
 - Secure your validator private key by splitting it across multiple private signer nodes using threshold Ed25519 signatures
 - Add security and availability without sacrificing block sign performance.
 
@@ -54,8 +54,8 @@ software or this license, under any kind of legal claim.
 
 ## References
 
-- [CometBFT Validator Documentation](https://docs.cometbft.com/main/core/validators)
-- [Cosmos Hub Validator Documentation](https://hub.cosmos.network/master/validators/overview.html)
+- [CometBFT Validator Documentation](https://docs.cometbft.com/v0.38/core/validators)
+- [Cosmos Hub Validator Documentation](https://hub.cosmos.network/main/validators/overview.html)
 - [Provably Secure Distributed Schnorr Signatures and a (t, n) Threshold Scheme for Implicit Certificates](http://cacr.uwaterloo.ca/techreports/2001/corr2001-13.ps)
 
 ## Acknowledgement
