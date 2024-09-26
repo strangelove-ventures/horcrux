@@ -25,7 +25,7 @@ RUN if [ "${TARGETARCH}" = "arm64" ] && [ "${BUILDARCH}" != "arm64" ]; then \
 RUN if [ -d "/go/bin/linux_${TARGETARCH}" ]; then mv /go/bin/linux_${TARGETARCH}/* /go/bin/; fi
 
 # Use minimal busybox from infra-toolkit image for final scratch image
-FROM ghcr.io/strangelove-ventures/infra-toolkit:v0.0.6 AS busybox-min
+FROM ghcr.io/strangelove-ventures/infra-toolkit:v0.1.7@sha256:1ca9116b8aa8e32f5a2f072039abf856076635c262ef84011b4c4ef3dd50eb42 AS busybox-min
 RUN addgroup --gid 2345 -S horcrux && adduser --uid 2345 -S horcrux -G horcrux
 
 # Use ln and rm from full featured busybox for assembling final image
