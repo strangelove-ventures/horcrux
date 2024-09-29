@@ -18,7 +18,7 @@ const (
 	flagGRPCTimeout = "grpc-timeout"
 	flagOverwrite   = "overwrite"
 	flagBare        = "bare"
-	flagGRPCAddress = "gprc-address"
+	flagGRPCAddress = "grpc-address"
 	flagMaxReadSize = "max-read-size"
 )
 
