@@ -56,7 +56,7 @@ software or this license, under any kind of legal claim.
 
 - [CometBFT Validator Documentation](https://docs.cometbft.com/v1.0/explanation/core/validators)
 - [Cosmos Hub Validator Documentation](https://hub.cosmos.network/main/validators)
-- [Provably Secure Distributed Schnorr Signatures and a (t, n) Threshold Scheme for Implicit Certificates](http://cacr.uwaterloo.ca/techreports/2001/corr2001-13.psd)
+- [Provably Secure Distributed Schnorr Signatures and a (t, n) Threshold Scheme for Implicit Certificates](http://cacr.uwaterloo.ca/techreports/2001/corr2001-13.ps)
 
 ## Acknowledgement
 
