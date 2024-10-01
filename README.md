@@ -1,14 +1,37 @@
-# Horcrux
+[![Conforms to README.lint](https://img.shields.io/badge/README.lint-conforming-brightgreen)](https://github.com/strangelove-ventures/readme-dot-lint)
 
-Horcrux is a [multi-party-computation (MPC)](https://en.wikipedia.org/wiki/Secure_multi-party_computation) signing service for CometBFT (Formerly known as Tendermint) nodes
+🌌 Why use Horcrux?
+=============================
 
-## Why use Horcrux?
+Tired of answering PagerDuty in the middle of the night? Eliminate the risk of double-signing, and harden and streamline your node ops.
 
-Take your validator infrastructure to the next level of security and availability
+🌌🌌 Who benefits from Horcrux?
+=============================
+
+Node operators who like their beauty sleep.
+
+
+🌌🌌🌌 What exactly does Horcrux do?
+=============================
+
+Separate out signing, and node operations and ensure High Availability of signing keys by sharding. Horcrux is a [multi-party-computation (MPC)](https://en.wikipedia.org/wiki/Secure_multi-party_computation) signing service for CometBFT (Formerly known as Tendermint) nodes.
 
 - Composed of a cluster of signer nodes in place of the [remote signer](https://docs.tendermint.com/master/nodes/remote-signer.html), enabling High Availability (HA) for block signing through fault tolerance.
 - Secure your validator private key by splitting it across multiple private signer nodes using threshold Ed25519 signatures
 - Add security and availability without sacrificing block sign performance.
+
+
+
+🌌🌌🌌🌌 How do I use Horcrux?
+=============================
+
+## Running Horcrux
+
+See documentation in [`docs/migrating.md`](/docs/migrating.md) to learn how to upgrade your validator infrastructure with Horcrux.
+
+
+🌌🌌🌌🌌🌌 Extras
+=============================
 
 ## Design
 
@@ -37,9 +60,6 @@ Horcrux signer cluster configured with 5 total nodes, threshold 3.
 
 [![Demo](https://img.youtube.com/vi/O-yy1CYBDsI/0.jpg)](https://www.youtube.com/watch?v=O-yy1CYBDsI)
 
-## Running Horcrux
-
-See documentation in [`docs/migrating.md`](/docs/migrating.md) to learn how to upgrade your validator infrastructure with Horcrux.
 
 ## Security
 
