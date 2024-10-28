@@ -9,6 +9,7 @@ import (
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
 	cometservice "github.com/cometbft/cometbft/libs/service"
+
 	"github.com/strangelove-ventures/horcrux/v3/signer"
 )
 
@@ -70,7 +71,7 @@ func NewThresholdValidator(
 	raftTimeout, _ := time.ParseDuration(thresholdCfg.RaftTimeout)
 
 	raftDir := filepath.Join(config.HomeDir, "raft")
-	if err := os.MkdirAll(raftDir, 0700); err != nil {
+	if err := os.MkdirAll(raftDir, 0o700); err != nil {
 		return nil, nil, fmt.Errorf("error creating raft directory: %w", err)
 	}
 

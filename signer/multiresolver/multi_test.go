@@ -10,12 +10,13 @@ import (
 	"time"
 
 	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
-	"github.com/strangelove-ventures/horcrux/v3/signer"
-	"github.com/strangelove-ventures/horcrux/v3/signer/multiresolver"
-	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+
+	"github.com/strangelove-ventures/horcrux/v3/signer"
+	"github.com/strangelove-ventures/horcrux/v3/signer/multiresolver"
+	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 )
 
 func createListener(nodeID string, homedir string) (string, func(), error) {

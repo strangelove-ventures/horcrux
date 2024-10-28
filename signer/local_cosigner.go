@@ -7,11 +7,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
+	"golang.org/x/sync/errgroup"
+
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	cometlog "github.com/cometbft/cometbft/libs/log"
-	"github.com/google/uuid"
-	"golang.org/x/sync/errgroup"
 )
 
 var _ Cosigner = &LocalCosigner{}
@@ -133,13 +134,13 @@ func (cosigner *LocalCosigner) waitForSignStatesToFlushToDisk() {
 }
 
 // GetID returns the id of the cosigner
-// Implements Cosigner interface
+// Implements Cosigner interface.
 func (cosigner *LocalCosigner) GetID() int {
 	return cosigner.security.GetID()
 }
 
 // GetAddress returns the RPC URL of the cosigner
-// Implements Cosigner interface
+// Implements Cosigner interface.
 func (cosigner *LocalCosigner) GetAddress() string {
 	return cosigner.address
 }
@@ -159,7 +160,7 @@ func (cosigner *LocalCosigner) getChainState(chainID string) (*ChainState, error
 }
 
 // GetPubKey returns public key of the validator.
-// Implements Cosigner interface
+// Implements Cosigner interface.
 func (cosigner *LocalCosigner) GetPubKey(chainID string) (cometcrypto.PubKey, error) {
 	if err := cosigner.LoadSignStateIfNecessary(chainID); err != nil {
 		return nil, err
@@ -184,7 +185,7 @@ func (cosigner *LocalCosigner) CombineSignatures(chainID string, signatures []Pa
 }
 
 // VerifySignature validates a signed payload against the public key.
-// Implements Cosigner interface
+// Implements Cosigner interface.
 func (cosigner *LocalCosigner) VerifySignature(chainID string, payload, signature []byte) bool {
 	if err := cosigner.LoadSignStateIfNecessary(chainID); err != nil {
 		return false
@@ -203,7 +204,7 @@ func (cosigner *LocalCosigner) VerifySignature(chainID string, payload, signatur
 
 // Sign the sign request using the cosigner's shard
 // Return the signed bytes or an error
-// Implements Cosigner interface
+// Implements Cosigner interface.
 func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignResponse, error) {
 	chainID := req.ChainID
 
@@ -288,7 +289,6 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		SignBytes:              req.SignBytes,
 		VoteExtensionSignature: res.VoteExtensionSignature,
 	}, &cosigner.pendingDiskWG)
-
 	if err != nil {
 		if _, isSameHRSError := err.(*SameHRSError); !isSameHRSError {
 			return res, err
@@ -368,9 +368,6 @@ func (cosigner *LocalCosigner) GetNonces(
 	// so we perform these operations in parallel.
 
 	for j, u := range uuids {
-		j := j
-		u := u
-
 		outerEg.Go(func() error {
 			meta, err := cosigner.generateNoncesIfNecessary(u)
 			if err != nil {
@@ -386,8 +383,6 @@ func (cosigner *LocalCosigner) GetNonces(
 				if peerID == id {
 					continue
 				}
-
-				i := i
 
 				eg.Go(func() error {
 					secretPart, err := cosigner.getNonce(meta, peerID)
@@ -449,7 +444,7 @@ func (cosigner *LocalCosigner) generateNoncesIfNecessary(uuid uuid.UUID) (*Nonce
 }
 
 // Get the ephemeral secret part for an ephemeral share
-// The ephemeral secret part is encrypted for the receiver
+// The ephemeral secret part is encrypted for the receiver.
 func (cosigner *LocalCosigner) getNonce(
 	meta *NoncesWithExpiration,
 	peerID int,
@@ -469,7 +464,7 @@ func (cosigner *LocalCosigner) getNonce(
 
 const errUnexpectedState = "unexpected state, metadata does not exist for U:"
 
-// setNonce stores a nonce provided by another cosigner
+// setNonce stores a nonce provided by another cosigner.
 func (cosigner *LocalCosigner) setNonce(uuid uuid.UUID, nonce CosignerNonce) error {
 	// Verify the source signature
 	if nonce.Signature == nil {
@@ -508,7 +503,8 @@ func (cosigner *LocalCosigner) setNonce(uuid uuid.UUID, nonce CosignerNonce) err
 
 func (cosigner *LocalCosigner) SetNoncesAndSign(
 	_ context.Context,
-	req CosignerSetNoncesAndSignRequest) (*CosignerSignResponse, error) {
+	req CosignerSetNoncesAndSignRequest,
+) (*CosignerSignResponse, error) {
 	chainID := req.ChainID
 
 	if err := cosigner.LoadSignStateIfNecessary(chainID); err != nil {
@@ -521,8 +517,6 @@ func (cosigner *LocalCosigner) SetNoncesAndSign(
 	// so we perform these operations in parallel.
 
 	for _, secretPart := range req.Nonces.Nonces {
-		secretPart := secretPart
-
 		eg.Go(func() error {
 			return cosigner.setNonce(req.Nonces.UUID, secretPart)
 		})
@@ -530,8 +524,6 @@ func (cosigner *LocalCosigner) SetNoncesAndSign(
 
 	if req.VoteExtensionNonces != nil {
 		for _, secretPart := range req.VoteExtensionNonces.Nonces {
-			secretPart := secretPart
-
 			eg.Go(func() error {
 				return cosigner.setNonce(req.VoteExtensionNonces.UUID, secretPart)
 			})

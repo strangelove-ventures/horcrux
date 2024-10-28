@@ -8,13 +8,15 @@ import (
 	"os"
 	"sync"
 
+	"github.com/gogo/protobuf/proto"
+
 	cometbytes "github.com/cometbft/cometbft/libs/bytes"
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/cometbft/cometbft/libs/protoio"
 	"github.com/cometbft/cometbft/libs/tempfile"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	comet "github.com/cometbft/cometbft/types"
-	"github.com/gogo/protobuf/proto"
+
 	"github.com/strangelove-ventures/horcrux/v3/signer/cond"
 )
 
@@ -44,6 +46,10 @@ func CanonicalVoteToStep(vote *cometproto.CanonicalVote) int8 {
 		return stepPrevote
 	case cometproto.PrecommitType:
 		return stepPrecommit
+	case cometproto.ProposalType:
+		panic("Invalid vote type")
+	case cometproto.UnknownType:
+		panic("Unknown vote type")
 	default:
 		panic("Unknown vote type")
 	}
@@ -55,6 +61,10 @@ func VoteToStep(vote *cometproto.Vote) int8 {
 		return stepPrevote
 	case cometproto.PrecommitType:
 		return stepPrecommit
+	case cometproto.ProposalType:
+		panic("Invalid vote type")
+	case cometproto.UnknownType:
+		panic("Unknown vote type")
 	default:
 		panic("Unknown vote type")
 	}
@@ -287,7 +297,7 @@ func (signState *SignState) save(jsonBytes []byte) {
 		panic("cannot save SignState: filePath not set")
 	}
 
-	err := tempfile.WriteFileAtomic(outFile, jsonBytes, 0600)
+	err := tempfile.WriteFileAtomic(outFile, jsonBytes, 0o600)
 	if err != nil {
 		panic(err)
 	}

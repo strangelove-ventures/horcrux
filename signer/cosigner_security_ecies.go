@@ -9,10 +9,11 @@ import (
 	"math/big"
 	"os"
 
-	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"golang.org/x/sync/errgroup"
+
+	cometjson "github.com/cometbft/cometbft/libs/json"
 )
 
 var _ CosignerSecurity = &CosignerSecurityECIES{}
@@ -172,7 +173,6 @@ func (c *CosignerSecurityECIES) EncryptAndSign(id int, noncePub []byte, nonceSha
 	// cosigners can verify the signature to confirm sender validity
 
 	jsonBytes, err := cometjson.Marshal(nonce)
-
 	if err != nil {
 		return nonce, err
 	}

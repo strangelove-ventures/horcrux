@@ -25,13 +25,13 @@ import (
 )
 
 var (
-	// application's version string
+	// application's version string.
 	Version = ""
-	// commit
+	// commit.
 	Commit = ""
-	// sdk version
+	// sdk version.
 	SDKVersion = ""
-	// tendermint version
+	// tendermint version.
 	CBFTVersion = ""
 )
 
@@ -62,7 +62,7 @@ func NewInfo() Info {
 	}
 }
 
-// versionCmd represents the version command
+// versionCmd represents the version command.
 func versionCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:          "version",

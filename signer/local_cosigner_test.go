@@ -10,15 +10,16 @@ import (
 	"testing"
 	"time"
 
-	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	"github.com/cometbft/cometbft/libs/log"
-	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	comet "github.com/cometbft/cometbft/types"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
+
+	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/libs/log"
+	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	comet "github.com/cometbft/cometbft/types"
 )
 
 const (
@@ -36,6 +37,7 @@ func TestLocalCosignerSignRSA3of5(t *testing.T) {
 }
 
 func testLocalCosignerSignRSA(t *testing.T, threshold, total uint8) {
+	t.Helper()
 	t.Parallel()
 
 	security := make([]CosignerSecurity, total)
@@ -72,6 +74,7 @@ func TestLocalCosignerSignECIES3of5(t *testing.T) {
 }
 
 func testLocalCosignerSignECIES(t *testing.T, threshold, total uint8) {
+	t.Helper()
 	t.Parallel()
 
 	security := make([]CosignerSecurity, total)
@@ -100,6 +103,8 @@ func testLocalCosignerSignECIES(t *testing.T, threshold, total uint8) {
 }
 
 func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []CosignerSecurity) {
+	t.Helper()
+
 	privateKey := cometcryptoed25519.GenPrivKey()
 
 	privKeyBytes := [64]byte{}
@@ -147,7 +152,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 		}
 
 		cosignerDir := filepath.Join(tmpDir, fmt.Sprintf("cosigner%d", id))
-		err := os.Mkdir(cosignerDir, 0700)
+		err := os.Mkdir(cosignerDir, 0o700)
 		require.NoError(t, err)
 
 		cosigner := NewLocalCosigner(
@@ -163,7 +168,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 
 		keyBz, err := key.MarshalJSON()
 		require.NoError(t, err)
-		err = os.WriteFile(cosigner.config.KeyFilePathCosigner(testChainID), keyBz, 0600)
+		err = os.WriteFile(cosigner.config.KeyFilePathCosigner(testChainID), keyBz, 0o600)
 		require.NoError(t, err)
 
 		defer cosigner.waitForSignStatesToFlushToDisk()

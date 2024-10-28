@@ -11,7 +11,7 @@ import (
 var _ PrivValidator = &SingleSignerValidator{}
 
 // SingleSignerValidator guards access to an underlying PrivValidator by using mutexes
-// for each of the PrivValidator interface functions
+// for each of the PrivValidator interface functions.
 type SingleSignerValidator struct {
 	config     *RuntimeConfig
 	chainState sync.Map
@@ -35,7 +35,7 @@ func NewSingleSignerValidator(config *RuntimeConfig) *SingleSignerValidator {
 	}
 }
 
-// GetPubKey implements types.PrivValidator
+// GetPubKey implements types.PrivValidator.
 func (pv *SingleSignerValidator) GetPubKey(_ context.Context, chainID string) ([]byte, error) {
 	chainState, err := pv.loadChainStateIfNecessary(chainID)
 	if err != nil {
@@ -48,7 +48,7 @@ func (pv *SingleSignerValidator) GetPubKey(_ context.Context, chainID string) ([
 	return pubKey.Bytes(), nil
 }
 
-// SignVote implements types.PrivValidator
+// SignVote implements types.PrivValidator.
 func (pv *SingleSignerValidator) Sign(
 	_ context.Context,
 	chainID string,

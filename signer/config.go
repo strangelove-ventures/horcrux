@@ -8,7 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/cometbft/cometbft/crypto"
+	"gopkg.in/yaml.v2"
+
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/codec/legacy"
 	"github.com/cosmos/cosmos-sdk/codec/types"
@@ -16,8 +17,10 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/cosmos/cosmos-sdk/types/bech32"
+
+	"github.com/cometbft/cometbft/crypto"
+
 	"github.com/strangelove-ventures/horcrux/v3/client"
-	"gopkg.in/yaml.v2"
 )
 
 type SignMode string
@@ -27,7 +30,7 @@ const (
 	SignModeSingle    SignMode = "single"
 )
 
-// Config maps to the on-disk yaml format
+// Config maps to the on-disk yaml format.
 type Config struct {
 	PrivValKeyDir       *string              `yaml:"keyDir,omitempty"`
 	SignMode            SignMode             `yaml:"signMode"`
@@ -178,7 +181,7 @@ func (c RuntimeConfig) CosignerStateFile(chainID string) string {
 }
 
 func (c RuntimeConfig) WriteConfigFile() error {
-	return os.WriteFile(c.ConfigFile, c.Config.MustMarshalYaml(), 0600)
+	return os.WriteFile(c.ConfigFile, c.Config.MustMarshalYaml(), 0o600)
 }
 
 func fileExists(file string) error {

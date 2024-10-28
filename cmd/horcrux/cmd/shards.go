@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+
 	"github.com/strangelove-ventures/horcrux/v3/signer"
 )
 
@@ -31,7 +32,7 @@ func createCosignerDirectoryIfNecessary(out string, id int) (string, error) {
 		if !os.IsNotExist(err) {
 			return "", fmt.Errorf("unexpected error fetching info for cosigner directory: %w", err)
 		}
-		if err := os.Mkdir(dir, 0700); err != nil {
+		if err := os.Mkdir(dir, 0o700); err != nil {
 			return "", fmt.Errorf("failed to make directory for cosigner files: %w", err)
 		}
 		return dir, nil
@@ -119,7 +120,7 @@ func createCosignerEd25519ShardsCmd() *cobra.Command {
 
 			out, _ := cmd.Flags().GetString(flagOutputDir)
 			if out != "" {
-				if err := os.MkdirAll(out, 0700); err != nil {
+				if err := os.MkdirAll(out, 0o700); err != nil {
 					return err
 				}
 			}
@@ -157,6 +158,8 @@ func createCosignerEd25519ShardsCmd() *cobra.Command {
 }
 
 // createCosignerECIESShardsCmd is a cobra command for creating cosigner-to-cosigner encryption secp256k1 keys.
+//
+//nolint:dupl
 func createCosignerECIESShardsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create-ecies-shards",
@@ -177,7 +180,7 @@ func createCosignerECIESShardsCmd() *cobra.Command {
 
 			out, _ := cmd.Flags().GetString(flagOutputDir)
 			if out != "" {
-				if err := os.MkdirAll(out, 0700); err != nil {
+				if err := os.MkdirAll(out, 0o700); err != nil {
 					return err
 				}
 			}
@@ -205,6 +208,8 @@ func createCosignerECIESShardsCmd() *cobra.Command {
 }
 
 // createCosignerRSAShardsCmd is a cobra command for creating cosigner-to-cosigner encryption RSA keys.
+//
+//nolint:dupl
 func createCosignerRSAShardsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create-rsa-shards",
@@ -225,7 +230,7 @@ func createCosignerRSAShardsCmd() *cobra.Command {
 
 			out, _ := cmd.Flags().GetString(flagOutputDir)
 			if out != "" {
-				if err := os.MkdirAll(out, 0700); err != nil {
+				if err := os.MkdirAll(out, 0o700); err != nil {
 					return err
 				}
 			}

@@ -8,8 +8,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/strangelove-ventures/horcrux/v3/signer"
 	"github.com/stretchr/testify/require"
+
+	"github.com/strangelove-ventures/horcrux/v3/signer"
 )
 
 const testChainID = "test"
@@ -429,7 +430,7 @@ func TestRuntimeConfigKeyFileExists(t *testing.T) {
 		},
 	).Error(), err.Error())
 
-	err = os.WriteFile(keyFile, []byte{}, 0600)
+	err = os.WriteFile(keyFile, []byte{}, 0o600)
 	require.NoError(t, err)
 
 	_, err = c.KeyFileExistsCosigner(testChainID)
@@ -449,7 +450,7 @@ func TestRuntimeConfigKeyFileExists(t *testing.T) {
 		},
 	).Error(), err.Error())
 
-	err = os.WriteFile(keyFile, []byte{}, 0600)
+	err = os.WriteFile(keyFile, []byte{}, 0o600)
 	require.NoError(t, err)
 
 	_, err = c.KeyFileExistsSingleSigner(testChainID)

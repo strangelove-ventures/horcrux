@@ -7,12 +7,13 @@ import (
 
 	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"github.com/spf13/cobra"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
 	"github.com/strangelove-ventures/horcrux/v3/client"
 	"github.com/strangelove-ventures/horcrux/v3/signer"
 	"github.com/strangelove-ventures/horcrux/v3/signer/multiresolver"
 	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 func init() {
@@ -178,5 +179,4 @@ func getLeaderCmd() *cobra.Command {
 			return nil
 		},
 	}
-
 }

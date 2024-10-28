@@ -3,8 +3,9 @@ package client_test
 import (
 	"testing"
 
-	"github.com/strangelove-ventures/horcrux/v3/client"
 	"github.com/stretchr/testify/require"
+
+	"github.com/strangelove-ventures/horcrux/v3/client"
 )
 
 func TestLeaderElectionMultiAddressDomain(t *testing.T) {

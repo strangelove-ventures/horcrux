@@ -2,11 +2,12 @@ package signer
 
 import (
 	"context"
+	"os"
 	"path/filepath"
+	"testing"
 	"time"
 
-	"os"
-	"testing"
+	"github.com/stretchr/testify/require"
 
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/crypto/tmhash"
@@ -14,7 +15,6 @@ import (
 	cometrand "github.com/cometbft/cometbft/libs/rand"
 	cometprivval "github.com/cometbft/cometbft/privval"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	"github.com/stretchr/testify/require"
 )
 
 func TestSingleSignerValidator(t *testing.T) {
@@ -23,7 +23,7 @@ func TestSingleSignerValidator(t *testing.T) {
 	tmpDir := t.TempDir()
 	stateDir := filepath.Join(tmpDir, "state")
 
-	err := os.MkdirAll(stateDir, 0700)
+	err := os.MkdirAll(stateDir, 0o700)
 	require.NoError(t, err)
 
 	runtimeConfig := &RuntimeConfig{
@@ -40,10 +40,10 @@ func TestSingleSignerValidator(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = os.WriteFile(runtimeConfig.KeyFilePathSingleSigner(testChainID), marshaled, 0600)
+	err = os.WriteFile(runtimeConfig.KeyFilePathSingleSigner(testChainID), marshaled, 0o600)
 	require.NoError(t, err)
 
-	err = os.WriteFile(runtimeConfig.KeyFilePathSingleSigner("different"), marshaled, 0600)
+	err = os.WriteFile(runtimeConfig.KeyFilePathSingleSigner("different"), marshaled, 0o600)
 	require.NoError(t, err)
 
 	validator := NewSingleSignerValidator(runtimeConfig)
@@ -71,8 +71,10 @@ func TestSingleSignerValidator(t *testing.T) {
 
 	// construct different block ID for proposal at same height as highest signed
 	randHash := cometrand.Bytes(tmhash.Size)
-	blockID := cometproto.BlockID{Hash: randHash,
-		PartSetHeader: cometproto.PartSetHeader{Total: 5, Hash: randHash}}
+	blockID := cometproto.BlockID{
+		Hash:          randHash,
+		PartSetHeader: cometproto.PartSetHeader{Total: 5, Hash: randHash},
+	}
 
 	proposal = cometproto.Proposal{
 		Height:  1,
@@ -123,5 +125,4 @@ func TestSingleSignerValidator(t *testing.T) {
 
 	require.True(t, privateKey.PubKey().VerifySignature(block.VoteExtensionSignBytes, voteExtSig),
 		"vote extension signature verification failed")
-
 }

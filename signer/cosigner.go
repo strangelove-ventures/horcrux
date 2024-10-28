@@ -6,15 +6,17 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	"github.com/cometbft/cometbft/libs/protoio"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	"github.com/google/uuid"
+
 	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 )
 
 // Cosigner interface is a set of methods for an m-of-n threshold signature.
-// This interface abstracts the underlying key storage and management
+// This interface abstracts the underlying key storage and management.
 type Cosigner interface {
 	// Get the ID of the cosigner
 	// The ID is the shamir index: 1, 2, etc...
@@ -47,7 +49,7 @@ func (cosigners Cosigners) GetByID(id int) Cosigner {
 }
 
 // CosignerSignRequest is sent to a co-signer to obtain their signature for the SignBytes
-// The SignBytes should be a serialized block
+// The SignBytes should be a serialized block.
 type CosignerSignRequest struct {
 	ChainID                string
 	SignBytes              []byte

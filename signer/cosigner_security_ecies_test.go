@@ -56,6 +56,8 @@ func TestCosignerECIES(t *testing.T) {
 }
 
 func testCosignerSecurity(t *testing.T, securities []CosignerSecurity) error {
+	t.Helper()
+
 	var (
 		mockPub   = []byte("mock_pub")
 		mockShare = []byte("mock_share")
@@ -104,16 +106,12 @@ func TestConcurrentIterateCosignerECIES(t *testing.T) {
 	for i := 0; i < 5000; i++ {
 		var eg errgroup.Group
 		for i, security := range securities {
-			security := security
-			i := i
 			eg.Go(func() error {
 				var nestedEg errgroup.Group
 				for j, security2 := range securities {
 					if i == j {
 						continue
 					}
-					security2 := security2
-					j := j
 					nestedEg.Go(func() error {
 						n, err := security.EncryptAndSign(j+1, []byte("mock_pub"), []byte("mock_share"))
 						if err != nil {

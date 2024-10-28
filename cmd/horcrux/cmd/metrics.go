@@ -11,8 +11,9 @@ import (
 
 	"github.com/armon/go-metrics"
 	gmprometheus "github.com/armon/go-metrics/prometheus"
-	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	cometlog "github.com/cometbft/cometbft/libs/log"
 )
 
 func AddPrometheusMetrics(mux *http.ServeMux, out io.Writer) {
@@ -35,7 +36,7 @@ func AddPrometheusMetrics(mux *http.ServeMux, out io.Writer) {
 	logger.Info("Prometheus Metrics Listening", "address", config.Config.DebugAddr, "path", "/metrics")
 }
 
-// EnableDebugAndMetrics - Initialization errors are not fatal, only logged
+// EnableDebugAndMetrics - Initialization errors are not fatal, only logged.
 func EnableDebugAndMetrics(ctx context.Context, out io.Writer) {
 	logger := cometlog.NewTMLogger(cometlog.NewSyncWriter(out)).With("module", "debugserver")
 
@@ -95,5 +96,4 @@ func EnableDebugAndMetrics(ctx context.Context, out io.Writer) {
 			}
 		}
 	}()
-
 }

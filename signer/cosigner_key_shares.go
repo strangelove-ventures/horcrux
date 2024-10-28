@@ -6,15 +6,16 @@ import (
 	"encoding/json"
 	"os"
 
-	cometjson "github.com/cometbft/cometbft/libs/json"
-	"github.com/cometbft/cometbft/privval"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 	"golang.org/x/sync/errgroup"
+
+	cometjson "github.com/cometbft/cometbft/libs/json"
+	"github.com/cometbft/cometbft/privval"
 )
 
-// CreateCosignerEd25519ShardsFromFile creates CosignerEd25519Key objects from a priv_validator_key.json file
+// CreateCosignerEd25519ShardsFromFile creates CosignerEd25519Key objects from a priv_validator_key.json file.
 func CreateCosignerEd25519ShardsFromFile(priv string, threshold, shards uint8) ([]CosignerEd25519Key, error) {
 	pv, err := ReadPrivValidatorFile(priv)
 	if err != nil {
@@ -23,7 +24,7 @@ func CreateCosignerEd25519ShardsFromFile(priv string, threshold, shards uint8) (
 	return CreateCosignerEd25519Shards(pv, threshold, shards), nil
 }
 
-// CreateCosignerEd25519Shards creates CosignerEd25519Key objects from a privval.FilePVKey
+// CreateCosignerEd25519Shards creates CosignerEd25519Key objects from a privval.FilePVKey.
 func CreateCosignerEd25519Shards(pv privval.FilePVKey, threshold, shards uint8) []CosignerEd25519Key {
 	privShards := tsed25519.DealShares(tsed25519.ExpandSecret(pv.PrivKey.Bytes()[:32]), threshold, shards)
 	out := make([]CosignerEd25519Key, shards)
@@ -72,7 +73,7 @@ func WriteCosignerEd25519ShardFile(cosigner CosignerEd25519Key, file string) err
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(file, jsonBytes, 0600)
+	return os.WriteFile(file, jsonBytes, 0o600)
 }
 
 // WriteCosignerRSAShardFile writes a cosigner RSA key to a given file name.
@@ -81,7 +82,7 @@ func WriteCosignerRSAShardFile(cosigner CosignerRSAKey, file string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(file, jsonBytes, 0600)
+	return os.WriteFile(file, jsonBytes, 0o600)
 }
 
 // CreateCosignerECIESShards generates CosignerECIESKey objects.
@@ -107,7 +108,7 @@ func WriteCosignerECIESShardFile(cosigner CosignerECIESKey, file string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(file, jsonBytes, 0600)
+	return os.WriteFile(file, jsonBytes, 0o600)
 }
 
 func makeRSAKeys(num int) (rsaKeys []*rsa.PrivateKey, pubKeys []*rsa.PublicKey, err error) {
@@ -116,7 +117,6 @@ func makeRSAKeys(num int) (rsaKeys []*rsa.PrivateKey, pubKeys []*rsa.PublicKey, 
 	var eg errgroup.Group
 	bitSize := 4096
 	for i := 0; i < num; i++ {
-		i := i
 		eg.Go(func() error {
 			rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
 			if err != nil {
@@ -136,7 +136,6 @@ func makeECIESKeys(num int) ([]*ecies.PrivateKey, []*ecies.PublicKey, error) {
 	pubKeys := make([]*ecies.PublicKey, num)
 	var eg errgroup.Group
 	for i := 0; i < num; i++ {
-		i := i
 		eg.Go(func() error {
 			eciesKey, err := ecies.GenerateKey(rand.Reader, secp256k1.S256(), nil)
 			if err != nil {

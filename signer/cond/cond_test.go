@@ -5,8 +5,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/strangelove-ventures/horcrux/v3/signer/cond"
 	"github.com/stretchr/testify/require"
+
+	"github.com/strangelove-ventures/horcrux/v3/signer/cond"
 )
 
 func TestRace(t *testing.T) {
@@ -17,7 +18,7 @@ func TestRace(t *testing.T) {
 		c.L.Lock()
 		x = 1
 		c.Wait()
-		require.Equal(t, 2, x)
+		require.Equal(t, 2, x) //nolint:testifylint // go-require
 		x = 3
 		c.Broadcast()
 		c.L.Unlock()
@@ -43,7 +44,7 @@ func TestRace(t *testing.T) {
 		for {
 			if x == 2 {
 				c.Wait()
-				require.Equal(t, 3, x)
+				require.Equal(t, 3, x) //nolint:testifylint // go-require
 				break
 			}
 			if x == 3 {

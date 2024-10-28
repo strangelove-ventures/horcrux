@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/spf13/cobra"
+
+	"github.com/cosmos/cosmos-sdk/types/bech32"
+
 	"github.com/cometbft/cometbft/crypto"
 	cometprivval "github.com/cometbft/cometbft/privval"
-	"github.com/cosmos/cosmos-sdk/types/bech32"
-	"github.com/spf13/cobra"
+
 	"github.com/strangelove-ventures/horcrux/v3/signer"
 )
 
@@ -28,7 +31,6 @@ func addressCmd() *cobra.Command {
 		SilenceUsage: true,
 		Args:         cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-
 			var pubKey crypto.PubKey
 
 			chainID := args[0]

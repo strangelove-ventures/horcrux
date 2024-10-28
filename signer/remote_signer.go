@@ -95,7 +95,7 @@ func (rs *ReconnRemoteSigner) establishConnection(ctx context.Context) (net.Conn
 	return conn, nil
 }
 
-// main loop for ReconnRemoteSigner
+// main loop for ReconnRemoteSigner.
 func (rs *ReconnRemoteSigner) loop(ctx context.Context) {
 	var conn net.Conn
 	for {

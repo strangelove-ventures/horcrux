@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
-	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+
+	cometlog "github.com/cometbft/cometbft/libs/log"
 )
 
 func TestNonceCache(_ *testing.T) {
@@ -27,32 +28,32 @@ func TestMovingAverage(t *testing.T) {
 
 	ma.add(3*time.Second, 500)
 	require.Len(t, ma.items, 1)
-	require.Equal(t, float64(500), ma.average())
+	require.InEpsilon(t, float64(500), ma.average(), 0)
 
 	ma.add(3*time.Second, 100)
 	require.Len(t, ma.items, 2)
-	require.Equal(t, float64(300), ma.average())
+	require.InEpsilon(t, float64(300), ma.average(), 0)
 
 	ma.add(6*time.Second, 600)
 	require.Len(t, ma.items, 3)
-	require.Equal(t, float64(450), ma.average())
+	require.InEpsilon(t, float64(450), ma.average(), 0)
 
 	// should kick out the first one
 	ma.add(3*time.Second, 500)
 	require.Len(t, ma.items, 3)
-	require.Equal(t, float64(450), ma.average())
+	require.InEpsilon(t, float64(450), ma.average(), 0)
 
 	// should kick out the second one
 	ma.add(6*time.Second, 500)
 	require.Len(t, ma.items, 3)
-	require.Equal(t, float64(540), ma.average())
+	require.InEpsilon(t, float64(540), ma.average(), 0)
 
 	for i := 0; i < 5; i++ {
 		ma.add(2500*time.Millisecond, 1000)
 	}
 
 	require.Len(t, ma.items, 5)
-	require.Equal(t, float64(1000), ma.average())
+	require.InEpsilon(t, float64(1000), ma.average(), 0)
 }
 
 func TestClearNonces(t *testing.T) {
@@ -172,12 +173,12 @@ func TestNonceCacheDemand(t *testing.T) {
 		_, err := nonceCache.GetNonces([]Cosigner{cosigners[0], cosigners[1]})
 		require.NoError(t, err)
 		time.Sleep(10 * time.Millisecond)
-		require.Greater(t, nonceCache.cache.Size(), 0)
+		require.Positive(t, nonceCache.cache.Size())
 	}
 
 	size := nonceCache.cache.Size()
 
-	require.Greater(t, size, 0)
+	require.Positive(t, size)
 
 	cancel()
 
@@ -185,7 +186,7 @@ func TestNonceCacheDemand(t *testing.T) {
 
 	count, pruned := mp.Result()
 
-	require.Greater(t, count, 0, "count of pruning calls must be greater than 0")
+	require.Positive(t, count, "count of pruning calls must be greater than 0")
 	require.Equal(t, 0, pruned, "no nonces should have been pruned")
 }
 
@@ -217,6 +218,7 @@ func TestNonceCacheExpiration(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	const loadN = 100
+
 	// Load first set of 100 nonces
 	nonceCache.LoadN(ctx, loadN)
 
@@ -239,7 +241,7 @@ func TestNonceCacheExpiration(t *testing.T) {
 
 	// we should have pruned only the first set of nonces
 	// The second set of nonces should not have expired yet and we should not have load any more
-	require.Equal(t, pruned, loadN)
+	require.Equal(t, loadN, pruned)
 
 	cancel()
 
@@ -424,7 +426,7 @@ func TestNonceCacheDemandSlow(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		time.Sleep(200 * time.Millisecond)
-		require.Greater(t, nonceCache.cache.Size(), 0)
+		require.Positive(t, nonceCache.cache.Size())
 		_, err := nonceCache.GetNonces([]Cosigner{cosigners[0], cosigners[1]})
 		require.NoError(t, err)
 	}
@@ -461,7 +463,7 @@ func TestNonceCacheDemandSlowDefault(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		time.Sleep(7 * time.Second)
-		require.Greater(t, nonceCache.cache.Size(), 0)
+		require.Positive(t, nonceCache.cache.Size())
 		_, err := nonceCache.GetNonces([]Cosigner{cosigners[0], cosigners[1]})
 		require.NoError(t, err)
 	}
