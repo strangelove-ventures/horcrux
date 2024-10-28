@@ -17,10 +17,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Install and setup go
-      - name: Set up Go 1.21
+      - name: Set up Go 1.23
         uses: actions/setup-go@v4
         with:
-          go-version: '^1.21.4'
+          go-version: '^1.23'
 
       # checkout horcrux
       - name: checkout horcrux
@@ -47,10 +47,10 @@ jobs:
           - TestHorcruxProxyGRPC
     steps:
       # Install and setup go
-      - name: Set up Go 1.21
+      - name: Set up Go 1.23
         uses: actions/setup-go@v4
         with:
-          go-version: '^1.21.4'
+          go-version: '^1.23'
 
       # checkout horcrux
       - name: checkout horcrux
