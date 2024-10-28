@@ -10,6 +10,7 @@ linters:
     - asciicheck
     - bidichk
     - bodyclose
+    - copyloopvar
     - decorder
     - dupl
     - dupword
@@ -17,8 +18,7 @@ linters:
     - errchkjson
     - errname
     - exhaustive
-    - exportloopref
-    - forbidigo
+    # - forbidigo disabled because there are many places in cmd where passing in a logger would require non-trivial refactor
     - gci
     - goconst
     - gocritic
@@ -29,7 +29,6 @@ linters:
     - gosmopolitan
     - govet
     - grouper
-    - importas
     - ineffassign
     - loggercheck
     - misspell
@@ -61,87 +60,11 @@ linters-settings:
       - prefix(github.com/cosmos)
       - prefix(github.com/cosmos/cosmos-sdk)
       - prefix(github.com/cometbft/cometbft)
-      # TODO: Replace below with '- prefix(<project-package-name>)'
       - prefix(github.com/strangelove-ventures/horcrux)
   gosec:
     excludes:
       - G404 # disables checks on insecure random number source
-  importas:
-    no-extra-aliases: true
-    alias:
-      - pkg: github.com/cosmos/cosmos-sdk/crypto/codec
-        alias: cryptocodec
-      - pkg: github.com/cosmos/cosmos-sdk/crypto/types
-        alias: cryptotypes
-      - pkg: github.com/cosmos/cosmos-sdk/x/slashing/types
-        alias: slashingtypes
-      - pkg: github.com/cometbft/cometbft/types
-        alias: comet
-      - pkg: github.com/cometbft/cometbft/config
-        alias: cometconfig
-      - pkg: github.com/cometbft/cometbft/crypto
-        alias: cometcrypto
-      - pkg: github.com/cometbft/cometbft/crypto/ed25519
-        alias: cometcryptoed25519
-      - pkg: github.com/cometbft/cometbft/crypto/encoding
-        alias: cometcryptoencoding
-      - pkg: github.com/tendermint/go-amino
-        alias: amino
-      - pkg: github.com/cometbft/cometbft/libs/bytes
-        alias: cometbytes
-      - pkg: github.com/cometbft/cometbft/libs/json
-        alias: cometjson
-      - pkg: github.com/cometbft/cometbft/libs/log
-        alias: cometlog
-      - pkg: github.com/cometbft/cometbft/libs/net
-        alias: cometnet
-      - pkg: github.com/cometbft/cometbft/libs/os
-        alias: cometos
-      - pkg: github.com/cometbft/cometbft/libs/rand
-        alias: cometrand
-      - pkg: github.com/cometbft/cometbft/libs/service
-        alias: cometservice
-      - pkg: github.com/cometbft/cometbft/p2p/conn
-        alias: cometp2pconn
-      - pkg: github.com/cometbft/cometbft/privval
-        alias: cometprivval
-      - pkg: github.com/cometbft/cometbft/proto/tendermint/types
-        alias: cometproto
-      - pkg: github.com/cometbft/cometbft/proto/tendermint/crypto
-        alias: cometprotocrypto
-      - pkg: github.com/cometbft/cometbft/proto/tendermint/privval
-        alias: cometprotoprivval
-      - pkg: github.com/cometbft/cometbft/rpc/client
-        alias: cometrpcclient
-      - pkg: github.com/cometbft/cometbft/rpc/client/http
-        alias: cometrpchttp
-      - pkg: github.com/cometbft/cometbft/rpc/jsonrpc/client
-        alias: cometrpcjsonclient
-      - pkg: github.com/cometbft/cometbft/rpc/jsonrpc/types
-        alias: cometrpcjsontypes
-      - pkg: github.com/cometbft/cometbft/rpc/core/types
-        alias: cometrpctypes
-      - pkg: github.com/ecies/go/v2
-        alias: ecies
-      - pkg: github.com/grpc-ecosystem/go-grpc-middleware/retry
-        alias: grpcretry
-      - pkg : github.com/kraken-hpc/go-fork
-        alias: fork
-      - pkg: github.com/armon/go-metrics/prometheus
-        alias: gmprometheus
-      - pkg: github.com/mitchellh/go-homedir
-        alias: homedir
-      - pkg: gitlab.com/unit410/threshold-ed25519/pkg
-        alias: tsed25519
-      - pkg: github.com/Jille/raft-grpc-transport
-        alias: raftgrpctransport
-      - pkg: github.com/hashicorp/raft-boltdb/v2
-        alias: boltdb
-      - pkg: math/rand
-        alias: mrand
-  testifylint:
-    disable:
-      - float-compare
+      - G115 # disables checks on type conversions between signed and unsigned integers
 
 issues:
   max-issues-per-linter: 0
