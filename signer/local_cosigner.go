@@ -368,9 +368,6 @@ func (cosigner *LocalCosigner) GetNonces(
 	// so we perform these operations in parallel.
 
 	for j, u := range uuids {
-		j := j
-		u := u
-
 		outerEg.Go(func() error {
 			meta, err := cosigner.generateNoncesIfNecessary(u)
 			if err != nil {
@@ -386,8 +383,6 @@ func (cosigner *LocalCosigner) GetNonces(
 				if peerID == id {
 					continue
 				}
-
-				i := i
 
 				eg.Go(func() error {
 					secretPart, err := cosigner.getNonce(meta, peerID)
@@ -522,8 +517,6 @@ func (cosigner *LocalCosigner) SetNoncesAndSign(
 	// so we perform these operations in parallel.
 
 	for _, secretPart := range req.Nonces.Nonces {
-		secretPart := secretPart
-
 		eg.Go(func() error {
 			return cosigner.setNonce(req.Nonces.UUID, secretPart)
 		})
@@ -531,8 +524,6 @@ func (cosigner *LocalCosigner) SetNoncesAndSign(
 
 	if req.VoteExtensionNonces != nil {
 		for _, secretPart := range req.VoteExtensionNonces.Nonces {
-			secretPart := secretPart
-
 			eg.Go(func() error {
 				return cosigner.setNonce(req.VoteExtensionNonces.UUID, secretPart)
 			})

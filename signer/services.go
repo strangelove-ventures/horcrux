@@ -61,14 +61,16 @@ func RequireNotRunning(log cometlog.Logger, pidFilePath string) error {
 		return nil
 	}
 
-	errno, ok := err.(syscall.Errno)
+	var errno syscall.Errno
+	ok := errors.As(err, &errno)
 	if !ok {
 		return fmt.Errorf("unexpected error type from signaling horcrux PID: %d", pid)
 	}
-	switch errno {
-	case syscall.ESRCH:
+
+	switch {
+	case errors.Is(errno, syscall.ESRCH):
 		return fmt.Errorf("search error while signaling horcrux PID: %d", pid)
-	case syscall.EPERM:
+	case errors.Is(errno, syscall.EPERM):
 		return fmt.Errorf("permission denied accessing horcrux PID: %d", pid)
 	}
 	return fmt.Errorf("unexpected error while signaling horcrux PID: %d", pid)

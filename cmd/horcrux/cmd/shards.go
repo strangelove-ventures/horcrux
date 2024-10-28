@@ -158,6 +158,8 @@ func createCosignerEd25519ShardsCmd() *cobra.Command {
 }
 
 // createCosignerECIESShardsCmd is a cobra command for creating cosigner-to-cosigner encryption secp256k1 keys.
+//
+//nolint:dupl
 func createCosignerECIESShardsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create-ecies-shards",
@@ -206,6 +208,8 @@ func createCosignerECIESShardsCmd() *cobra.Command {
 }
 
 // createCosignerRSAShardsCmd is a cobra command for creating cosigner-to-cosigner encryption RSA keys.
+//
+//nolint:dupl
 func createCosignerRSAShardsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create-rsa-shards",

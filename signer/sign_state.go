@@ -46,6 +46,10 @@ func CanonicalVoteToStep(vote *cometproto.CanonicalVote) int8 {
 		return stepPrevote
 	case cometproto.PrecommitType:
 		return stepPrecommit
+	case cometproto.ProposalType:
+		panic("Invalid vote type")
+	case cometproto.UnknownType:
+		panic("Unknown vote type")
 	default:
 		panic("Unknown vote type")
 	}
@@ -57,6 +61,10 @@ func VoteToStep(vote *cometproto.Vote) int8 {
 		return stepPrevote
 	case cometproto.PrecommitType:
 		return stepPrecommit
+	case cometproto.ProposalType:
+		panic("Invalid vote type")
+	case cometproto.UnknownType:
+		panic("Unknown vote type")
 	default:
 		panic("Unknown vote type")
 	}

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	fork "github.com/kraken-hpc/go-fork"
+	"github.com/kraken-hpc/go-fork"
 	"github.com/stretchr/testify/require"
 
 	cometlog "github.com/cometbft/cometbft/libs/log"
@@ -131,7 +131,7 @@ func TestIsRunningNonExistentPid(t *testing.T) {
 	require.NoError(t, err, "error writing pid file")
 
 	err = signer.RequireNotRunning(cometlog.NewNopLogger(), pidFilePath)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	_, err = os.Stat(pidFilePath)
 	require.ErrorIs(t, err, os.ErrNotExist)

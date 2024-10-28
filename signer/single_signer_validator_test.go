@@ -7,13 +7,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/crypto/tmhash"
 	cometjson "github.com/cometbft/cometbft/libs/json"
 	cometrand "github.com/cometbft/cometbft/libs/rand"
 	cometprivval "github.com/cometbft/cometbft/privval"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	"github.com/stretchr/testify/require"
 )
 
 func TestSingleSignerValidator(t *testing.T) {

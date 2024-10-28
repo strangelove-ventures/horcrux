@@ -736,7 +736,6 @@ func (pv *ThresholdValidator) Sign(
 			var eg errgroup.Group
 			var mu sync.Mutex
 			for _, c := range cosignersForThisBlock {
-				c := c
 				eg.Go(func() error {
 					nonces, err := c.GetNonces(ctx, []uuid.UUID{u})
 					if err != nil {
@@ -792,7 +791,6 @@ func (pv *ThresholdValidator) Sign(
 
 	var eg errgroup.Group
 	for _, cosigner := range cosignersForThisBlock {
-		cosigner := cosigner
 		eg.Go(func() error {
 			for cosigner != nil {
 				signCtx, cancel := context.WithTimeout(ctx, pv.grpcTimeout)

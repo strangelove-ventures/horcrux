@@ -278,8 +278,6 @@ func (cnc *CosignerNonceCache) LoadN(ctx context.Context, n int) {
 	expiration := time.Now().Add(cnc.nonceExpiration)
 
 	for i, p := range cnc.cosigners {
-		i := i
-		p := p
 		go func() {
 			defer wg.Done()
 			ctx, cancel := context.WithTimeout(ctx, cnc.getNoncesTimeout)

@@ -117,7 +117,6 @@ func makeRSAKeys(num int) (rsaKeys []*rsa.PrivateKey, pubKeys []*rsa.PublicKey, 
 	var eg errgroup.Group
 	bitSize := 4096
 	for i := 0; i < num; i++ {
-		i := i
 		eg.Go(func() error {
 			rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
 			if err != nil {
@@ -137,7 +136,6 @@ func makeECIESKeys(num int) ([]*ecies.PrivateKey, []*ecies.PublicKey, error) {
 	pubKeys := make([]*ecies.PublicKey, num)
 	var eg errgroup.Group
 	for i := 0; i < num; i++ {
-		i := i
 		eg.Go(func() error {
 			eciesKey, err := ecies.GenerateKey(rand.Reader, secp256k1.S256(), nil)
 			if err != nil {

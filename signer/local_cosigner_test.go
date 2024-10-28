@@ -37,6 +37,7 @@ func TestLocalCosignerSignRSA3of5(t *testing.T) {
 }
 
 func testLocalCosignerSignRSA(t *testing.T, threshold, total uint8) {
+	t.Helper()
 	t.Parallel()
 
 	security := make([]CosignerSecurity, total)
@@ -73,6 +74,7 @@ func TestLocalCosignerSignECIES3of5(t *testing.T) {
 }
 
 func testLocalCosignerSignECIES(t *testing.T, threshold, total uint8) {
+	t.Helper()
 	t.Parallel()
 
 	security := make([]CosignerSecurity, total)
@@ -101,6 +103,8 @@ func testLocalCosignerSignECIES(t *testing.T, threshold, total uint8) {
 }
 
 func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []CosignerSecurity) {
+	t.Helper()
+
 	privateKey := cometcryptoed25519.GenPrivKey()
 
 	privKeyBytes := [64]byte{}

@@ -13,6 +13,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"github.com/ethereum/go-ethereum/crypto/secp256k1"
+	"github.com/stretchr/testify/require"
+	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
+	"golang.org/x/sync/errgroup"
+
 	cometcrypto "github.com/cometbft/cometbft/crypto"
 	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/crypto/tmhash"
@@ -20,11 +26,6 @@ import (
 	cometrand "github.com/cometbft/cometbft/libs/rand"
 	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	comet "github.com/cometbft/cometbft/types"
-	"github.com/ethereum/go-ethereum/crypto/ecies"
-	"github.com/ethereum/go-ethereum/crypto/secp256k1"
-	"github.com/stretchr/testify/require"
-	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
-	"golang.org/x/sync/errgroup"
 )
 
 func TestThresholdValidator2of2(t *testing.T) {
@@ -64,6 +65,8 @@ func loadKeyForLocalCosigner(
 }
 
 func testThresholdValidator(t *testing.T, threshold, total uint8) {
+	t.Helper()
+
 	cosigners, pubKey := getTestLocalCosigners(t, threshold, total)
 
 	thresholdCosigners := make([]Cosigner, 0, threshold-1)
@@ -340,6 +343,8 @@ func testThresholdValidator(t *testing.T, threshold, total uint8) {
 }
 
 func getTestLocalCosigners(t *testing.T, threshold, total uint8) ([]*LocalCosigner, cometcrypto.PubKey) {
+	t.Helper()
+
 	eciesKeys := make([]*ecies.PrivateKey, total)
 	pubKeys := make([]*ecies.PublicKey, total)
 	cosigners := make([]*LocalCosigner, total)
@@ -410,6 +415,8 @@ func getTestLocalCosigners(t *testing.T, threshold, total uint8) ([]*LocalCosign
 }
 
 func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) {
+	t.Helper()
+
 	cosigners, pubKey := getTestLocalCosigners(t, threshold, total)
 
 	thresholdValidators := make([]*ThresholdValidator, 0, total)
@@ -487,9 +494,9 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 		wg.Add(len(thresholdValidators))
 		var mu sync.Mutex
 		success := false
-		for _, tv := range thresholdValidators {
-			tv := tv
 
+		//nolint:dupl
+		for _, tv := range thresholdValidators {
 			tv.nonceCache.LoadN(ctx, 1)
 
 			go func() {
@@ -529,9 +536,9 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 		require.True(t, success) // at least one should succeed so that the block is not missed.
 		wg.Add(len(thresholdValidators))
 		success = false
-		for _, tv := range thresholdValidators {
-			tv := tv
 
+		//nolint:dupl
+		for _, tv := range thresholdValidators {
 			tv.nonceCache.LoadN(ctx, 1)
 
 			go func() {
@@ -572,8 +579,6 @@ func testThresholdValidatorLeaderElection(t *testing.T, threshold, total uint8) 
 		wg.Add(len(thresholdValidators))
 		success = false
 		for _, tv := range thresholdValidators {
-			tv := tv
-
 			tv.nonceCache.LoadN(ctx, 2)
 
 			go func() {
