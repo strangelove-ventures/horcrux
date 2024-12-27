@@ -1,6 +1,6 @@
 # Contributing to Horcrux
 
-Welcome to the Horcrux project! We're thrilled that you're interested in contributing. Horcrux a multi-party-computation signing service for CometBFT nodes. This document outlines the process and guidelines for contributing to Horcrux. Please read it carefully to ensure that you understand our workflow and the standards we expect for our community.
+Welcome to the Horcrux project! We're thrilled that you're interested in contributing. Horcrux is a multi-party-computation signing service for CometBFT nodes. This document outlines the process and guidelines for contributing to Horcrux. Please read it carefully to ensure that you understand our workflow and the standards we expect for our community.
 
 ## Table of Contents
 
@@ -34,7 +34,7 @@ To get started, follow these steps:
    git clone https://github.com/<Username>/horcrux.git
    ```
 
-3. Crate a new branch on your fork
+3. Create a new branch on your fork
 
     ```sh
     git checkout -b name/broad-description-of-feature    
