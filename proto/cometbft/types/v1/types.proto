@@ -1,5 +1,5 @@
 syntax = "proto3";
-package tendermint.types;
+package cometbft.types.v1;
 
 option go_package = "github.com/strangelove-ventures/horcrux/v3/comet/proto/types";
 

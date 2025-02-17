@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	dockertypes "github.com/docker/docker/api/types"
+	dockerimagetypes "github.com/docker/docker/api/types/image"
 	"github.com/strangelove-ventures/horcrux/v3/signer"
 	interchaintest "github.com/strangelove-ventures/interchaintest/v8"
 	"github.com/strangelove-ventures/interchaintest/v8/chain/cosmos"
@@ -360,7 +360,7 @@ func TestMultipleChainHorcrux(t *testing.T) {
 	chainWrappers := make([]*chainWrapper, totalChains)
 	pubKeys := make([][]byte, totalChains)
 	chainConfigs := make([]*cosignerChainConfig, totalChains)
-	preGenesises := make([]func(*chainWrapper) func(ibc.ChainConfig) error, totalChains)
+	preGenesises := make([]func(*chainWrapper) func(ibc.Chain) error, totalChains)
 
 	for i := 0; i < totalChains; i++ {
 		chainConfigs[i] = &cosignerChainConfig{
@@ -382,8 +382,8 @@ func TestMultipleChainHorcrux(t *testing.T) {
 	for i, chainConfig := range chainConfigs {
 		i := i
 		chainConfig := chainConfig
-		preGenesises[i] = func(cw *chainWrapper) func(ibc.ChainConfig) error {
-			return func(cc ibc.ChainConfig) error {
+		preGenesises[i] = func(cw *chainWrapper) func(ibc.Chain) error {
+			return func(cc ibc.Chain) error {
 
 				firstSentry := cw.chain.Validators[0]
 				sentries := append(cosmos.ChainNodes{firstSentry}, cw.chain.FullNodes...)
@@ -580,7 +580,7 @@ func TestHorcruxProxyGRPC(t *testing.T) {
 	_, err := client.ImagePull(
 		ctx,
 		horcruxProxyRegistry+":"+horcruxProxyTag,
-		dockertypes.ImagePullOptions{},
+		dockerimagetypes.PullOptions{},
 	)
 	require.NoError(t, err)
 
@@ -596,7 +596,7 @@ func TestHorcruxProxyGRPC(t *testing.T) {
 	chainWrappers := make([]*chainWrapper, totalChains)
 	pubKeys := make([][]byte, totalChains)
 	chainConfigs := make([]*cosignerChainConfig, totalChains)
-	preGenesises := make([]func(*chainWrapper) func(ibc.ChainConfig) error, totalChains)
+	preGenesises := make([]func(*chainWrapper) func(ibc.Chain) error, totalChains)
 
 	for i := 0; i < totalChains; i++ {
 		chainConfigs[i] = &cosignerChainConfig{
@@ -621,8 +621,8 @@ func TestHorcruxProxyGRPC(t *testing.T) {
 	for i, chainConfig := range chainConfigs {
 		i := i
 		chainConfig := chainConfig
-		preGenesises[i] = func(cw *chainWrapper) func(ibc.ChainConfig) error {
-			return func(cc ibc.ChainConfig) error {
+		preGenesises[i] = func(cw *chainWrapper) func(ibc.Chain) error {
+			return func(cc ibc.Chain) error {
 
 				firstSentry := cw.chain.Validators[0]
 				sentries := append(cosmos.ChainNodes{firstSentry}, cw.chain.FullNodes...)

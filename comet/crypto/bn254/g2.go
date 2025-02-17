@@ -9,7 +9,7 @@ import (
 	bn254fp "github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	bn254fr "github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr/mimc"
-	"github.com/tunabay/go-bitarray"
+	"github.com/strangelove-ventures/horcrux/v3/comet/crypto/bn254/bitarray"
 )
 
 // Union whitepaper: (1), (2), M ◦ H_{mimc^4}

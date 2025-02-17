@@ -11,7 +11,7 @@ import (
 	cometbftjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/cosmos/cosmos-sdk/types/bech32"
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
-	"github.com/docker/docker/client"
+	"github.com/moby/moby/client"
 	cometcryptobn254 "github.com/strangelove-ventures/horcrux/v3/comet/crypto/bn254"
 	cometjson "github.com/strangelove-ventures/horcrux/v3/comet/libs/json"
 	"github.com/strangelove-ventures/horcrux/v3/comet/privval"
@@ -32,7 +32,7 @@ const (
 	// testChainVersion = "v10.0.2"
 
 	testChain        = "union" // ghcr.io/strangelove-ventures/heighliner/gaia
-	testChainVersion = "v0.24.0"
+	testChainVersion = "v0.25.0"
 
 	signerPort       = "2222"
 	signerPortDocker = signerPort + "/tcp"
@@ -58,7 +58,7 @@ type chainWrapper struct {
 	totalValidators int // total number of validators on chain at genesis
 	totalSentries   int // number of additional sentry nodes
 	modifyGenesis   func(cc ibc.ChainConfig, b []byte) ([]byte, error)
-	preGenesis      func(*chainWrapper) func(ibc.ChainConfig) error
+	preGenesis      func(*chainWrapper) func(ibc.Chain) error
 }
 
 func init() {
@@ -79,7 +79,7 @@ func startChains(
 
 	cs := make([]*interchaintest.ChainSpec, len(chains))
 	for i, c := range chains {
-		var preGenesis func(ibc.ChainConfig) error
+		var preGenesis func(ibc.Chain) error
 		if c.preGenesis != nil {
 			preGenesis = c.preGenesis(c)
 		}
@@ -96,7 +96,7 @@ func startChains(
 					{
 						Repository: "ghcr.io/strangelove-ventures/heighliner/" + testChain,
 						Version:    testChainVersion,
-						UidGid:     "1025:1025",
+						UIDGID:     "1025:1025",
 					},
 				},
 				Bin:            "uniond",
@@ -175,7 +175,7 @@ func horcruxSidecar(ctx context.Context, node *cosmos.ChainNode, name string, cl
 	startCmd = append(startCmd, startupFlags...)
 	if err := node.NewSidecarProcess(
 		ctx, false, name, client, network,
-		ibc.DockerImage{Repository: signerImage, Version: "latest", UidGid: signerImageUidGid},
+		ibc.DockerImage{Repository: signerImage, Version: "latest", UIDGID: signerImageUidGid},
 		signerImageHomeDir, []string{signerPortDocker, grpcPortDocker, debugPortDocker}, startCmd, nil,
 	); err != nil {
 		return nil, err
@@ -190,7 +190,7 @@ func horcruxProxySidecar(ctx context.Context, node *cosmos.ChainNode, name strin
 	startCmd = append(startCmd, startupFlags...)
 	if err := node.NewSidecarProcess(
 		ctx, false, name, client, network,
-		ibc.DockerImage{Repository: horcruxProxyRegistry, Version: horcruxProxyTag, UidGid: "100:1000"},
+		ibc.DockerImage{Repository: horcruxProxyRegistry, Version: horcruxProxyTag, UIDGID: "100:1000"},
 		signerImageHomeDir, nil, startCmd, nil,
 	); err != nil {
 		return nil, err

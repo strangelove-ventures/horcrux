@@ -91,10 +91,10 @@ func EnableDebugAndMetrics(ctx context.Context, out io.Writer) {
 		<-ctx.Done()
 		logger.Info("Gracefully Stopping Debug Server")
 		if err := srv.Shutdown(context.Background()); err != nil {
-			logger.Error("Error in Stopping Debug Server", err)
+			logger.Error("Error in Stopping Debug Server", "err", err)
 			logger.Info("Force Stopping Debug Server")
 			if err = srv.Close(); err != nil {
-				logger.Error("Error in Force Stopping Debug Server", err)
+				logger.Error("Error in Force Stopping Debug Server", "err", err)
 			}
 		}
 	}()

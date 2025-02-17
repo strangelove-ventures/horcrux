@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/client"
+	"github.com/moby/moby/client"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/strangelove-ventures/horcrux/v3/signer"
@@ -86,9 +86,9 @@ func preGenesisSingleNodeAndHorcruxThreshold(
 	totalSigners int, // total number of signers for the single horcrux validator
 	threshold uint8, // key shard threshold, and therefore how many horcrux signers must participate to sign a block
 	sentriesPerSigner int, // how many sentries should each horcrux signer connect to (min: 1, max: totalSentries)
-	pubKey *[]byte) func(*chainWrapper) func(ibc.ChainConfig) error {
-	return func(cw *chainWrapper) func(ibc.ChainConfig) error {
-		return func(cc ibc.ChainConfig) error {
+	pubKey *[]byte) func(*chainWrapper) func(ibc.Chain) error {
+	return func(cw *chainWrapper) func(ibc.Chain) error {
+		return func(cc ibc.Chain) error {
 			horcruxValidator := cw.chain.Validators[0]
 
 			sentries := append(cosmos.ChainNodes{horcruxValidator}, cw.chain.FullNodes...)
@@ -126,9 +126,9 @@ func preGenesisAllHorcruxThreshold(
 	sentriesPerValidator int, // how many sentries for each horcrux validator (min: sentriesPerSigner, max: totalSentries)
 	sentriesPerSigner int, // how many sentries should each horcrux signer connect to (min: 1, max: sentriesPerValidator)
 
-	pubKeys [][]byte) func(*chainWrapper) func(ibc.ChainConfig) error {
-	return func(cw *chainWrapper) func(ibc.ChainConfig) error {
-		return func(cc ibc.ChainConfig) error {
+	pubKeys [][]byte) func(*chainWrapper) func(ibc.Chain) error {
+	return func(cw *chainWrapper) func(ibc.Chain) error {
+		return func(cc ibc.Chain) error {
 			fnsPerVal := sentriesPerValidator - 1 // minus 1 for the validator itself
 			var eg errgroup.Group
 			for i, validator := range cw.chain.Validators {

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/docker/docker/client"
+	"github.com/moby/moby/client"
 	cometjson "github.com/strangelove-ventures/horcrux/v3/comet/libs/json"
 	"github.com/strangelove-ventures/horcrux/v3/comet/privval"
 	"github.com/strangelove-ventures/horcrux/v3/signer"
@@ -66,9 +66,9 @@ func preGenesisSingleNodeAndHorcruxSingle(
 	logger *zap.Logger,
 	client *client.Client,
 	network string,
-	pubKey *[]byte) func(*chainWrapper) func(ibc.ChainConfig) error {
-	return func(cw *chainWrapper) func(ibc.ChainConfig) error {
-		return func(cc ibc.ChainConfig) error {
+	pubKey *[]byte) func(*chainWrapper) func(ibc.Chain) error {
+	return func(cw *chainWrapper) func(ibc.Chain) error {
+		return func(cc ibc.Chain) error {
 			horcruxValidator := cw.chain.Validators[0]
 
 			pvKey, err := getPrivvalKey(ctx, horcruxValidator)

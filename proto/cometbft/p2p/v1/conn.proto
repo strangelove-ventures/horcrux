@@ -1,10 +1,10 @@
 syntax = "proto3";
-package tendermint.p2p;
+package cometbft.p2p.v1;
 
 option go_package = "github.com/strangelove-ventures/horcrux/v3/comet/proto/p2p";
 
 import "gogoproto/gogo.proto";
-import "tendermint/crypto/keys.proto";
+import "cometbft/crypto/v1/keys.proto";
 
 message PacketPing {}
 
@@ -25,6 +25,6 @@ message Packet {
 }
 
 message AuthSigMessage {
-  tendermint.crypto.PublicKey pub_key = 1 [(gogoproto.nullable) = false];
+  cometbft.crypto.v1.PublicKey pub_key = 1 [(gogoproto.nullable) = false];
   bytes                       sig     = 2;
 }

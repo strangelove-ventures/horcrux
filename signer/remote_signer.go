@@ -12,7 +12,6 @@ import (
 	"github.com/strangelove-ventures/horcrux/v3/comet/encoding"
 	cometnet "github.com/strangelove-ventures/horcrux/v3/comet/libs/net"
 	cometp2pconn "github.com/strangelove-ventures/horcrux/v3/comet/p2p/conn"
-	cometprotocrypto "github.com/strangelove-ventures/horcrux/v3/comet/proto/crypto"
 	cometprotoprivval "github.com/strangelove-ventures/horcrux/v3/comet/proto/privval"
 	cometproto "github.com/strangelove-ventures/horcrux/v3/comet/proto/types"
 	"github.com/strangelove-ventures/horcrux/v3/types"
@@ -236,8 +235,7 @@ func (rs *ReconnRemoteSigner) handleSignProposalRequest(
 func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) cometprotoprivval.Message {
 	totalPubKeyRequests.WithLabelValues(chainID).Inc()
 	msgSum := &cometprotoprivval.Message_PubKeyResponse{PubKeyResponse: &cometprotoprivval.PubKeyResponse{
-		PubKey: cometprotocrypto.PublicKey{},
-		Error:  nil,
+		Error: nil,
 	}}
 
 	pubKey, err := rs.privVal.GetPubKey(context.TODO(), chainID)
@@ -264,6 +262,8 @@ func (rs *ReconnRemoteSigner) handlePubKeyRequest(chainID string) cometprotopriv
 		return cometprotoprivval.Message{Sum: msgSum}
 	}
 	msgSum.PubKeyResponse.PubKey = pk
+	msgSum.PubKeyResponse.PubKeyBytes = pubKey.Bytes()
+	msgSum.PubKeyResponse.PubKeyType = pubKey.Type()
 	return cometprotoprivval.Message{Sum: msgSum}
 }
 
