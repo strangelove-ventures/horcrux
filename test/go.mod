@@ -1,8 +1,9 @@
 module github.com/strangelove-ventures/horcrux/v3/test
 
-go 1.22.2
+go 1.24
 
 require (
+	github.com/cometbft/cometbft v0.38.6
 	github.com/cosmos/cosmos-sdk v0.50.5
 	github.com/docker/docker v24.0.9+incompatible
 	github.com/prometheus/client_model v0.6.1
@@ -65,7 +66,6 @@ require (
 	github.com/cockroachdb/pebble v1.1.0 // indirect
 	github.com/cockroachdb/redact v1.1.5 // indirect
 	github.com/cockroachdb/tokenbucket v0.0.0-20230807174530-cc333fc44b06 // indirect
-	github.com/cometbft/cometbft v0.38.6 // indirect
 	github.com/cometbft/cometbft-db v0.12.0 // indirect
 	github.com/consensys/bavard v0.1.13 // indirect
 	github.com/consensys/gnark-crypto v0.12.1 // indirect
