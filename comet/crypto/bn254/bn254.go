@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"math/big"
 
-	bls254 "github.com/strangelove-ventures/horcrux/v3/comet/crypto/bn254/bls"
-
 	"golang.org/x/crypto/sha3"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -18,7 +16,8 @@ import (
 
 	"github.com/holiman/uint256"
 	"github.com/strangelove-ventures/horcrux/v3/comet/crypto"
-	cometjson "github.com/strangelove-ventures/horcrux/v3/comet/libs/json"
+	bls254 "github.com/strangelove-ventures/horcrux/v3/comet/crypto/bn254/bls"
+	cjson "github.com/strangelove-ventures/horcrux/v3/comet/libs/json"
 )
 
 const (
@@ -28,8 +27,8 @@ const (
 	sizeFp          = fp.Bytes
 	sizePublicKey   = sizeFp
 	sizePrivateKey  = sizeFr + sizePublicKey
-	PrivKeyName     = "tendermint/PrivKeyBn254"
-	PubKeyName      = "tendermint/PubKeyBn254"
+	PrivKeyName     = "cometbft/PrivKeyBn254"
+	PubKeyName      = "cometbft/PubKeyBn254"
 	KeyType         = "bn254"
 	CometblsSigDST  = "COMETBLS_SIG_BN254G2_XMDMIMC256"
 	CometblsHMACKey = "CometBLS"
@@ -44,8 +43,8 @@ var (
 )
 
 func init() {
-	cometjson.RegisterType(PubKey{}, PubKeyName)
-	cometjson.RegisterType(PrivKey{}, PrivKeyName)
+	cjson.RegisterType(PubKey{}, PubKeyName)
+	cjson.RegisterType(PrivKey{}, PrivKeyName)
 
 	_, _, G1Gen, G2Gen = bn254.Generators()
 
