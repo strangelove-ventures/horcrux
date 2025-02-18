@@ -501,7 +501,7 @@ func (pv *ThresholdValidator) waitForPeerNonces(
 		missedNonces.WithLabelValues(peer.GetAddress()).Inc()
 		totalMissedNonces.WithLabelValues(peer.GetAddress()).Inc()
 
-		pv.logger.Error("Error getting nonces", "cosigner", peer.GetID(), "err", err)
+		pv.logger.Error("Error getting nonces", "cosigner", peer.GetID(), "error", err)
 		return
 	}
 

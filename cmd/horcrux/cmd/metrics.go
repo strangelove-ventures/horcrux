@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -81,7 +80,7 @@ func EnableDebugAndMetrics(ctx context.Context, out io.Writer) {
 				logger.Info("Debug Server Shutdown Complete")
 				return
 			}
-			logger.Error(fmt.Sprintf("Debug Endpoint failed to start: %+v", err))
+			logger.Error("Debug Endpoint failed to start", "error", err)
 			panic(err)
 		}
 	}()
@@ -91,10 +90,10 @@ func EnableDebugAndMetrics(ctx context.Context, out io.Writer) {
 		<-ctx.Done()
 		logger.Info("Gracefully Stopping Debug Server")
 		if err := srv.Shutdown(context.Background()); err != nil {
-			logger.Error("Error in Stopping Debug Server", "err", err)
+			logger.Error("Error in Stopping Debug Server", "error", err)
 			logger.Info("Force Stopping Debug Server")
 			if err = srv.Close(); err != nil {
-				logger.Error("Error in Force Stopping Debug Server", "err", err)
+				logger.Error("Error in Force Stopping Debug Server", "error", err)
 			}
 		}
 	}()

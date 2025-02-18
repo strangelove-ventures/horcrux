@@ -78,7 +78,7 @@ func TestMultiResolver(t *testing.T) {
 		grpcretry.WithMax(5),
 	}
 
-	connDNS, err := grpc.Dial(targetDNS,
+	connDNS, err := grpc.NewClient(targetDNS,
 		grpc.WithDefaultServiceConfig(serviceConfig),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
@@ -94,7 +94,7 @@ func TestMultiResolver(t *testing.T) {
 	_, err = grpcClient.GetLeader(ctx, &grpccosigner.GetLeaderRequest{})
 	require.NoError(t, err)
 
-	connIP, err := grpc.Dial(targetIP,
+	connIP, err := grpc.NewClient(targetIP,
 		grpc.WithDefaultServiceConfig(serviceConfig),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),

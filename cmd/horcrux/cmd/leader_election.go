@@ -51,7 +51,7 @@ horcrux elect 2 # elect specific leader`,
 			}
 
 			fmt.Printf("Broadcasting to address: %s\n", grpcAddress)
-			conn, err := grpc.Dial(grpcAddress,
+			conn, err := grpc.NewClient(grpcAddress,
 				grpc.WithDefaultServiceConfig(serviceConfig), grpc.WithTransportCredentials(insecure.NewCredentials()),
 				grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
 				grpc.WithUnaryInterceptor(grpcretry.UnaryClientInterceptor(retryOpts...)))
@@ -154,7 +154,7 @@ func getLeaderCmd() *cobra.Command {
 			}
 
 			fmt.Printf("Request address: %s\n", grpcAddress)
-			conn, err := grpc.Dial(grpcAddress,
+			conn, err := grpc.NewClient(grpcAddress,
 				grpc.WithTransportCredentials(insecure.NewCredentials()),
 				grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
 				grpc.WithUnaryInterceptor(grpcretry.UnaryClientInterceptor(retryOpts...)))

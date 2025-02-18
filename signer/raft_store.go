@@ -240,7 +240,7 @@ func (s *RaftStore) Delete(key string) error {
 func (s *RaftStore) Join(nodeID, addr string) error {
 	configFuture := s.raft.GetConfiguration()
 	if err := configFuture.Error(); err != nil {
-		s.logger.Error("failed to get raft configuration", err)
+		s.logger.Error("failed to get raft configuration", "error", err)
 		return err
 	}
 
@@ -251,7 +251,7 @@ func (s *RaftStore) Join(nodeID, addr string) error {
 			// However if *both* the ID and the address are the same, then nothing -- not even
 			// a join operation -- is needed.
 			if srv.Address == raft.ServerAddress(addr) && srv.ID == raft.ServerID(nodeID) {
-				s.logger.Error("node already member of cluster, ignoring join request", nodeID, addr)
+				s.logger.Error("node already member of cluster, ignoring join request", "nodeID", nodeID, "address", addr)
 				return nil
 			}
 
@@ -302,7 +302,7 @@ type fsm RaftStore
 func (f *fsm) Apply(l *raft.Log) interface{} {
 	var c command
 	if err := json.Unmarshal(l.Data, &c); err != nil {
-		f.logger.Error("failed to unmarshal command", "err", err)
+		f.logger.Error("failed to unmarshal command", "error", err)
 		return nil
 	}
 

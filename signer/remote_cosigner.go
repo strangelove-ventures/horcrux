@@ -72,7 +72,7 @@ func getGRPCClient(address string) (grpccosigner.CosignerClient, error) {
 	} else {
 		grpcAddress = url.Host
 	}
-	conn, err := grpc.Dial(grpcAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(grpcAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
 	}

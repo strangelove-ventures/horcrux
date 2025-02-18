@@ -91,7 +91,7 @@ func (rs *ReconnRemoteSigner) Start(ctx context.Context) {
 				"sleep (s)", connRetrySec,
 				"address", rs.address,
 				"attempt", retries,
-				"err", err,
+				"error", err,
 			)
 			select {
 			case <-ctx.Done():
@@ -112,7 +112,7 @@ func (rs *ReconnRemoteSigner) Start(ctx context.Context) {
 			rs.logger.Error(
 				"Failed to read message from connection",
 				"address", rs.address,
-				"err", err,
+				"error", err,
 			)
 			rs.closeConn(conn)
 			conn = nil
@@ -127,7 +127,7 @@ func (rs *ReconnRemoteSigner) Start(ctx context.Context) {
 			rs.logger.Error(
 				"Failed to write message to connection",
 				"address", rs.address,
-				"err", err,
+				"error", err,
 			)
 			rs.closeConn(conn)
 			conn = nil
@@ -165,7 +165,7 @@ func (rs *ReconnRemoteSigner) handleRequest(req cometprotoprivval.Message) comet
 	case *cometprotoprivval.Message_PingRequest:
 		return rs.handlePingRequest()
 	default:
-		rs.logger.Error("Unknown request", "err", fmt.Errorf("%v", typedReq))
+		rs.logger.Error("Unknown request", "error", fmt.Errorf("%v", typedReq))
 		return cometprotoprivval.Message{}
 	}
 }
@@ -296,7 +296,7 @@ func (rs *ReconnRemoteSigner) closeConn(conn net.Conn) {
 	if err := conn.Close(); err != nil {
 		rs.logger.Error("Failed to close connection to chain node",
 			"address", rs.address,
-			"err", err,
+			"error", err,
 		)
 	}
 }

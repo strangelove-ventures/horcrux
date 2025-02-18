@@ -341,7 +341,7 @@ func getLeader(ctx context.Context, cosigner *cosmos.SidecarProcess) (int, error
 		return -1, err
 	}
 	grpcAddress := ports[0]
-	conn, err := grpc.Dial(grpcAddress,
+	conn, err := grpc.NewClient(grpcAddress,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
 	)

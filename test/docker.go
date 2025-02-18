@@ -93,6 +93,7 @@ func BuildHorcruxImage(ctx context.Context, _ *client.Client) error {
 	opts := types.ImageBuildOptions{
 		Dockerfile: dockerfile,
 		Tags:       []string{signerImage + ":latest"},
+		PullParent: false,
 		BuildArgs: map[string]*string{
 			"output": &outputStr,
 		},
