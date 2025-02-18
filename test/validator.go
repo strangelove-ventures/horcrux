@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -98,8 +99,10 @@ func startChains(
 	network string,
 	chains ...*chainWrapper,
 ) {
-	err := BuildHorcruxImage(ctx, client)
-	require.NoError(t, err)
+	if os.Getenv("SKIP_HORCRUX_IMAGE_BUILD") != "true" {
+		err := BuildHorcruxImage(ctx, client)
+		require.NoError(t, err)
+	}
 
 	cs := make([]*interchaintest.ChainSpec, len(chains))
 	for i, c := range chains {
