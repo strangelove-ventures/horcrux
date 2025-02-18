@@ -18,7 +18,8 @@ const (
 	flagGRPCTimeout = "grpc-timeout"
 	flagOverwrite   = "overwrite"
 	flagBare        = "bare"
-	flagGRPCAddress = "flagGRPCAddress"
+	flagGRPCAddress = "grpc-address"
+	flagMaxReadSize = "max-read-size"
 )
 
 func configCmd() *cobra.Command {
@@ -70,6 +71,7 @@ for threshold signer mode, --cosigner flags and --threshold flag are required.
 			}
 			debugAddr, _ := cmdFlags.GetString(flagDebugAddr)
 			grpcAddr, _ := cmdFlags.GetString(flagGRPCAddress)
+			maxReadSize, _ := cmdFlags.GetInt(flagMaxReadSize)
 			if signMode == string(signer.SignModeThreshold) {
 				// Threshold Mode Config
 				cosignersFlag, _ := cmdFlags.GetStringSlice(flagCosigner)
@@ -90,9 +92,10 @@ for threshold signer mode, --cosigner flags and --threshold flag are required.
 						GRPCTimeout: grpcTimeout,
 						RaftTimeout: raftTimeout,
 					},
-					ChainNodes: cn,
-					DebugAddr:  debugAddr,
-					GRPCAddr:   grpcAddr,
+					ChainNodes:  cn,
+					DebugAddr:   debugAddr,
+					GRPCAddr:    grpcAddr,
+					MaxReadSize: maxReadSize,
 				}
 
 				if !bare {
@@ -107,6 +110,7 @@ for threshold signer mode, --cosigner flags and --threshold flag are required.
 					PrivValKeyDir: keyDir,
 					ChainNodes:    cn,
 					DebugAddr:     debugAddr,
+					MaxReadSize:   maxReadSize,
 				}
 				if !bare {
 					if err = cfg.ValidateSingleSignerConfig(); err != nil {
@@ -162,5 +166,6 @@ for threshold signer mode, --cosigner flags and --threshold flag are required.
 		"allows initialization without providing any flags. If flags are provided, will not perform final validation",
 	)
 	f.StringP(flagGRPCAddress, "g", "", "GRPC address if listener should be enabled")
+	f.Int(flagMaxReadSize, 1024*1024, "max read size for remote signer connection")
 	return cmd
 }

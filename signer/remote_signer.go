@@ -36,6 +36,8 @@ type ReconnRemoteSigner struct {
 	privVal PrivValidator
 
 	dialer net.Dialer
+
+	maxReadSize int
 }
 
 // NewReconnRemoteSigner return a ReconnRemoteSigner that will dial using the given
@@ -48,6 +50,7 @@ func NewReconnRemoteSigner(
 	logger *slog.Logger,
 	privVal PrivValidator,
 	dialer net.Dialer,
+	maxReadSize int,
 ) *ReconnRemoteSigner {
 	return &ReconnRemoteSigner{
 		logger:  logger,
@@ -284,31 +287,6 @@ func getRemoteSignerError(err error) *cometprotoprivval.RemoteSignerError {
 		Description: err.Error(),
 	}
 }
-
-// func StartRemoteSigners(
-// 	services []cometservice.Service,
-// 	logger *slog.Logger,
-// 	privVal PrivValidator,
-// 	nodes []string,
-// ) ([]cometservice.Service, error) {
-// 	var err error
-// 	go StartMetrics()
-// 	for _, node := range nodes {
-// 		// CometBFT requires a connection within 3 seconds of start or crashes
-// 		// A long timeout such as 30 seconds would cause the sentry to fail in loops
-// 		// Use a short timeout and dial often to connect within 3 second window
-// 		dialer := net.Dialer{Timeout: 2 * time.Second}
-// 		s := NewReconnRemoteSigner(node, logger, privVal, dialer)
-
-// 		err = s.Start()
-// 		if err != nil {
-// 			return nil, err
-// 		}
-
-// 		services = append(services, s)
-// 	}
-// 	return services, err
-// }
 
 func (rs *ReconnRemoteSigner) closeConn(conn net.Conn) {
 	if conn == nil {

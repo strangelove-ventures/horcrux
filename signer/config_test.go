@@ -380,6 +380,7 @@ func TestRuntimeConfigWriteConfigFile(t *testing.T) {
 					PrivValAddr: "tcp://127.0.0.1:3456",
 				},
 			},
+			MaxReadSize: 1024 * 1024,
 		},
 	}
 
@@ -404,6 +405,7 @@ chainNodes:
 - privValAddr: tcp://127.0.0.1:3456
 debugAddr: ""
 grpcAddr: ""
+maxReadSize: 1048576
 `, string(configYamlBz))
 }
 
