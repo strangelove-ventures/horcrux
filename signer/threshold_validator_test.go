@@ -16,6 +16,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr/mimc"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	cometcryptobn254 "github.com/strangelove-ventures/horcrux/v3/comet/crypto/bn254"
@@ -280,8 +281,9 @@ func testThresholdValidator(t *testing.T, keyType string, threshold, total uint8
 		err = eg.Wait()
 		require.NoError(t, err)
 
-		blockIDHash := sha256.New()
-		blockIDHash.Write([]byte("something"))
+		blockIDHash := mimc.NewMiMC()
+
+		blockIDHash.Write([]byte("01234567890123456789012345678901"))
 
 		precommit := cometproto.Vote{
 			Height:    int64(i),

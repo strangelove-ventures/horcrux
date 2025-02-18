@@ -64,10 +64,10 @@ func TestPubKeyEncodingEd25519New(t *testing.T) {
 
 func TestPubKeyEncodingBn254(t *testing.T) {
 	const shard = `{
-		"pubKey":"GiDdw489mIOeveo0DtEo92+I20JoPopwpxkYsfYiCCsFHw==",
-		"keyType":"bn254",
-		"privateShard":"FRPM7QlT/UJunPz5DgMAQ7H0RTZiEc9ZXQz16somPw0=",
-		"id":1
+	"pubKey":"mgYg3BYpPKAOYQUV9UPDLONDvIlhigtB1+Z3Vi7DXGZ6hFk=",
+	"keyType":"bn254",
+	"privateShard":"EfFU3vqRIlB/epaNyPbx9cvaclfFGK5g/l+hDEN1u1w=",
+	"id":1
 }`
 
 	key := new(signer.CosignerKey)
@@ -78,12 +78,12 @@ func TestPubKeyEncodingBn254(t *testing.T) {
 	require.Equal(t, "bn254", key.KeyType)
 	require.Equal(t, 1, key.ID)
 
-	pubz, err := base64.StdEncoding.DecodeString("3cOPPZiDnr3qNA7RKPdviNtCaD6KcKcZGLH2IggrBR8=")
+	pubz, err := base64.StdEncoding.DecodeString("3BYpPKAOYQUV9UPDLONDvIlhigtB1+Z3Vi7DXGZ6hFk=")
 	require.NoError(t, err)
 
 	require.Equal(t, pubz, key.PubKey)
 
-	privbz, err := base64.StdEncoding.DecodeString("FRPM7QlT/UJunPz5DgMAQ7H0RTZiEc9ZXQz16somPw0=")
+	privbz, err := base64.StdEncoding.DecodeString("EfFU3vqRIlB/epaNyPbx9cvaclfFGK5g/l+hDEN1u1w=")
 	require.NoError(t, err)
 
 	require.Equal(t, privbz, key.PrivateShard)
