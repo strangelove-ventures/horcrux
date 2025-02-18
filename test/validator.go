@@ -1,6 +1,7 @@
 package test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	cometbftcrypto "github.com/cometbft/cometbft/crypto"
 	cometbftjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/cosmos/cosmos-sdk/types/bech32"
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
@@ -61,8 +63,30 @@ type chainWrapper struct {
 	preGenesis      func(*chainWrapper) func(ibc.Chain) error
 }
 
+type cbftB254PubKeyWrapper struct {
+	cometcryptobn254.PubKey
+}
+
+func (pk cbftB254PubKeyWrapper) Address() cometbftcrypto.Address {
+	return pk.PubKey.Address()
+}
+
+func (pk cbftB254PubKeyWrapper) Equals(other cometbftcrypto.PubKey) bool {
+	return bytes.Equal(pk.Bytes(), other.Bytes())
+}
+
+func (pk cbftB254PubKeyWrapper) MarshalJSON() ([]byte, error) {
+	return json.Marshal(pk.PubKey)
+}
+
+func (pk cbftB254PubKeyWrapper) UnmarshalJSON(b []byte) error {
+	return json.Unmarshal(b, &pk.PubKey)
+}
+
+var _ cometbftcrypto.PubKey = cbftB254PubKeyWrapper{}
+
 func init() {
-	cometbftjson.RegisterType(cometcryptobn254.PubKey{}, cometcryptobn254.PubKeyName)
+	cometbftjson.RegisterType(cbftB254PubKeyWrapper{}, cometcryptobn254.PubKeyName)
 }
 
 // startChains starts the given chains locally within docker composed of containers.
@@ -246,7 +270,14 @@ func enablePrivvalListener(
 
 // getValSigningInfo returns the signing info for the given validator from the reference node.
 func getValSigningInfo(tn *cosmos.ChainNode, address []byte) (*slashingtypes.ValidatorSigningInfo, error) {
-	valConsPrefix := fmt.Sprintf("%svalcons", tn.Chain.Config().Bech32Prefix)
+	b32Prefix := tn.Chain.Config().Bech32Prefix
+
+	if b32Prefix == "union" {
+		// For some reason union has a different prefix (cosmosvalcons) for validators.
+		b32Prefix = "cosmos"
+	}
+
+	valConsPrefix := fmt.Sprintf("%svalcons", b32Prefix)
 
 	bech32ValConsAddress, err := bech32.ConvertAndEncode(valConsPrefix, address)
 	if err != nil {
