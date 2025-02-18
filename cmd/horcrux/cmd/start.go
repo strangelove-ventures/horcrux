@@ -79,7 +79,7 @@ func startCmd() *cobra.Command {
 				// A long timeout such as 30 seconds would cause the sentry to fail in loops
 				// Use a short timeout and dial often to connect within 3 second window
 				dialer := net.Dialer{Timeout: 2 * time.Second}
-				s := signer.NewReconnRemoteSigner(node, logger, val, dialer)
+				s := signer.NewReconnRemoteSigner(node, logger, val, dialer, config.Config.MaxReadSize)
 
 				go s.Start(ctx)
 			}

@@ -53,11 +53,12 @@ func NewReconnRemoteSigner(
 	maxReadSize int,
 ) *ReconnRemoteSigner {
 	return &ReconnRemoteSigner{
-		logger:  logger,
-		address: address,
-		privVal: privVal,
-		dialer:  dialer,
-		privKey: cometcryptoed25519.GenPrivKey(),
+		logger:      logger,
+		address:     address,
+		privVal:     privVal,
+		dialer:      dialer,
+		privKey:     cometcryptoed25519.GenPrivKey(),
+		maxReadSize: maxReadSize,
 	}
 }
 
@@ -106,7 +107,7 @@ func (rs *ReconnRemoteSigner) Start(ctx context.Context) {
 			return
 		}
 
-		req, err := types.ReadMsg(conn)
+		req, err := types.ReadMsg(conn, rs.maxReadSize)
 		if err != nil {
 			rs.logger.Error(
 				"Failed to read message from connection",
