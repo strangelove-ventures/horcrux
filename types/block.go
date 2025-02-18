@@ -154,7 +154,7 @@ func (b Block) ToProto() *grpccosigner.Block {
 		Height:        b.Height,
 		Round:         b.Round,
 		Step:          int32(b.Step),
-		POLRound:      int32(b.POLRound),
+		POLRound:      int32(b.POLRound), //nolint:gosec
 		VoteExtension: b.VoteExtension,
 		Timestamp:     b.Timestamp.UnixNano(),
 	}
@@ -174,7 +174,7 @@ func BlockFromProto(block *grpccosigner.Block) Block {
 	b := Block{
 		Height:        block.Height,
 		Round:         block.Round,
-		Step:          int8(block.Step),
+		Step:          int8(block.Step), //nolint:gosec
 		POLRound:      int64(block.POLRound),
 		VoteExtension: block.VoteExtension,
 		Timestamp:     time.Unix(0, block.Timestamp),

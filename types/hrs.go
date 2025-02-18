@@ -55,7 +55,7 @@ func HRSTKeyFromProto(hrs *grpccosigner.HRST) HRSTKey {
 	return HRSTKey{
 		Height:    hrs.GetHeight(),
 		Round:     hrs.GetRound(),
-		Step:      int8(hrs.GetStep()),
+		Step:      int8(hrs.GetStep()), //nolint:gosec
 		Timestamp: hrs.GetTimestamp(),
 	}
 }

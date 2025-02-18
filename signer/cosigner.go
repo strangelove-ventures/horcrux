@@ -71,8 +71,8 @@ type CosignerNonce struct {
 
 func (secretPart *CosignerNonce) toProto() *grpccosigner.Nonce {
 	return &grpccosigner.Nonce{
-		SourceID:      int32(secretPart.SourceID),
-		DestinationID: int32(secretPart.DestinationID),
+		SourceID:      int32(secretPart.SourceID),      //nolint:gosec
+		DestinationID: int32(secretPart.DestinationID), //nolint:gosec
 		PubKey:        secretPart.PubKey,
 		Share:         secretPart.Share,
 		Signature:     secretPart.Signature,

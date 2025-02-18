@@ -85,7 +85,7 @@ func NewThresholdValidator(
 		defaultGetNoncesInterval,
 		grpcTimeout,
 		defaultNonceExpiration,
-		uint8(threshold),
+		uint8(threshold), //nolint:gosec
 		nil,
 	)
 	return &ThresholdValidator{
@@ -633,7 +633,7 @@ func (pv *ThresholdValidator) Sign(
 	}
 
 	numPeers := len(pv.peerCosigners)
-	total := uint8(numPeers + 1)
+	total := uint8(numPeers + 1) //nolint:gosec
 
 	peerStartTime := time.Now()
 

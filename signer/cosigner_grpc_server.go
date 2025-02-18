@@ -148,7 +148,7 @@ func (rpc *CosignerGRPCServer) GetLeader(
 	*grpccosigner.GetLeaderRequest,
 ) (*grpccosigner.GetLeaderResponse, error) {
 	leader := rpc.raftStore.GetLeader()
-	return &grpccosigner.GetLeaderResponse{Leader: int32(leader)}, nil
+	return &grpccosigner.GetLeaderResponse{Leader: int32(leader)}, nil //nolint:gosec
 }
 
 func (rpc *CosignerGRPCServer) Ping(context.Context, *grpccosigner.PingRequest) (*grpccosigner.PingResponse, error) {

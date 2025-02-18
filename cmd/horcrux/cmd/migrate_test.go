@@ -55,14 +55,14 @@ func TestMigrateV2toV3(t *testing.T) {
 	require.Equal(t, testdata.ConfigMigrated, string(newConfigFileBz))
 }
 
-func appendToFile(file, append string) error {
+func appendToFile(file, str string) error {
 	f, err := os.OpenFile(file,
 		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	_, err = f.WriteString(append)
+	_, err = f.WriteString(str)
 	return err
 }
 

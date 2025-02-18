@@ -97,8 +97,8 @@ func maxPid() int {
 }
 
 func getUnusedPid() (int, error) {
-	max := maxPid()
-	for pid := 1; pid <= max; pid++ {
+	m := maxPid()
+	for pid := 1; pid <= m; pid++ {
 		process, err := os.FindProcess(pid)
 		if err != nil {
 			continue

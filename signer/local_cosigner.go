@@ -263,7 +263,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 
 	nonces, err := cosigner.combinedNonces(
 		cosigner.GetID(),
-		uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
+		uint8(cosigner.config.Config.ThresholdModeConfig.Threshold), //nolint:gosec
 		req.UUID,
 	)
 	if err != nil {
@@ -274,7 +274,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	if len(voteExtensionSignBytes) > 0 {
 		voteExtNonces, err = cosigner.combinedNonces(
 			cosigner.GetID(),
-			uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
+			uint8(cosigner.config.Config.ThresholdModeConfig.Threshold), //nolint:gosec
 			req.VoteExtUUID,
 		)
 		if err != nil {
@@ -324,8 +324,8 @@ func (cosigner *LocalCosigner) generateNonces() ([]Nonces, error) {
 	meta := make([]Nonces, total)
 
 	nonces, err := GenerateNoncesEd25519(
-		uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
-		uint8(total),
+		uint8(cosigner.config.Config.ThresholdModeConfig.Threshold), //nolint:gosec
+		uint8(total), //nolint:gosec
 	)
 	if err != nil {
 		return nil, err
@@ -365,8 +365,8 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 	case CosignerKeyTypeBn254:
 		signer, err = NewThresholdSignerSoftBn254(
 			key,
-			uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
-			uint8(len(cosigner.config.Config.ThresholdModeConfig.Cosigners)),
+			uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),      //nolint:gosec
+			uint8(len(cosigner.config.Config.ThresholdModeConfig.Cosigners)), //nolint:gosec
 		)
 		if err != nil {
 			return err
@@ -376,8 +376,8 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 	default:
 		signer = NewThresholdSignerSoftEd25519(
 			key,
-			uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
-			uint8(len(cosigner.config.Config.ThresholdModeConfig.Cosigners)),
+			uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),      //nolint:gosec
+			uint8(len(cosigner.config.Config.ThresholdModeConfig.Cosigners)), //nolint:gosec
 		)
 	}
 
