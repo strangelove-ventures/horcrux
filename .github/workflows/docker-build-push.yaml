@@ -19,7 +19,9 @@ on:
 
 env:
   GHCR_SLUG: ghcr.io/${{ github.repository }}
-
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  
 jobs:
   prepare:
     runs-on: ubuntu-latest
