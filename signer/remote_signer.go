@@ -310,7 +310,7 @@ func StartRemoteSigners(
 
 		services = append(services, s)
 	}
-	return services, err
+	return services, nil
 }
 
 func (rs *ReconnRemoteSigner) closeConn(conn net.Conn) {
