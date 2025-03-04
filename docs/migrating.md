@@ -2,7 +2,7 @@
 
 ## Disclaimer
 
-Before starting, \***\*please make sure to have a clear understanding of node and validator operational requirements\*\***. This guide is medium to high difficulty. Operation of `horcrux` assumes significant prior knowledge of these systems. Debugging problems that may arise will entail a significant amount financial risk (double sign) if you are running on mainnet so a clear understanding of the systems you are working with is important. Please attempt this operation on a testnet before you do so on a mainnet validator.
+Before starting, \***\*please make sure to have a clear understanding of node and validator operational requirements\*\***. This guide is medium to high difficulty. Operation of `horcrux` assumes significant prior knowledge of these systems. Debugging problems that may arise will entail a significant amount of financial risk (double sign) if you are running on mainnet so a clear understanding of the systems you are working with is important. Please attempt this operation on a testnet before you do so on a mainnet validator.
 
 > **CAUTION:** This operation will require you to take your validator down for some time. If you work quickly and follow the guide, this downtime shouldn't be more than 5-10 minutes. But regardless, be aware of the downtime slashing on your chain and be careful not to exceed that limit.
 
@@ -28,7 +28,7 @@ This document will describe a migration from a "starting system" to a 2-of-3 mul
 
 The first step to the migration is to sync the chain nodes (also known as full nodes) that you will be using as sentries. To follow this guide, ensure that you have nodes from the chain you are validating on that are in sync with the latest height of the chain. You can validate with a minimum of one sentry node, but more are recommended for redundancy/availability. We will use three chain nodes for this example. Follow the instructions for the individual chain for spinning up those nodes. This is the part of setting up `horcrux` that takes the longest.
 
-> **NOTE:** This is also a great usecase for [state sync](https://blog.cosmos.network/cosmos-sdk-state-sync-guide-99e4cf43be2f). Or one of the [quick sync services](https://quicksync.io/) that exist.
+> **NOTE:** This is also a great use case for [state sync](https://blog.cosmos.network/cosmos-sdk-state-sync-guide-99e4cf43be2f). Or one of the [quick sync services](https://quicksync.io/) that exist.
 
 ### 2. Setup Signer Nodes
 
@@ -143,7 +143,7 @@ If you will be signing for multiple chains with this single horcrux cluster, rep
 
 ### 5. Distribute config file and key shards to each cosigner.
 
-The files need to be moved their corresponding signer nodes in the `~/.horcrux/` directory. It is important to make sure the files for the cosigner `{id}` (in `cosigner_{id}`) are placed on the corresponding cosigner node. If not, the cluster will not produce valid signatures. If you have named your nodes with their index as the signer index, as in this guide, this operation should be easy to check.
+The files need to be moved to their corresponding signer nodes in the `~/.horcrux/` directory. It is important to make sure the files for the cosigner `{id}` (in `cosigner_{id}`) are placed on the corresponding cosigner node. If not, the cluster will not produce valid signatures. If you have named your nodes with their index as the signer index, as in this guide, this operation should be easy to check.
 
 At the end of this step, each of your horcrux nodes should have a `~/.horcrux/{chain-id}_shard.json` file for each `chain-id` with the contents matching the appropriate `cosigner_{id}/{chain-id}_shard.json` file corresponding to the node number. Additionally, each of your horcrux nodes should have a `~/.horcrux/ecies_keys.json` file with the contents matching the appropriate `cosigner_{id}/ecies_keys.json` file corresponding to the node number.
 
@@ -206,7 +206,7 @@ The signer will continue retrying attempts to reach the sentries until we turn t
 - Misnaming or incorrect structure of the files in `~/.horcrux/state`. Double check these if you see errors
 - Misnaming or misplacement of the `~/.horcrux/{chain-id}_shard.json` file
 
-> **NOTE:** leaving these logs streaming in seperate terminal windows will enable you to watch the cluster connect to the sentries.
+> **NOTE:** leaving these logs streaming in separate terminal windows will enable you to watch the cluster connect to the sentries.
 
 ### 8. Configure and start your full nodes
 
