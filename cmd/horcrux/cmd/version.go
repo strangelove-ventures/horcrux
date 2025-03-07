@@ -29,19 +29,13 @@ var (
 	Version = ""
 	// commit
 	Commit = ""
-	// sdk version
-	SDKVersion = ""
-	// tendermint version
-	CBFTVersion = ""
 )
 
 // Info defines the application version information.
 type Info struct {
-	Version          string `json:"version" yaml:"version"`
-	GitCommit        string `json:"commit" yaml:"commit"`
-	GoVersion        string `json:"go_version" yaml:"go_version"`
-	CosmosSdkVersion string `json:"cosmos_sdk_version" yaml:"cosmos_sdk_version"`
-	CometBFTVersion  string `json:"cometbft_version" yaml:"cometbft_version"`
+	Version   string `json:"version" yaml:"version"`
+	GitCommit string `json:"commit" yaml:"commit"`
+	GoVersion string `json:"go_version" yaml:"go_version"`
 }
 
 func NewInfo() Info {
@@ -54,11 +48,9 @@ func NewInfo() Info {
 	}
 
 	return Info{
-		Version:          Version,
-		GitCommit:        Commit,
-		GoVersion:        fmt.Sprintf("%s %s/%s", runtime.Version(), runtime.GOOS, runtime.GOARCH),
-		CosmosSdkVersion: dependencyVersions["github.com/cosmos/cosmos-sdk"],
-		CometBFTVersion:  dependencyVersions["github.com/cometbft/cometbft"],
+		Version:   Version,
+		GitCommit: Commit,
+		GoVersion: fmt.Sprintf("%s %s/%s", runtime.Version(), runtime.GOOS, runtime.GOARCH),
 	}
 }
 
@@ -68,7 +60,7 @@ func versionCmd() *cobra.Command {
 		Use:          "version",
 		Short:        "Version information for horcrux",
 		SilenceUsage: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			bz, err := json.MarshalIndent(NewInfo(), "", "  ")
 			if err != nil {
 				return err

@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/url"
 	"os"
@@ -22,11 +23,10 @@ import (
 	"github.com/Jille/raft-grpc-leader-rpc/leaderhealth"
 	raftgrpctransport "github.com/Jille/raft-grpc-transport"
 	"github.com/Jille/raftadmin"
-	"github.com/cometbft/cometbft/libs/log"
-	"github.com/cometbft/cometbft/libs/service"
 	"github.com/hashicorp/raft"
 	boltdb "github.com/hashicorp/raft-boltdb/v2"
-	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
+	grpccosigner "github.com/strangelove-ventures/horcrux/v3/grpc/cosigner"
+	"github.com/strangelove-ventures/horcrux/v3/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
@@ -46,8 +46,6 @@ type command struct {
 
 // Store is a simple key-value store, where all changes are made via Raft consensus.
 type RaftStore struct {
-	service.BaseService
-
 	NodeID      string
 	RaftDir     string
 	RaftBind    string
@@ -59,7 +57,7 @@ type RaftStore struct {
 
 	raft *raft.Raft // The consensus mechanism
 
-	logger             log.Logger
+	logger             *slog.Logger
 	cosigner           *LocalCosigner
 	thresholdValidator *ThresholdValidator
 }
@@ -67,8 +65,8 @@ type RaftStore struct {
 // New returns a new Store.
 func NewRaftStore(
 	nodeID string, directory string, bindAddress string, timeout time.Duration,
-	logger log.Logger, cosigner *LocalCosigner, cosigners []Cosigner) *RaftStore {
-	cosignerRaftStore := &RaftStore{
+	logger *slog.Logger, cosigner *LocalCosigner, cosigners []Cosigner) *RaftStore {
+	return &RaftStore{
 		NodeID:      nodeID,
 		RaftDir:     directory,
 		RaftBind:    bindAddress,
@@ -78,49 +76,37 @@ func NewRaftStore(
 		cosigner:    cosigner,
 		Cosigners:   cosigners,
 	}
-
-	cosignerRaftStore.BaseService = *service.NewBaseService(logger, "CosignerRaftStore", cosignerRaftStore)
-	return cosignerRaftStore
 }
 
 func (s *RaftStore) SetThresholdValidator(thresholdValidator *ThresholdValidator) {
 	s.thresholdValidator = thresholdValidator
 }
 
-func (s *RaftStore) init() error {
+// Start starts the raft server
+func (s *RaftStore) Start() {
 	host := p2pURLToRaftAddress(s.RaftBind)
 	_, port, err := net.SplitHostPort(host)
 	if err != nil {
-		return fmt.Errorf("failed to parse local address: %s, %v", host, err)
+		panic(fmt.Errorf("failed to parse local address: %s, %v", host, err))
 	}
 	s.logger.Info("Local Raft Listening", "port", port)
 	sock, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
 	if err != nil {
-		return err
+		panic(err)
 	}
 	transportManager, err := s.Open()
 	if err != nil {
-		return err
+		panic(err)
 	}
 	grpcServer := grpc.NewServer()
-	proto.RegisterCosignerServer(grpcServer, NewCosignerGRPCServer(s.cosigner, s.thresholdValidator, s))
+	grpccosigner.RegisterCosignerServer(grpcServer, NewCosignerGRPCServer(s.cosigner, s.thresholdValidator, s))
 	transportManager.Register(grpcServer)
 	leaderhealth.Setup(s.raft, grpcServer, []string{"Leader"})
 	raftadmin.Register(grpcServer, s.raft)
 	reflection.Register(grpcServer)
-	return grpcServer.Serve(sock)
-}
-
-// OnStart starts the raft server
-func (s *RaftStore) OnStart() error {
-	go func() {
-		err := s.init()
-		if err != nil {
-			panic(err)
-		}
-	}()
-
-	return nil
+	if err := grpcServer.Serve(sock); err != nil {
+		panic(err)
+	}
 }
 
 func p2pURLToRaftAddress(p2pURL string) string {
@@ -254,7 +240,7 @@ func (s *RaftStore) Delete(key string) error {
 func (s *RaftStore) Join(nodeID, addr string) error {
 	configFuture := s.raft.GetConfiguration()
 	if err := configFuture.Error(); err != nil {
-		s.logger.Error("failed to get raft configuration", err)
+		s.logger.Error("failed to get raft configuration", "error", err)
 		return err
 	}
 
@@ -265,7 +251,7 @@ func (s *RaftStore) Join(nodeID, addr string) error {
 			// However if *both* the ID and the address are the same, then nothing -- not even
 			// a join operation -- is needed.
 			if srv.Address == raft.ServerAddress(addr) && srv.ID == raft.ServerID(nodeID) {
-				s.logger.Error("node already member of cluster, ignoring join request", nodeID, addr)
+				s.logger.Error("node already member of cluster, ignoring join request", "nodeID", nodeID, "address", addr)
 				return nil
 			}
 
@@ -306,7 +292,7 @@ func (s *RaftStore) GetLeader() int {
 	return id
 }
 
-func (s *RaftStore) ShareSigned(lss ChainSignStateConsensus) error {
+func (s *RaftStore) ShareSigned(lss types.ChainSignStateConsensus) error {
 	return s.Emit(raftEventLSS, lss)
 }
 
@@ -316,7 +302,7 @@ type fsm RaftStore
 func (f *fsm) Apply(l *raft.Log) interface{} {
 	var c command
 	if err := json.Unmarshal(l.Data, &c); err != nil {
-		f.logger.Error("failed to unmarshal command", err.Error())
+		f.logger.Error("failed to unmarshal command", "error", err)
 		return nil
 	}
 
@@ -326,7 +312,7 @@ func (f *fsm) Apply(l *raft.Log) interface{} {
 	case "delete":
 		return f.applyDelete(c.Key)
 	default:
-		f.logger.Error("unrecognized command op", c.Op)
+		f.logger.Error("unrecognized command", "op", c.Op)
 		return nil
 	}
 }
@@ -380,7 +366,7 @@ func (f *fsm) applyDelete(key string) interface{} {
 
 type fsmSnapshot struct {
 	store  map[string]string
-	logger log.Logger
+	logger *slog.Logger
 }
 
 func (f *fsmSnapshot) Persist(sink raft.SnapshotSink) error {
@@ -401,10 +387,10 @@ func (f *fsmSnapshot) Persist(sink raft.SnapshotSink) error {
 	}()
 
 	if err != nil {
-		f.logger.Error("Snapshot persist error", err.Error())
+		f.logger.Error("Snapshot persist error", "err", err)
 		sinkErr := sink.Cancel()
 		if sinkErr != nil {
-			f.logger.Error("Error cancelling sink", sinkErr.Error())
+			f.logger.Error("Error cancelling sink", "err", sinkErr)
 		}
 	}
 

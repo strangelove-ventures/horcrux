@@ -2,15 +2,13 @@ package signer
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"time"
 
-	cometcrypto "github.com/cometbft/cometbft/crypto"
-	"github.com/cometbft/cometbft/libs/protoio"
-	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	cometcrypto "github.com/strangelove-ventures/horcrux/v3/comet/crypto"
+	grpccosigner "github.com/strangelove-ventures/horcrux/v3/grpc/cosigner"
+	"github.com/strangelove-ventures/horcrux/v3/types"
+
 	"github.com/google/uuid"
-	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 )
 
 // Cosigner interface is a set of methods for an m-of-n threshold signature.
@@ -49,11 +47,10 @@ func (cosigners Cosigners) GetByID(id int) Cosigner {
 // CosignerSignRequest is sent to a co-signer to obtain their signature for the SignBytes
 // The SignBytes should be a serialized block
 type CosignerSignRequest struct {
-	ChainID                string
-	SignBytes              []byte
-	UUID                   uuid.UUID
-	VoteExtensionSignBytes []byte
-	VoteExtUUID            uuid.UUID
+	ChainID     string
+	Block       types.Block
+	UUID        uuid.UUID
+	VoteExtUUID uuid.UUID
 }
 
 type CosignerSignResponse struct {
@@ -72,10 +69,10 @@ type CosignerNonce struct {
 	Signature     []byte
 }
 
-func (secretPart *CosignerNonce) toProto() *proto.Nonce {
-	return &proto.Nonce{
-		SourceID:      int32(secretPart.SourceID),
-		DestinationID: int32(secretPart.DestinationID),
+func (secretPart *CosignerNonce) toProto() *grpccosigner.Nonce {
+	return &grpccosigner.Nonce{
+		SourceID:      int32(secretPart.SourceID),      //nolint:gosec
+		DestinationID: int32(secretPart.DestinationID), //nolint:gosec
 		PubKey:        secretPart.PubKey,
 		Share:         secretPart.Share,
 		Signature:     secretPart.Signature,
@@ -84,14 +81,14 @@ func (secretPart *CosignerNonce) toProto() *proto.Nonce {
 
 type CosignerNonces []CosignerNonce
 
-func (secretParts CosignerNonces) toProto() (out []*proto.Nonce) {
+func (secretParts CosignerNonces) toProto() (out []*grpccosigner.Nonce) {
 	for _, secretPart := range secretParts {
 		out = append(out, secretPart.toProto())
 	}
 	return
 }
 
-func CosignerNonceFromProto(secretPart *proto.Nonce) CosignerNonce {
+func CosignerNonceFromProto(secretPart *grpccosigner.Nonce) CosignerNonce {
 	return CosignerNonce{
 		SourceID:      int(secretPart.SourceID),
 		DestinationID: int(secretPart.DestinationID),
@@ -101,7 +98,7 @@ func CosignerNonceFromProto(secretPart *proto.Nonce) CosignerNonce {
 	}
 }
 
-func CosignerNoncesFromProto(secretParts []*proto.Nonce) []CosignerNonce {
+func CosignerNoncesFromProto(secretParts []*grpccosigner.Nonce) []CosignerNonce {
 	out := make([]CosignerNonce, len(secretParts))
 	for i, secretPart := range secretParts {
 		out[i] = CosignerNonceFromProto(secretPart)
@@ -111,7 +108,7 @@ func CosignerNoncesFromProto(secretParts []*proto.Nonce) []CosignerNonce {
 
 type CosignerSignBlockRequest struct {
 	ChainID string
-	Block   *Block
+	Block   *types.Block
 }
 
 type CosignerSignBlockResponse struct {
@@ -135,10 +132,10 @@ func (n *CosignerUUIDNonces) For(id int) *CosignerUUIDNonces {
 
 type CosignerUUIDNoncesMultiple []*CosignerUUIDNonces
 
-func (n CosignerUUIDNoncesMultiple) toProto() []*proto.UUIDNonce {
-	out := make([]*proto.UUIDNonce, len(n))
+func (n CosignerUUIDNoncesMultiple) toProto() []*grpccosigner.UUIDNonce {
+	out := make([]*grpccosigner.UUIDNonce, len(n))
 	for i, nonces := range n {
-		out[i] = &proto.UUIDNonce{
+		out[i] = &grpccosigner.UUIDNonce{
 			Uuid:   nonces.UUID[:],
 			Nonces: nonces.Nonces.toProto(),
 		}
@@ -148,59 +145,9 @@ func (n CosignerUUIDNoncesMultiple) toProto() []*proto.UUIDNonce {
 
 type CosignerSetNoncesAndSignRequest struct {
 	ChainID string
-	HRST    HRSTKey
 
-	Nonces    *CosignerUUIDNonces
-	SignBytes []byte
+	Nonces              *CosignerUUIDNonces
+	VoteExtensionNonces *CosignerUUIDNonces
 
-	VoteExtensionNonces    *CosignerUUIDNonces
-	VoteExtensionSignBytes []byte
-}
-
-func verifySignPayload(chainID string, signBytes, voteExtensionSignBytes []byte) (HRSTKey, bool, error) {
-	var vote cometproto.CanonicalVote
-	voteErr := protoio.UnmarshalDelimited(signBytes, &vote)
-	if voteErr == nil && (vote.Type == cometproto.PrevoteType || vote.Type == cometproto.PrecommitType) {
-		hrstKey := HRSTKey{
-			Height:    vote.Height,
-			Round:     vote.Round,
-			Step:      CanonicalVoteToStep(&vote),
-			Timestamp: vote.Timestamp.UnixNano(),
-		}
-
-		if hrstKey.Step == stepPrecommit && len(voteExtensionSignBytes) > 0 && vote.BlockID != nil {
-			var voteExt cometproto.CanonicalVoteExtension
-			if err := protoio.UnmarshalDelimited(voteExtensionSignBytes, &voteExt); err != nil {
-				return hrstKey, false, fmt.Errorf("failed to unmarshal vote extension: %w", err)
-			}
-			if voteExt.ChainId != chainID {
-				return hrstKey, false, fmt.Errorf("vote extension chain ID %s does not match chain ID %s", voteExt.ChainId, chainID)
-			}
-			if voteExt.Height != hrstKey.Height {
-				return hrstKey, false,
-					fmt.Errorf("vote extension height %d does not match block height %d", voteExt.Height, hrstKey.Height)
-			}
-			if voteExt.Round != hrstKey.Round {
-				return hrstKey, false,
-					fmt.Errorf("vote extension round %d does not match block round %d", voteExt.Round, hrstKey.Round)
-			}
-			return hrstKey, true, nil
-		}
-
-		return hrstKey, false, nil
-	}
-
-	var proposal cometproto.CanonicalProposal
-	proposalErr := protoio.UnmarshalDelimited(signBytes, &proposal)
-	if proposalErr == nil {
-		return HRSTKey{
-			Height:    proposal.Height,
-			Round:     proposal.Round,
-			Step:      stepPropose,
-			Timestamp: proposal.Timestamp.UnixNano(),
-		}, false, nil
-	}
-
-	return HRSTKey{}, false,
-		fmt.Errorf("failed to unmarshal sign bytes into vote or proposal: %w", errors.Join(voteErr, proposalErr))
+	Block types.Block
 }

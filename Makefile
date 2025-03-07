@@ -12,10 +12,10 @@ LD_FLAGS := $(strip $(LD_FLAGS))
 BUILD_FLAGS := -ldflags '$(LD_FLAGS)'
 
 build:
-	@go build -mod readonly $(BUILD_FLAGS) -o build/ ./cmd/horcrux/...
+	@go build -buildvcs=false -mod readonly $(BUILD_FLAGS) -o build/ ./cmd/horcrux/...
 
 install:
-	@go install -mod readonly $(BUILD_FLAGS) ./cmd/horcrux/...
+	@go install -buildvcs=false -mod readonly $(BUILD_FLAGS) ./cmd/horcrux/...
 
 build-linux:
 	@GOOS=linux GOARCH=amd64 go build --mod readonly $(BUILD_FLAGS) -o ./build/horcrux ./cmd/horcrux
@@ -33,7 +33,7 @@ clean:
 	rm -rf build
 
 build-horcrux-docker:
-	docker build -t strangelove-ventures/horcrux:$(VERSION) -f ./docker/horcrux/Dockerfile .
+	docker build -t strangelove-ventures/horcrux:$(VERSION) .
 
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 mkfile_dir := $(dir $(mkfile_path))

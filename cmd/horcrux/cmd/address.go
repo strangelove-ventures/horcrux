@@ -1,16 +1,16 @@
 package cmd
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
 
-	"github.com/cometbft/cometbft/crypto"
-	cometprivval "github.com/cometbft/cometbft/privval"
-	"github.com/cosmos/cosmos-sdk/types/bech32"
 	"github.com/spf13/cobra"
+	cometprivval "github.com/strangelove-ventures/horcrux/v3/comet/privval"
 	"github.com/strangelove-ventures/horcrux/v3/signer"
+	"github.com/strangelove-ventures/horcrux/v3/signer/bech32"
 )
 
 type AddressCmdOutput struct {
@@ -27,9 +27,9 @@ func addressCmd() *cobra.Command {
 		Example:      `horcrux cosigner address cosmos`,
 		SilenceUsage: true,
 		Args:         cobra.RangeArgs(1, 2),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 
-			var pubKey crypto.PubKey
+			var pubKey []byte
 
 			chainID := args[0]
 
@@ -45,7 +45,7 @@ func addressCmd() *cobra.Command {
 					return err
 				}
 
-				key, err := signer.LoadCosignerEd25519Key(keyFile)
+				key, err := signer.LoadCosignerKey(keyFile)
 				if err != nil {
 					return fmt.Errorf("error reading cosigner key: %w, check that key is present for chain ID: %s", err, chainID)
 				}
@@ -61,13 +61,16 @@ func addressCmd() *cobra.Command {
 					return fmt.Errorf("error reading priv-validator key: %w, check that key is present for chain ID: %s", err, chainID)
 				}
 
-				filePV := cometprivval.LoadFilePVEmptyState(keyFile, "")
-				pubKey = filePV.Key.PubKey
+				filePV, err := cometprivval.LoadFilePV(keyFile, "")
+				if err != nil {
+					return err
+				}
+				pubKey = filePV.Key.PubKey.Bytes()
 			default:
 				panic(fmt.Errorf("unexpected sign mode: %s", config.Config.SignMode))
 			}
 
-			pubKeyAddress := pubKey.Address()
+			address := sha256.New().Sum(pubKey)[:20]
 
 			pubKeyJSON, err := signer.PubKey("", pubKey)
 			if err != nil {
@@ -75,12 +78,12 @@ func addressCmd() *cobra.Command {
 			}
 
 			output := AddressCmdOutput{
-				HexAddress: strings.ToUpper(hex.EncodeToString(pubKeyAddress)),
+				HexAddress: strings.ToUpper(hex.EncodeToString(address)),
 				PubKey:     pubKeyJSON,
 			}
 
 			if len(args) == 2 {
-				bech32ValConsAddress, err := bech32.ConvertAndEncode(args[1]+"valcons", pubKeyAddress)
+				bech32ValConsAddress, err := bech32.ConvertAndEncode(args[1]+"valcons", address)
 				if err != nil {
 					return err
 				}

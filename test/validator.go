@@ -1,20 +1,24 @@
 package test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strconv"
 	"testing"
 	"time"
 
-	cometbytes "github.com/cometbft/cometbft/libs/bytes"
-	cometjson "github.com/cometbft/cometbft/libs/json"
-	"github.com/cometbft/cometbft/privval"
+	cometbftcrypto "github.com/cometbft/cometbft/crypto"
+	cometbftjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/cosmos/cosmos-sdk/types/bech32"
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
-	"github.com/docker/docker/client"
-	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
+	"github.com/moby/moby/client"
+	cometcryptobn254 "github.com/strangelove-ventures/horcrux/v3/comet/crypto/bn254"
+	cometjson "github.com/strangelove-ventures/horcrux/v3/comet/libs/json"
+	"github.com/strangelove-ventures/horcrux/v3/comet/privval"
+	grpccosigner "github.com/strangelove-ventures/horcrux/v3/grpc/cosigner"
 	interchaintest "github.com/strangelove-ventures/interchaintest/v8"
 	"github.com/strangelove-ventures/interchaintest/v8/chain/cosmos"
 	"github.com/strangelove-ventures/interchaintest/v8/ibc"
@@ -27,8 +31,11 @@ import (
 )
 
 const (
-	testChain        = "gaia" // ghcr.io/strangelove-ventures/heighliner/gaia
-	testChainVersion = "v10.0.2"
+	// testChain        = "gaia" // ghcr.io/strangelove-ventures/heighliner/gaia
+	// testChainVersion = "v10.0.2"
+
+	testChain        = "union" // ghcr.io/strangelove-ventures/heighliner/gaia
+	testChainVersion = "v0.25.0"
 
 	signerPort       = "2222"
 	signerPortDocker = signerPort + "/tcp"
@@ -45,7 +52,7 @@ const (
 	signerImageHomeDir = "/home/horcrux"
 
 	horcruxProxyRegistry = "ghcr.io/strangelove-ventures/horcrux-proxy"
-	horcruxProxyTag      = "andrew-vote_extensions"
+	horcruxProxyTag      = "bn254"
 )
 
 // chainWrapper holds the initial configuration for a chain to start from genesis.
@@ -54,7 +61,33 @@ type chainWrapper struct {
 	totalValidators int // total number of validators on chain at genesis
 	totalSentries   int // number of additional sentry nodes
 	modifyGenesis   func(cc ibc.ChainConfig, b []byte) ([]byte, error)
-	preGenesis      func(*chainWrapper) func(ibc.ChainConfig) error
+	preGenesis      func(*chainWrapper) func(ibc.Chain) error
+}
+
+type cbftB254PubKeyWrapper struct {
+	cometcryptobn254.PubKey
+}
+
+func (pk cbftB254PubKeyWrapper) Address() cometbftcrypto.Address {
+	return pk.PubKey.Address()
+}
+
+func (pk cbftB254PubKeyWrapper) Equals(other cometbftcrypto.PubKey) bool {
+	return bytes.Equal(pk.Bytes(), other.Bytes())
+}
+
+func (pk cbftB254PubKeyWrapper) MarshalJSON() ([]byte, error) {
+	return json.Marshal(pk.PubKey)
+}
+
+func (pk cbftB254PubKeyWrapper) UnmarshalJSON(b []byte) error {
+	return json.Unmarshal(b, &pk.PubKey)
+}
+
+var _ cometbftcrypto.PubKey = cbftB254PubKeyWrapper{}
+
+func init() {
+	cometbftjson.RegisterType(cbftB254PubKeyWrapper{}, cometcryptobn254.PubKeyName)
 }
 
 // startChains starts the given chains locally within docker composed of containers.
@@ -66,12 +99,14 @@ func startChains(
 	network string,
 	chains ...*chainWrapper,
 ) {
-	err := BuildHorcruxImage(ctx, client)
-	require.NoError(t, err)
+	if os.Getenv("SKIP_HORCRUX_IMAGE_BUILD") != "true" {
+		err := BuildHorcruxImage(ctx, client)
+		require.NoError(t, err)
+	}
 
 	cs := make([]*interchaintest.ChainSpec, len(chains))
 	for i, c := range chains {
-		var preGenesis func(ibc.ChainConfig) error
+		var preGenesis func(ibc.Chain) error
 		if c.preGenesis != nil {
 			preGenesis = c.preGenesis(c)
 		}
@@ -81,8 +116,25 @@ func startChains(
 			NumValidators: &c.totalValidators,
 			NumFullNodes:  &c.totalSentries,
 			ChainConfig: ibc.ChainConfig{
-				ModifyGenesis: c.modifyGenesis,
-				PreGenesis:    preGenesis,
+				Type:    "cosmos",
+				Name:    testChain,
+				ChainID: fmt.Sprintf("union-%d", i),
+				Images: []ibc.DockerImage{
+					{
+						Repository: "ghcr.io/strangelove-ventures/heighliner/" + testChain,
+						Version:    testChainVersion,
+						UIDGID:     "1025:1025",
+					},
+				},
+				Bin:            "uniond",
+				Bech32Prefix:   "union",
+				Denom:          "umuno",
+				CoinType:       "118",
+				GasPrices:      "0umuno",
+				GasAdjustment:  1.2,
+				TrustingPeriod: "336h",
+				ModifyGenesis:  c.modifyGenesis,
+				PreGenesis:     preGenesis,
 				ConfigFileOverrides: map[string]any{
 					"config/config.toml": testutil.Toml{
 						"consensus": testutil.Toml{
@@ -150,8 +202,8 @@ func horcruxSidecar(ctx context.Context, node *cosmos.ChainNode, name string, cl
 	startCmd = append(startCmd, startupFlags...)
 	if err := node.NewSidecarProcess(
 		ctx, false, name, client, network,
-		ibc.DockerImage{Repository: signerImage, Version: "latest", UidGid: signerImageUidGid},
-		signerImageHomeDir, []string{signerPortDocker, grpcPortDocker, debugPortDocker}, startCmd,
+		ibc.DockerImage{Repository: signerImage, Version: "latest", UIDGID: signerImageUidGid},
+		signerImageHomeDir, []string{signerPortDocker, grpcPortDocker, debugPortDocker}, startCmd, nil,
 	); err != nil {
 		return nil, err
 	}
@@ -165,8 +217,8 @@ func horcruxProxySidecar(ctx context.Context, node *cosmos.ChainNode, name strin
 	startCmd = append(startCmd, startupFlags...)
 	if err := node.NewSidecarProcess(
 		ctx, false, name, client, network,
-		ibc.DockerImage{Repository: horcruxProxyRegistry, Version: horcruxProxyTag, UidGid: "100:1000"},
-		signerImageHomeDir, nil, startCmd,
+		ibc.DockerImage{Repository: horcruxProxyRegistry, Version: horcruxProxyTag, UIDGID: "100:1000"},
+		signerImageHomeDir, nil, startCmd, nil,
 	); err != nil {
 		return nil, err
 	}
@@ -175,18 +227,18 @@ func horcruxProxySidecar(ctx context.Context, node *cosmos.ChainNode, name strin
 }
 
 // getPrivvalKey reads the priv_validator_key.json file from the given node.
-func getPrivvalKey(ctx context.Context, node *cosmos.ChainNode) (privval.FilePVKey, error) {
+func getPrivvalKey(ctx context.Context, node *cosmos.ChainNode) (*privval.FilePVKey, error) {
 	keyBz, err := node.ReadFile(ctx, "config/priv_validator_key.json")
 	if err != nil {
-		return privval.FilePVKey{}, fmt.Errorf("failed to read priv_validator_key.json: %w", err)
+		return nil, fmt.Errorf("failed to read priv_validator_key.json: %w", err)
 	}
 
-	pvKey := privval.FilePVKey{}
+	var pvKey privval.FilePVKey
 	if err := cometjson.Unmarshal(keyBz, &pvKey); err != nil {
-		return privval.FilePVKey{}, fmt.Errorf("failed to unmarshal priv validator key: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal priv validator key: %w", err)
 	}
 
-	return pvKey, nil
+	return &pvKey, nil
 }
 
 // enablePrivvalListener enables the privval listener on the given sentry nodes.
@@ -220,8 +272,15 @@ func enablePrivvalListener(
 }
 
 // getValSigningInfo returns the signing info for the given validator from the reference node.
-func getValSigningInfo(tn *cosmos.ChainNode, address cometbytes.HexBytes) (*slashingtypes.ValidatorSigningInfo, error) {
-	valConsPrefix := fmt.Sprintf("%svalcons", tn.Chain.Config().Bech32Prefix)
+func getValSigningInfo(tn *cosmos.ChainNode, address []byte) (*slashingtypes.ValidatorSigningInfo, error) {
+	b32Prefix := tn.Chain.Config().Bech32Prefix
+
+	if b32Prefix == "union" {
+		// For some reason union has a different prefix (cosmosvalcons) for validators.
+		b32Prefix = "cosmos"
+	}
+
+	valConsPrefix := fmt.Sprintf("%svalcons", b32Prefix)
 
 	bech32ValConsAddress, err := bech32.ConvertAndEncode(valConsPrefix, address)
 	if err != nil {
@@ -238,7 +297,7 @@ func getValSigningInfo(tn *cosmos.ChainNode, address cometbytes.HexBytes) (*slas
 }
 
 // requireHealthyValidator asserts that the given validator is not tombstoned, not jailed, and has not missed any blocks in the slashing window.
-func requireHealthyValidator(t *testing.T, referenceNode *cosmos.ChainNode, validatorAddress cometbytes.HexBytes) {
+func requireHealthyValidator(t *testing.T, referenceNode *cosmos.ChainNode, validatorAddress []byte) {
 	signingInfo, err := getValSigningInfo(referenceNode, validatorAddress)
 	require.NoError(t, err)
 
@@ -285,7 +344,7 @@ func getLeader(ctx context.Context, cosigner *cosmos.SidecarProcess) (int, error
 		return -1, err
 	}
 	grpcAddress := ports[0]
-	conn, err := grpc.Dial(grpcAddress,
+	conn, err := grpc.NewClient(grpcAddress,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
 	)
@@ -297,9 +356,9 @@ func getLeader(ctx context.Context, cosigner *cosmos.SidecarProcess) (int, error
 	ctx, cancelFunc := context.WithTimeout(ctx, 10*time.Second)
 	defer cancelFunc()
 
-	grpcClient := proto.NewCosignerClient(conn)
+	grpcClient := grpccosigner.NewCosignerClient(conn)
 
-	res, err := grpcClient.GetLeader(ctx, &proto.GetLeaderRequest{})
+	res, err := grpcClient.GetLeader(ctx, &grpccosigner.GetLeaderRequest{})
 	if err != nil {
 		return -1, err
 	}

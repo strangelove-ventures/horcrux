@@ -12,15 +12,18 @@ on:
       - '**.proto'
       - 'Makefile'
 
+env:
+  TAR_PATH: horcrux.tar
+
 jobs:
   unit:
     runs-on: ubuntu-latest
     steps:
       # Install and setup go
-      - name: Set up Go 1.21
+      - name: Set up Go 1.24
         uses: actions/setup-go@v4
         with:
-          go-version: '^1.21.4'
+          go-version: '^1.24.0'
 
       # checkout horcrux
       - name: checkout horcrux
@@ -29,12 +32,47 @@ jobs:
       # run tests
       - name: run horcrux tests
         run: make test
-  e2e:
+
+  build-docker:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          file: Dockerfile
+          tags: horcrux-test:latest
+          load: true
+        
+      - name: Export Docker image
+        run: docker save horcrux-test:latest > ${{ env.TAR_PATH }}
+  
+      - name: Publish Tarball as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: horcrux-test-docker-image
+          path: ${{ env.TAR_PATH }}
+
+  e2e:
+    needs: build-docker
+    runs-on: ubuntu-latest
+    env:
+      SKIP_HORCRUX_IMAGE_BUILD: "true"
     strategy:
       fail-fast: false
       matrix:
-        test: 
+        test:
           - TestMultipleChainHorcrux
           - TestChainPureHorcrux
           - TestDownedSigners2of3
@@ -46,11 +84,19 @@ jobs:
           - TestSingleSignerTwoSentries
           - TestHorcruxProxyGRPC
     steps:
+      - name: Download Tarball Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: horcrux-test-docker-image
+
+      - name: Load Docker Image
+        run: docker image load -i ${{ env.TAR_PATH }}
+
       # Install and setup go
-      - name: Set up Go 1.21
+      - name: Set up Go 1.24
         uses: actions/setup-go@v4
         with:
-          go-version: '^1.21.4'
+          go-version: '^1.24.0'
 
       # checkout horcrux
       - name: checkout horcrux

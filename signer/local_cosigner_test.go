@@ -4,19 +4,21 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	"github.com/cometbft/cometbft/libs/log"
-	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	comet "github.com/cometbft/cometbft/types"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/google/uuid"
+	cometcryptoed25519 "github.com/strangelove-ventures/horcrux/v3/comet/crypto/ed25519"
+	cometproto "github.com/strangelove-ventures/horcrux/v3/comet/proto/types"
+	horcruxed25519 "github.com/strangelove-ventures/horcrux/v3/signer/ed25519"
+	"github.com/strangelove-ventures/horcrux/v3/types"
 	"github.com/stretchr/testify/require"
 	tsed25519 "gitlab.com/unit410/threshold-ed25519/pkg"
 )
@@ -123,21 +125,14 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 
 	now := time.Now()
 
-	hrst := HRSTKey{
-		Height:    1,
-		Round:     0,
-		Step:      2,
-		Timestamp: now.UnixNano(),
-	}
-
 	u, err := uuid.NewRandom()
 	require.NoError(t, err)
 
 	for i := 0; i < int(total); i++ {
 		id := i + 1
 
-		key := CosignerEd25519Key{
-			PubKey:       pubKey,
+		key := &CosignerKey{
+			PubKey:       pubKey.Bytes(),
 			PrivateShard: privShards[i],
 			ID:           id,
 		}
@@ -151,7 +146,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 		require.NoError(t, err)
 
 		cosigner := NewLocalCosigner(
-			log.NewNopLogger(),
+			slog.New(slog.NewTextHandler(os.Stdout, nil)),
 			&RuntimeConfig{
 				HomeDir:  cosignerDir,
 				StateDir: cosignerDir,
@@ -161,7 +156,7 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 			"",
 		)
 
-		keyBz, err := key.MarshalJSON()
+		keyBz, err := json.Marshal(key)
 		require.NoError(t, err)
 		err = os.WriteFile(cosigner.config.KeyFilePathCosigner(testChainID), keyBz, 0600)
 		require.NoError(t, err)
@@ -190,7 +185,10 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 	vote.Type = cometproto.PrevoteType
 	vote.Timestamp = now
 
-	signBytes := comet.VoteSignBytes("chain-id", &vote)
+	block := types.VoteToBlock(&vote)
+
+	signBytes, _, err := horcruxed25519.SignBytes(testChainID, block)
+	require.NoError(t, err)
 
 	sigs := make([]PartialSignature, threshold)
 
@@ -214,9 +212,8 @@ func testLocalCosignerSign(t *testing.T, threshold, total uint8, security []Cosi
 				UUID:   u,
 				Nonces: cosignerNonces,
 			},
-			ChainID:   testChainID,
-			HRST:      hrst,
-			SignBytes: signBytes,
+			ChainID: testChainID,
+			Block:   block,
 		})
 		require.NoError(t, err)
 

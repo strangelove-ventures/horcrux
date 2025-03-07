@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/strangelove-ventures/horcrux/v3/signer"
+	"github.com/strangelove-ventures/horcrux/v3/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -64,23 +64,21 @@ func TestStateSetCmd(t *testing.T) {
 				height, err := strconv.ParseInt(tc.args[1], 10, 64)
 				require.NoError(t, err)
 
-				ss, err := signer.LoadSignState(filepath.Join(stateDir, chainID+"_priv_validator_state.json"))
+				ss, err := types.LoadSignState(filepath.Join(stateDir, chainID+"_priv_validator_state.json"))
 				require.NoError(t, err)
 				require.Equal(t, height, ss.Height)
 				require.Equal(t, int64(0), ss.Round)
 				require.Equal(t, int8(0), ss.Step)
-				require.Nil(t, ss.NoncePublic)
-				require.Nil(t, ss.Signature)
-				require.Nil(t, ss.SignBytes)
+				require.Empty(t, ss.Signature)
+				require.Empty(t, ss.SignBytes)
 
-				ss, err = signer.LoadSignState(filepath.Join(stateDir, chainID+"_share_sign_state.json"))
+				ss, err = types.LoadSignState(filepath.Join(stateDir, chainID+"_share_sign_state.json"))
 				require.NoError(t, err)
 				require.Equal(t, height, ss.Height)
 				require.Equal(t, int64(0), ss.Round)
 				require.Equal(t, int8(0), ss.Step)
-				require.Nil(t, ss.NoncePublic)
-				require.Nil(t, ss.Signature)
-				require.Nil(t, ss.SignBytes)
+				require.Empty(t, ss.Signature)
+				require.Empty(t, ss.SignBytes)
 			}
 		})
 	}

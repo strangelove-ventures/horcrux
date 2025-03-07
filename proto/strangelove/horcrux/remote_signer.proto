@@ -3,7 +3,7 @@ package strangelove.horcrux;
 
 import "strangelove/horcrux/cosigner.proto";
 
-option go_package = "github.com/strangelove-ventures/horcrux/v3/signer/proto";
+option go_package = "github.com/strangelove-ventures/horcrux/v3/grpc/horcrux";
 
 service RemoteSigner {
 	rpc PubKey (PubKeyRequest) returns (PubKeyResponse) {}

@@ -4,13 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
-	cometcrypto "github.com/cometbft/cometbft/crypto"
-	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/google/uuid"
+	cometcrypto "github.com/strangelove-ventures/horcrux/v3/comet/crypto"
+	cometcryptobn254 "github.com/strangelove-ventures/horcrux/v3/comet/crypto/bn254"
+	cometcryptoed25519 "github.com/strangelove-ventures/horcrux/v3/comet/crypto/ed25519"
+	"github.com/strangelove-ventures/horcrux/v3/types"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -24,7 +26,7 @@ const nonceExpiration = 20 * time.Second
 // It maintains a high watermark to avoid double-signing.
 // Signing is thread safe.
 type LocalCosigner struct {
-	logger        cometlog.Logger
+	logger        *slog.Logger
 	config        *RuntimeConfig
 	security      CosignerSecurity
 	chainState    sync.Map
@@ -37,7 +39,7 @@ type LocalCosigner struct {
 }
 
 func NewLocalCosigner(
-	logger cometlog.Logger,
+	logger *slog.Logger,
 	config *RuntimeConfig,
 	security CosignerSecurity,
 	address string,
@@ -54,7 +56,7 @@ func NewLocalCosigner(
 type ChainState struct {
 	// lastSignState stores the last sign state for an HRS we have fully signed
 	// incremented whenever we are asked to sign an HRS
-	lastSignState *SignState
+	lastSignState *types.SignState
 	// signer generates nonces, combines nonces, signs, and verifies signatures.
 	signer ThresholdSigner
 }
@@ -90,7 +92,7 @@ func (cosigner *LocalCosigner) combinedNonces(myID int, threshold uint8, uuid uu
 
 	nonces, ok := cosigner.nonces[uuid]
 	if !ok {
-		return nil, errors.New("no metadata at HRS")
+		return nil, fmt.Errorf("no nonces found for UUID: %s", uuid)
 	}
 
 	combinedNonces := make([]Nonce, 0, threshold)
@@ -114,7 +116,7 @@ func (cosigner *LocalCosigner) combinedNonces(myID int, threshold uint8, uuid uu
 // than the current high watermark. A mutex is used to avoid concurrent state updates.
 // The disk write is scheduled in a separate goroutine which will perform an atomic write.
 // pendingDiskWG is used upon termination in pendingDiskWG to ensure all writes have completed.
-func (cosigner *LocalCosigner) SaveLastSignedState(chainID string, signState SignStateConsensus) error {
+func (cosigner *LocalCosigner) SaveLastSignedState(chainID string, signState types.SignStateConsensus) error {
 	ccs, err := cosigner.getChainState(chainID)
 	if err != nil {
 		return err
@@ -170,7 +172,14 @@ func (cosigner *LocalCosigner) GetPubKey(chainID string) (cometcrypto.PubKey, er
 		return nil, err
 	}
 
-	return cometcryptoed25519.PubKey(ccs.signer.PubKey()), nil
+	switch ccs.signer.(type) {
+	case *ThresholdSignerSoftBn254:
+		return cometcryptobn254.PubKey(ccs.signer.PubKey()), nil
+	case *ThresholdSignerSoftEd25519:
+		return cometcryptoed25519.PubKey(ccs.signer.PubKey()), nil
+	default:
+		return nil, fmt.Errorf("unknown signer type: %T", ccs.signer)
+	}
 }
 
 // CombineSignatures combines partial signatures into a full signature.
@@ -183,22 +192,33 @@ func (cosigner *LocalCosigner) CombineSignatures(chainID string, signatures []Pa
 	return ccs.signer.CombineSignatures(signatures)
 }
 
+func (cosigner *LocalCosigner) SignBytes(chainID string, block types.Block) ([]byte, []byte, error) {
+	ccs, err := cosigner.getChainState(chainID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error getting chain state: %s", err)
+	}
+
+	return ccs.signer.ConstructPayload(chainID, block)
+}
+
 // VerifySignature validates a signed payload against the public key.
 // Implements Cosigner interface
 func (cosigner *LocalCosigner) VerifySignature(chainID string, payload, signature []byte) bool {
 	if err := cosigner.LoadSignStateIfNecessary(chainID); err != nil {
+		fmt.Printf("error loading sign state: %s\n", err)
 		return false
 	}
 
 	ccs, err := cosigner.getChainState(chainID)
 	if err != nil {
+		fmt.Printf("error getting chain state: %s\n", err)
 		return false
 	}
 
 	sig := make([]byte, len(signature))
 	copy(sig, signature)
 
-	return cometcryptoed25519.PubKey(ccs.signer.PubKey()).VerifySignature(payload, sig)
+	return ccs.signer.VerifySignature(payload, sig)
 }
 
 // Sign the sign request using the cosigner's shard
@@ -214,15 +234,17 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		return res, err
 	}
 
-	hrst, hasVoteExtensions, err := verifySignPayload(chainID, req.SignBytes, req.VoteExtensionSignBytes)
+	// This function has multiple exit points.  Only start time can be guaranteed
+	metricsTimeKeeper.SetPreviousLocalSignStart(time.Now())
+
+	block := req.Block
+
+	signBytes, voteExtensionSignBytes, err := ccs.signer.ConstructPayload(chainID, block)
 	if err != nil {
 		return res, err
 	}
 
-	// This function has multiple exit points.  Only start time can be guaranteed
-	metricsTimeKeeper.SetPreviousLocalSignStart(time.Now())
-
-	existingSignature, err := ccs.lastSignState.existingSignatureOrErrorIfRegression(hrst, req.SignBytes)
+	existingSignature, err := ccs.lastSignState.ExistingSignatureOrErrorIfRegression(block, signBytes)
 	if err != nil {
 		return res, err
 	}
@@ -241,7 +263,7 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 
 	nonces, err := cosigner.combinedNonces(
 		cosigner.GetID(),
-		uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
+		uint8(cosigner.config.Config.ThresholdModeConfig.Threshold), //nolint:gosec
 		req.UUID,
 	)
 	if err != nil {
@@ -249,10 +271,10 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	}
 
 	var voteExtNonces []Nonce
-	if hasVoteExtensions {
+	if len(voteExtensionSignBytes) > 0 {
 		voteExtNonces, err = cosigner.combinedNonces(
 			cosigner.GetID(),
-			uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
+			uint8(cosigner.config.Config.ThresholdModeConfig.Threshold), //nolint:gosec
 			req.VoteExtUUID,
 		)
 		if err != nil {
@@ -265,13 +287,13 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 	var sig, voteExtSig []byte
 	eg.Go(func() error {
 		var err error
-		sig, err = ccs.signer.Sign(nonces, req.SignBytes)
+		sig, err = ccs.signer.Sign(nonces, signBytes)
 		return err
 	})
-	if hasVoteExtensions {
+	if len(voteExtensionSignBytes) > 0 {
 		eg.Go(func() error {
 			var err error
-			voteExtSig, err = ccs.signer.Sign(voteExtNonces, req.VoteExtensionSignBytes)
+			voteExtSig, err = ccs.signer.Sign(voteExtNonces, voteExtensionSignBytes)
 			return err
 		})
 	}
@@ -280,17 +302,10 @@ func (cosigner *LocalCosigner) sign(req CosignerSignRequest) (CosignerSignRespon
 		return res, err
 	}
 
-	err = ccs.lastSignState.Save(SignStateConsensus{
-		Height:                 hrst.Height,
-		Round:                  hrst.Round,
-		Step:                   hrst.Step,
-		Signature:              sig,
-		SignBytes:              req.SignBytes,
-		VoteExtensionSignature: res.VoteExtensionSignature,
-	}, &cosigner.pendingDiskWG)
+	err = ccs.lastSignState.Save(block.SignStateConsensus(signBytes, sig, voteExtSig), &cosigner.pendingDiskWG)
 
 	if err != nil {
-		if _, isSameHRSError := err.(*SameHRSError); !isSameHRSError {
+		if _, isSameHRSError := err.(*types.SameHRSError); !isSameHRSError {
 			return res, err
 		}
 	}
@@ -308,9 +323,9 @@ func (cosigner *LocalCosigner) generateNonces() ([]Nonces, error) {
 	total := len(cosigner.config.Config.ThresholdModeConfig.Cosigners)
 	meta := make([]Nonces, total)
 
-	nonces, err := GenerateNonces(
-		uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),
-		uint8(total),
+	nonces, err := GenerateNoncesEd25519(
+		uint8(cosigner.config.Config.ThresholdModeConfig.Threshold), //nolint:gosec
+		uint8(total), //nolint:gosec
 	)
 	if err != nil {
 		return nil, err
@@ -330,16 +345,40 @@ func (cosigner *LocalCosigner) LoadSignStateIfNecessary(chainID string) error {
 		return nil
 	}
 
-	signState, err := LoadOrCreateSignState(cosigner.config.CosignerStateFile(chainID))
+	signState, err := types.LoadOrCreateSignState(cosigner.config.CosignerStateFile(chainID))
 	if err != nil {
 		return err
 	}
 
-	var signer ThresholdSigner
-
-	signer, err = NewThresholdSignerSoft(cosigner.config, cosigner.GetID(), chainID)
+	keyFile, err := cosigner.config.KeyFileExistsCosigner(chainID)
 	if err != nil {
 		return err
+	}
+
+	key, err := LoadCosignerKey(keyFile)
+	if err != nil {
+		return fmt.Errorf("error reading cosigner key: %s", err)
+	}
+
+	var signer ThresholdSigner
+	switch key.KeyType {
+	case CosignerKeyTypeBn254:
+		signer, err = NewThresholdSignerSoftBn254(
+			key,
+			uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),      //nolint:gosec
+			uint8(len(cosigner.config.Config.ThresholdModeConfig.Cosigners)), //nolint:gosec
+		)
+		if err != nil {
+			return err
+		}
+	case CosignerKeyTypeEd25519:
+		fallthrough
+	default:
+		signer = NewThresholdSignerSoftEd25519(
+			key,
+			uint8(cosigner.config.Config.ThresholdModeConfig.Threshold),      //nolint:gosec
+			uint8(len(cosigner.config.Config.ThresholdModeConfig.Cosigners)), //nolint:gosec
+		)
 	}
 
 	cosigner.chainState.Store(chainID, &ChainState{
@@ -543,13 +582,12 @@ func (cosigner *LocalCosigner) SetNoncesAndSign(
 	}
 
 	cosignerReq := CosignerSignRequest{
-		UUID:      req.Nonces.UUID,
-		ChainID:   chainID,
-		SignBytes: req.SignBytes,
+		ChainID: chainID,
+		Block:   req.Block,
+		UUID:    req.Nonces.UUID,
 	}
 
-	if len(req.VoteExtensionSignBytes) > 0 {
-		cosignerReq.VoteExtensionSignBytes = req.VoteExtensionSignBytes
+	if req.Block.Step == types.StepPrecommit && req.VoteExtensionNonces != nil {
 		cosignerReq.VoteExtUUID = req.VoteExtensionNonces.UUID
 	}
 

@@ -1,19 +1,18 @@
 package signer
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
 	"syscall"
-
-	cometlog "github.com/cometbft/cometbft/libs/log"
-	cometos "github.com/cometbft/cometbft/libs/os"
-	cometservice "github.com/cometbft/cometbft/libs/service"
 )
 
-func RequireNotRunning(log cometlog.Logger, pidFilePath string) error {
+func RequireNotRunning(log *slog.Logger, pidFilePath string) error {
 	if _, err := os.Stat(pidFilePath); err != nil {
 		if os.IsNotExist(err) {
 			// lock file does not exist, can continue starting daemon
@@ -74,7 +73,7 @@ func RequireNotRunning(log cometlog.Logger, pidFilePath string) error {
 	return fmt.Errorf("unexpected error while signaling horcrux PID: %d", pid)
 }
 
-func WaitAndTerminate(logger cometlog.Logger, services []cometservice.Service, pidFilePath string) {
+func WaitAndTerminate(logger *slog.Logger, cancel context.CancelFunc, pidFilePath string) {
 	done := make(chan struct{})
 
 	pidFile, err := os.OpenFile(pidFilePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
@@ -86,17 +85,29 @@ func WaitAndTerminate(logger cometlog.Logger, services []cometservice.Service, p
 	if err != nil {
 		panic(fmt.Errorf("error writing to lock file: %s. %w", pidFilePath, err))
 	}
-	cometos.TrapSignal(logger, func() {
+
+	TrapSignal(logger, func() {
 		if err := os.Remove(pidFilePath); err != nil {
 			fmt.Printf("Error removing lock file: %v\n", err)
 		}
-		for _, service := range services {
-			err := service.Stop()
-			if err != nil {
-				panic(err)
-			}
-		}
+		cancel()
 		close(done)
 	})
 	<-done
+}
+
+// TrapSignal catches the SIGTERM/SIGINT and executes cb function. After that it exits
+// with code 0.
+func TrapSignal(logger *slog.Logger, cb func()) {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		for sig := range c {
+			logger.Info("signal trapped", "msg", fmt.Sprintf("captured %v, exiting...", sig))
+			if cb != nil {
+				cb()
+			}
+			os.Exit(0)
+		}
+	}()
 }

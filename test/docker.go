@@ -3,15 +3,20 @@ package test
 import (
 	"bufio"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
+	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
+	dockerimagetypes "github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/pkg/archive"
+	"github.com/google/uuid"
+	"github.com/moby/moby/client"
 )
 
 type DockerImageBuildErrorDetail struct {
@@ -24,21 +29,76 @@ type DockerImageBuildLogAux struct {
 
 type DockerImageBuildLog struct {
 	Stream      string                       `json:"stream"`
-	Aux         *DockerImageBuildLogAux      `json:"aux"`
+	Aux         any                          `json:"aux"`
 	Error       string                       `json:"error"`
 	ErrorDetail *DockerImageBuildErrorDetail `json:"errorDetail"`
 }
 
+func getConfig() *configfile.ConfigFile {
+	// Try to read Docker config for auth
+	configFile := filepath.Join(os.Getenv("HOME"), ".docker", "config.json")
+	if _, err := os.Stat(configFile); err != nil {
+		return nil
+	}
+
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		return nil
+	}
+
+	var config configfile.ConfigFile
+
+	if err := json.Unmarshal(data, &config); err != nil {
+		return nil
+	}
+
+	return &config
+}
+
+func getDockerClient() (*client.Client, error) {
+	opts := []client.Opt{
+		client.WithVersion("1.41"),            // Use a specific API version
+		client.WithTimeout(120 * time.Second), // Longer timeout
+	}
+
+	return client.NewClientWithOpts(opts...)
+}
+
+// TODO: find better way for buildkit to be able to pull images
+func primeDockerDaemon(ctx context.Context, client *client.Client) error {
+	images := []string{
+		"golang:1.24-alpine",
+		"busybox:1.34.1-musl",
+		"ghcr.io/strangelove-ventures/infra-toolkit:v0.0.6",
+	}
+
+	for _, image := range images {
+		_, err := client.ImagePull(ctx, image, dockerimagetypes.PullOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to pull %s: %w", image, err)
+		}
+	}
+	return nil
+}
+
 // BuildHorcruxImage builds a Docker image for horcrux from current Dockerfile
-func BuildHorcruxImage(ctx context.Context, client *client.Client) error {
+func BuildHorcruxImage(ctx context.Context, _ *client.Client) error {
 	dir, err := os.Getwd()
 	if err != nil {
 		return err
 	}
-	dockerfile := "docker/horcrux/native.Dockerfile"
+	dockerfile := "Dockerfile"
+	outputStr := "type=docker"
+
 	opts := types.ImageBuildOptions{
 		Dockerfile: dockerfile,
 		Tags:       []string{signerImage + ":latest"},
+		PullParent: false,
+		BuildArgs: map[string]*string{
+			"output": &outputStr,
+		},
+		Version: types.BuilderBuildKit,
+		BuildID: fmt.Sprintf("buildkit-%s", uuid.New().String()),
 	}
 
 	tar, err := archive.TarWithOptions(filepath.Dir(dir), &archive.TarOptions{})
@@ -46,10 +106,23 @@ func BuildHorcruxImage(ctx context.Context, client *client.Client) error {
 		panic(fmt.Errorf("error archiving project for docker: %v", err))
 	}
 
+	client, err := getDockerClient()
+	if err != nil {
+		return err
+	}
+
+	if err := primeDockerDaemon(ctx, client); err != nil {
+		return err
+	}
+
+	os.Setenv("BUILDKIT_PROGRESS", "plain")
+
 	res, err := client.ImageBuild(ctx, tar, opts)
 	if err != nil {
 		return err
 	}
+
+	defer res.Body.Close()
 
 	scanner := bufio.NewScanner(res.Body)
 
@@ -61,10 +134,18 @@ func BuildHorcruxImage(ctx context.Context, client *client.Client) error {
 			return err
 		}
 		if dockerLogLine.Stream != "" {
-			fmt.Printf(dockerLogLine.Stream)
+			fmt.Printf("%s", dockerLogLine.Stream)
 		}
 		if dockerLogLine.Aux != nil {
-			fmt.Printf("Image ID: %s\n", dockerLogLine.Aux.ID)
+			if auxStr, ok := dockerLogLine.Aux.(string); ok {
+				log, err := base64.StdEncoding.DecodeString(auxStr)
+				if err != nil {
+					return err
+				}
+				fmt.Printf("%s", log)
+			} else if auxObj, ok := dockerLogLine.Aux.(*DockerImageBuildLogAux); ok {
+				fmt.Printf("%s", auxObj.ID)
+			}
 		}
 		if dockerLogLine.Error != "" {
 			return errors.New(dockerLogLine.Error)

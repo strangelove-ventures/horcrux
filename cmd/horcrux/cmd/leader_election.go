@@ -8,9 +8,9 @@ import (
 	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/horcrux/v3/client"
+	grpccosigner "github.com/strangelove-ventures/horcrux/v3/grpc/cosigner"
 	"github.com/strangelove-ventures/horcrux/v3/signer"
 	"github.com/strangelove-ventures/horcrux/v3/signer/multiresolver"
-	"github.com/strangelove-ventures/horcrux/v3/signer/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -30,7 +30,7 @@ To choose a specific leader, pass that leader's ID as an argument.
 		Example: `horcrux elect # elect next eligible leader
 horcrux elect 2 # elect specific leader`,
 		SilenceUsage: true,
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
+		RunE: func(_ *cobra.Command, args []string) (err error) {
 			if config.Config.ThresholdModeConfig == nil {
 				return fmt.Errorf("threshold mode configuration is not present in config file")
 			}
@@ -51,7 +51,7 @@ horcrux elect 2 # elect specific leader`,
 			}
 
 			fmt.Printf("Broadcasting to address: %s\n", grpcAddress)
-			conn, err := grpc.Dial(grpcAddress,
+			conn, err := grpc.NewClient(grpcAddress,
 				grpc.WithDefaultServiceConfig(serviceConfig), grpc.WithTransportCredentials(insecure.NewCredentials()),
 				grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
 				grpc.WithUnaryInterceptor(grpcretry.UnaryClientInterceptor(retryOpts...)))
@@ -69,16 +69,16 @@ horcrux elect 2 # elect specific leader`,
 			ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancelFunc()
 
-			grpcClient := proto.NewCosignerClient(conn)
+			grpcClient := grpccosigner.NewCosignerClient(conn)
 			_, err = grpcClient.TransferLeadership(
 				ctx,
-				&proto.TransferLeadershipRequest{LeaderID: leaderID},
+				&grpccosigner.TransferLeadershipRequest{LeaderID: leaderID},
 			)
 			if err != nil {
 				return err
 			}
 
-			res, err := grpcClient.GetLeader(ctx, &proto.GetLeaderRequest{})
+			res, err := grpcClient.GetLeader(ctx, &grpccosigner.GetLeaderRequest{})
 			if err != nil {
 				return err
 			}
@@ -97,7 +97,7 @@ func getLeaderCmd() *cobra.Command {
 		Args:         cobra.NoArgs,
 		Example:      `horcrux leader`,
 		SilenceUsage: true,
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
+		RunE: func(_ *cobra.Command, _ []string) (err error) {
 			thresholdCfg := config.Config.ThresholdModeConfig
 			if thresholdCfg == nil {
 				return fmt.Errorf("threshold mode configuration is not present in config file")
@@ -154,7 +154,7 @@ func getLeaderCmd() *cobra.Command {
 			}
 
 			fmt.Printf("Request address: %s\n", grpcAddress)
-			conn, err := grpc.Dial(grpcAddress,
+			conn, err := grpc.NewClient(grpcAddress,
 				grpc.WithTransportCredentials(insecure.NewCredentials()),
 				grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
 				grpc.WithUnaryInterceptor(grpcretry.UnaryClientInterceptor(retryOpts...)))
@@ -166,9 +166,9 @@ func getLeaderCmd() *cobra.Command {
 			ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancelFunc()
 
-			grpcClient := proto.NewCosignerClient(conn)
+			grpcClient := grpccosigner.NewCosignerClient(conn)
 
-			res, err := grpcClient.GetLeader(ctx, &proto.GetLeaderRequest{})
+			res, err := grpcClient.GetLeader(ctx, &grpccosigner.GetLeaderRequest{})
 			if err != nil {
 				return err
 			}

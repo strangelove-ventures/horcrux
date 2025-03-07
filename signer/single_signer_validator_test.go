@@ -2,23 +2,24 @@ package signer
 
 import (
 	"context"
+	"crypto/rand"
 	"path/filepath"
 	"time"
 
 	"os"
 	"testing"
 
-	cometcryptoed25519 "github.com/cometbft/cometbft/crypto/ed25519"
-	"github.com/cometbft/cometbft/crypto/tmhash"
-	cometjson "github.com/cometbft/cometbft/libs/json"
-	cometrand "github.com/cometbft/cometbft/libs/rand"
-	cometprivval "github.com/cometbft/cometbft/privval"
-	cometproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	cometcryptoed25519 "github.com/strangelove-ventures/horcrux/v3/comet/crypto/ed25519"
+	cometjson "github.com/strangelove-ventures/horcrux/v3/comet/libs/json"
+	cometprivval "github.com/strangelove-ventures/horcrux/v3/comet/privval"
+	cometproto "github.com/strangelove-ventures/horcrux/v3/comet/proto/types"
+	horcruxed25519 "github.com/strangelove-ventures/horcrux/v3/signer/ed25519"
+	"github.com/strangelove-ventures/horcrux/v3/types"
 	"github.com/stretchr/testify/require"
 )
 
 func TestSingleSignerValidator(t *testing.T) {
-	t.Skip("TODO: fix this test when run with 'make test'")
+	// t.Skip("TODO: fix this test when run with 'make test'")
 
 	tmpDir := t.TempDir()
 	stateDir := filepath.Join(tmpDir, "state")
@@ -54,23 +55,29 @@ func TestSingleSignerValidator(t *testing.T) {
 		Type:   cometproto.ProposalType,
 	}
 
-	block := ProposalToBlock(testChainID, &proposal)
+	block := types.ProposalToBlock(&proposal)
 
 	ctx := context.Background()
 
 	signature, _, _, err := validator.Sign(ctx, testChainID, block)
 	require.NoError(t, err)
 
-	require.True(t, privateKey.PubKey().VerifySignature(block.SignBytes, signature))
+	signBytes, _, err := horcruxed25519.SignBytes(testChainID, block)
+	require.NoError(t, err)
+
+	require.True(t, privateKey.PubKey().VerifySignature(signBytes, signature))
 
 	proposal.Timestamp = time.Now()
 
 	// should be able to sign same proposal with only differing timestamp
-	_, _, _, err = validator.Sign(ctx, testChainID, ProposalToBlock(testChainID, &proposal))
+	_, _, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(&proposal))
 	require.NoError(t, err)
 
 	// construct different block ID for proposal at same height as highest signed
-	randHash := cometrand.Bytes(tmhash.Size)
+	randHash := make([]byte, 32)
+	_, err = rand.Read(randHash)
+	require.NoError(t, err)
+
 	blockID := cometproto.BlockID{Hash: randHash,
 		PartSetHeader: cometproto.PartSetHeader{Total: 5, Hash: randHash}}
 
@@ -82,46 +89,50 @@ func TestSingleSignerValidator(t *testing.T) {
 	}
 
 	// should not be able to sign same proposal at same height as highest signed with different BlockID
-	_, _, _, err = validator.Sign(ctx, testChainID, ProposalToBlock(testChainID, &proposal))
+	_, _, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(&proposal))
 	require.Error(t, err, "double sign!")
 
 	proposal.Round = 19
 
 	// should not be able to sign lower than highest signed
-	_, _, _, err = validator.Sign(ctx, testChainID, ProposalToBlock(testChainID, &proposal))
+	_, _, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(&proposal))
 	require.Error(t, err, "double sign!")
 
 	// lower LSS should sign for different chain ID
-	_, _, _, err = validator.Sign(ctx, "different", ProposalToBlock("different", &proposal))
+	_, _, _, err = validator.Sign(ctx, "different", types.ProposalToBlock(&proposal))
 	require.NoError(t, err)
 
 	// reinitialize validator to make sure new runtime will not allow double sign
 	validator = NewSingleSignerValidator(runtimeConfig)
 
-	_, _, _, err = validator.Sign(ctx, testChainID, ProposalToBlock(testChainID, &proposal))
+	_, _, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(&proposal))
 	require.Error(t, err, "double sign!")
 
 	proposal.Round = 21
 
 	// signing higher block now should succeed
-	_, _, _, err = validator.Sign(ctx, testChainID, ProposalToBlock(testChainID, &proposal))
+	_, _, _, err = validator.Sign(ctx, testChainID, types.ProposalToBlock(&proposal))
 	require.NoError(t, err)
 
 	precommit := cometproto.Vote{
 		Height:    2,
 		Round:     0,
 		Type:      cometproto.PrecommitType,
+		BlockID:   cometproto.BlockID{Hash: []byte("test")},
 		Timestamp: time.Now(),
 		Extension: []byte("test"),
 	}
 
-	block = VoteToBlock(testChainID, &precommit)
+	block = types.VoteToBlock(&precommit)
 	sig, voteExtSig, _, err := validator.Sign(ctx, testChainID, block)
 	require.NoError(t, err)
 
-	require.True(t, privateKey.PubKey().VerifySignature(block.SignBytes, sig), "signature verification failed")
+	signBytes, voteExtSignBytes, err := horcruxed25519.SignBytes(testChainID, block)
+	require.NoError(t, err)
 
-	require.True(t, privateKey.PubKey().VerifySignature(block.VoteExtensionSignBytes, voteExtSig),
+	require.True(t, privateKey.PubKey().VerifySignature(signBytes, sig), "signature verification failed")
+
+	require.True(t, privateKey.PubKey().VerifySignature(voteExtSignBytes, voteExtSig),
 		"vote extension signature verification failed")
 
 }

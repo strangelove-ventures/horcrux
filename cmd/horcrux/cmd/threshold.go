@@ -3,12 +3,11 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
 
-	cometlog "github.com/cometbft/cometbft/libs/log"
-	cometservice "github.com/cometbft/cometbft/libs/service"
 	"github.com/strangelove-ventures/horcrux/v3/signer"
 )
 
@@ -16,10 +15,10 @@ const maxWaitForSameBlockAttempts = 3
 
 func NewThresholdValidator(
 	ctx context.Context,
-	logger cometlog.Logger,
-) ([]cometservice.Service, *signer.ThresholdValidator, error) {
+	logger *slog.Logger,
+) (*signer.ThresholdValidator, error) {
 	if err := config.Config.ValidateThresholdModeConfig(); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	thresholdCfg := config.Config.ThresholdModeConfig
@@ -35,7 +34,7 @@ func NewThresholdValidator(
 		var rsaErr error
 		security, rsaErr = config.CosignerSecurityRSA()
 		if rsaErr != nil {
-			return nil, nil, fmt.Errorf("failed to initialize cosigner ECIES / RSA security : %w / %w", eciesErr, rsaErr)
+			return nil, fmt.Errorf("failed to initialize cosigner ECIES / RSA security : %w / %w", eciesErr, rsaErr)
 		}
 	}
 
@@ -43,7 +42,7 @@ func NewThresholdValidator(
 		if c.ShardID != security.GetID() {
 			rc, err := signer.NewRemoteCosigner(c.ShardID, c.P2PAddr)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to initialize remote cosigner: %w", err)
+				return nil, fmt.Errorf("failed to initialize remote cosigner: %w", err)
 			}
 			remoteCosigners = append(
 				remoteCosigners,
@@ -55,7 +54,7 @@ func NewThresholdValidator(
 	}
 
 	if p2pListen == "" {
-		return nil, nil, fmt.Errorf("cosigner config does not exist for our shard ID %d", security.GetID())
+		return nil, fmt.Errorf("cosigner config does not exist for our shard ID %d", security.GetID())
 	}
 
 	localCosigner := signer.NewLocalCosigner(
@@ -71,7 +70,7 @@ func NewThresholdValidator(
 
 	raftDir := filepath.Join(config.HomeDir, "raft")
 	if err := os.MkdirAll(raftDir, 0700); err != nil {
-		return nil, nil, fmt.Errorf("error creating raft directory: %w", err)
+		return nil, fmt.Errorf("error creating raft directory: %w", err)
 	}
 
 	// RAFT node ID is the cosigner ID
@@ -80,10 +79,7 @@ func NewThresholdValidator(
 	// Start RAFT store listener
 	raftStore := signer.NewRaftStore(nodeID,
 		raftDir, p2pListen, raftTimeout, logger, localCosigner, remoteCosigners)
-	if err := raftStore.Start(); err != nil {
-		return nil, nil, fmt.Errorf("error starting raft store: %w", err)
-	}
-	services := []cometservice.Service{raftStore}
+	go raftStore.Start()
 
 	val := signer.NewThresholdValidator(
 		logger,
@@ -98,9 +94,7 @@ func NewThresholdValidator(
 
 	raftStore.SetThresholdValidator(val)
 
-	if err := val.Start(ctx); err != nil {
-		return nil, nil, fmt.Errorf("failed to start threshold validator: %w", err)
-	}
+	val.Start(ctx)
 
-	return services, val, nil
+	return val, nil
 }

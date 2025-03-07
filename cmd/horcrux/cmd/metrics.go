@@ -3,20 +3,20 @@ package cmd
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/pprof"
 	"time"
 
-	"github.com/armon/go-metrics"
-	gmprometheus "github.com/armon/go-metrics/prometheus"
-	cometlog "github.com/cometbft/cometbft/libs/log"
+	"github.com/hashicorp/go-metrics"
+	gmprometheus "github.com/hashicorp/go-metrics/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/strangelove-ventures/horcrux/v3/signer"
 )
 
 func AddPrometheusMetrics(mux *http.ServeMux, out io.Writer) {
-	logger := cometlog.NewTMLogger(cometlog.NewSyncWriter(out)).With("module", "metrics")
+	logger := slog.New(slog.NewTextHandler(out, nil)).With("module", "metrics")
 
 	// Add metrics from raft's implementation of go-metrics
 	cfg := gmprometheus.DefaultPrometheusOpts
@@ -37,7 +37,7 @@ func AddPrometheusMetrics(mux *http.ServeMux, out io.Writer) {
 
 // EnableDebugAndMetrics - Initialization errors are not fatal, only logged
 func EnableDebugAndMetrics(ctx context.Context, out io.Writer) {
-	logger := cometlog.NewTMLogger(cometlog.NewSyncWriter(out)).With("module", "debugserver")
+	logger := slog.New(slog.NewTextHandler(out, nil)).With("module", "debugserver")
 
 	// Configure Shared Debug HTTP Server for pprof and prometheus
 	if len(config.Config.DebugAddr) == 0 {
@@ -61,6 +61,8 @@ func EnableDebugAndMetrics(ctx context.Context, out io.Writer) {
 	// Add prometheus metrics
 	AddPrometheusMetrics(mux, out)
 
+	go signer.StartMetrics(ctx)
+
 	// Configure Debug Server Network Parameters
 	srv := &http.Server{
 		Handler:           mux,
@@ -78,7 +80,7 @@ func EnableDebugAndMetrics(ctx context.Context, out io.Writer) {
 				logger.Info("Debug Server Shutdown Complete")
 				return
 			}
-			logger.Error(fmt.Sprintf("Debug Endpoint failed to start: %+v", err))
+			logger.Error("Debug Endpoint failed to start", "error", err)
 			panic(err)
 		}
 	}()
@@ -88,10 +90,10 @@ func EnableDebugAndMetrics(ctx context.Context, out io.Writer) {
 		<-ctx.Done()
 		logger.Info("Gracefully Stopping Debug Server")
 		if err := srv.Shutdown(context.Background()); err != nil {
-			logger.Error("Error in Stopping Debug Server", err)
+			logger.Error("Error in Stopping Debug Server", "error", err)
 			logger.Info("Force Stopping Debug Server")
 			if err = srv.Close(); err != nil {
-				logger.Error("Error in Force Stopping Debug Server", err)
+				logger.Error("Error in Force Stopping Debug Server", "error", err)
 			}
 		}
 	}()

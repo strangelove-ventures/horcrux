@@ -3,11 +3,11 @@ package signer
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	cometlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/google/uuid"
 )
 
@@ -19,7 +19,7 @@ const (
 )
 
 type CosignerNonceCache struct {
-	logger    cometlog.Logger
+	logger    *slog.Logger
 	cosigners []Cosigner
 
 	leader Leader
@@ -159,7 +159,7 @@ type CachedNonce struct {
 }
 
 func NewCosignerNonceCache(
-	logger cometlog.Logger,
+	logger *slog.Logger,
 	cosigners []Cosigner,
 	leader Leader,
 	getNoncesInterval time.Duration,
@@ -219,7 +219,8 @@ func (cnc *CosignerNonceCache) reconcile(ctx context.Context) {
 
 	lastReconcileNonces := cnc.lastReconcileNonces.Load()
 	// calculate nonces per minute
-	noncesPerMin := float64(int(lastReconcileNonces)-remainingNonces-pruned) / timeSinceLastReconcile.Minutes()
+	noncesPerMin := float64(int(lastReconcileNonces)-remainingNonces-pruned) / //nolint:gosec
+		timeSinceLastReconcile.Minutes()
 	if noncesPerMin < 0 {
 		noncesPerMin = 0
 	}
@@ -236,7 +237,7 @@ func (cnc *CosignerNonceCache) reconcile(ctx context.Context) {
 	additional := t - remainingNonces
 
 	defer func() {
-		cnc.lastReconcileNonces.Store(uint64(remainingNonces + additional))
+		cnc.lastReconcileNonces.Store(uint64(remainingNonces + additional)) //nolint:gosec
 		cnc.lastReconcileTime = time.Now()
 	}()
 
@@ -331,7 +332,7 @@ func (cnc *CosignerNonceCache) LoadN(ctx context.Context, n int) {
 }
 
 func (cnc *CosignerNonceCache) Start(ctx context.Context) {
-	cnc.lastReconcileNonces.Store(uint64(cnc.cache.Size()))
+	cnc.lastReconcileNonces.Store(uint64(cnc.cache.Size())) //nolint:gosec
 	cnc.lastReconcileTime = time.Now()
 
 	timer := time.NewTimer(cnc.getNoncesInterval)

@@ -1,0 +1,68 @@
+syntax = "proto3";
+package cometbft.types.v1;
+
+option go_package = "github.com/strangelove-ventures/horcrux/v3/comet/proto/types";
+
+import "gogoproto/gogo.proto";
+import "google/protobuf/timestamp.proto";
+
+// SignedMsgType is a type of signed message in the consensus.
+enum SignedMsgType {
+  option (gogoproto.goproto_enum_stringer) = true;
+  option (gogoproto.goproto_enum_prefix)   = false;
+
+  SIGNED_MSG_TYPE_UNKNOWN = 0 [(gogoproto.enumvalue_customname) = "UnknownType"];
+  // Votes
+  SIGNED_MSG_TYPE_PREVOTE   = 1 [(gogoproto.enumvalue_customname) = "PrevoteType"];
+  SIGNED_MSG_TYPE_PRECOMMIT = 2 [(gogoproto.enumvalue_customname) = "PrecommitType"];
+
+  // Proposals
+  SIGNED_MSG_TYPE_PROPOSAL = 32 [(gogoproto.enumvalue_customname) = "ProposalType"];
+}
+
+// PartSetHeader
+message PartSetHeader {
+    uint32 total = 1;
+    bytes  hash  = 2;
+}
+  
+// BlockID
+message BlockID {
+    bytes         hash            = 1;
+    PartSetHeader part_set_header = 2 [(gogoproto.nullable) = false];
+}
+
+// Vote represents a prevote or precommit vote from validators for
+// consensus.
+message Vote {
+  SignedMsgType type     = 1;
+  int64         height   = 2;
+  int32         round    = 3;
+  BlockID       block_id = 4
+      [(gogoproto.nullable) = false, (gogoproto.customname) = "BlockID"];  // zero if vote is nil.
+  google.protobuf.Timestamp timestamp = 5
+      [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
+  bytes validator_address = 6;
+  int32 validator_index   = 7;
+  // Vote signature by the validator if they participated in consensus for the
+  // associated block.
+  bytes signature = 8;
+  // Vote extension provided by the application. Only valid for precommit
+  // messages.
+  bytes extension = 9;
+  // Vote extension signature by the validator if they participated in
+  // consensus for the associated block.
+  // Only valid for precommit messages.
+  bytes extension_signature = 10;
+}
+
+message Proposal {
+  SignedMsgType             type      = 1;
+  int64                     height    = 2;
+  int32                     round     = 3;
+  int32                     pol_round = 4;
+  BlockID                   block_id  = 5 [(gogoproto.customname) = "BlockID", (gogoproto.nullable) = false];
+  google.protobuf.Timestamp timestamp = 6
+      [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
+  bytes signature = 7;
+}

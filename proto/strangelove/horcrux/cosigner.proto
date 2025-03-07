@@ -1,7 +1,7 @@
 syntax = "proto3";
 package strangelove.horcrux;
 
-option go_package = "github.com/strangelove-ventures/horcrux/v3/signer/proto";
+option go_package = "github.com/strangelove-ventures/horcrux/v3/grpc/cosigner";
 
 service Cosigner {
 	rpc SignBlock (SignBlockRequest) returns (SignBlockResponse) {}
@@ -16,9 +16,16 @@ message Block {
 	int64 height = 1;
 	int64 round = 2;
 	int32 step = 3;
-	bytes signBytes = 4;
-	bytes voteExtSignBytes = 5;
+	BlockID blockID = 4;
+	int32 pOLRound = 5;
 	int64 timestamp = 6;
+	bytes voteExtension = 7;
+}
+
+message BlockID {
+	bytes hash = 1;
+	uint32 partSetHeaderTotal = 2;
+	bytes partSetHeaderHash = 3;
 }
 
 message SignBlockRequest {
@@ -55,12 +62,12 @@ message HRST {
 message SetNoncesAndSignRequest {
 	bytes uuid = 1;
 	repeated Nonce nonces = 2;
-	HRST hrst = 3;
-	bytes signBytes = 4;
-	bytes voteExtUuid = 5;
-	repeated Nonce voteExtNonces = 6;
-	bytes voteExtSignBytes = 7;
-	string chainID = 8;
+
+	bytes voteExtUuid = 3;
+	repeated Nonce voteExtNonces = 4;
+
+	Block block = 5;
+	string chainID = 6;
 }
 
 message SetNoncesAndSignResponse {

@@ -9,9 +9,9 @@ import (
 	"math/big"
 	"os"
 
-	cometjson "github.com/cometbft/cometbft/libs/json"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
+	cometjson "github.com/strangelove-ventures/horcrux/v3/comet/libs/json"
 	"golang.org/x/sync/errgroup"
 )
 
