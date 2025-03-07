@@ -16,6 +16,13 @@ type BlockID struct {
 	PartSetHeader PartSetHeader `json:"part_set_header"`
 }
 
+func (bid *BlockID) lockedCopy() *BlockID {
+	return &BlockID{
+		Hash:          append([]byte(nil), bid.Hash...),
+		PartSetHeader: bid.PartSetHeader.lockedCopy(),
+	}
+}
+
 // IsZero returns true if this is the BlockID of a nil block.
 func (bid *BlockID) IsZero() bool {
 	return len(bid.Hash) == 0 && bid.PartSetHeader.IsZero()
@@ -52,6 +59,13 @@ func (bid *BlockID) ToCanonical() *cometproto.CanonicalBlockID {
 type PartSetHeader struct {
 	Total uint32 `json:"total"`
 	Hash  []byte `json:"hash"`
+}
+
+func (psh PartSetHeader) lockedCopy() PartSetHeader {
+	return PartSetHeader{
+		Total: psh.Total,
+		Hash:  append([]byte(nil), psh.Hash...),
+	}
 }
 
 func (psh PartSetHeader) IsZero() bool {
