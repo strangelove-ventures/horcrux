@@ -142,17 +142,7 @@ func (signState *SignState) existingSignatureOrErrorIfRegression(hrst HRSTKey, s
 	return nil, nil
 }
 
-func (signState *SignState) HRSKey() HRSKey {
-	signState.mu.RLock()
-	defer signState.mu.RUnlock()
-	return HRSKey{
-		Height: signState.Height,
-		Round:  signState.Round,
-		Step:   signState.Step,
-	}
-}
-
-func (signState *SignState) hrsKeyLocked() HRSKey {
+func (signState *SignState) lockedHrsKey() HRSKey {
 	return HRSKey{
 		Height: signState.Height,
 		Round:  signState.Round,
@@ -208,18 +198,25 @@ func newConflictingDataError(existingSignBytes, newSignBytes []byte) *Conflictin
 func (signState *SignState) GetFromCache(hrs HRSKey) (HRSKey, *SignStateConsensus) {
 	signState.mu.RLock()
 	defer signState.mu.RUnlock()
-	latestBlock := signState.hrsKeyLocked()
+	latestBlock := signState.lockedHrsKey()
 	if ssc, ok := signState.cache[hrs]; ok {
 		return latestBlock, &ssc
 	}
 	return latestBlock, nil
 }
 
-// cacheAndMarshal will cache a SignStateConsensus for it's HRS and return the marshalled bytes.
-func (signState *SignState) cacheAndMarshal(ssc SignStateConsensus) []byte {
+// blockDoubleSign will prevent double signing by checking the HRS against the current SignState.
+// It must only return nil error if the HRS is greater than the current SignState
+// so that we only sign atomically and incrementally.
+// Returns a copy of the SignState in the case of a successful update that will be persisted to disk.
+func (signState *SignState) blockDoubleSign(ssc SignStateConsensus) (*SignState, error) {
 	signState.mu.Lock()
 	defer signState.mu.Unlock()
+	if err := signState.lockedGetErrorIfLessOrEqual(ssc.Height, ssc.Round, ssc.Step); err != nil {
+		return nil, err
+	}
 
+	// HRS is greater than existing state, move forward with caching and saving.
 	signState.cache[ssc.HRSKey()] = ssc
 
 	for hrs := range signState.cache {
@@ -235,12 +232,7 @@ func (signState *SignState) cacheAndMarshal(ssc SignStateConsensus) []byte {
 	signState.SignBytes = ssc.SignBytes
 	signState.VoteExtensionSignature = ssc.VoteExtensionSignature
 
-	jsonBytes, err := cometjson.MarshalIndent(signState, "", "  ")
-	if err != nil {
-		panic(err)
-	}
-
-	return jsonBytes
+	return signState.lockedCopy(), nil
 }
 
 // Save updates the high watermark height/round/step (HRS) if it is greater
@@ -251,14 +243,10 @@ func (signState *SignState) Save(
 	ssc SignStateConsensus,
 	pendingDiskWG *sync.WaitGroup,
 ) error {
-	err := signState.GetErrorIfLessOrEqual(ssc.Height, ssc.Round, ssc.Step)
+	signStateCopy, err := signState.blockDoubleSign(ssc)
 	if err != nil {
 		return err
 	}
-
-	// HRS is greater than existing state, move forward with caching and saving.
-
-	jsonBytes := signState.cacheAndMarshal(ssc)
 
 	// Broadcast to waiting goroutines to notify them that an
 	// existing signature for their HRS may now be available.
@@ -268,18 +256,47 @@ func (signState *SignState) Save(
 		pendingDiskWG.Add(1)
 		go func() {
 			defer pendingDiskWG.Done()
-			signState.save(jsonBytes)
+			saveSignState(signStateCopy)
 		}()
 	} else {
-		signState.save(jsonBytes)
+		saveSignState(signStateCopy)
 	}
 
 	return nil
 }
 
+// copy returns a deep copy of the SignState. Not thread-safe (requires external lock).
+func (signState *SignState) lockedCopy() *SignState {
+	sig := make([]byte, len(signState.Signature))
+	noncePub := make([]byte, len(signState.NoncePublic))
+	signBz := make([]byte, len(signState.SignBytes))
+	voteExtSig := make([]byte, len(signState.VoteExtensionSignature))
+
+	copy(sig, signState.Signature)
+	copy(noncePub, signState.NoncePublic)
+	copy(signBz, signState.SignBytes)
+	copy(voteExtSig, signState.VoteExtensionSignature)
+
+	return &SignState{
+		Height:                 signState.Height,
+		Round:                  signState.Round,
+		Step:                   signState.Step,
+		NoncePublic:            noncePub,
+		Signature:              sig,
+		SignBytes:              signBz,
+		VoteExtensionSignature: voteExtSig,
+		filePath:               signState.filePath,
+	}
+}
+
 // Save persists the FilePvLastSignState to its filePath.
-func (signState *SignState) save(jsonBytes []byte) {
-	outFile := signState.filePath
+// IMPORTANT: This method is not thread-safe and should only be called with a copy of the SignState.
+func saveSignState(ss *SignState) {
+	jsonBytes, err := cometjson.MarshalIndent(ss, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+	outFile := ss.filePath
 	if outFile == os.DevNull {
 		return
 	}
@@ -287,8 +304,7 @@ func (signState *SignState) save(jsonBytes []byte) {
 		panic("cannot save SignState: filePath not set")
 	}
 
-	err := tempfile.WriteFileAtomic(outFile, jsonBytes, 0600)
-	if err != nil {
+	if err := tempfile.WriteFileAtomic(outFile, jsonBytes, 0600); err != nil {
 		panic(err)
 	}
 }
@@ -399,9 +415,9 @@ func newSameHRSError(hrs HRSKey) *SameHRSError {
 	}
 }
 
-func (signState *SignState) GetErrorIfLessOrEqual(height int64, round int64, step int8) error {
+func (signState *SignState) lockedGetErrorIfLessOrEqual(height int64, round int64, step int8) error {
 	hrs := HRSKey{Height: height, Round: round, Step: step}
-	signStateHRS := signState.HRSKey()
+	signStateHRS := signState.lockedHrsKey()
 	if signStateHRS.GreaterThan(hrs) {
 		return errors.New("regression not allowed")
 	}
@@ -483,12 +499,7 @@ func LoadOrCreateSignState(filepath string) (*SignState, error) {
 		}
 		state.cond = cond.New(&state.mu)
 
-		jsonBytes, err := cometjson.MarshalIndent(state, "", "  ")
-		if err != nil {
-			panic(err)
-		}
-
-		state.save(jsonBytes)
+		saveSignState(state)
 		return state, nil
 	}
 
