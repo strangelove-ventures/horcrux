@@ -252,7 +252,7 @@ var (
 	failedSignVote = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "signer_total_failed_sign_vote",
-			Help: "Total Times Signer Failed to sign block - Unstarted and Unexepcted Height",
+			Help: "Total Times Signer Failed to sign block - Unstarted and Unexpected Height",
 		},
 		[]string{"chain_id"},
 	)
